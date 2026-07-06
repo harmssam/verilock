@@ -1,5 +1,6 @@
 import { Coins, Shield, Wallet } from 'lucide-react'
-import { formatSealFeeNim, getSealPricing } from './sealPricing'
+import { SealFeeAmount } from './SealFeeAmount'
+import { getSealPricing } from './sealPricing'
 import './NimiqSealInfo.css'
 
 export function NimiqSealInfo() {
@@ -58,10 +59,11 @@ export function NimiqSealInfo() {
           <div>
             <span className="nimiq-info-pricing-label">Seal fee</span>
             <div className="nimiq-info-pricing-amounts">
-              <span className="nimiq-info-pricing-current">{formatSealFeeNim(pricing.feeNim)}</span>
-              {pricing.promoActive && (
-                <span className="nimiq-info-pricing-was">{formatSealFeeNim(pricing.baseFeeNim)}</span>
-              )}
+              <SealFeeAmount
+                feeNim={pricing.feeNim}
+                baseFeeNim={pricing.baseFeeNim}
+                showWas={pricing.promoActive}
+              />
               <span className="nimiq-info-pricing-per">per document</span>
             </div>
           </div>

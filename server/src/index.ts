@@ -40,6 +40,7 @@ import {
   startAttestationPoller,
   submitAttestation,
 } from './attestations.js'
+import { getNimPrices } from './nimPrices.js'
 import { getSealPricing } from './sealPricing.js'
 
 assertSafeBootConfig()
@@ -106,6 +107,17 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/api/seal-pricing', (_req, res) => {
   res.json(getSealPricing())
+})
+
+app.get('/api/nim-prices', async (_req, res) => {
+  try {
+    const prices = await getNimPrices()
+    res.json(prices)
+  } catch (err) {
+    res.status(502).json({
+      error: err instanceof Error ? err.message : 'Could not fetch NIM prices',
+    })
+  }
 })
 
 app.post('/api/auth/challenge', authChallengeLimit, (req, res) => {
