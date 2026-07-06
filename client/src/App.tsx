@@ -1630,22 +1630,6 @@ export default function App() {
             link and send the same PDF file to other signers yourself (email, AirDrop, etc.).
           </p>
           <div className="field">
-            <label>Title</label>
-            <input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder={
-                docType === 'rental'
-                  ? '123 Main St — 12-month lease'
-                  : docType === 'nda'
-                    ? 'Project Falcon — mutual NDA'
-                    : docType === 'contract'
-                      ? 'Vendor services agreement'
-                      : 'Agreement title'
-              }
-            />
-          </div>
-          <div className="field">
             <label>Type</label>
             <select
               value={docType}
@@ -1661,6 +1645,22 @@ export default function App() {
               <option value="nda">NDA</option>
               <option value="other">Other</option>
             </select>
+          </div>
+          <div className="field">
+            <label>Title</label>
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder={
+                docType === 'rental'
+                  ? '123 Main St — 12-month lease'
+                  : docType === 'nda'
+                    ? 'Project Falcon — mutual NDA'
+                    : docType === 'contract'
+                      ? 'Vendor services agreement'
+                      : 'Agreement title'
+              }
+            />
           </div>
           {docType === 'rental' ? (
             <div className="field">
@@ -1735,8 +1735,9 @@ export default function App() {
                 maxLength={MAX_DOCUMENT_NOTES_LENGTH}
               />
               <span className="muted">
-                Saved with this agreement and visible to all signers. Summarize context only — do not paste
-                passwords, keys, or confidential document text.
+                {docNotes.length}/{MAX_DOCUMENT_NOTES_LENGTH} characters. Saved with this agreement and visible
+                to all signers. Summarize context only — do not paste passwords, keys, or confidential document
+                text.
               </span>
             </div>
           )}
