@@ -13,7 +13,7 @@ export function getDataDir(): string {
 }
 
 export function getDatabasePath(): string {
-  return process.env.DATABASE_PATH ?? join(getDataDir(), 'seal.db')
+  return process.env.DATABASE_PATH ?? join(getDataDir(), 'verilock.db')
 }
 
 export function getDocsDir(): string {

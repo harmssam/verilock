@@ -1,9 +1,9 @@
 import { Coins, Shield, Wallet } from 'lucide-react'
 import { SealFeeAmount } from './SealFeeAmount'
 import { getSealPricing } from './sealPricing'
-import './NimiqSealInfo.css'
+import './NimiqLockInfo.css'
 
-export function NimiqSealInfo() {
+export function NimiqLockInfo() {
   const pricing = getSealPricing()
 
   return (

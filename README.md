@@ -12,28 +12,6 @@ Built for the [Mini Apps Competition](https://miniappscompetition.com/).
 4. **Lock** — zero-fee Nimiq transaction anchors `seal:v1:lock:{docId}:{sha256}` on-chain
 5. **Verify** — anyone can upload a PDF or enter a doc ID to check integrity
 
-***REMOVED***
-
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-
-## GitHub
-
-Repository: **https://github.com/sharms/verilock**
-
-First-time setup (init git, create or rename the remote repo, push):
-
-***REMOVED***
-bash scripts/setup-github.sh
-***REMOVED***
-
-***REMOVED***
-
 ## Quick start (local)
 
 **Requirements:** Node.js 22+
@@ -63,16 +41,6 @@ VeriLock deploys as a **single service**: Express API + static client from one U
 ### 1. Create project
 
 ***REMOVED***
-
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
-
-***REMOVED***
-
-***REMOVED***
 ***REMOVED***
 ***REMOVED***
 ***REMOVED***
@@ -85,7 +53,7 @@ In the Railway dashboard:
 2. Mount path: `/data`
 3. Set environment variable: `DATA_DIR=/data`
 
-This keeps SQLite (`seal.db`) across deploys. PDF files are not stored — only document fingerprints and signing metadata.
+This keeps SQLite (`verilock.db`) across deploys. PDF files are not stored — only document fingerprints and signing metadata.
 
 ### 3. Environment variables
 
@@ -115,7 +83,7 @@ Or deploy via Docker:
 
 ***REMOVED***
 docker build -t verilock .
-docker run -p 3002:3002 -v seal-data:/data -e DATA_DIR=/data -e NODE_ENV=production verilock
+docker run -p 3002:3002 -v verilock-data:/data -e DATA_DIR=/data -e NODE_ENV=production verilock
 ***REMOVED***
 
 ### 5. Test production locally
@@ -161,6 +129,6 @@ Self-send transaction (`recipient = sender`, `value = 0`) — the locking wallet
 - [x] Nimiq Pay mini app (`@nimiq/mini-app-sdk`)
 - [x] NIM wallet interaction (`sign`, `sendBasicTransactionWithData`)
 - [x] Railway deploy config (volume, health check, monolith)
-- [ ] Public GitHub repo with OSS license
+- [x] Public GitHub repo with OSS license (MIT)
 - [ ] Live HTTPS demo on Railway
 - [ ] Nimiq wallet for prize payout
