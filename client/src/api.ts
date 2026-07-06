@@ -97,6 +97,15 @@ export const api = {
       promoEndsLabel: string | null
     }>('/api/seal-pricing'),
 
+  nimPrices: () =>
+    request<{
+      usd: number
+      eur: number
+      cad: number
+      lastUpdatedAt: number | null
+      source: 'coingecko'
+    }>('/api/nim-prices'),
+
   prepareLock: (token: string, docId: string, finalSha256: string) =>
     request<{
       document: SealDocument
