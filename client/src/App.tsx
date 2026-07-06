@@ -29,6 +29,7 @@ import { buildNimiqExplorerUrl } from './explorer'
 import {
   countActionable,
   isCollectingSignatures,
+  isDocumentCreator,
   isSealingPhase,
   isSigningComplete,
 } from './agreements'
@@ -331,14 +332,33 @@ export default function App() {
 
   const documentShareUrl = activeDoc ? `${appUrl}/d/${activeDoc.slug}` : ''
 
-  const copyDocumentShareLink = useCallback(async () => {
-    if (!documentShareUrl) return
+  const workflowShareDoc =
+    address && token
+      ? (() => {
+          if (activeDoc && isDocumentCreator(activeDoc, address) && isCollectingSignatures(activeDoc)) {
+            return activeDoc
+          }
+          return (
+            documents.find(
+              doc => isDocumentCreator(doc, address) && isCollectingSignatures(doc),
+            ) ?? null
+          )
+        })()
+      : null
+  const workflowShareUrl = workflowShareDoc ? `${appUrl}/d/${workflowShareDoc.slug}` : ''
+
+  const copyShareLink = useCallback(async (url: string) => {
+    if (!url) return
     if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(documentShareUrl)
+      await navigator.clipboard.writeText(url)
     }
     setShareLinkCopied(true)
     window.setTimeout(() => setShareLinkCopied(false), 2500)
-  }, [documentShareUrl])
+  }, [])
+
+  const copyDocumentShareLink = useCallback(async () => {
+    await copyShareLink(documentShareUrl)
+  }, [copyShareLink, documentShareUrl])
 
   const goToCreate = useCallback(() => {
     if (!token) return
@@ -379,6 +399,11 @@ export default function App() {
     setScreen('home')
     if (token) void refreshMe(token)
   }, [token, refreshMe])
+
+  const startOverWorkflow = useCallback(() => {
+    setActiveDoc(null)
+    goToCreate()
+  }, [goToCreate])
 
   const actionableAgreementCount = countActionable(documents, address)
   const walletConnecting = walletStatus !== null && !address
@@ -1370,6 +1395,11 @@ export default function App() {
             screen={screen}
             onConnect={() => void connectWallet()}
             walletConnecting={walletConnecting}
+            onStartOver={startOverWorkflow}
+            shareDoc={workflowShareDoc}
+            shareUrl={workflowShareUrl}
+            shareLinkCopied={shareLinkCopied}
+            onCopyShareLink={() => void copyShareLink(workflowShareUrl)}
           />
           <NimiqSealInfo />
         </>

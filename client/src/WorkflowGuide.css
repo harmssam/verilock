@@ -29,6 +29,11 @@
 }
 
 .workflow-now {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.55rem;
   margin: 0 0 1rem;
   padding: 0.55rem 0.75rem;
   border-radius: var(--radius-sm);
@@ -37,8 +42,24 @@
   font-size: 0.85rem;
 }
 
+.workflow-now p {
+  margin: 0;
+}
+
 .workflow-now strong {
   color: var(--mint);
+}
+
+.workflow-start-over {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.32rem 0.7rem;
+  font-size: 0.74rem;
+}
+
+.workflow-card--home .share-card--embedded {
+  margin: 0 0 1rem;
 }
 
 /* ── Home timeline ── */
