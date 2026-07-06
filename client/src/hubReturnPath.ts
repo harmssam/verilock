@@ -38,6 +38,10 @@ export function verifySlugFromPath(path: string): string | null {
   return path.match(/^\/v\/([^/]+)/)?.[1] ?? null
 }
 
+export function isAgreementsPath(path: string): boolean {
+  return /^\/agreements\/?$/.test(path)
+}
+
 export function resolveDocumentSlugFromLocation(pathname?: string): string | null {
   const path = pathname ?? (typeof window !== 'undefined' ? window.location.pathname : '')
   return documentSlugFromPath(path) ?? (readHubReturnPath() ? documentSlugFromPath(readHubReturnPath()!) : null)

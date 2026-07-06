@@ -24,8 +24,8 @@
 
 .brand-mark {
   flex-shrink: 0;
-  width: 3rem;
-  height: 3rem;
+  width: 3.5rem;
+  height: 3.5rem;
   object-fit: contain;
   filter: drop-shadow(0 4px 16px rgba(59, 130, 246, 0.28));
   transform: rotate(-4deg);
@@ -59,6 +59,64 @@
   color: var(--text-muted);
   font-size: 0.82rem;
   font-weight: 500;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
+
+.header-agreements-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(59, 130, 246, 0.32);
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--sky);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.header-agreements-link:hover {
+  background: rgba(37, 99, 235, 0.2);
+  border-color: rgba(125, 211, 252, 0.45);
+  color: var(--text);
+}
+
+.header-agreements-link--active {
+  background: rgba(94, 234, 212, 0.12);
+  border-color: rgba(94, 234, 212, 0.35);
+  color: var(--mint);
+}
+
+.header-agreements-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-brand);
+  color: #0d112e;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.agreements-page-link {
+  margin: -0.35rem 0 1.1rem;
+  font-size: 0.82rem;
+  text-align: center;
 }
 
 .wallet-pill {

@@ -1,3 +1,7 @@
+.agreements-panel--compact {
+  margin-bottom: 0.65rem;
+}
+
 .agreements-panel-header {
   display: flex;
   align-items: flex-start;

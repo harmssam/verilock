@@ -52,6 +52,7 @@ import {
 import {
   consumeHubReturnPath,
   documentSlugFromPath,
+  isAgreementsPath,
   readHubReturnPath,
   verifySlugFromPath,
 } from './hubReturnPath'
@@ -85,7 +86,7 @@ import {
 } from './WorkflowGuide'
 import './App.css'
 
-type Screen = 'home' | 'create' | 'document' | 'verify'
+type Screen = 'home' | 'agreements' | 'create' | 'document' | 'verify'
 
 const createServerBroadcastFallback: BroadcastFallbackFactory = sessionToken => {
   return async serializedTx => {
@@ -397,6 +398,13 @@ export default function App() {
 
   const goHome = useCallback(() => {
     setScreen('home')
+    window.history.pushState({}, '', '/')
+    if (token) void refreshMe(token)
+  }, [token, refreshMe])
+
+  const goAgreements = useCallback(() => {
+    setScreen('agreements')
+    window.history.pushState({}, '', '/agreements')
     if (token) void refreshMe(token)
   }, [token, refreshMe])
 
@@ -451,8 +459,9 @@ export default function App() {
             authScheme: 'hub',
           })
           applySession(result.token, verified.address)
-          await refreshMe(result.token)
+          const me = await refreshMe(result.token)
           setWalletStatus(null)
+          if (me.documents.length > 0 && screen !== 'document') goAgreements()
           return
         } catch (hubErr) {
           if (isPopupBlockedError(hubErr)) {
@@ -471,8 +480,9 @@ export default function App() {
       const verified = await api.verify(sessionToken, { publicKey, signature, authScheme: 'pay' })
       setNimiq(provider)
       applySession(sessionToken, verified.address)
-      await refreshMe(sessionToken)
+      const me = await refreshMe(sessionToken)
       setWalletStatus(null)
+      if (me.documents.length > 0 && screen !== 'document') goAgreements()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Wallet connection failed'
       if (isHubRedirectError(err)) {
@@ -1103,12 +1113,14 @@ export default function App() {
       }
 
       const sessionToken = loadSession()?.token ?? stored?.token ?? null
+      let bootDocumentCount = 0
       if (sessionToken) {
         try {
           const me = await api.me(sessionToken)
           if (cancelled) return
           applySession(sessionToken, me.address)
           setDocuments(me.documents)
+          bootDocumentCount = me.documents.length
         } catch {
           clearSession()
           setToken(null)
@@ -1142,6 +1154,11 @@ export default function App() {
         setVerifySlug(verifySlugFromUrl)
         setVerifyFromLink(true)
         pendingVerifyLookupRef.current = verifySlugFromUrl
+      } else if (isAgreementsPath(path)) {
+        setScreen('agreements')
+      } else if (sessionToken && bootDocumentCount > 0 && path === '/') {
+        setScreen('agreements')
+        window.history.replaceState({}, '', '/agreements')
       }
     }
 
@@ -1302,8 +1319,8 @@ export default function App() {
             className="brand-mark"
             src="/verilock-mark-96.png"
             alt=""
-            width={48}
-            height={48}
+            width={56}
+            height={56}
             decoding="async"
           />
           <div className="brand-text">
@@ -1312,9 +1329,25 @@ export default function App() {
           </div>
         </div>
         {address ? (
-          <span className="wallet-pill">
-            {address.slice(0, 8)}…{address.slice(-4)}
-          </span>
+          <div className="header-actions">
+            {documents.length > 0 && (
+              <button
+                type="button"
+                className={`header-agreements-link${screen === 'agreements' ? ' header-agreements-link--active' : ''}`}
+                onClick={goAgreements}
+              >
+                My agreements
+                {actionableAgreementCount > 0 && (
+                  <span className="header-agreements-badge" aria-label={`${actionableAgreementCount} need action`}>
+                    {actionableAgreementCount}
+                  </span>
+                )}
+              </button>
+            )}
+            <span className="wallet-pill">
+              {address.slice(0, 8)}…{address.slice(-4)}
+            </span>
+          </div>
         ) : (
           <button
             className={`btn btn-primary${walletConnecting ? ' btn--busy' : ''}`}
@@ -1346,7 +1379,10 @@ export default function App() {
       <PrivacyNotice />
 
       <div className="tabs">
-        <button className={`tab ${screen === 'home' ? 'active' : ''}`} onClick={() => goHome()}>
+        <button
+          className={`tab ${screen === 'agreements' ? 'active' : ''}`}
+          onClick={() => goAgreements()}
+        >
           <Files className="tab-icon" size={16} strokeWidth={2.25} aria-hidden />
           Agreements
           {actionableAgreementCount > 0 && (
@@ -1388,6 +1424,26 @@ export default function App() {
 
       {screen === 'home' ? (
         <>
+          {token && documents.length > 0 && (
+            <AgreementsPanel
+              documents={documents}
+              address={address}
+              activeDocId={activeDoc?.id}
+              compact
+              onOpen={openDocument}
+              onSeal={slug => void triggerSeal(slug)}
+              onCreateNew={goToCreate}
+            />
+          )}
+          {token && documents.length > 0 && (
+            <p className="agreements-page-link muted">
+              <TextLink onClick={goAgreements}>Open full agreements page</TextLink>
+              {' · '}
+              {actionableAgreementCount > 0
+                ? `${actionableAgreementCount} need${actionableAgreementCount === 1 ? 's' : ''} your action`
+                : `${documents.length} total`}
+            </p>
+          )}
           <WorkflowGuide
             hasWallet={Boolean(token)}
             address={address}
@@ -1403,7 +1459,7 @@ export default function App() {
           />
           <NimiqLockInfo />
         </>
-      ) : screen !== 'document' && screen !== 'verify' ? (
+      ) : screen === 'create' ? (
         <>
           <WorkflowProgress current={workflowStep} role={workflowRole} />
           <WorkflowGuide
@@ -1417,7 +1473,7 @@ export default function App() {
         </>
       ) : null}
 
-      {screen !== 'home' && screen !== 'document' && screen !== 'verify' && (
+      {screen === 'create' && (
         <WorkflowNextAction
           hasWallet={Boolean(token)}
           address={address}
@@ -1457,22 +1513,37 @@ export default function App() {
         </div>
       )}
 
-      {screen === 'home' && (
+      {screen === 'agreements' && (
         <>
           {!token ? (
             <div className="card">
               <h2>Your agreements</h2>
               <p className="muted">Connect wallet to view and manage your agreements.</p>
+              <button
+                type="button"
+                className={`btn btn-primary${walletConnecting ? ' btn--busy' : ''}`}
+                onClick={() => void connectWallet()}
+                disabled={busy}
+                style={{ marginTop: '0.75rem' }}
+              >
+                {walletConnecting ? 'Connecting…' : 'Connect wallet'}
+              </button>
             </div>
           ) : (
-            <AgreementsPanel
-              documents={documents}
-              address={address}
-              activeDocId={activeDoc?.id}
-              onOpen={openDocument}
-              onSeal={slug => void triggerSeal(slug)}
-              onCreateNew={goToCreate}
-            />
+            <>
+              <AgreementsPanel
+                documents={documents}
+                address={address}
+                activeDocId={activeDoc?.id}
+                onOpen={openDocument}
+                onSeal={slug => void triggerSeal(slug)}
+                onCreateNew={goToCreate}
+              />
+              <p className="agreements-page-link muted">
+                New here?{' '}
+                <TextLink onClick={goHome}>See how VeriLock works</TextLink>
+              </p>
+            </>
           )}
         </>
       )}

@@ -165,11 +165,18 @@
   line-height: 1.3;
 }
 
-.workflow-step-login {
-  padding: 0.28rem 0.65rem;
-  font-size: 0.72rem;
+.btn.workflow-step-login {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.2;
   border-radius: var(--radius-pill);
-  box-shadow: 0 2px 10px rgba(94, 234, 212, 0.25);
+  box-shadow: 0 1px 5px rgba(94, 234, 212, 0.2);
+}
+
+.btn.workflow-step-login.btn--busy {
+  min-width: 0;
+  gap: 0.3rem;
 }
 
 .workflow-step-body .muted {
