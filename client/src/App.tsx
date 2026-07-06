@@ -1202,7 +1202,7 @@ export default function App() {
           />
           <div className="brand-text">
             <h1>VeriLock</h1>
-            <p>Sign it. Lock it. Prove it. Your PDF stays on your device.</p>
+            <p>Sign together. Prove forever.</p>
           </div>
         </div>
         {address ? (

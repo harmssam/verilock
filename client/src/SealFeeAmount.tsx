@@ -36,7 +36,9 @@ export function SealFeeAmount({ feeNim, baseFeeNim, showWas = false, className }
       <span className="seal-fee-amount-nim">{formatSealFeeNim(feeNim)}</span>
       {fiatAmount != null && (
         <span className="seal-fee-amount-fiat">
-          <span className="seal-fee-amount-fiat-value">≈ {formatFiatAmount(fiatAmount, currency)}</span>
+          <span className="seal-fee-amount-fiat-value">
+            ≈ {formatFiatAmount(fiatAmount, currency)} (est.)
+          </span>
           <select
             className="seal-fee-amount-currency"
             value={currency}
@@ -55,7 +57,9 @@ export function SealFeeAmount({ feeNim, baseFeeNim, showWas = false, className }
         <span className="seal-fee-amount-was">
           <span className="seal-fee-amount-was-nim">{formatSealFeeNim(baseFeeNim)}</span>
           {baseFiatAmount != null && (
-            <span className="seal-fee-amount-was-fiat">≈ {formatFiatAmount(baseFiatAmount, currency)}</span>
+            <span className="seal-fee-amount-was-fiat">
+              ≈ {formatFiatAmount(baseFiatAmount, currency)} (est.)
+            </span>
           )}
         </span>
       )}
