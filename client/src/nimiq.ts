@@ -8,7 +8,7 @@ import {
   type HubLockRedirectResult,
 } from './hubSealRedirect'
 import { saveHubReturnPath } from './hubReturnPath'
-import { clearStaleHubRpcState, getHubReturnUrl } from './hubRedirectParse'
+import { clearStaleHubRpcStateIfIdle, getHubReturnUrl } from './hubRedirectParse'
 import { peekHubRedirectInUrl, RPC_ID_SEARCH_PARAM } from './sealRecovery'
 import { sealError, sealLog, sealWarn } from './sealDebug'
 import { getSealFeeLuna } from './sealPricing'
@@ -123,9 +123,11 @@ function hubRedirectBehavior(localState: Record<string, unknown>) {
   return new RedirectRequestBehavior(getHubReturnUrl(), localState)
 }
 
-/** Hub redirect is fragile in Safari and some privacy browsers — use only when requested. */
-export function shouldUseHubRedirect(options?: { useRedirect?: boolean }): boolean {
-  return options?.useRedirect === true
+/** Hub redirect is the supported desktop flow; popup is opt-in only. */
+export function shouldUseHubRedirect(options?: { useRedirect?: boolean; usePopup?: boolean }): boolean {
+  if (options?.usePopup === true) return false
+  if (options?.useRedirect === false) return false
+  return true
 }
 
 export const HUB_REDIRECT_MESSAGE = 'Redirecting to Nimiq Hub…'
@@ -637,9 +639,11 @@ export async function connectViaHub(
 }> {
   const hub = getHubApi()
 
-  if (options?.preferRedirect) {
-    clearStaleHubRpcState()
+  const preferRedirect = options?.preferRedirect ?? true
+  if (preferRedirect) {
+    clearStaleHubRpcStateIfIdle()
     saveHubReturnPath()
+    sealLog('hub:redirectChooseAddress', { returnUrl: getHubReturnUrl() })
     const behavior = hubRedirectBehavior({ flow: 'login' })
     await hub.chooseAddress(
       { appName: APP_NAME },
@@ -649,7 +653,8 @@ export async function connectViaHub(
   }
 
   try {
-    clearStaleHubRpcState()
+    clearStaleHubRpcStateIfIdle()
+    sealLog('hub:popupChooseAddress')
     const chosen = await hub.chooseAddress({ appName: APP_NAME })
     const address = chosen.address
     const { token, nonce } = await getChallenge(address)
@@ -800,8 +805,9 @@ export async function sendLockAttestationViaHub(
     docId,
   }
 
-  if (options?.preferRedirect) {
-    clearStaleHubRpcState()
+  const preferRedirect = options?.preferRedirect ?? true
+  if (preferRedirect) {
+    clearStaleHubRpcStateIfIdle()
     saveHubReturnPath()
     const behavior = hubRedirectBehavior(lockState)
     await hub.signTransaction(
@@ -812,7 +818,8 @@ export async function sendLockAttestationViaHub(
   }
 
   try {
-    clearStaleHubRpcState()
+    clearStaleHubRpcStateIfIdle()
+    sealLog('hub:popupSignTransaction', { docId })
     const signed = await hub.signTransaction(request)
     const txHash = await finalizeHubLockTransaction(signed as SignedTransaction, {
       hubBroadcast: false,

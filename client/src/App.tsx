@@ -14,7 +14,6 @@ import {
   isNimiqPayHost,
   peekHubRedirectInUrl,
   isPopupBlockedError,
-  popupBlockedHelp,
   probeNimiqPay,
   ensureNimiqProvider,
   sendLockAttestation,
@@ -45,10 +44,9 @@ import {
   shouldShowStaleSealNotice,
   staleSealNoticeFor,
 } from './sealFlow'
-import { clearStaleHubRpcState } from './hubRedirectParse'
+import { clearStaleHubRpcStateIfIdle, hasPendingHubRedirect } from './hubRedirectParse'
 import {
   clearSealInFlight,
-  hasHubReturnSignal,
   loadSealInFlight,
   pruneExpiredSealInFlight,
   RPC_ID_SEARCH_PARAM,
@@ -282,6 +280,7 @@ export default function App() {
   const pendingCreateScrollRef = useRef(false)
   const pendingSealSlugRef = useRef<string | null>(null)
   const sealInFlightRef = useRef(false)
+  const hubConnectInFlightRef = useRef(false)
   const workflowRole = resolveRole({
     hasWallet: Boolean(token),
     address,
@@ -487,6 +486,10 @@ export default function App() {
     isMobileDevice() && !inNimiqPay && !isNimiqPayHost() && !address
 
   const connectWallet = async (options?: { useRedirect?: boolean; usePopup?: boolean }) => {
+    if (hubConnectInFlightRef.current || peekHubRedirectInUrl() || hasPendingHubRedirect()) {
+      setWalletStatus(HUB_REDIRECT_MESSAGE)
+      return
+    }
     setBusy(true)
     setError(null)
     setShowOpenInPay(false)
@@ -496,7 +499,7 @@ export default function App() {
       setWalletStatus(
         payHost
           ? 'Waiting for Nimiq Pay wallet… approve the dialog when it appears.'
-          : 'Opening Nimiq Hub…',
+          : 'Redirecting to Nimiq Hub…',
       )
 
       // window.nimiq may lag behind window.nimiqPay inside the Nimiq Pay WebView.
@@ -516,7 +519,20 @@ export default function App() {
         if (isMobileDevice() && !shouldUseHubRedirect(options)) {
           setWalletStatus('Opening Nimiq Pay…')
           const payResult = launchNimiqPayMiniApp(appUrl)
-          if (payResult === 'launched' || payResult === 'already-in-pay') return
+          if (payResult === 'already-in-pay') return
+          if (payResult === 'launched') {
+            setWalletStatus(null)
+            window.setTimeout(() => {
+              if (document.visibilityState !== 'visible') return
+              if (loadSession()?.token) return
+              setShowOpenInPay(true)
+              setError(
+                'Install Nimiq Pay on your phone, then open VeriLock from the app — or use the options below.',
+              )
+              scrollToConnectPanel()
+            }, 2500)
+            return
+          }
           setShowOpenInPay(true)
           setWalletStatus(null)
           setError(
@@ -526,42 +542,10 @@ export default function App() {
           return
         }
 
+        hubConnectInFlightRef.current = true
         const preferRedirect = shouldUseHubRedirect(options)
-        if (preferRedirect) {
-          setWalletStatus('Redirecting to Nimiq Hub…')
-          await connectViaHub(async addr => api.challenge(addr), { preferRedirect: true })
-          return
-        }
-
-        try {
-          setWalletStatus('Opening Nimiq Hub popup… allow pop-ups if prompted.')
-          const result = await connectViaHub(async addr => api.challenge(addr))
-          const verified = await api.verify(result.token, {
-            publicKey: result.publicKey,
-            signature: result.signature,
-            authScheme: 'hub',
-          })
-          applySession(result.token, verified.address)
-          const me = await refreshMe(result.token)
-          setWalletStatus(null)
-          if (me.documents.length > 0 && screen !== 'document') goAgreements()
-          else if (me.documents.length === 0 && screen === 'home') goToCreate()
-          return
-        } catch (hubErr) {
-          if (isPopupBlockedError(hubErr)) {
-            setShowOpenInPay(true)
-            scrollToConnectPanel()
-            throw new Error(popupBlockedHelp())
-          }
-          const hubMessage = hubErr instanceof Error ? hubErr.message : String(hubErr)
-          if (/invalid request/i.test(hubMessage)) {
-            throw new Error(
-              'Nimiq Hub rejected the connection. Use "Continue via Hub redirect" below, ' +
-                'or disable other wallet browser extensions (e.g. MetaMask) on this site.',
-            )
-          }
-          throw hubErr
-        }
+        await connectViaHub(async addr => api.challenge(addr), { preferRedirect })
+        return
       }
 
       setWalletStatus('Approve account access in Nimiq Pay…')
@@ -583,10 +567,13 @@ export default function App() {
         setWalletStatus(HUB_REDIRECT_MESSAGE)
         return
       }
+      hubConnectInFlightRef.current = false
       setError(message)
       setWalletStatus(null)
     } finally {
-      setBusy(false)
+      if (!hubConnectInFlightRef.current) {
+        setBusy(false)
+      }
     }
   }
 
@@ -1079,9 +1066,7 @@ export default function App() {
         rpcId: new URLSearchParams(window.location.search).get('rpcId'),
       })
 
-      if (!hasHubReturnSignal()) {
-        clearStaleHubRpcState()
-      }
+      clearStaleHubRpcStateIfIdle()
 
       // Process Hub hash before any replaceState — wiping the URL loses the redirect response.
       const hubRedirectSetup = await setupHubRedirectHandlers(
@@ -1103,10 +1088,12 @@ export default function App() {
             setAddress(null)
             setError(err instanceof Error ? err.message : 'Hub redirect login failed')
           } finally {
+            hubConnectInFlightRef.current = false
             setBusy(false)
           }
         },
         err => {
+          hubConnectInFlightRef.current = false
           setError(err.message)
           setBusy(false)
         },
@@ -2233,7 +2220,6 @@ export default function App() {
               sealFundsError={sealFundsError}
               onRefreshFunds={() => void refreshSealFunds()}
               onSeal={() => void triggerSeal()}
-              onSealRedirect={() => void lockDocument({ useRedirect: true })}
             />
           )}
 
