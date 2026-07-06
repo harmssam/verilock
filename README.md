@@ -133,4 +133,4 @@ Self-send transaction (`recipient = sender`, `value = 0`) — the locking wallet
 - [x] Railway deploy config (volume, health check, monolith)
 - [x] Public GitHub repo with OSS license (MIT)
 - [x] Live HTTPS demo on Railway — [https://verilock.online/](https://verilock.online/)
-- [x] Nimiq wallet for prize payout — `NQ81 5N9J RGBJ MLJQ NBKE MQ1R D27T XS8P CVKA` (same wallet that receives seal fees)
+- [x] Nimiq wallet for prize payout — `NQ81 5N9J RGBJ MLJQ NBKE MQ1R D27T XS8P CVKA`
