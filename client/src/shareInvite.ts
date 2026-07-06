@@ -1,6 +1,18 @@
 import { formatPartyRole } from './signing'
 import type { RentalMetadata, SealDocument } from './types'
 
+export interface ShareInviteContent {
+  subject: string
+  title: string
+  shareUrl: string
+  pdfName: string
+  signed: number
+  required: number
+  waitingOn: string[]
+  rentalLines: string[]
+  signingSteps: string[]
+}
+
 function pendingPartyLabels(doc: SealDocument): string[] {
   return doc.parties
     .filter(party => party.required && party.status !== 'signed')
@@ -24,39 +36,57 @@ function rentalDetailLines(metadata: RentalMetadata | null): string[] {
   return lines
 }
 
-export function buildShareEmailBody(doc: SealDocument, shareUrl: string): string {
+export function buildShareInviteContent(doc: SealDocument, shareUrl: string): ShareInviteContent {
   const waitingOn = pendingPartyLabels(doc)
   const rentalLines = doc.type === 'rental' ? rentalDetailLines(doc.metadata as RentalMetadata) : []
   const pdfName = doc.originalFilename ?? 'the agreement PDF'
 
+  return {
+    subject: `Please sign: ${doc.title}`,
+    title: doc.title,
+    shareUrl,
+    pdfName,
+    signed: doc.signingProgress.signed,
+    required: doc.signingProgress.required,
+    waitingOn,
+    rentalLines,
+    signingSteps: [
+      'Open the signing link in your browser',
+      'Connect a Nimiq wallet',
+      `Choose ${pdfName} on your computer and confirm it matches`,
+      'Enter your name, draw your signature, and submit',
+    ],
+  }
+}
+
+export function buildShareEmailBody(doc: SealDocument, shareUrl: string): string {
+  const content = buildShareInviteContent(doc, shareUrl)
+
   const lines = [
     'Hi,',
     '',
-    `You're invited to sign "${doc.title}" on VeriLock.`,
+    `You're invited to sign "${content.title}" on VeriLock.`,
     '',
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
     '  SIGNING LINK',
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    shareUrl,
+    content.shareUrl,
     '',
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
     '  ATTACH THE PDF (required)',
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    `Attach this exact file to your email: ${pdfName}`,
+    `Attach this exact file to your email: ${content.pdfName}`,
     '',
     'VeriLock never hosts your PDF. The signer must receive the same file you fingerprinted so they can verify it locally.',
     '',
     'How to sign:',
-    '1. Open the signing link above in your browser',
-    '2. Connect a Nimiq wallet',
-    `3. Choose ${pdfName} on your computer and confirm it matches`,
-    '4. Enter your name, draw your signature, and submit',
+    ...content.signingSteps.map((step, index) => `${index + 1}. ${step}`),
     '',
     'Agreement details:',
-    `• Title: ${doc.title}`,
-    `• Signatures: ${doc.signingProgress.signed}/${doc.signingProgress.required} collected`,
-    ...rentalLines.map(line => `• ${line}`),
-    ...(waitingOn.length > 0 ? [`• Still waiting on: ${waitingOn.join(', ')}`] : []),
+    `• Title: ${content.title}`,
+    `• Signatures: ${content.signed}/${content.required} collected`,
+    ...content.rentalLines.map(line => `• ${line}`),
+    ...(content.waitingOn.length > 0 ? [`• Still waiting on: ${content.waitingOn.join(', ')}`] : []),
     '',
     '—',
     'VeriLock · Sign together. Prove forever.',
@@ -66,7 +96,7 @@ export function buildShareEmailBody(doc: SealDocument, shareUrl: string): string
 }
 
 export function buildShareMailtoUrl(doc: SealDocument, shareUrl: string): string {
-  const subject = `Please sign: ${doc.title}`
+  const content = buildShareInviteContent(doc, shareUrl)
   const body = buildShareEmailBody(doc, shareUrl)
-  return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  return `mailto:?subject=${encodeURIComponent(content.subject)}&body=${encodeURIComponent(body)}`
 }

@@ -1,5 +1,6 @@
-import { Check, LoaderCircle, Sparkles } from 'lucide-react'
+import { Check, LoaderCircle, RotateCcw, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { ShareInviteCard } from './ShareInviteCard'
 import { normalizeAddress } from './addresses'
 import { formatSealFeeSummary } from './sealPricing'
 import { TextLink } from './TextLink'
@@ -318,6 +319,11 @@ interface WorkflowGuideProps {
   onGoCreate?: () => void
   onConnect?: () => void
   walletConnecting?: boolean
+  onStartOver?: () => void
+  shareDoc?: SealDocument | null
+  shareUrl?: string
+  shareLinkCopied?: boolean
+  onCopyShareLink?: () => void
 }
 
 export function WorkflowGuide({
@@ -329,6 +335,11 @@ export function WorkflowGuide({
   onGoCreate,
   onConnect,
   walletConnecting,
+  onStartOver,
+  shareDoc,
+  shareUrl = '',
+  shareLinkCopied,
+  onCopyShareLink,
 }: WorkflowGuideProps) {
   const role = resolveRole({ hasWallet, address: address ?? null, activeDoc, screen })
   const steps = getStepsForRole(role)
@@ -364,9 +375,27 @@ export function WorkflowGuide({
         <p className="workflow-intro">{intro}</p>
       </div>
 
-      <p className="workflow-now muted">
-        You&apos;re on <strong>step {currentIndex + 1}</strong> — {steps[currentIndex]?.title}
-      </p>
+      <div className="workflow-now muted">
+        <p>
+          You&apos;re on <strong>step {currentIndex + 1}</strong> — {steps[currentIndex]?.title}
+        </p>
+        {current === 'verify' && onStartOver && (
+          <button type="button" className="btn btn-secondary workflow-start-over" onClick={onStartOver}>
+            <RotateCcw size={14} strokeWidth={2.25} aria-hidden />
+            Start over
+          </button>
+        )}
+      </div>
+
+      {current === 'share' && shareDoc && shareUrl && onCopyShareLink && (
+        <ShareInviteCard
+          document={shareDoc}
+          shareUrl={shareUrl}
+          linkCopied={Boolean(shareLinkCopied)}
+          onCopyLink={onCopyShareLink}
+          embedded
+        />
+      )}
 
       <ol className="workflow-timeline" aria-label="Signing workflow">
         {steps.map((step, index) => {

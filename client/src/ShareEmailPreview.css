@@ -1,0 +1,161 @@
+.share-email-preview-card {
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(192, 132, 252, 0.28);
+  background: linear-gradient(160deg, rgba(20, 13, 46, 0.95), rgba(10, 6, 24, 0.98));
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.share-email-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--gradient-brand);
+  color: #0a0618;
+}
+
+.share-email-preview-brand {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.share-email-preview-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: rgba(10, 6, 24, 0.18);
+}
+
+.share-email-preview-greeting,
+.share-email-preview-lead,
+.share-email-preview-section,
+.share-email-preview-footer {
+  margin: 0;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.share-email-preview-greeting {
+  margin-top: 0.9rem;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.share-email-preview-lead {
+  margin-top: 0.35rem;
+  margin-bottom: 0.85rem;
+  color: var(--text);
+  line-height: 1.45;
+  font-size: 0.9rem;
+}
+
+.share-email-preview-section {
+  margin-bottom: 0.85rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.share-email-preview-section h4 {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--violet);
+}
+
+.share-email-preview-section--link {
+  background: rgba(94, 234, 212, 0.06);
+}
+
+.share-email-preview-section--pdf {
+  background: rgba(251, 113, 133, 0.06);
+}
+
+.share-email-preview-section--pdf h4 {
+  color: var(--coral);
+}
+
+.share-email-preview-url {
+  display: block;
+  word-break: break-all;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--mint);
+  text-decoration: none;
+}
+
+.share-email-preview-url:hover {
+  text-decoration: underline;
+}
+
+.share-email-preview-pdf {
+  padding: 0.12rem 0.4rem;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+  font-size: 0.82em;
+  color: var(--text);
+}
+
+.share-email-preview-note {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.share-email-preview-steps {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.share-email-preview-details {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.share-email-preview-details li {
+  display: grid;
+  grid-template-columns: minmax(4.5rem, 30%) 1fr;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.share-email-preview-details span {
+  color: var(--text-dim);
+}
+
+.share-email-preview-details strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.share-email-preview-footer {
+  padding-top: 0.55rem;
+  padding-bottom: 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+
+.share-email-preview-card--compact .share-email-preview-lead,
+.share-email-preview-card--compact .share-email-preview-section {
+  font-size: 0.84rem;
+}
