@@ -145,7 +145,9 @@ export function AgreementsPanel({
                 <li key={doc.id}>{renderItem(doc)}</li>
               ))}
             </ul>
-            {hidden > 0 && <p className="muted agreement-group-more">+{hidden} more in this section on Home</p>}
+            {hidden > 0 && (
+              <p className="muted agreement-group-more">+{hidden} more in this section on Agreements</p>
+            )}
           </section>
         )
       })}
