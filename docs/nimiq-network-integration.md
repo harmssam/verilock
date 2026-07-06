@@ -31,7 +31,7 @@ Individual RPC method pages (e.g. `getTransactionByHash`) are listed on the meth
 
 ## Architecture overview
 
-***REMOVED***
+```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         VeriLock (browser + Express)                       │
 │  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐ │
@@ -58,7 +58,7 @@ Individual RPC method pages (e.g. `getTransactionByHash`) are listed on the meth
            │                                                        │
            └──────────────── broadcast ────────────────────────────┘
                                     Nimiq blockchain (Albatross)
-***REMOVED***
+```
 
 **Data flow summary**
 
@@ -78,11 +78,11 @@ VeriLock picks a mode at runtime (`getWalletMode()` in `client/src/nimiq.ts`):
 | **Nimiq Pay** (`nimiq-pay`) | `window.nimiqPay` and/or `window.nimiq` after `init()` | [@nimiq/mini-app-sdk](https://www.nimiq.dev/mini-apps/api-reference/nimiq-provider) | Mini app inside Nimiq Pay; mobile deeplink |
 | **Hub** (`hub`) | Default when not in Pay host | [@nimiq/hub-api](https://www.nimiq.dev/hub) → `https://hub.nimiq.com` | Desktop browser, popup or full-page redirect |
 
-***REMOVED***ts
+```ts
 // client/src/nimiq.ts — getWalletMode()
 if (isNimiqPayHost() || window.nimiq) return 'nimiq-pay'
 return 'hub'
-***REMOVED***
+```
 
 **Opening in Nimiq Pay:** `nimiqpay://miniapp?url=<origin>` ([Mini Apps — Sharing](https://www.nimiq.dev/mini-apps)). VeriLock only assigns this scheme on mobile (`launchNimiqPayMiniApp`).
 
@@ -101,9 +101,9 @@ VeriLock uses a **challenge–response** pattern recommended for third-party Hub
 
 Hub messages use the Keyguard prefix documented in the [transactions guide — Message Prefixing](https://www.nimiq.dev/hub/guide/transactions#message-prefixing):
 
-***REMOVED***
+```
 sign(sha256(`\x16Nimiq Signed Message:\n${message.length}${message}`))
-***REMOVED***
+```
 
 Pay path passes the raw nonce to RPC `verifySignature` with `isHex: true` (Nimiq Pay `sign()` returns hex `publicKey` and `signature`).
 
@@ -176,12 +176,12 @@ Built identically on client and server (`buildAttestationPayloadBytes`):
 
 **Total: 37 bytes** (under the 64-byte basic-tx data limit).
 
-***REMOVED***ts
+```ts
 // client/src/nimiq.ts — buildAttestationPayloadBytes()
 payload[0] = ATTESTATION_PAYLOAD_VERSION // 1
 // bytes 1–4: docShortId(docId) — 4 bytes from first 8 hex chars of UUID
 // bytes 5–36: finalSha256 as 32 bytes
-***REMOVED***
+```
 
 Legacy UTF-8 format `seal:v1:lock:{shortId}:{sha256}` is still accepted when verifying old txs (`parseAttestationPayload` / `verifyAttestationPayload` in `server/src/nimiq-rpc.ts`).
 
@@ -192,7 +192,7 @@ Legacy UTF-8 format `seal:v1:lock:{shortId}:{sha256}` is still accepted when ver
 
 VeriLock uses **`hub.checkout()`** for lock ([API reference — checkout](https://www.nimiq.dev/hub/api-reference#checkout), [transactions guide](https://www.nimiq.dev/hub/guide/transactions#checkout)). Hub signs **and broadcasts** the transaction.
 
-***REMOVED***ts
+```ts
 // client/src/nimiq.ts — buildHubLockCheckoutRequest()
 {
   appName: APP_NAME,
@@ -204,7 +204,7 @@ VeriLock uses **`hub.checkout()`** for lock ([API reference — checkout](https:
   extraData: buildAttestationPayloadBytes(docId, finalSha256),
   validityDuration: 120,
 }
-***REMOVED***
+```
 
 Default recipient: Nimiq Foundation (`NQ09VF5Y1PKVMRM45LE155KVP6R2GXYJXYQF`), overridable via `VITE_ATTESTATION_RECIPIENT` / `ATTESTATION_RECIPIENT`.
 
@@ -226,14 +226,14 @@ Hub’s request parser rejects **value 0**. The 1-luna payment (~0.00001 NIM) go
 
 ### Nimiq Pay: zero-value self-send
 
-***REMOVED***ts
+```ts
 // client/src/nimiq.ts — sendLockAttestation()
 await nimiq.sendBasicTransactionWithData({
   recipient: address,
   value: 0,
   data: buildAttestationPayload(docId, finalSha256), // hex string
 })
-***REMOVED***
+```
 
 Maps to [`sendBasicTransactionWithData`](https://www.nimiq.dev/mini-apps/api-reference/nimiq-provider#sendbasictransactionwithdata). Nimiq Pay signs, sends, and returns the **transaction hash**. Fee is chosen by the wallet (often 0).
 
@@ -245,7 +245,7 @@ Maps to [`sendBasicTransactionWithData`](https://www.nimiq.dev/mini-apps/api-ref
 
 **Legacy `signTransaction` relay:** Used only for older in-flight redirect responses.
 
-***REMOVED***
+```
 finalizeHubLockTransaction()
   ├─ hubBroadcast (checkout)? → wait up to 30s → proceed with hash either way
   └─ relaySignedTransaction()  [SIGN_TRANSACTION fallback]
@@ -253,7 +253,7 @@ finalizeHubLockTransaction()
         ├─ broadcastRawTransaction (preferServer → POST /api/transactions/broadcast)
         ├─ wait up to 20s (RELAY_NETWORK_SOFT_WAIT_MS)
         └─ if broadcast attempted but not visible → proceed with hash anyway
-***REMOVED***
+```
 
 | Layer | Method | File |
 |-------|--------|------|
@@ -268,9 +268,9 @@ Lookups use `getTransactionByHash`, then `getTransactionFromMempool` if not foun
 
 **Server broadcast fallback** is wired per session token in `App.tsx`:
 
-***REMOVED***ts
+```ts
 createServerBroadcastFallback(token) → api.broadcastTransaction(token, serializedTx)
-***REMOVED***
+```
 
 **Typical timing:** Hub sign ~10–30s (user) + network visibility ~5–30s + block confirmation ~30–90s → **~1–2 minutes** total when the wallet is funded.
 
