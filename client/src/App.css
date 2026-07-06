@@ -139,6 +139,16 @@
   margin-bottom: 0.35rem;
 }
 
+.hash-chip.text-link,
+a.hash-chip.text-link {
+  color: inherit;
+}
+
+a.hash-chip.text-link:hover,
+a.hash-chip.text-link:focus-visible {
+  color: var(--mint);
+}
+
 .all-signed-note {
   color: var(--mint);
   font-weight: 600;
