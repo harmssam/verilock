@@ -22,6 +22,7 @@ import {
   addSignature,
   beginLock,
   createDocument,
+  deleteDocument,
   getDocumentPublic,
   getMyDocuments,
   prepareLock,
@@ -234,6 +235,19 @@ app.get('/api/documents/:id', (req, res) => {
   res.json({ document: doc })
 })
 
+app.delete('/api/documents/:id', docLimit, authMiddleware, requireVerifiedWallet, (req, res) => {
+  const address = res.locals.address as string
+  try {
+    deleteDocument(req.params.id!, address)
+    res.json({ ok: true })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Delete failed'
+    const status =
+      message === 'Only the creator can delete this agreement' ? 403 : message === 'Document not found' ? 404 : 400
+    res.status(status).json({ error: message })
+  }
+})
+
 app.post('/api/documents/:id/signatures', docLimit, authMiddleware, requireVerifiedWallet, (req, res) => {
   const { partyId, signatureType, clientSha256, displayName, signatureImage } = req.body as {
     partyId?: string
@@ -382,6 +396,7 @@ app.get('/api/verify/:idOrSlug', (req, res) => {
     title: doc.title,
     originalFilename: doc.originalFilename,
     status: doc.status,
+    creatorAddress: doc.creatorAddress,
     originalSha256: doc.originalSha256,
     finalSha256: doc.finalSha256,
     createdAt: doc.createdAt,

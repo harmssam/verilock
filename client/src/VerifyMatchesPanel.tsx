@@ -1,3 +1,5 @@
+import { Trash2 } from 'lucide-react'
+import { canDeleteDocument } from './agreements'
 import { SignaturesPanel } from './SignaturesPanel'
 import type { VerifyResult } from './types'
 import './VerifyMatchesPanel.css'
@@ -14,9 +16,19 @@ interface VerifyMatchesPanelProps {
   matches: VerifyResult[]
   appUrl: string
   highlightSlug?: string | null
+  walletAddress?: string | null
+  deletingId?: string | null
+  onDelete?: (match: VerifyResult) => void
 }
 
-export function VerifyMatchesPanel({ matches, appUrl, highlightSlug }: VerifyMatchesPanelProps) {
+export function VerifyMatchesPanel({
+  matches,
+  appUrl,
+  highlightSlug,
+  walletAddress = null,
+  deletingId = null,
+  onDelete,
+}: VerifyMatchesPanelProps) {
   if (matches.length === 0) return null
 
   return (
@@ -29,6 +41,7 @@ export function VerifyMatchesPanel({ matches, appUrl, highlightSlug }: VerifyMat
       <ul className="verify-matches-list">
         {matches.map(match => {
           const highlighted = highlightSlug === match.slug
+          const deletable = canDeleteDocument(match, walletAddress)
           return (
             <li
               key={match.id}
@@ -70,6 +83,29 @@ export function VerifyMatchesPanel({ matches, appUrl, highlightSlug }: VerifyMat
               </dl>
               {match.signatures.length > 0 && (
                 <SignaturesPanel signatures={match.signatures} parties={match.parties} compact />
+              )}
+              {deletable && onDelete && (
+                <div className="verify-match-actions">
+                  <button
+                    type="button"
+                    className={`btn btn-danger verify-match-delete${deletingId === match.id ? ' btn--busy' : ''}`}
+                    disabled={Boolean(deletingId)}
+                    aria-busy={deletingId === match.id}
+                    onClick={() => onDelete(match)}
+                  >
+                    {deletingId === match.id ? (
+                      'Deleting…'
+                    ) : (
+                      <>
+                        <Trash2 size={16} strokeWidth={2.25} aria-hidden />
+                        Delete agreement
+                      </>
+                    )}
+                  </button>
+                  <p className="muted verify-match-delete-hint">
+                    You created this agreement and it is not sealed yet. Deletion cannot be undone.
+                  </p>
+                </div>
               )}
             </li>
           )

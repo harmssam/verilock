@@ -1,5 +1,6 @@
 import { v4 as uuid } from 'uuid'
 import {
+  deleteDocumentById,
   getDocumentById,
   getDocumentBySlug,
   getPartiesForDocument,
@@ -402,4 +403,21 @@ export function getDocumentPublic(idOrSlug: string) {
   const doc = getDocumentById(idOrSlug) ?? getDocumentBySlug(idOrSlug)
   if (!doc) return null
   return publicDocument(doc)
+}
+
+export function deleteDocument(idOrSlug: string, requesterAddress: string): void {
+  const doc = getDocumentById(idOrSlug) ?? getDocumentBySlug(idOrSlug)
+  if (!doc) {
+    throw new Error('Document not found')
+  }
+  if (normalizeAddress(doc.creatorAddress) !== normalizeAddress(requesterAddress)) {
+    throw new Error('Only the creator can delete this agreement')
+  }
+  if (doc.status === 'locked') {
+    throw new Error('Sealed agreements cannot be deleted')
+  }
+  if (doc.status === 'locking') {
+    throw new Error('Agreements being sealed cannot be deleted')
+  }
+  deleteDocumentById(doc.id)
 }
