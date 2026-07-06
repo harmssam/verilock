@@ -1,4 +1,5 @@
 import { shortAddress } from './addresses'
+import { buildNimiqAddressExplorerUrl } from './explorer'
 import { formatPartyRole } from './signing'
 import type { DocumentParty, DocumentSignature } from './types'
 import './SignaturesPanel.css'
@@ -37,7 +38,18 @@ export function SignaturesPanel({ signatures, parties, compact }: SignaturesPane
               <div className="signatures-panel-meta">
                 <strong>{label}</strong>
                 <span className="muted">
-                  {role} · {shortAddress(sig.signerAddress)} · {signedAt}
+                  {role} ·{' '}
+                  <a
+                    className="signatures-panel-address"
+                    href={buildNimiqAddressExplorerUrl(sig.signerAddress)}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={sig.signerAddress}
+                  >
+                    {shortAddress(sig.signerAddress)}
+                  </a>
+                  {' · '}
+                  {signedAt}
                 </span>
                 {sig.signatureType === 'typed' && !sig.imageUrl && (
                   <span className="signatures-panel-typed muted">Typed acknowledgment</span>

@@ -1368,6 +1368,8 @@ export default function App() {
             address={address}
             activeDoc={activeDoc}
             screen={screen}
+            onConnect={() => void connectWallet()}
+            walletConnecting={walletConnecting}
           />
           <NimiqSealInfo />
         </>
