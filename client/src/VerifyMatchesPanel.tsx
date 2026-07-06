@@ -1,7 +1,7 @@
 import { Trash2 } from 'lucide-react'
 import { canDeleteDocument } from './agreements'
 import { SignaturesPanel } from './SignaturesPanel'
-import type { VerifyResult } from './types'
+import { documentTypeUsesNotes, type VerifyResult } from './types'
 import './VerifyMatchesPanel.css'
 
 function formatTimestamp(value: number | null): string {
@@ -59,6 +59,14 @@ export function VerifyMatchesPanel({
                   <span className="document-filename-value">{match.originalFilename}</span>
                 </p>
               )}
+              {documentTypeUsesNotes(match.type) &&
+                typeof match.metadata?.notes === 'string' &&
+                match.metadata.notes.trim() && (
+                  <div className="document-notes verify-match-notes">
+                    <span className="document-filename-label">Notes</span>
+                    <p className="document-notes-body muted">{match.metadata.notes}</p>
+                  </div>
+                )}
               <dl className="verify-match-meta">
                 <div>
                   <dt>Document ID</dt>
