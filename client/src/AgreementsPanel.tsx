@@ -10,7 +10,7 @@ import {
   isDocumentCreator,
   type AgreementBucket,
 } from './agreements'
-import type { SealDocument } from './types'
+import { documentTypeLabel, type SealDocument } from './types'
 import './AgreementsPanel.css'
 
 interface AgreementsPanelProps {
@@ -79,7 +79,10 @@ export function AgreementsPanel({
       >
         <button type="button" className="agreement-item-open" onClick={() => onOpen(doc.slug)}>
           <div className="agreement-item-main">
-            <strong>{doc.title}</strong>
+            <div className="agreement-item-title-row">
+              <strong>{doc.title}</strong>
+              <span className="agreement-type-tag">{documentTypeLabel(doc.type)}</span>
+            </div>
             {doc.originalFilename && (
               <span className="agreement-item-filename">{doc.originalFilename}</span>
             )}

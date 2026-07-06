@@ -48,6 +48,20 @@ export function documentTypeUsesNotes(type: string): boolean {
   return type === 'nda' || type === 'other'
 }
 
+const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  rental: 'Rental',
+  contract: 'Contract',
+  nda: 'NDA',
+  other: 'Other',
+}
+
+export function documentTypeLabel(type: string): string {
+  if ((DOCUMENT_TYPES as readonly string[]).includes(type)) {
+    return DOCUMENT_TYPE_LABELS[type as DocumentType]
+  }
+  return type.charAt(0).toUpperCase() + type.slice(1)
+}
+
 export interface SealDocument {
   id: string
   slug: string
