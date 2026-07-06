@@ -19,7 +19,7 @@ interface SealCardProps {
   sealFundsError?: string | null
   onRefreshFunds?: () => void
   onSeal: () => void
-  onSealPopup?: () => void
+  onSealRedirect?: () => void
 }
 
 function priorSealFailed(document: SealDocument): boolean {
@@ -40,7 +40,7 @@ export function SealCard({
   sealFundsError,
   onRefreshFunds,
   onSeal,
-  onSealPopup,
+  onSealRedirect,
 }: SealCardProps) {
   const pricing = getSealPricing()
   const failedPrior = priorSealFailed(document)
@@ -159,14 +159,14 @@ export function SealCard({
             'Seal via Hub'
           )}
         </button>
-        {!inNimiqPay && !hasNimiqProvider && onSealPopup && (
+        {!inNimiqPay && !hasNimiqProvider && onSealRedirect && (
           <button
             type="button"
             className="btn btn-secondary"
             disabled={!canSeal}
-            onClick={onSealPopup}
+            onClick={onSealRedirect}
           >
-            Try popup
+            Full-page Hub
           </button>
         )}
         {onRefreshFunds && !busy && (

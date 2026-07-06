@@ -2,6 +2,7 @@ import { RPC_ID_SEARCH_PARAM } from './sealRecovery'
 
 const HUB_RPC_UINT8_ARRAY_TYPE = 0
 const RPC_REQUESTS_KEY = 'rpcRequests'
+const HUB_RESPONSE_KEY_PREFIX = 'response-'
 
 export type RpcRedirectResponse = {
   id: number
@@ -108,4 +109,27 @@ export function readRedirectResponse(): RpcRedirectResponse | null {
     if (rpcId) redirect = loadStoredRedirectResponse(rpcId)
   }
   return redirect
+}
+
+/** Full page URL Hub should return to (path + query, no hash). */
+export function getHubReturnUrl(): string {
+  if (typeof window === 'undefined') return '/'
+  const { origin, pathname, search } = window.location
+  return `${origin}${pathname}${search}`
+}
+
+/** Drop stale Hub RPC entries that cause "Invalid request" on the next connect/seal. */
+export function clearStaleHubRpcState(): void {
+  if (typeof window === 'undefined') return
+  try {
+    sessionStorage.removeItem(RPC_REQUESTS_KEY)
+    const stale: string[] = []
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i)
+      if (key?.startsWith(HUB_RESPONSE_KEY_PREFIX)) stale.push(key)
+    }
+    for (const key of stale) sessionStorage.removeItem(key)
+  } catch {
+    // sessionStorage may be blocked in strict privacy modes
+  }
 }

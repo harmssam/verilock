@@ -8,6 +8,7 @@ import {
   type HubLockRedirectResult,
 } from './hubSealRedirect'
 import { saveHubReturnPath } from './hubReturnPath'
+import { clearStaleHubRpcState, getHubReturnUrl } from './hubRedirectParse'
 import { peekHubRedirectInUrl, RPC_ID_SEARCH_PARAM } from './sealRecovery'
 import { sealError, sealLog, sealWarn } from './sealDebug'
 import { getSealFeeLuna } from './sealPricing'
@@ -116,6 +117,15 @@ export function popupBlockedHelp(): string {
     'Pop-up blocked. Allow pop-ups for this site in your browser settings, ' +
     'or open VeriLock inside the Nimiq Pay app (recommended — no pop-ups needed).'
   )
+}
+
+function hubRedirectBehavior(localState: Record<string, unknown>) {
+  return new RedirectRequestBehavior(getHubReturnUrl(), localState)
+}
+
+/** Hub redirect is fragile in Safari and some privacy browsers — use only when requested. */
+export function shouldUseHubRedirect(options?: { useRedirect?: boolean }): boolean {
+  return options?.useRedirect === true
 }
 
 export const HUB_REDIRECT_MESSAGE = 'Redirecting to Nimiq Hub…'
@@ -438,7 +448,7 @@ function registerHubEventHandlers(
     try {
       const { address } = chosen as ChooseAddressResult
       const { token, nonce } = await getChallenge(address)
-      const behavior = RedirectRequestBehavior.withLocalState({ token })
+      const behavior = hubRedirectBehavior({ token })
       await hub.signMessage(
         { appName: APP_NAME, message: nonce, signer: address },
         behavior as Parameters<typeof hub.signMessage>[1],
@@ -628,8 +638,9 @@ export async function connectViaHub(
   const hub = getHubApi()
 
   if (options?.preferRedirect) {
+    clearStaleHubRpcState()
     saveHubReturnPath()
-    const behavior = RedirectRequestBehavior.withLocalState({ flow: 'login' })
+    const behavior = hubRedirectBehavior({ flow: 'login' })
     await hub.chooseAddress(
       { appName: APP_NAME },
       behavior as Parameters<typeof hub.chooseAddress>[1],
@@ -638,6 +649,7 @@ export async function connectViaHub(
   }
 
   try {
+    clearStaleHubRpcState()
     const chosen = await hub.chooseAddress({ appName: APP_NAME })
     const address = chosen.address
     const { token, nonce } = await getChallenge(address)
@@ -789,8 +801,9 @@ export async function sendLockAttestationViaHub(
   }
 
   if (options?.preferRedirect) {
+    clearStaleHubRpcState()
     saveHubReturnPath()
-    const behavior = RedirectRequestBehavior.withLocalState(lockState)
+    const behavior = hubRedirectBehavior(lockState)
     await hub.signTransaction(
       request,
       behavior as Parameters<typeof hub.signTransaction>[1],
@@ -799,6 +812,7 @@ export async function sendLockAttestationViaHub(
   }
 
   try {
+    clearStaleHubRpcState()
     const signed = await hub.signTransaction(request)
     const txHash = await finalizeHubLockTransaction(signed as SignedTransaction, {
       hubBroadcast: false,
