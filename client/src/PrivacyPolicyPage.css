@@ -1,0 +1,47 @@
+.privacy-policy-lead {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.privacy-policy-updated {
+  margin: 0 0 1.25rem;
+  font-size: 0.78rem;
+}
+
+.privacy-policy-section {
+  margin-bottom: 1.15rem;
+}
+
+.privacy-policy-section:last-child {
+  margin-bottom: 0;
+}
+
+.privacy-policy-section h3 {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.privacy-policy-section p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.privacy-policy-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.15rem;
+  line-height: 1.55;
+}
+
+.privacy-policy-list li + li {
+  margin-top: 0.35rem;
+}
+
+.privacy-policy-list strong {
+  color: var(--text);
+  font-weight: 600;
+}
