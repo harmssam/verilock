@@ -72,3 +72,28 @@
   background: rgba(248, 113, 113, 0.18);
   border-color: rgba(248, 113, 113, 0.5);
 }
+
+@media (max-width: 480px) {
+  .wallet-menu {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .wallet-menu-trigger {
+    max-width: 100%;
+  }
+
+  .wallet-menu-dropdown {
+    min-width: 0;
+    width: min(100%, calc(100vw - 1.5rem - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    max-width: none;
+    right: 0;
+    left: auto;
+  }
+
+  .wallet-menu-address {
+    white-space: normal;
+    word-break: break-all;
+  }
+}
