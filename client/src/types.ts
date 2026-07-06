@@ -100,10 +100,12 @@ export interface VerifyResult {
   slug: string
   title: string
   originalFilename: string | null
+  type: string
   status: string
   creatorAddress: string
   originalSha256: string
   finalSha256: string | null
+  metadata: Record<string, unknown> | null
   createdAt: number
   lockedAt: number | null
   attestation: DocumentAttestation | null
