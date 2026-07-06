@@ -1,8 +1,10 @@
-const SEAL_IN_FLIGHT_KEY = 'nimiq-seal-seal-in-flight'
+const SEAL_IN_FLIGHT_KEY = 'verilock-seal-in-flight'
+const LEGACY_SEAL_IN_FLIGHT_KEY = 'nimiq-seal-seal-in-flight'
 /** @deprecated migrated on read — remove after a few releases */
 const LEGACY_PENDING_SEAL_KEY = 'nimiq-seal-pending-seal'
 /** @deprecated migrated on read — remove after a few releases */
 const LEGACY_SEAL_REDIRECT_KEY = 'nimiq-seal-seal-redirect'
+const LEGACY_SESSION_KEY = 'nimiq-seal-session'
 
 export const SEAL_IN_FLIGHT_TTL_MS = 60 * 60 * 1000
 export const HUB_REFERRER_HOST = 'hub.nimiq.com'
@@ -40,6 +42,17 @@ function removeStorage(store: Storage, key: string): void {
   }
 }
 
+function readLegacySession(): { token?: string; address?: string } | null {
+  const sessionRaw =
+    readStorage(sessionStorage, 'verilock-session') ?? readStorage(sessionStorage, LEGACY_SESSION_KEY)
+  if (!sessionRaw) return null
+  try {
+    return JSON.parse(sessionRaw) as { token?: string; address?: string }
+  } catch {
+    return null
+  }
+}
+
 function migrateLegacySealRecovery(): SealInFlight | null {
   const redirectRaw = readStorage(localStorage, LEGACY_SEAL_REDIRECT_KEY)
   if (redirectRaw) {
@@ -53,17 +66,12 @@ function migrateLegacySealRecovery(): SealInFlight | null {
       removeStorage(localStorage, LEGACY_SEAL_REDIRECT_KEY)
       removeStorage(sessionStorage, LEGACY_PENDING_SEAL_KEY)
       if (parsed.slug && parsed.docId && parsed.token) {
-        const sessionRaw = readStorage(sessionStorage, 'nimiq-seal-session')
-        let address = ''
-        if (sessionRaw) {
-          const session = JSON.parse(sessionRaw) as { address?: string }
-          address = session.address ?? ''
-        }
+        const session = readLegacySession()
         return {
           slug: parsed.slug,
           docId: parsed.docId,
           token: parsed.token,
-          address,
+          address: session?.address ?? '',
           startedAt: parsed.savedAt ?? Date.now(),
         }
       }
@@ -78,10 +86,8 @@ function migrateLegacySealRecovery(): SealInFlight | null {
     const parsed = JSON.parse(pendingRaw) as { slug?: string; docId?: string; savedAt?: number }
     removeStorage(sessionStorage, LEGACY_PENDING_SEAL_KEY)
     if (!parsed.slug || !parsed.docId) return null
-    const sessionRaw = readStorage(sessionStorage, 'nimiq-seal-session')
-    if (!sessionRaw) return null
-    const session = JSON.parse(sessionRaw) as { token?: string; address?: string }
-    if (!session.token) return null
+    const session = readLegacySession()
+    if (!session?.token) return null
     return {
       slug: parsed.slug,
       docId: parsed.docId,
@@ -101,14 +107,18 @@ export function saveSealInFlight(seal: Omit<SealInFlight, 'startedAt'>): void {
     SEAL_IN_FLIGHT_KEY,
     JSON.stringify({ ...seal, startedAt: Date.now() } satisfies SealInFlight),
   )
+  removeStorage(localStorage, LEGACY_SEAL_IN_FLIGHT_KEY)
 }
 
 export function clearSealInFlight(): void {
   removeStorage(localStorage, SEAL_IN_FLIGHT_KEY)
+  removeStorage(localStorage, LEGACY_SEAL_IN_FLIGHT_KEY)
 }
 
 export function loadSealInFlight(): SealInFlight | null {
-  const raw = readStorage(localStorage, SEAL_IN_FLIGHT_KEY)
+  const raw =
+    readStorage(localStorage, SEAL_IN_FLIGHT_KEY) ??
+    readStorage(localStorage, LEGACY_SEAL_IN_FLIGHT_KEY)
   if (!raw) return migrateLegacySealRecovery()
 
   try {
@@ -120,6 +130,9 @@ export function loadSealInFlight(): SealInFlight | null {
     if (Date.now() - parsed.startedAt > SEAL_IN_FLIGHT_TTL_MS) {
       clearSealInFlight()
       return null
+    }
+    if (readStorage(localStorage, SEAL_IN_FLIGHT_KEY) === null) {
+      saveSealInFlight(parsed)
     }
     return parsed
   } catch {
