@@ -7,6 +7,7 @@ COPY server/package.json server/package-lock.json ./server/
 
 RUN npm ci --prefix client && npm ci --prefix server
 
+COPY shared ./shared
 COPY client ./client
 COPY server ./server
 
@@ -26,6 +27,7 @@ RUN apt-get update \
 COPY server/package.json server/package-lock.json ./server/
 RUN npm ci --omit=dev --prefix server
 
+COPY --from=build /app/shared ./shared
 COPY --from=build /app/server/src ./server/src
 COPY --from=build /app/client/dist ./client/dist
 
