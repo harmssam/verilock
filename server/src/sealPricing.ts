@@ -1,43 +1,18 @@
-export const LUNA_PER_NIM = 100_000
-export const BASE_SEAL_FEE_NIM = 1000
-export const JULY_PROMO_DISCOUNT = 0.95
+export {
+  BASE_SEAL_FEE_NIM,
+  getMinimumSealBalanceLuna,
+  getSealFeeLuna,
+  getSealFeeNim,
+  getSealPricing,
+  hasSufficientSealBalance,
+  isJulyPromoActive,
+  JULY_PROMO_DISCOUNT,
+  LUNA_PER_NIM,
+  SEAL_TX_FEE_BUFFER_LUNA,
+  type SealPricing,
+} from '../../shared/sealPricing.js'
 
-export interface SealPricing {
-  feeNim: number
-  feeLuna: number
-  baseFeeNim: number
-  promoActive: boolean
-  promoLabel: string | null
-  promoEndsLabel: string | null
-}
-
-export function isJulyPromoActive(now = new Date()): boolean {
-  return now.getMonth() === 6
-}
-
-export function getSealFeeNim(now = new Date()): number {
-  if (isJulyPromoActive(now)) {
-    return BASE_SEAL_FEE_NIM * (1 - JULY_PROMO_DISCOUNT)
-  }
-  return BASE_SEAL_FEE_NIM
-}
-
-export function getSealFeeLuna(now = new Date()): number {
-  return Math.round(getSealFeeNim(now) * LUNA_PER_NIM)
-}
-
-export function getSealPricing(now = new Date()): SealPricing {
-  const promoActive = isJulyPromoActive(now)
-  const feeNim = getSealFeeNim(now)
-  return {
-    feeNim,
-    feeLuna: getSealFeeLuna(now),
-    baseFeeNim: BASE_SEAL_FEE_NIM,
-    promoActive,
-    promoLabel: promoActive ? '95% off — July only' : null,
-    promoEndsLabel: promoActive ? 'Promo ends August 1' : null,
-  }
-}
+import { getSealFeeLuna } from '../../shared/sealPricing.js'
 
 /** Legacy seal fees from earlier pricing (luna). */
 export const LEGACY_SEAL_FEE_LUNA = [0, 1, 100_000, 1_000_000] as const

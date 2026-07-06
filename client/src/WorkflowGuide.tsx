@@ -4,7 +4,7 @@ import { ShareInviteCard } from './ShareInviteCard'
 import { normalizeAddress } from './addresses'
 import { formatSealFeeSummary } from './sealPricing'
 import { TextLink } from './TextLink'
-import type { SealDocument } from './types'
+import type { AppScreen, SealDocument } from './types'
 import './WorkflowGuide.css'
 
 export type CreatorStepId =
@@ -101,7 +101,7 @@ export function resolveRole(input: {
   hasWallet: boolean
   address: string | null
   activeDoc: SealDocument | null
-  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
+  screen: AppScreen
 }): WorkflowRole {
   if (input.screen === 'verify') return 'verifier'
   if (input.activeDoc && input.screen === 'document') {
@@ -140,7 +140,7 @@ function resolveSignerStep(input: {
 function resolveCreatorStep(input: {
   hasWallet: boolean
   activeDoc: SealDocument | null
-  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
+  screen: AppScreen
 }): CreatorStepId {
   const { hasWallet, activeDoc, screen } = input
 
@@ -164,7 +164,7 @@ function resolveCreatorStep(input: {
 export function resolveCurrentStep(input: {
   hasWallet: boolean
   activeDoc: SealDocument | null
-  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
+  screen: AppScreen
   address?: string | null
 }): WorkflowStepId {
   const role = resolveRole({
@@ -217,7 +217,7 @@ export function getWorkflowHint(input: {
   hasWallet: boolean
   address?: string | null
   activeDoc: SealDocument | null
-  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
+  screen: AppScreen
 }): string {
   const role = resolveRole({
     hasWallet: input.hasWallet,
@@ -277,7 +277,7 @@ function renderWorkflowHint(input: {
   hasWallet: boolean
   address?: string | null
   activeDoc: SealDocument | null
-  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
+  screen: AppScreen
   onGoCreate?: () => void
 }): ReactNode {
   const current = resolveCurrentStep(input)
@@ -317,7 +317,7 @@ interface WorkflowGuideProps {
   hasWallet: boolean
   address?: string | null
   activeDoc: SealDocument | null
-  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
+  screen: AppScreen
   compact?: boolean
   onGoCreate?: () => void
   onConnect?: () => void
@@ -508,7 +508,7 @@ interface WorkflowNextActionProps {
   hasWallet: boolean
   address?: string | null
   activeDoc: SealDocument | null
-  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
+  screen: AppScreen
   walletConnecting?: boolean
   onConnect?: () => void
   onGoCreate?: () => void

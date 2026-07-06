@@ -230,7 +230,7 @@ async function waitForTransactionOnNetwork(
 }
 
 export type TransactionBroadcastFallback = (serializedTx: string) => Promise<void>
-export type BroadcastFallbackFactory = (token: string) => TransactionBroadcastFallback
+export type BroadcastFallbackFactory = (token: string, docId: string) => TransactionBroadcastFallback
 
 function normalizeRawTransactionHex(rawTx: string): string {
   const clean = rawTx.replace(/^0x/i, '').trim()
@@ -475,7 +475,7 @@ function registerHubEventHandlers(
       sealLog('hub:lockTxSigned', { docId, hash: signed.hash, hubBroadcast })
       const lockWork = finalizeHubLockTransaction(signed, {
         hubBroadcast,
-        broadcastFallback: token ? createBroadcastFallback?.(token) : undefined,
+        broadcastFallback: token ? createBroadcastFallback?.(token, docId) : undefined,
       })
         .then(txHash => handleLockComplete({ token, docId, txHash }))
         .catch(err => handleLockError(err instanceof Error ? err : new Error(String(err))))

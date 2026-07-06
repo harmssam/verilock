@@ -1,11 +1,13 @@
-import { Coins, Shield, Wallet } from 'lucide-react'
-import { SealFeeAmount } from './SealFeeAmount'
-import { getSealPricing } from './sealPricing'
+import { Shield, Wallet } from 'lucide-react'
+import { SealPricingDisplay } from './SealPricingDisplay'
+import { TextLink } from './TextLink'
 import './NimiqLockInfo.css'
 
-export function NimiqLockInfo() {
-  const pricing = getSealPricing()
+interface NimiqLockInfoProps {
+  onOpenPricing?: () => void
+}
 
+export function NimiqLockInfo({ onOpenPricing }: NimiqLockInfoProps) {
   return (
     <div className="card nimiq-info-card">
       <h2 className="nimiq-info-title">
@@ -53,31 +55,12 @@ export function NimiqLockInfo() {
         </section>
       </div>
 
-      <div className="nimiq-info-pricing">
-        <div className="nimiq-info-pricing-head">
-          <Coins className="nimiq-info-pricing-icon" size={18} strokeWidth={2.25} aria-hidden />
-          <div>
-            <span className="nimiq-info-pricing-label">Seal fee</span>
-            <div className="nimiq-info-pricing-amounts">
-              <SealFeeAmount
-                feeNim={pricing.feeNim}
-                baseFeeNim={pricing.baseFeeNim}
-                showWas={pricing.promoActive}
-              />
-              <span className="nimiq-info-pricing-per">per document</span>
-            </div>
-          </div>
-        </div>
-        {pricing.promoActive && (
-          <div className="nimiq-info-promo">
-            <span className="nimiq-info-promo-badge">{pricing.promoLabel}</span>
-            <span className="muted nimiq-info-promo-note">{pricing.promoEndsLabel}</span>
-          </div>
-        )}
-        <p className="muted nimiq-info-pricing-note">
-          Signing and verifying are free. You only pay when the agreement is sealed on-chain.
+      <SealPricingDisplay />
+      {onOpenPricing && (
+        <p className="muted nimiq-info-pricing-link">
+          <TextLink onClick={onOpenPricing}>Full pricing page</TextLink>
         </p>
-      </div>
+      )}
     </div>
   )
 }
