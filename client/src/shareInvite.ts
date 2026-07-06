@@ -1,5 +1,5 @@
 import { formatPartyRole } from './signing'
-import type { RentalMetadata, SealDocument } from './types'
+import { documentTypeUsesNotes, type RentalMetadata, type SealDocument } from './types'
 
 export interface ShareInviteContent {
   subject: string
@@ -10,6 +10,7 @@ export interface ShareInviteContent {
   required: number
   waitingOn: string[]
   rentalLines: string[]
+  detailLines: string[]
   signingSteps: string[]
 }
 
@@ -36,9 +37,17 @@ function rentalDetailLines(metadata: RentalMetadata | null): string[] {
   return lines
 }
 
+function noteDetailLines(doc: SealDocument): string[] {
+  if (!documentTypeUsesNotes(doc.type) || !doc.metadata) return []
+  const notes = doc.metadata.notes
+  if (typeof notes !== 'string' || !notes.trim()) return []
+  return [`Notes: ${notes.trim()}`]
+}
+
 export function buildShareInviteContent(doc: SealDocument, shareUrl: string): ShareInviteContent {
   const waitingOn = pendingPartyLabels(doc)
   const rentalLines = doc.type === 'rental' ? rentalDetailLines(doc.metadata as RentalMetadata) : []
+  const detailLines = [...rentalLines, ...noteDetailLines(doc)]
   const pdfName = doc.originalFilename ?? 'the agreement PDF'
 
   return {
@@ -50,6 +59,7 @@ export function buildShareInviteContent(doc: SealDocument, shareUrl: string): Sh
     required: doc.signingProgress.required,
     waitingOn,
     rentalLines,
+    detailLines,
     signingSteps: [
       'Open the signing link in your browser',
       'Connect a Nimiq wallet',
@@ -85,7 +95,7 @@ export function buildShareEmailBody(doc: SealDocument, shareUrl: string): string
     'Agreement details:',
     `• Title: ${content.title}`,
     `• Signatures: ${content.signed}/${content.required} collected`,
-    ...content.rentalLines.map(line => `• ${line}`),
+    ...content.detailLines.map(line => `• ${line}`),
     ...(content.waitingOn.length > 0 ? [`• Still waiting on: ${content.waitingOn.join(', ')}`] : []),
     '',
     '—',

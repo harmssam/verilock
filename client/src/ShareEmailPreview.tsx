@@ -60,7 +60,7 @@ export function ShareEmailPreview({ content, compact }: ShareEmailPreviewProps) 
               {content.signed}/{content.required} collected
             </strong>
           </li>
-          {content.rentalLines.map(line => (
+          {content.detailLines.map(line => (
             <li key={line}>
               <span>Details</span>
               <strong>{line}</strong>

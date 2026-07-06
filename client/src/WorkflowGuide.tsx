@@ -295,6 +295,9 @@ function renderWorkflowHint(input: {
   }
 
   if (current === 'create') {
+    if (input.screen === 'create') {
+      return 'Choose a PDF on your computer — it never gets uploaded. You\'ll get a share link; send the file to other signers yourself.'
+    }
     return (
       <>
         Open{' '}
@@ -349,6 +352,19 @@ export function WorkflowGuide({
     const step = steps.find(s => s.id === current) ?? steps[0]!
     const index = steps.findIndex(s => s.id === current) + 1
     const hint = renderWorkflowHint({ hasWallet, address, activeDoc, screen, onGoCreate })
+
+    if (current === 'create' && screen === 'create') {
+      return (
+        <div className="workflow-next workflow-step-card">
+          <p className="workflow-step-card-label">
+            <span className="workflow-hint-step">Step {index} of {steps.length}</span>
+            <strong>{step.title}</strong>
+          </p>
+          <p className="muted">{hint}</p>
+        </div>
+      )
+    }
+
     return (
       <p className="workflow-hint">
         <span className="workflow-hint-step">Step {index} of {steps.length}</span>
@@ -524,6 +540,7 @@ export function WorkflowNextAction({
       action = onConnect ? { label: 'Connect wallet', onClick: onConnect } : null
       break
     case 'create':
+      if (screen === 'create') return null
       title = 'Create your agreement'
       body = 'Choose a PDF on your computer — it never gets uploaded. You\'ll get a share link; send the file to other signers yourself.'
       action = onGoCreate ? { label: 'Go to New agreement', onClick: onGoCreate } : null

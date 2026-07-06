@@ -366,7 +366,8 @@ a.hash-chip.text-link:focus-visible {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.25);
@@ -375,11 +376,28 @@ a.hash-chip.text-link:focus-visible {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.field textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+  line-height: 1.45;
+}
+
 .field input:focus,
-.field select:focus {
+.field select:focus,
+.field textarea:focus {
   outline: none;
   border-color: var(--mint);
   box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.15);
+}
+
+.document-notes {
+  margin-top: 0.75rem;
+}
+
+.document-notes-body {
+  margin: 0.35rem 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* ── File picker ── */
