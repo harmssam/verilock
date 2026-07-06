@@ -1,6 +1,8 @@
 import { Check, LoaderCircle, Sparkles } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { normalizeAddress } from './addresses'
 import { formatSealFeeSummary } from './sealPricing'
+import { TextLink } from './TextLink'
 import type { SealDocument } from './types'
 import './WorkflowGuide.css'
 
@@ -270,15 +272,60 @@ export function getWorkflowHint(input: {
   return `Step ${index}: ${step.title} — ${step.detail}`
 }
 
+function renderWorkflowHint(input: {
+  hasWallet: boolean
+  address?: string | null
+  activeDoc: SealDocument | null
+  screen: 'home' | 'create' | 'document' | 'verify'
+  onGoCreate?: () => void
+}): ReactNode {
+  const current = resolveCurrentStep(input)
+
+  if (current === 'connect' && !input.hasWallet) {
+    return (
+      <>
+        Connect your Nimiq wallet to unlock{' '}
+        <TextLink onClick={input.onGoCreate} disabled={!input.onGoCreate} title="New agreement tab">
+          New agreement
+        </TextLink>
+        .
+      </>
+    )
+  }
+
+  if (current === 'create') {
+    return (
+      <>
+        Open{' '}
+        <TextLink onClick={input.onGoCreate} disabled={!input.onGoCreate} title="New agreement tab">
+          New agreement
+        </TextLink>
+        {' '}
+        and fingerprint your PDF locally — it never leaves your computer.
+      </>
+    )
+  }
+
+  return getWorkflowHint(input).replace(/^Step \d+: /, '')
+}
+
 interface WorkflowGuideProps {
   hasWallet: boolean
   address?: string | null
   activeDoc: SealDocument | null
   screen: 'home' | 'create' | 'document' | 'verify'
   compact?: boolean
+  onGoCreate?: () => void
 }
 
-export function WorkflowGuide({ hasWallet, address, activeDoc, screen, compact }: WorkflowGuideProps) {
+export function WorkflowGuide({
+  hasWallet,
+  address,
+  activeDoc,
+  screen,
+  compact,
+  onGoCreate,
+}: WorkflowGuideProps) {
   const role = resolveRole({ hasWallet, address: address ?? null, activeDoc, screen })
   const steps = getStepsForRole(role)
   const current = resolveCurrentStep({ hasWallet, activeDoc, screen, address })
@@ -286,7 +333,7 @@ export function WorkflowGuide({ hasWallet, address, activeDoc, screen, compact }
   if (compact) {
     const step = steps.find(s => s.id === current) ?? steps[0]!
     const index = steps.findIndex(s => s.id === current) + 1
-    const hint = getWorkflowHint({ hasWallet, address, activeDoc, screen }).replace(/^Step \d+: /, '')
+    const hint = renderWorkflowHint({ hasWallet, address, activeDoc, screen, onGoCreate })
     return (
       <p className="workflow-hint">
         <span className="workflow-hint-step">Step {index} of {steps.length}</span>
