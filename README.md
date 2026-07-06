@@ -16,14 +16,14 @@ Built for the [Mini Apps Competition](https://miniappscompetition.com/).
 
 **Requirements:** Node.js 22+
 
-***REMOVED***
+```bash
 cd verilock
 npm install
 npm install --prefix server
 npm install --prefix client
 
 SKIP_CHAIN_VERIFY=true npm run dev
-***REMOVED***
+```
 
 - **UI:** http://localhost:5174 (Vite dev server)
 - **API:** http://localhost:3002/api/health
@@ -40,10 +40,10 @@ VeriLock deploys as a **single service**: Express API + static client from one U
 
 ### 1. Create project
 
-***REMOVED***
-***REMOVED***
-***REMOVED***
-***REMOVED***
+```bash
+railway init
+railway up
+```
 
 ### 2. Add a persistent volume
 
@@ -73,38 +73,38 @@ Do **not** set `SKIP_CHAIN_VERIFY` in production.
 
 Railway reads `railway.toml` automatically:
 
-***REMOVED***toml
+```toml
 buildCommand = npm install && … && npm run build --prefix client
 startCommand = NODE_ENV=production npm run start --prefix server
 healthcheckPath = /api/health
-***REMOVED***
+```
 
 Or deploy via Docker:
 
-***REMOVED***
+```bash
 docker build -t verilock .
 docker run -p 3002:3002 -v verilock-data:/data -e DATA_DIR=/data -e NODE_ENV=production verilock
-***REMOVED***
+```
 
 ### 5. Test production locally
 
-***REMOVED***
+```bash
 npm run build
 npm run start:prod-local
 # → http://localhost:3003 (API + UI same origin; stop dev server if port conflicts)
-***REMOVED***
+```
 
 ### 6. Open in Nimiq Pay
 
-***REMOVED***
+```
 nimiqpay://miniapp?url=https://your-app.up.railway.app
-***REMOVED***
+```
 
 ## On-chain payload
 
-***REMOVED***
+```
 seal:v1:lock:{docId8}:{finalSha256}
-***REMOVED***
+```
 
 Self-send transaction (`recipient = sender`, `value = 0`) — the locking wallet is the on-chain attestor.
 
