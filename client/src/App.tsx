@@ -52,6 +52,7 @@ import {
   consumeHubReturnPath,
   documentSlugFromPath,
   readHubReturnPath,
+  verifySlugFromPath,
 } from './hubReturnPath'
 import { clearSession, loadSession, saveSession } from './session'
 import { DateField } from './DateField'
@@ -60,7 +61,9 @@ import { PrivacyNotice } from './PrivacyNotice'
 import { NimiqPayOpenPanel } from './NimiqPayOpenPanel'
 import { NimiqSealInfo } from './NimiqSealInfo'
 import { formatSealFeeNim, getSealPricing } from './sealPricing'
+import { ShareInviteCard } from './ShareInviteCard'
 import { SignaturesPanel } from './SignaturesPanel'
+import { TextLink } from './TextLink'
 import { prepareSignatureImageUpload } from './signatureImage'
 import { getPdfPageCount, sha256Hex } from './pdf/hashPdf'
 import {
@@ -231,6 +234,8 @@ export default function App() {
   } | null>(null)
   const [verifySlug, setVerifySlug] = useState('')
   const [verifyDetail, setVerifyDetail] = useState<VerifyResult | null>(null)
+  const [verifyFromLink, setVerifyFromLink] = useState(false)
+  const pendingVerifyLookupRef = useRef<string | null>(null)
   const [shareLinkCopied, setShareLinkCopied] = useState(false)
 
   const appUrl = typeof window !== 'undefined' ? window.location.origin : ''
@@ -420,7 +425,7 @@ export default function App() {
           })
           applySession(result.token, verified.address)
           await refreshMe(result.token)
-          setWalletStatus('Wallet connected.')
+          setWalletStatus(null)
           return
         } catch (hubErr) {
           if (isPopupBlockedError(hubErr)) {
@@ -440,7 +445,7 @@ export default function App() {
       setNimiq(provider)
       applySession(sessionToken, verified.address)
       await refreshMe(sessionToken)
-      setWalletStatus('Wallet connected.')
+      setWalletStatus(null)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Wallet connection failed'
       if (isHubRedirectError(err)) {
@@ -910,7 +915,7 @@ export default function App() {
             applySession(result.token, verified.address)
             await refreshMe(result.token)
             setError(null)
-            setWalletStatus('Wallet connected.')
+            setWalletStatus(null)
           } catch (err) {
             clearSession()
             setToken(null)
@@ -1089,7 +1094,7 @@ export default function App() {
 
       const path = window.location.pathname
       let routeSlug = documentSlugFromPath(path)
-      const verifyMatch = path.match(/^\/v\/([^/]+)/)
+      const verifySlugFromUrl = verifySlugFromPath(path)
 
       if (!routeSlug) {
         const savedReturnPath = readHubReturnPath()
@@ -1105,9 +1110,11 @@ export default function App() {
         if (hubLoginHandled || hubLockHandled) consumeHubReturnPath()
         setScreen('document')
         void loadDocument(routeSlug)
-      } else if (verifyMatch) {
+      } else if (verifySlugFromUrl) {
         setScreen('verify')
-        setVerifySlug(verifyMatch[1]!)
+        setVerifySlug(verifySlugFromUrl)
+        setVerifyFromLink(true)
+        pendingVerifyLookupRef.current = verifySlugFromUrl
       }
     }
 
@@ -1161,13 +1168,14 @@ export default function App() {
     }
   }
 
-  const runVerifySlug = async () => {
-    if (!verifySlug) return
+  const runVerifySlug = async (slugOverride?: string) => {
+    const slug = slugOverride ?? verifySlug
+    if (!slug) return
     setBusy(true)
     setError(null)
     setVerifyDetail(null)
     try {
-      const result = await api.verifyDocument(verifySlug)
+      const result = await api.verifyDocument(slug)
       setVerifyDetail(result)
       setVerifyHash(result.finalSha256 ?? result.originalSha256)
       const verifyLabel =
@@ -1191,6 +1199,15 @@ export default function App() {
       setBusy(false)
     }
   }
+
+  useEffect(() => {
+    const slug = pendingVerifyLookupRef.current
+    if (!slug) return
+    pendingVerifyLookupRef.current = null
+    void runVerifySlug(slug)
+    // Auto-lookup once when opened via /v/:slug
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="app">
@@ -1234,7 +1251,9 @@ export default function App() {
 
       {walletStatus && (
         <p className="wallet-status" role="status" aria-live="polite">
-          <LoaderCircle className="wallet-status-spinner" size={16} strokeWidth={2.5} aria-hidden />
+          {walletConnecting && (
+            <LoaderCircle className="wallet-status-spinner" size={16} strokeWidth={2.5} aria-hidden />
+          )}
           {walletStatus}
         </p>
       )}
@@ -1268,9 +1287,17 @@ export default function App() {
 
       {!token && screen !== 'verify' && (
         <p className="tab-hint">
-          {isInvitedSigner
-            ? 'Connect wallet to sign this agreement.'
-            : 'Connect wallet first to unlock New agreement.'}
+          {isInvitedSigner ? (
+            'Connect wallet to sign this agreement.'
+          ) : (
+            <>
+              Connect wallet first to unlock{' '}
+              <TextLink onClick={goToCreate} title="New agreement tab">
+                New agreement
+              </TextLink>
+              .
+            </>
+          )}
         </p>
       )}
 
@@ -1293,6 +1320,7 @@ export default function App() {
             activeDoc={activeDoc}
             screen={screen}
             compact
+            onGoCreate={goToCreate}
           />
         </>
       ) : null}
@@ -1574,23 +1602,12 @@ export default function App() {
           )}
 
           {isCreatorOnDoc && isCollectingSignatures(activeDoc) && (
-            <div className="card share-card">
-              <h2>Invite signers</h2>
-              <p className="muted">
-                {activeDoc.signingProgress.signed}/{activeDoc.signingProgress.required} signed — send
-                this link and the PDF file (from your computer) to anyone who still needs to sign. The PDF
-                is never hosted by VeriLock.
-              </p>
-              <div className="hash-chip">{documentShareUrl}</div>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ marginTop: '0.75rem' }}
-                onClick={() => void copyDocumentShareLink()}
-              >
-                {shareLinkCopied ? 'Link copied' : 'Copy link'}
-              </button>
-            </div>
+            <ShareInviteCard
+              document={activeDoc}
+              shareUrl={documentShareUrl}
+              linkCopied={shareLinkCopied}
+              onCopyLink={() => void copyDocumentShareLink()}
+            />
           )}
 
           <div className="card">
@@ -1701,21 +1718,13 @@ export default function App() {
                   <h2>Sign</h2>
                   <p className="muted">{resolution.message}</p>
                   {waitingForOthers && isCreatorOnDoc && (
-                    <div className="sign-status-share">
-                      <p className="muted">
-                        {activeDoc.signingProgress.signed}/{activeDoc.signingProgress.required} signed — copy
-                        the link and send the PDF to anyone who still needs to sign:
-                      </p>
-                      <div className="hash-chip">{documentShareUrl}</div>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ marginTop: '0.75rem' }}
-                        onClick={() => void copyDocumentShareLink()}
-                      >
-                        {shareLinkCopied ? 'Link copied' : 'Copy link'}
-                      </button>
-                    </div>
+                    <ShareInviteCard
+                      document={activeDoc}
+                      shareUrl={documentShareUrl}
+                      linkCopied={shareLinkCopied}
+                      onCopyLink={() => void copyDocumentShareLink()}
+                      embedded
+                    />
                   )}
                   <button
                     type="button"
@@ -1876,44 +1885,27 @@ export default function App() {
 
       {screen === 'verify' && (
         <div className="card">
-          <h2>Verify a document</h2>
+          <h2>{verifyFromLink && verifyDetail ? verifyDetail.title : 'Verify a document'}</h2>
           <p className="screen-step-label">
             {formatStepLabel({ role: 'verifier', current: 'verify', subtitle: 'Verify anytime' })}
           </p>
-          <p className="muted">
-            No wallet needed. Load a PDF to fingerprint it locally and check it matches a locked agreement,
-            or look up a document by ID.
-          </p>
-          <div className="field">
-            <label>PDF on your computer</label>
-            <FilePicker
-              accept="application/pdf"
-              file={verifyFile}
-              emptyLabel="Load PDF to verify"
-              disabled={busy}
-              onChange={setVerifyFile}
-            />
-          </div>
-          <button className="btn btn-secondary" disabled={!verifyFile || busy} onClick={() => void runVerifyUpload()}>
-            Verify fingerprint locally
-          </button>
-
-          <div className="field" style={{ marginTop: '1.25rem' }}>
-            <label>Or enter document slug / ID</label>
-            <input value={verifySlug} onChange={e => setVerifySlug(e.target.value)} placeholder="abc123def456" />
-          </div>
-          <button className="btn btn-secondary" disabled={!verifySlug || busy} onClick={() => void runVerifySlug()}>
-            Lookup document
-          </button>
-
-          {verifyHash && (
-            <div className="field" style={{ marginTop: '1rem' }}>
-              <label>Computed / stored hash</label>
-              <div className="hash-chip">{verifyHash}</div>
-            </div>
+          {verifyFromLink ? (
+            <p className="muted">
+              {busy && !verifyDetail
+                ? 'Looking up this document…'
+                : verifyDetail
+                  ? 'This agreement is registered on VeriLock. Load your PDF copy below to fingerprint it locally and confirm it matches.'
+                  : 'No wallet needed. Checking the document from your link.'}
+            </p>
+          ) : (
+            <p className="muted">
+              No wallet needed. Load a PDF to fingerprint it locally and check it matches a locked agreement,
+              or look up a document by ID.
+            </p>
           )}
+
           {verifyResult && (
-            <p className={`verify-feedback verify-feedback--${verifyResult.tone}`}>
+            <p className={`verify-feedback verify-feedback--${verifyResult.tone}`} style={{ marginTop: '0.75rem' }}>
               {verifyResult.tone === 'success' && (
                 <CircleCheck className="verify-feedback-icon" size={18} strokeWidth={2.25} aria-hidden />
               )}
@@ -1924,7 +1916,7 @@ export default function App() {
             </p>
           )}
           {verifyDetail?.originalFilename && (
-            <p className="document-filename" style={{ marginTop: '1rem' }}>
+            <p className="document-filename" style={{ marginTop: '0.75rem' }}>
               <span className="document-filename-label">PDF file</span>
               <span className="document-filename-value">{verifyDetail.originalFilename}</span>
             </p>
@@ -1934,6 +1926,43 @@ export default function App() {
               signatures={verifyDetail.signatures}
               parties={verifyDetail.parties}
             />
+          )}
+
+          {(verifyFromLink ? verifyDetail : true) && (
+            <>
+              <div className="field" style={{ marginTop: verifyFromLink ? '1.25rem' : undefined }}>
+                <label>{verifyFromLink ? 'Confirm with your PDF copy' : 'PDF on your computer'}</label>
+                <FilePicker
+                  accept="application/pdf"
+                  file={verifyFile}
+                  emptyLabel="Load PDF to verify"
+                  disabled={busy}
+                  onChange={setVerifyFile}
+                />
+              </div>
+              <button className="btn btn-secondary" disabled={!verifyFile || busy} onClick={() => void runVerifyUpload()}>
+                Verify fingerprint locally
+              </button>
+            </>
+          )}
+
+          {!verifyFromLink && (
+            <>
+              <div className="field" style={{ marginTop: '1.25rem' }}>
+                <label>Or enter document slug / ID</label>
+                <input value={verifySlug} onChange={e => setVerifySlug(e.target.value)} placeholder="abc123def456" />
+              </div>
+              <button className="btn btn-secondary" disabled={!verifySlug || busy} onClick={() => void runVerifySlug()}>
+                Lookup document
+              </button>
+            </>
+          )}
+
+          {verifyHash && (
+            <div className="field" style={{ marginTop: '1rem' }}>
+              <label>Computed / stored hash</label>
+              <div className="hash-chip">{verifyHash}</div>
+            </div>
           )}
         </div>
       )}
