@@ -2,27 +2,28 @@
   --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
   --font-body: 'Figtree', system-ui, sans-serif;
 
-  --bg-deep: #0a0618;
-  --bg-mid: #140d2e;
+  --bg-deep: #0d112e;
+  --bg-mid: #121a38;
   --surface: rgba(255, 255, 255, 0.055);
   --surface-hover: rgba(255, 255, 255, 0.09);
   --surface-raised: rgba(255, 255, 255, 0.08);
   --border: rgba(255, 255, 255, 0.1);
   --border-bright: rgba(255, 255, 255, 0.18);
 
-  --text: #f4f0ff;
-  --text-muted: #a89ec8;
-  --text-dim: #7a7199;
+  --text: #eef3ff;
+  --text-muted: #8fa3c4;
+  --text-dim: #5c7094;
 
   --mint: #5eead4;
   --mint-deep: #14b8a6;
   --lime: #bef264;
   --coral: #fb7185;
-  --violet: #c084fc;
+  --blue: #3b82f6;
+  --blue-deep: #2563eb;
   --amber: #fbbf24;
   --sky: #7dd3fc;
 
-  --gradient-brand: linear-gradient(135deg, var(--mint) 0%, var(--lime) 45%, var(--violet) 100%);
+  --gradient-brand: linear-gradient(135deg, var(--mint) 0%, var(--sky) 48%, var(--blue) 100%);
   --gradient-warm: linear-gradient(135deg, var(--coral), var(--amber));
   --gradient-card: linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
 
@@ -33,7 +34,7 @@
 
   --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.35);
   --shadow-glow-mint: 0 0 48px rgba(94, 234, 212, 0.18);
-  --shadow-glow-violet: 0 0 48px rgba(192, 132, 252, 0.15);
+  --shadow-glow-blue: 0 0 48px rgba(59, 130, 246, 0.18);
 
   font-family: var(--font-body);
   line-height: 1.55;
@@ -53,9 +54,9 @@ body {
   margin: 0;
   min-height: 100dvh;
   background:
-    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(192, 132, 252, 0.22), transparent 55%),
-    radial-gradient(ellipse 60% 40% at 90% 10%, rgba(94, 234, 212, 0.18), transparent 50%),
-    radial-gradient(ellipse 50% 35% at 50% 100%, rgba(251, 113, 133, 0.12), transparent 55%),
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(37, 99, 235, 0.2), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 90% 10%, rgba(94, 234, 212, 0.16), transparent 50%),
+    radial-gradient(ellipse 50% 35% at 50% 100%, rgba(20, 184, 166, 0.1), transparent 55%),
     linear-gradient(180deg, var(--bg-mid) 0%, var(--bg-deep) 100%);
   background-attachment: fixed;
 }
@@ -92,7 +93,7 @@ button {
   height: 320px;
   top: -80px;
   right: -60px;
-  background: rgba(192, 132, 252, 0.25);
+  background: rgba(37, 99, 235, 0.22);
 }
 
 #root::after {

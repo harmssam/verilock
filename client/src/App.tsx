@@ -1300,7 +1300,7 @@ export default function App() {
         <div className="brand">
           <img
             className="brand-mark"
-            src="/verilock-logo-96.png"
+            src="/verilock-mark-96.png"
             alt=""
             width={48}
             height={48}
