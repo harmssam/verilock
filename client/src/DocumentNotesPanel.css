@@ -1,0 +1,41 @@
+.document-notes-panel {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(59, 130, 246, 0.18);
+}
+
+.document-notes-panel-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.document-notes-panel-block {
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.document-notes-panel-text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.document-notes-panel--compact {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+}
+
+.document-notes-panel--compact .document-notes-panel-block {
+  padding: 0.6rem;
+}
+
+.document-notes-panel--compact .document-notes-panel-text {
+  font-size: 0.85rem;
+}

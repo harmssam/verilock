@@ -21,7 +21,9 @@
   top: calc(100% + 0.45rem);
   right: 0;
   z-index: 30;
-  min-width: 16.5rem;
+  min-width: 22.5rem;
+  width: max-content;
+  max-width: min(calc(100vw - 2rem), 28rem);
   padding: 0.85rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-bright);
@@ -42,10 +44,11 @@
 .wallet-menu-address {
   margin: 0 0 0.75rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   line-height: 1.4;
   color: var(--mint);
-  word-break: break-all;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .wallet-menu-signout {

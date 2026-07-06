@@ -64,6 +64,7 @@ import { NimiqPayOpenPanel } from './NimiqPayOpenPanel'
 import { NimiqLockInfo } from './NimiqLockInfo'
 import { formatSealFeeNim, getSealPricing } from './sealPricing'
 import { ShareInviteCard } from './ShareInviteCard'
+import { DocumentNotesPanel } from './DocumentNotesPanel'
 import { SignaturesPanel } from './SignaturesPanel'
 import { VerifyMatchesPanel } from './VerifyMatchesPanel'
 import { TextLink } from './TextLink'
@@ -1905,12 +1906,8 @@ export default function App() {
               </div>
             )}
             {documentTypeUsesNotes(activeDoc.type) &&
-              typeof activeDoc.metadata?.notes === 'string' &&
-              activeDoc.metadata.notes.trim() && (
-                <div className="document-notes">
-                  <span className="document-filename-label">Notes</span>
-                  <p className="document-notes-body muted">{activeDoc.metadata.notes}</p>
-                </div>
+              typeof activeDoc.metadata?.notes === 'string' && (
+                <DocumentNotesPanel notes={activeDoc.metadata.notes} />
               )}
             <p className="muted">
               Signatures: {activeDoc.signingProgress.signed}/{activeDoc.signingProgress.required}
