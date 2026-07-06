@@ -140,6 +140,14 @@ function scrollToSealedConfirmation(): void {
   })
 }
 
+const CONNECT_PANEL_ID = 'connect-panel'
+
+function scrollToConnectPanel(): void {
+  requestAnimationFrame(() => {
+    document.getElementById(CONNECT_PANEL_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
 function SignaturePad({ onChange }: { onChange: (blob: Blob | null) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawing = useRef(false)
@@ -475,6 +483,8 @@ export default function App() {
 
   const actionableAgreementCount = countActionable(documents, address)
   const walletConnecting = walletStatus !== null && !address
+  const mobilePayConnect =
+    isMobileDevice() && !inNimiqPay && !isNimiqPayHost() && !address
 
   const connectWallet = async (options?: { useRedirect?: boolean; usePopup?: boolean }) => {
     setBusy(true)
@@ -509,6 +519,10 @@ export default function App() {
           if (payResult === 'launched' || payResult === 'already-in-pay') return
           setShowOpenInPay(true)
           setWalletStatus(null)
+          setError(
+            'Install Nimiq Pay on your phone, then open VeriLock from the app — or use the options below.',
+          )
+          scrollToConnectPanel()
           return
         }
 
@@ -536,6 +550,7 @@ export default function App() {
         } catch (hubErr) {
           if (isPopupBlockedError(hubErr)) {
             setShowOpenInPay(true)
+            scrollToConnectPanel()
             throw new Error(popupBlockedHelp())
           }
           const hubMessage = hubErr instanceof Error ? hubErr.message : String(hubErr)
@@ -1474,7 +1489,8 @@ export default function App() {
               className={`header-agreements-link${screen === 'agreements' ? ' header-agreements-link--active' : ''}`}
               onClick={goAgreements}
             >
-              My agreements
+              <span className="header-agreements-label--long">My agreements</span>
+              <span className="header-agreements-label--short">Agreements</span>
               {actionableAgreementCount > 0 && (
                 <span className="header-agreements-badge" aria-label={`${actionableAgreementCount} need action`}>
                   {actionableAgreementCount}
@@ -1491,7 +1507,7 @@ export default function App() {
           </>
         ) : (
           <button
-            className={`btn btn-primary${walletConnecting ? ' btn--busy' : ''}`}
+            className={`btn btn-primary header-connect-btn${walletConnecting ? ' btn--busy' : ''}`}
             onClick={() => void connectWallet()}
             disabled={busy}
             aria-busy={walletConnecting}
@@ -1499,8 +1515,10 @@ export default function App() {
             {walletConnecting ? (
               <>
                 <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
-                Connecting…
+                {mobilePayConnect ? 'Opening…' : 'Connecting…'}
               </>
+            ) : mobilePayConnect ? (
+              'Open in Nimiq Pay'
             ) : (
               'Connect wallet'
             )}
@@ -1648,7 +1666,7 @@ export default function App() {
       {error && <p className="error">{error}</p>}
 
       {!address && !inNimiqPay && !isNimiqPayHost() && screen !== 'verify' && (
-        <div className="card banner-pay">
+        <div id={CONNECT_PANEL_ID} className="card banner-pay connect-panel">
           <h2>Connect with Nimiq Pay or Hub</h2>
           <NimiqPayOpenPanel
             appUrl={appUrl}
@@ -1678,7 +1696,11 @@ export default function App() {
           {!token ? (
             <div className="card">
               <h2>Your agreements</h2>
-              <p className="muted">Connect wallet to view and manage your agreements.</p>
+              <p className="muted">
+                {mobilePayConnect
+                  ? 'Open VeriLock in Nimiq Pay to view and manage your agreements.'
+                  : 'Connect wallet to view and manage your agreements.'}
+              </p>
               <button
                 type="button"
                 className={`btn btn-primary${walletConnecting ? ' btn--busy' : ''}`}
@@ -1686,7 +1708,13 @@ export default function App() {
                 disabled={busy}
                 style={{ marginTop: '0.75rem' }}
               >
-                {walletConnecting ? 'Connecting…' : 'Connect wallet'}
+                {walletConnecting
+                  ? mobilePayConnect
+                    ? 'Opening…'
+                    : 'Connecting…'
+                  : mobilePayConnect
+                    ? 'Open in Nimiq Pay'
+                    : 'Connect wallet'}
               </button>
             </div>
           ) : (
