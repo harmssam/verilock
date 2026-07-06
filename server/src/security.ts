@@ -47,7 +47,7 @@ export function sanitizeFilename(name: string | undefined): string | null {
 export const DOCUMENT_TYPES = ['rental', 'contract', 'nda', 'other'] as const
 export type DocumentType = (typeof DOCUMENT_TYPES)[number]
 
-const MAX_NOTE_LENGTH = 500
+const MAX_NOTE_LENGTH = 256
 const MAX_RENTAL_FIELD_LENGTH = 120
 
 export function sanitizeDocumentType(type: string | undefined): DocumentType {
