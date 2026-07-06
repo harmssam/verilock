@@ -91,8 +91,8 @@ export const SIGNER_STEPS: StepDef[] = [
 
 const ROLE_CHIPS: { id: WorkflowRole; label: string; path: string }[] = [
   { id: 'creator', label: 'Creator', path: 'Fingerprint locally → share → lock' },
-  { id: 'signer', label: 'Signer', path: 'Open link → sign' },
-  { id: 'verifier', label: 'Verifier', path: 'Verify tab only' },
+  { id: 'signer', label: 'Signer(s)', path: 'Open link → sign' },
+  { id: 'verifier', label: 'Verifier', path: 'Verify sealed PDFs' },
 ]
 
 export type WorkflowRole = 'creator' | 'signer' | 'verifier' | 'unknown'
@@ -101,7 +101,7 @@ export function resolveRole(input: {
   hasWallet: boolean
   address: string | null
   activeDoc: SealDocument | null
-  screen: 'home' | 'create' | 'document' | 'verify'
+  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
 }): WorkflowRole {
   if (input.screen === 'verify') return 'verifier'
   if (input.activeDoc && input.screen === 'document') {
@@ -140,7 +140,7 @@ function resolveSignerStep(input: {
 function resolveCreatorStep(input: {
   hasWallet: boolean
   activeDoc: SealDocument | null
-  screen: 'home' | 'create' | 'document' | 'verify'
+  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
 }): CreatorStepId {
   const { hasWallet, activeDoc, screen } = input
 
@@ -164,7 +164,7 @@ function resolveCreatorStep(input: {
 export function resolveCurrentStep(input: {
   hasWallet: boolean
   activeDoc: SealDocument | null
-  screen: 'home' | 'create' | 'document' | 'verify'
+  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
   address?: string | null
 }): WorkflowStepId {
   const role = resolveRole({
@@ -217,7 +217,7 @@ export function getWorkflowHint(input: {
   hasWallet: boolean
   address?: string | null
   activeDoc: SealDocument | null
-  screen: 'home' | 'create' | 'document' | 'verify'
+  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
 }): string {
   const role = resolveRole({
     hasWallet: input.hasWallet,
@@ -277,7 +277,7 @@ function renderWorkflowHint(input: {
   hasWallet: boolean
   address?: string | null
   activeDoc: SealDocument | null
-  screen: 'home' | 'create' | 'document' | 'verify'
+  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
   onGoCreate?: () => void
 }): ReactNode {
   const current = resolveCurrentStep(input)
@@ -314,7 +314,7 @@ interface WorkflowGuideProps {
   hasWallet: boolean
   address?: string | null
   activeDoc: SealDocument | null
-  screen: 'home' | 'create' | 'document' | 'verify'
+  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
   compact?: boolean
   onGoCreate?: () => void
   onConnect?: () => void
@@ -492,7 +492,7 @@ interface WorkflowNextActionProps {
   hasWallet: boolean
   address?: string | null
   activeDoc: SealDocument | null
-  screen: 'home' | 'create' | 'document' | 'verify'
+  screen: 'home' | 'agreements' | 'create' | 'document' | 'verify'
   walletConnecting?: boolean
   onConnect?: () => void
   onGoCreate?: () => void
