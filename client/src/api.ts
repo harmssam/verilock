@@ -80,6 +80,12 @@ export const api = {
   getDocument: (id: string) =>
     request<{ document: SealDocument }>(`/api/documents/${id}`),
 
+  deleteDocument: (token: string, docId: string) =>
+    request<{ ok: boolean }>(`/api/documents/${docId}`, {
+      method: 'DELETE',
+      headers: withAuth(token),
+    }),
+
   signDocument: (token: string, docId: string, body: SignDocumentBody) =>
     request<{ document: SealDocument }>(`/api/documents/${docId}/signatures`, {
       method: 'POST',

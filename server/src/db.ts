@@ -272,6 +272,27 @@ export function lockDocument(id: string, lockedAt: number): void {
   db.prepare('UPDATE documents SET status = ?, locked_at = ? WHERE id = ?').run('locked', lockedAt, id)
 }
 
+export function deleteDocumentById(documentId: string): boolean {
+  const doc = getDocumentById(documentId)
+  if (!doc) return false
+
+  const remove = db.transaction((id: string) => {
+    const signatureIds = db
+      .prepare('SELECT id FROM signatures WHERE document_id = ?')
+      .all(id) as Array<{ id: string }>
+    for (const { id: signatureId } of signatureIds) {
+      db.prepare('DELETE FROM signature_images WHERE signature_id = ?').run(signatureId)
+    }
+    db.prepare('DELETE FROM signatures WHERE document_id = ?').run(id)
+    db.prepare('DELETE FROM attestations WHERE document_id = ?').run(id)
+    db.prepare('DELETE FROM document_parties WHERE document_id = ?').run(id)
+    db.prepare('DELETE FROM documents WHERE id = ?').run(id)
+  })
+
+  remove(documentId)
+  return true
+}
+
 export function listDocumentsForAddress(address: string): DocumentRecord[] {
   const rows = db
     .prepare(

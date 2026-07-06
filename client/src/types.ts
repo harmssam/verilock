@@ -86,6 +86,7 @@ export interface VerifyResult {
   title: string
   originalFilename: string | null
   status: string
+  creatorAddress: string
   originalSha256: string
   finalSha256: string | null
   createdAt: number
