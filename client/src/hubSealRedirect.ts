@@ -4,6 +4,7 @@ import type { ChooseAddressResult, SignedMessage, SignedTransaction } from '@nim
 import {
   clearRpcIdSearchParam,
   consumeRedirectHash,
+  getHubReturnUrl,
   loadStoredRpcRequest,
   readRedirectResponse,
   type RpcRedirectResponse,
@@ -194,7 +195,7 @@ export function processLenientHubRedirect(
         try {
           const { token, nonce } = await getChallenge(address)
           const hub = deps.getHubApi()
-          const behavior = RedirectRequestBehavior.withLocalState({ token })
+          const behavior = new RedirectRequestBehavior(getHubReturnUrl(), { token })
           await hub.signMessage(
             { appName: deps.appName, message: nonce, signer: address },
             behavior as Parameters<typeof hub.signMessage>[1],
