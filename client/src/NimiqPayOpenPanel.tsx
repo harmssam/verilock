@@ -88,7 +88,7 @@ export function NimiqPayOpenPanel({
             {busy ? (
               <>
                 <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
-                Opening Hub…
+                Redirecting to Hub…
               </>
             ) : (
               'Connect via Nimiq Hub'

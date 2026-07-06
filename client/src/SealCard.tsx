@@ -19,7 +19,6 @@ interface SealCardProps {
   sealFundsError?: string | null
   onRefreshFunds?: () => void
   onSeal: () => void
-  onSealRedirect?: () => void
 }
 
 function priorSealFailed(document: SealDocument): boolean {
@@ -40,7 +39,6 @@ export function SealCard({
   sealFundsError,
   onRefreshFunds,
   onSeal,
-  onSealRedirect,
 }: SealCardProps) {
   const pricing = getSealPricing()
   const failedPrior = priorSealFailed(document)
@@ -159,16 +157,6 @@ export function SealCard({
             'Seal via Hub'
           )}
         </button>
-        {!inNimiqPay && !hasNimiqProvider && onSealRedirect && (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            disabled={!canSeal}
-            onClick={onSealRedirect}
-          >
-            Full-page Hub
-          </button>
-        )}
         {onRefreshFunds && !busy && (
           <button
             type="button"
@@ -183,8 +171,8 @@ export function SealCard({
 
       {!inNimiqPay && !hasNimiqProvider && (
         <p className="muted seal-card-hint">
-          On desktop, sealing opens Nimiq Hub in this tab (most reliable). If you prefer a popup,
-          use Try popup — keep this tab open until the transaction is approved.
+          Sealing redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the
+          on-chain proof is confirmed.
         </p>
       )}
 

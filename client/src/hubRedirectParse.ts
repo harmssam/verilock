@@ -118,6 +118,16 @@ export function getHubReturnUrl(): string {
   return `${origin}${pathname}${search}`
 }
 
+const HUB_REFERRER_HOST = 'hub.nimiq.com'
+
+/** True when the page is mid Hub redirect round-trip and rpcRequests must be preserved. */
+export function hasPendingHubRedirect(): boolean {
+  if (typeof window === 'undefined') return false
+  if (peekRedirectHash()) return true
+  if (new URLSearchParams(window.location.search).has(RPC_ID_SEARCH_PARAM)) return true
+  return document.referrer.includes(HUB_REFERRER_HOST)
+}
+
 /** Drop stale Hub RPC entries that cause "Invalid request" on the next connect/seal. */
 export function clearStaleHubRpcState(): void {
   if (typeof window === 'undefined') return
@@ -132,4 +142,10 @@ export function clearStaleHubRpcState(): void {
   } catch {
     // sessionStorage may be blocked in strict privacy modes
   }
+}
+
+/** Only clear Hub RPC storage when not returning from an in-flight redirect. */
+export function clearStaleHubRpcStateIfIdle(): void {
+  if (hasPendingHubRedirect()) return
+  clearStaleHubRpcState()
 }
