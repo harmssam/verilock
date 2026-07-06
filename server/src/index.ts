@@ -128,7 +128,7 @@ app.post('/api/auth/challenge', authChallengeLimit, (req, res) => {
     return
   }
   const normalized = normalizeAddress(address)
-  const nonce = `seal-login:${uuid()}:${Date.now()}`
+  const nonce = `VeriLock sign-in:${uuid()}:${Date.now()}`
   const token = uuid()
   createSession(token, normalized, nonce, SESSION_TTL_MS)
   res.json({ token, nonce, address: normalized })
