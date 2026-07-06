@@ -1,0 +1,176 @@
+import { normalizeAddress } from './addresses'
+import { resolveSigningParty } from './signing'
+import type { SealDocument } from './types'
+
+export type AgreementBucket = 'needs_you' | 'ready_to_seal' | 'waiting' | 'locked'
+
+export interface AgreementView {
+  bucket: AgreementBucket
+  headline: string
+  detail: string
+  cta: string
+}
+
+export const BUCKET_ORDER: AgreementBucket[] = [
+  'needs_you',
+  'ready_to_seal',
+  'waiting',
+  'locked',
+]
+
+export const BUCKET_LABELS: Record<AgreementBucket, string> = {
+  needs_you: 'Needs your action',
+  ready_to_seal: 'Ready to seal',
+  waiting: 'Waiting on others',
+  locked: 'Sealed',
+}
+
+export function isDocumentCreator(doc: SealDocument, address: string | null): boolean {
+  if (!address) return false
+  return normalizeAddress(doc.creatorAddress) === normalizeAddress(address)
+}
+
+export function isCollectingSignatures(doc: SealDocument): boolean {
+  if (doc.status === 'locked') return false
+  return doc.signingProgress.signed < doc.signingProgress.required
+}
+
+export function isSigningComplete(doc: SealDocument): boolean {
+  return doc.signingProgress.signed >= doc.signingProgress.required
+}
+
+export function isSealingPhase(doc: SealDocument): boolean {
+  if (doc.status === 'locked' || doc.attestation?.status === 'confirmed') return false
+  return (
+    doc.status === 'locking' ||
+    doc.status === 'ready_to_lock' ||
+    (doc.signingProgress.signed >= doc.signingProgress.required && doc.status !== 'locked')
+  )
+}
+
+export function getAgreementView(doc: SealDocument, address: string | null): AgreementView {
+  const { signed, required, readyToLock } = doc.signingProgress
+  const progress = `${signed}/${required} signed`
+
+  if (doc.status === 'locked' || doc.attestation?.status === 'confirmed') {
+    return {
+      bucket: 'locked',
+      headline: 'Sealed on-chain',
+      detail: progress,
+      cta: 'View',
+    }
+  }
+
+  const creator = isDocumentCreator(doc, address)
+
+  if (doc.status === 'locking' && doc.attestation?.status !== 'failed') {
+    return {
+      bucket: 'ready_to_seal',
+      headline: doc.attestation?.status === 'pending' ? 'Confirming seal' : 'Sealing in progress',
+      detail: progress,
+      cta: 'View',
+    }
+  }
+
+  if (doc.attestation?.status === 'failed' && doc.status !== 'locked') {
+    return {
+      bucket: 'ready_to_seal',
+      headline: 'Seal again',
+      detail: progress,
+      cta: 'Seal now',
+    }
+  }
+
+  if (readyToLock || doc.status === 'ready_to_lock') {
+    if (creator) {
+      return {
+        bucket: 'ready_to_seal',
+        headline: 'All signed — seal on-chain',
+        detail: progress,
+        cta: 'Seal now',
+      }
+    }
+    return {
+      bucket: 'waiting',
+      headline: 'Waiting to seal',
+      detail: progress,
+      cta: 'View',
+    }
+  }
+
+  if (address) {
+    const resolution = resolveSigningParty(doc, address)
+    if (resolution.ok) {
+      return {
+        bucket: 'needs_you',
+        headline: 'Your signature needed',
+        detail: progress,
+        cta: 'Sign now',
+      }
+    }
+    if (resolution.hint === 'already_signed') {
+      return {
+        bucket: 'waiting',
+        headline: 'You signed — waiting on others',
+        detail: progress,
+        cta: 'View & share',
+      }
+    }
+    if (resolution.hint === 'complete') {
+      return creator
+        ? {
+            bucket: 'ready_to_seal',
+            headline: 'All signed — seal on-chain',
+            detail: progress,
+            cta: 'Seal now',
+          }
+        : {
+            bucket: 'waiting',
+            headline: 'Waiting to seal',
+            detail: progress,
+            cta: 'View',
+          }
+    }
+  }
+
+  if (creator) {
+    return {
+      bucket: 'waiting',
+      headline: 'Waiting for signatures',
+      detail: progress,
+      cta: 'Share & view',
+    }
+  }
+
+  return {
+    bucket: 'waiting',
+    headline: 'In progress',
+    detail: progress,
+    cta: 'View',
+  }
+}
+
+export function groupAgreements(
+  docs: SealDocument[],
+  address: string | null,
+): Record<AgreementBucket, SealDocument[]> {
+  const groups: Record<AgreementBucket, SealDocument[]> = {
+    needs_you: [],
+    ready_to_seal: [],
+    waiting: [],
+    locked: [],
+  }
+
+  for (const doc of docs) {
+    groups[getAgreementView(doc, address).bucket].push(doc)
+  }
+
+  return groups
+}
+
+export function countActionable(docs: SealDocument[], address: string | null): number {
+  return docs.filter(doc => {
+    const bucket = getAgreementView(doc, address).bucket
+    return bucket === 'needs_you' || bucket === 'ready_to_seal'
+  }).length
+}
