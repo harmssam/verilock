@@ -63,6 +63,7 @@ import { NimiqSealInfo } from './NimiqSealInfo'
 import { formatSealFeeNim, getSealPricing } from './sealPricing'
 import { ShareInviteCard } from './ShareInviteCard'
 import { SignaturesPanel } from './SignaturesPanel'
+import { VerifyMatchesPanel } from './VerifyMatchesPanel'
 import { TextLink } from './TextLink'
 import { prepareSignatureImageUpload } from './signatureImage'
 import { getPdfPageCount, sha256Hex } from './pdf/hashPdf'
@@ -233,7 +234,7 @@ export default function App() {
     tone: 'success' | 'warn' | 'neutral'
   } | null>(null)
   const [verifySlug, setVerifySlug] = useState('')
-  const [verifyDetail, setVerifyDetail] = useState<VerifyResult | null>(null)
+  const [verifyMatches, setVerifyMatches] = useState<VerifyResult[]>([])
   const [verifyFromLink, setVerifyFromLink] = useState(false)
   const pendingVerifyLookupRef = useRef<string | null>(null)
   const [shareLinkCopied, setShareLinkCopied] = useState(false)
@@ -1126,41 +1127,82 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const describeVerifyMatch = (match: Pick<VerifyResult, 'title' | 'originalFilename'>) => {
+    const name = match.originalFilename ?? match.title
+    return match.originalFilename && match.originalFilename !== match.title
+      ? `"${match.title}" (${match.originalFilename})`
+      : `"${name}"`
+  }
+
+  const loadVerifyMatches = async (slugs: string[]) => {
+    const uniqueSlugs = [...new Set(slugs)]
+    return Promise.all(uniqueSlugs.map(slug => api.verifyDocument(slug)))
+  }
+
+  const applyVerifyMatches = (details: VerifyResult[]) => {
+    const ordered = [...details].sort((a, b) => (b.lockedAt ?? b.createdAt) - (a.lockedAt ?? a.createdAt))
+    setVerifyMatches(ordered)
+    if (ordered[0]) {
+      setVerifySlug(ordered[0].slug)
+      setVerifyHash(ordered[0].finalSha256 ?? ordered[0].originalSha256)
+    }
+    return ordered
+  }
+
+  const buildVerifyMatchMessage = (details: VerifyResult[]) => {
+    const locked = details.filter(match => match.status === 'locked')
+    if (locked.length === 1 && details.length === 1) {
+      const match = locked[0]!
+      return {
+        message: `${describeVerifyMatch(match)} sealed on ${match.lockedAt ? new Date(match.lockedAt).toLocaleString() : 'unknown'}.`,
+        tone: 'success' as const,
+      }
+    }
+    if (locked.length === 1 && details.length > 1) {
+      return {
+        message: `Your PDF matches ${details.length} agreements — ${describeVerifyMatch(locked[0]!)} is sealed on-chain.`,
+        tone: 'success' as const,
+      }
+    }
+    if (locked.length > 1) {
+      return {
+        message: `Your PDF matches ${locked.length} sealed agreements. Compare dates and document IDs below.`,
+        tone: 'success' as const,
+      }
+    }
+    if (details.length === 1) {
+      const match = details[0]!
+      return {
+        message: `Hash matches ${describeVerifyMatch(match)} but the agreement is not sealed yet.`,
+        tone: 'warn' as const,
+      }
+    }
+    return {
+      message: `Your PDF matches ${details.length} agreements, but none are sealed on-chain yet.`,
+      tone: 'warn' as const,
+    }
+  }
+
   const runVerifyUpload = async () => {
     if (!verifyFile) return
     setBusy(true)
     setError(null)
     setVerifyResult(null)
-    setVerifyDetail(null)
     try {
       const hash = await sha256Hex(await verifyFile.arrayBuffer())
       setVerifyHash(hash)
       const { matches } = await api.verifyHash(hash)
       if (matches.length === 0) {
+        setVerifyMatches([])
         setVerifyResult({
           message: 'No registered document matches this PDF hash.',
           tone: 'neutral',
         })
-      } else {
-        const locked = matches.filter(m => m.status === 'locked')
-        const describeMatch = (match: (typeof matches)[number]) => {
-          const name = match.originalFilename ?? match.title
-          return match.originalFilename && match.originalFilename !== match.title
-            ? `"${match.title}" (${match.originalFilename})`
-            : `"${name}"`
-        }
-        setVerifyResult(
-          locked.length > 0
-            ? {
-                message: `Match found — ${describeMatch(locked[0]!)} is locked on-chain.`,
-                tone: 'success',
-              }
-            : {
-                message: `Hash matches ${describeMatch(matches[0]!)} but document is not locked yet.`,
-                tone: 'warn',
-              },
-        )
+        return
       }
+
+      const details = applyVerifyMatches(await loadVerifyMatches(matches.map(match => match.slug)))
+      setVerifyResult(buildVerifyMatchMessage(details))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verify failed')
     } finally {
@@ -1173,26 +1215,10 @@ export default function App() {
     if (!slug) return
     setBusy(true)
     setError(null)
-    setVerifyDetail(null)
     try {
       const result = await api.verifyDocument(slug)
-      setVerifyDetail(result)
-      setVerifyHash(result.finalSha256 ?? result.originalSha256)
-      const verifyLabel =
-        result.originalFilename && result.originalFilename !== result.title
-          ? `"${result.title}" (${result.originalFilename})`
-          : `"${result.originalFilename ?? result.title}"`
-      setVerifyResult(
-        result.status === 'locked'
-          ? {
-              message: `${verifyLabel} locked at ${result.lockedAt ? new Date(result.lockedAt).toLocaleString() : 'unknown'}`,
-              tone: 'success',
-            }
-          : {
-              message: `Document ${verifyLabel} — status: ${result.status}`,
-              tone: 'neutral',
-            },
-      )
+      const details = applyVerifyMatches([result])
+      setVerifyResult(buildVerifyMatchMessage(details))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verify failed')
     } finally {
@@ -1230,7 +1256,7 @@ export default function App() {
           <span className="wallet-pill">
             {address.slice(0, 8)}…{address.slice(-4)}
           </span>
-        ) : (
+        ) : screen !== 'verify' ? (
           <button
             className={`btn btn-primary${walletConnecting ? ' btn--busy' : ''}`}
             onClick={() => void connectWallet()}
@@ -1246,7 +1272,7 @@ export default function App() {
               'Connect wallet'
             )}
           </button>
-        )}
+        ) : null}
       </header>
 
       {walletStatus && (
@@ -1311,7 +1337,7 @@ export default function App() {
           />
           <NimiqSealInfo />
         </>
-      ) : screen !== 'document' ? (
+      ) : screen !== 'document' && screen !== 'verify' ? (
         <>
           <WorkflowProgress current={workflowStep} role={workflowRole} />
           <WorkflowGuide
@@ -1325,7 +1351,7 @@ export default function App() {
         </>
       ) : null}
 
-      {screen !== 'home' && screen !== 'document' && (
+      {screen !== 'home' && screen !== 'document' && screen !== 'verify' && (
         <WorkflowNextAction
           hasWallet={Boolean(token)}
           address={address}
@@ -1339,7 +1365,7 @@ export default function App() {
 
       {error && <p className="error">{error}</p>}
 
-      {!address && !inNimiqPay && !isNimiqPayHost() && (
+      {!address && !inNimiqPay && !isNimiqPayHost() && screen !== 'verify' && (
         <div className="card banner-pay">
           <h2>Connect with Nimiq Pay or Hub</h2>
           <NimiqPayOpenPanel
@@ -1351,7 +1377,7 @@ export default function App() {
         </div>
       )}
 
-      {showOpenInPay && (
+      {showOpenInPay && screen !== 'verify' && (
         <div className="card banner-popup">
           <h2>Pop-up blocked</h2>
           <p className="muted">Use Nimiq Pay on your phone, or continue with Hub redirect.</p>
@@ -1885,15 +1911,21 @@ export default function App() {
 
       {screen === 'verify' && (
         <div className="card">
-          <h2>{verifyFromLink && verifyDetail ? verifyDetail.title : 'Verify a document'}</h2>
+          <h2>
+            {verifyMatches.length === 1
+              ? verifyMatches[0]!.title
+              : verifyMatches.length > 1
+                ? 'Matching agreements'
+                : 'Verify a document'}
+          </h2>
           <p className="screen-step-label">
             {formatStepLabel({ role: 'verifier', current: 'verify', subtitle: 'Verify anytime' })}
           </p>
           {verifyFromLink ? (
             <p className="muted">
-              {busy && !verifyDetail
+              {busy && verifyMatches.length === 0
                 ? 'Looking up this document…'
-                : verifyDetail
+                : verifyMatches.length > 0
                   ? 'This agreement is registered on VeriLock. Load your PDF copy below to fingerprint it locally and confirm it matches.'
                   : 'No wallet needed. Checking the document from your link.'}
             </p>
@@ -1915,20 +1947,13 @@ export default function App() {
               {verifyResult.message}
             </p>
           )}
-          {verifyDetail?.originalFilename && (
-            <p className="document-filename" style={{ marginTop: '0.75rem' }}>
-              <span className="document-filename-label">PDF file</span>
-              <span className="document-filename-value">{verifyDetail.originalFilename}</span>
-            </p>
-          )}
-          {verifyDetail && verifyDetail.signatures.length > 0 && (
-            <SignaturesPanel
-              signatures={verifyDetail.signatures}
-              parties={verifyDetail.parties}
-            />
-          )}
+          <VerifyMatchesPanel
+            matches={verifyMatches}
+            appUrl={appUrl}
+            highlightSlug={verifyFromLink ? verifySlug : null}
+          />
 
-          {(verifyFromLink ? verifyDetail : true) && (
+          {(verifyFromLink ? verifyMatches.length > 0 : true) && (
             <>
               <div className="field" style={{ marginTop: verifyFromLink ? '1.25rem' : undefined }}>
                 <label>{verifyFromLink ? 'Confirm with your PDF copy' : 'PDF on your computer'}</label>
