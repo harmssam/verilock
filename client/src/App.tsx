@@ -60,7 +60,7 @@ import { DateField } from './DateField'
 import { FilePicker } from './FilePicker'
 import { PrivacyNotice } from './PrivacyNotice'
 import { NimiqPayOpenPanel } from './NimiqPayOpenPanel'
-import { NimiqSealInfo } from './NimiqSealInfo'
+import { NimiqLockInfo } from './NimiqLockInfo'
 import { formatSealFeeNim, getSealPricing } from './sealPricing'
 import { ShareInviteCard } from './ShareInviteCard'
 import { SignaturesPanel } from './SignaturesPanel'
@@ -1401,7 +1401,7 @@ export default function App() {
             shareLinkCopied={shareLinkCopied}
             onCopyShareLink={() => void copyShareLink(workflowShareUrl)}
           />
-          <NimiqSealInfo />
+          <NimiqLockInfo />
         </>
       ) : screen !== 'document' && screen !== 'verify' ? (
         <>

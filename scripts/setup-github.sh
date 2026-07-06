@@ -16,42 +16,32 @@ if [ ! -d .git ]; then
 fi
 
 LOGIN="$(gh api user -q .login)"
-NIMIQ_REPO="${LOGIN}/nimiq-seal"
-VERILOCK_REPO="${LOGIN}/verilock"
+REPO="${LOGIN}/verilock"
 
 ACTION="unknown"
-if gh repo view "$NIMIQ_REPO" >/dev/null 2>&1; then
-  if gh repo view "$VERILOCK_REPO" >/dev/null 2>&1; then
-    echo "Both nimiq-seal and verilock exist on GitHub — linking to verilock."
-    ACTION="exists"
-  else
-    echo "Renaming ${NIMIQ_REPO} → verilock..."
-    gh repo rename verilock --repo "$NIMIQ_REPO" --yes
-    ACTION="renamed"
-  fi
-elif gh repo view "$VERILOCK_REPO" >/dev/null 2>&1; then
+if gh repo view "$REPO" >/dev/null 2>&1; then
   echo "verilock repo already exists."
   ACTION="exists"
 else
-  echo "Creating ${VERILOCK_REPO}..."
-  gh repo create verilock --private --source=. --remote=origin --push=false
+  echo "Creating ${REPO}..."
+  gh repo create verilock --public --source=. --remote=origin --push=false
   ACTION="created"
 fi
 
 if ! git remote get-url origin >/dev/null 2>&1; then
-  git remote add origin "https://github.com/${VERILOCK_REPO}.git"
+  git remote add origin "https://github.com/${REPO}.git"
 fi
 
 git add -A
 if git diff --cached --quiet; then
   echo "No changes to commit."
 else
-  git commit -m "Rebrand to VeriLock"
+  git commit -m "Prepare VeriLock for public release"
 fi
 
 git push -u origin main
 
 echo ""
 echo "Action: ${ACTION}"
-echo "Repo:   https://github.com/${VERILOCK_REPO}"
+echo "Repo:   https://github.com/${REPO}"
 git remote -v
