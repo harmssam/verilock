@@ -1,5 +1,6 @@
 import { Trash2 } from 'lucide-react'
 import { canDeleteDocument } from './agreements'
+import { DocumentNotesPanel } from './DocumentNotesPanel'
 import { SignaturesPanel } from './SignaturesPanel'
 import { documentTypeUsesNotes, type VerifyResult } from './types'
 import './VerifyMatchesPanel.css'
@@ -60,12 +61,8 @@ export function VerifyMatchesPanel({
                 </p>
               )}
               {documentTypeUsesNotes(match.type) &&
-                typeof match.metadata?.notes === 'string' &&
-                match.metadata.notes.trim() && (
-                  <div className="document-notes verify-match-notes">
-                    <span className="document-filename-label">Notes</span>
-                    <p className="document-notes-body muted">{match.metadata.notes}</p>
-                  </div>
+                typeof match.metadata?.notes === 'string' && (
+                  <DocumentNotesPanel notes={match.metadata.notes} compact />
                 )}
               <dl className="verify-match-meta">
                 <div>

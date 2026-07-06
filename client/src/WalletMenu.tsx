@@ -1,6 +1,6 @@
 import { LogOut } from 'lucide-react'
 import { useEffect, useId, useRef } from 'react'
-import { shortAddress } from './addresses'
+import { formatDisplayAddress, shortAddress } from './addresses'
 import './WalletMenu.css'
 
 interface WalletMenuProps {
@@ -51,8 +51,8 @@ export function WalletMenu({ address, open, onToggle, onClose, onSignOut }: Wall
       {open && (
         <div className="wallet-menu-dropdown" id={menuId} role="menu">
           <p className="wallet-menu-label">Connected wallet</p>
-          <p className="wallet-menu-address" title={address}>
-            {address}
+          <p className="wallet-menu-address" title={formatDisplayAddress(address)}>
+            {formatDisplayAddress(address)}
           </p>
           <button
             type="button"
