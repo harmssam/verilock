@@ -67,6 +67,7 @@ import { ShareInviteCard } from './ShareInviteCard'
 import { SignaturesPanel } from './SignaturesPanel'
 import { VerifyMatchesPanel } from './VerifyMatchesPanel'
 import { TextLink } from './TextLink'
+import { WalletMenu } from './WalletMenu'
 import { prepareSignatureImageUpload } from './signatureImage'
 import { getPdfPageCount, sha256Hex } from './pdf/hashPdf'
 import {
@@ -249,6 +250,7 @@ export default function App() {
   const [deletingVerifyId, setDeletingVerifyId] = useState<string | null>(null)
   const pendingVerifyLookupRef = useRef<string | null>(null)
   const [shareLinkCopied, setShareLinkCopied] = useState(false)
+  const [walletMenuOpen, setWalletMenuOpen] = useState(false)
 
   const appUrl = typeof window !== 'undefined' ? window.location.origin : ''
   const seedSignPdfHashRef = useRef<string | null>(null)
@@ -427,6 +429,20 @@ export default function App() {
     setActiveDoc(null)
     goToCreate()
   }, [goToCreate])
+
+  const signOut = useCallback(() => {
+    clearSession()
+    setToken(null)
+    setAddress(null)
+    setDocuments([])
+    setActiveDoc(null)
+    setNimiq(null)
+    setError(null)
+    setWalletStatus(null)
+    setWalletMenuOpen(false)
+    setScreen('agreements')
+    window.history.pushState({}, '', '/agreements')
+  }, [])
 
   const actionableAgreementCount = countActionable(documents, address)
   const walletConnecting = walletStatus !== null && !address
@@ -1350,23 +1366,25 @@ export default function App() {
         </div>
         {address ? (
           <div className="header-actions">
-            {documents.length > 0 && (
-              <button
-                type="button"
-                className={`header-agreements-link${screen === 'agreements' ? ' header-agreements-link--active' : ''}`}
-                onClick={goAgreements}
-              >
-                My agreements
-                {actionableAgreementCount > 0 && (
-                  <span className="header-agreements-badge" aria-label={`${actionableAgreementCount} need action`}>
-                    {actionableAgreementCount}
-                  </span>
-                )}
-              </button>
-            )}
-            <span className="wallet-pill">
-              {address.slice(0, 8)}…{address.slice(-4)}
-            </span>
+            <button
+              type="button"
+              className={`header-agreements-link${screen === 'agreements' ? ' header-agreements-link--active' : ''}`}
+              onClick={goAgreements}
+            >
+              My agreements
+              {actionableAgreementCount > 0 && (
+                <span className="header-agreements-badge" aria-label={`${actionableAgreementCount} need action`}>
+                  {actionableAgreementCount}
+                </span>
+              )}
+            </button>
+            <WalletMenu
+              address={address}
+              open={walletMenuOpen}
+              onToggle={() => setWalletMenuOpen(open => !open)}
+              onClose={() => setWalletMenuOpen(false)}
+              onSignOut={signOut}
+            />
           </div>
         ) : (
           <button
@@ -1458,6 +1476,7 @@ export default function App() {
               onOpen={openDocument}
               onSeal={slug => void triggerSeal(slug)}
               onCreateNew={goToCreate}
+              onSignOut={signOut}
             />
           )}
           {token && documents.length > 0 && (
@@ -1575,6 +1594,7 @@ export default function App() {
                 onOpen={openDocument}
                 onSeal={slug => void triggerSeal(slug)}
                 onCreateNew={goToCreate}
+                onSignOut={signOut}
               />
               <p className="agreements-page-link muted">
                 New here?{' '}
@@ -1594,6 +1614,7 @@ export default function App() {
           onOpen={openDocument}
           onSeal={slug => void triggerSeal(slug)}
           onCreateNew={goToCreate}
+          onSignOut={signOut}
         />
       )}
 
