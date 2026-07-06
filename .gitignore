@@ -1,0 +1,11 @@
+node_modules/
+.npm-cache/
+# Keep .railway/config.json — links CLI to the correct project
+dist/
+client/dist/
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+.DS_Store

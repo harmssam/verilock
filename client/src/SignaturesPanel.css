@@ -1,0 +1,81 @@
+.signatures-panel {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(192, 132, 252, 0.2);
+}
+
+.signatures-panel-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.signatures-panel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.signatures-panel-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.signatures-panel-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.signatures-panel-meta strong {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.signatures-panel-meta .muted {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.signatures-panel-typed {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--text-dim);
+}
+
+.signatures-panel-image {
+  flex: 0 0 auto;
+  max-width: min(100%, 220px);
+  height: auto;
+  max-height: 88px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #fff;
+  padding: 0.35rem;
+}
+
+.signatures-panel--compact .signatures-panel-item {
+  padding: 0.6rem;
+}
+
+.signatures-panel--compact .signatures-panel-image {
+  max-width: min(100%, 180px);
+  max-height: 72px;
+}

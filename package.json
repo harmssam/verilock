@@ -1,0 +1,25 @@
+{
+  "name": "verilock",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VeriLock — PDF signer mini app; anchor document hashes on the Nimiq blockchain",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sharms/verilock.git"
+  },
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "build": "npm install --prefix server && npm install --prefix client && npm run build --prefix client",
+    "start": "NODE_ENV=production npm run start --prefix server",
+    "start:local": "npm run start --prefix server",
+    "start:prod-local": "NODE_ENV=production PORT=3003 CORS_ORIGIN=http://localhost:3003 DATA_DIR=./server/data npm run start --prefix server"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

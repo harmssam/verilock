@@ -1,0 +1,152 @@
+.nimiq-info-card {
+  margin-bottom: 1rem;
+}
+
+.nimiq-info-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+
+.nimiq-info-title-icon {
+  flex-shrink: 0;
+  color: var(--mint);
+}
+
+.nimiq-info-lead {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.nimiq-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.nimiq-info-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.nimiq-info-section-icon {
+  color: var(--sky);
+}
+
+.nimiq-info-steps,
+.nimiq-info-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.nimiq-info-steps li + li,
+.nimiq-info-list li + li {
+  margin-top: 0.35rem;
+}
+
+.nimiq-info-list strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.nimiq-info-pricing {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(94, 234, 212, 0.25);
+  background: rgba(94, 234, 212, 0.06);
+}
+
+.nimiq-info-pricing-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.nimiq-info-pricing-icon {
+  flex-shrink: 0;
+  color: var(--amber);
+  margin-top: 0.1rem;
+}
+
+.nimiq-info-pricing-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin-bottom: 0.15rem;
+}
+
+.nimiq-info-pricing-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.55rem;
+}
+
+.nimiq-info-pricing-current {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--mint);
+}
+
+.nimiq-info-pricing-was {
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.nimiq-info-pricing-per {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.nimiq-info-promo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.55rem;
+}
+
+.nimiq-info-promo-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-warm);
+  color: #0a0618;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.nimiq-info-promo-note {
+  font-size: 0.8rem;
+}
+
+.nimiq-info-pricing-note {
+  margin: 0.55rem 0 0;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .nimiq-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
