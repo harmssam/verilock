@@ -10,9 +10,9 @@ export {
   LUNA_PER_NIM,
   SEAL_TX_FEE_BUFFER_LUNA,
   type SealPricing,
-} from '../../shared/sealPricing.js'
+} from './shared/sealPricing.js'
 
-import { getSealFeeLuna } from '../../shared/sealPricing.js'
+import { getSealFeeLuna } from './shared/sealPricing.js'
 
 /** Legacy seal fees from earlier pricing (luna). */
 export const LEGACY_SEAL_FEE_LUNA = [0, 1, 100_000, 1_000_000] as const

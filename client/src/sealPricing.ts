@@ -1,7 +1,7 @@
 import {
   getSealPricing as resolveSealPricing,
   type SealPricing,
-} from '../../shared/sealPricing'
+} from './shared/sealPricing'
 
 export {
   BASE_SEAL_FEE_NIM,
@@ -15,7 +15,7 @@ export {
   LUNA_PER_NIM,
   SEAL_TX_FEE_BUFFER_LUNA,
   type SealPricing,
-} from '../../shared/sealPricing'
+} from './shared/sealPricing'
 
 export function formatSealFeeNim(feeNim: number): string {
   const formatted = Number.isInteger(feeNim) ? String(feeNim) : feeNim.toFixed(2)
