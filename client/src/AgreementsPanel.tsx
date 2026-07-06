@@ -1,4 +1,5 @@
 import { FilePlus } from 'lucide-react'
+import { shortAddress } from './addresses'
 import { shortHash } from './pdf/hashPdf'
 import {
   BUCKET_LABELS,
@@ -20,6 +21,7 @@ interface AgreementsPanelProps {
   onOpen: (slug: string) => void
   onSeal?: (slug: string) => void
   onCreateNew?: () => void
+  onSignOut?: () => void
 }
 
 function statusClass(bucket: string): string {
@@ -56,6 +58,7 @@ export function AgreementsPanel({
   onOpen,
   onSeal,
   onCreateNew,
+  onSignOut,
 }: AgreementsPanelProps) {
   const groups = groupAgreements(documents, address)
   const actionable = countActionable(documents, address)
@@ -115,9 +118,23 @@ export function AgreementsPanel({
             </button>
           )}
         </div>
-        <p className="muted">
-          No agreements yet — create one by fingerprinting a PDF on your computer and collecting signatures.
-        </p>
+        {address ? (
+          <>
+            <p className="muted">
+              No agreements found for <span className="agreements-wallet">{shortAddress(address)}</span>.
+              Agreements are tied to the wallet that created or signed them.
+            </p>
+            {onSignOut && (
+              <button type="button" className="btn btn-secondary agreements-signout-btn" onClick={onSignOut}>
+                Sign out and try another wallet
+              </button>
+            )}
+          </>
+        ) : (
+          <p className="muted">
+            No agreements yet — create one by fingerprinting a PDF on your computer and collecting signatures.
+          </p>
+        )}
       </div>
     )
   }
@@ -139,6 +156,7 @@ export function AgreementsPanel({
             <p className="muted agreements-panel-subtitle">
               {documents.length} total
               {actionable > 0 ? ` · ${actionable} need${actionable === 1 ? 's' : ''} your action` : ''}
+              {sealedCount > 0 ? ` · ${sealedCount} sealed` : ''}
             </p>
           )}
         </div>

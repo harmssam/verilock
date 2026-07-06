@@ -119,7 +119,8 @@
   text-align: center;
 }
 
-.wallet-pill {
+.wallet-pill,
+.wallet-menu-trigger {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -133,7 +134,8 @@
   color: var(--mint);
 }
 
-.wallet-pill::before {
+.wallet-pill::before,
+.wallet-menu-trigger::before {
   content: '';
   width: 7px;
   height: 7px;

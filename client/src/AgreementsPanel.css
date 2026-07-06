@@ -19,6 +19,15 @@
   font-size: 0.88rem;
 }
 
+.agreements-wallet {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--mint);
+}
+
+.agreements-signout-btn {
+  margin-top: 0.85rem;
+}
+
 .agreements-panel-header .btn {
   flex-shrink: 0;
 }

@@ -293,15 +293,23 @@ export function deleteDocumentById(documentId: string): boolean {
   return true
 }
 
+function normalizedAddressExpr(column: string): string {
+  return `UPPER(REPLACE(${column}, ' ', ''))`
+}
+
 export function listDocumentsForAddress(address: string): DocumentRecord[] {
+  const wallet = normalizeAddress(address)
   const rows = db
     .prepare(
       `SELECT DISTINCT d.* FROM documents d
        LEFT JOIN document_parties p ON p.document_id = d.id
-       WHERE d.creator_address = ? OR p.wallet_address = ?
-       ORDER BY d.created_at DESC LIMIT 50`,
+       LEFT JOIN signatures s ON s.document_id = d.id
+       WHERE ${normalizedAddressExpr('d.creator_address')} = ?
+          OR ${normalizedAddressExpr('p.wallet_address')} = ?
+          OR ${normalizedAddressExpr('s.signer_address')} = ?
+       ORDER BY d.created_at DESC LIMIT 100`,
     )
-    .all(normalizeAddress(address), normalizeAddress(address)) as Record<string, unknown>[]
+    .all(wallet, wallet, wallet) as Record<string, unknown>[]
   return rows.map(rowToDocument)
 }
 
