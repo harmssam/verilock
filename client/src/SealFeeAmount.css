@@ -1,0 +1,74 @@
+.seal-fee-amount {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.55rem;
+}
+
+.seal-fee-amount-nim {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--mint);
+}
+
+.seal-fee-amount-fiat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.seal-fee-amount-fiat-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.seal-fee-amount-currency {
+  appearance: none;
+  border: 1px solid rgba(94, 234, 212, 0.25);
+  border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.12rem 1.2rem 0.12rem 0.45rem;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.35rem center;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.seal-fee-amount-currency:hover {
+  border-color: rgba(94, 234, 212, 0.45);
+  color: var(--text);
+}
+
+.seal-fee-amount-currency:focus {
+  outline: none;
+  border-color: var(--mint);
+  box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.15);
+}
+
+.seal-fee-amount-currency option {
+  color: #0a0618;
+}
+
+.seal-fee-amount-was {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.45rem;
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.seal-fee-amount-was-nim {
+  font-size: 0.95rem;
+}
+
+.seal-fee-amount-was-fiat {
+  font-size: 0.82rem;
+}

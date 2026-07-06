@@ -98,19 +98,6 @@
   gap: 0.4rem 0.55rem;
 }
 
-.nimiq-info-pricing-current {
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: var(--mint);
-}
-
-.nimiq-info-pricing-was {
-  font-size: 0.95rem;
-  color: var(--text-dim);
-  text-decoration: line-through;
-}
-
 .nimiq-info-pricing-per {
   font-size: 0.82rem;
   color: var(--text-muted);
