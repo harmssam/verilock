@@ -1,4 +1,4 @@
-export type AppScreen = 'home' | 'agreements' | 'create' | 'document' | 'verify' | 'pricing'
+export type AppScreen = 'home' | 'agreements' | 'create' | 'document' | 'verify' | 'pricing' | 'privacy'
 
 export interface DocumentParty {
   id: string

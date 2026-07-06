@@ -57,6 +57,7 @@ import {
   documentSlugFromPath,
   isAgreementsPath,
   isPricingPath,
+  isPrivacyPath,
   readHubReturnPath,
   verifySlugFromPath,
 } from './hubReturnPath'
@@ -67,6 +68,7 @@ import { PrivacyNotice } from './PrivacyNotice'
 import { NimiqPayOpenPanel } from './NimiqPayOpenPanel'
 import { NimiqLockInfo } from './NimiqLockInfo'
 import { PricePage } from './PricePage'
+import { PrivacyPolicyPage } from './PrivacyPolicyPage'
 import { evaluateSealFunds, insufficientSealFundsMessage } from './sealFunds'
 import { formatSealFeeNim, getSealPricing } from './sealPricing'
 import { useSealFunds } from './useSealFunds'
@@ -453,6 +455,11 @@ export default function App() {
   const goPricing = useCallback(() => {
     setScreen('pricing')
     window.history.pushState({}, '', '/pricing')
+  }, [])
+
+  const goPrivacy = useCallback(() => {
+    setScreen('privacy')
+    window.history.pushState({}, '', '/privacy')
   }, [])
 
   useEffect(() => {
@@ -1289,6 +1296,8 @@ export default function App() {
         setScreen('agreements')
       } else if (isPricingPath(path)) {
         setScreen('pricing')
+      } else if (isPrivacyPath(path)) {
+        setScreen('privacy')
       } else if (sessionToken && bootDocumentCount > 0 && path === '/') {
         setScreen('agreements')
         window.history.replaceState({}, '', '/agreements')
@@ -2289,6 +2298,8 @@ export default function App() {
 
       {screen === 'pricing' && <PricePage />}
 
+      {screen === 'privacy' && <PrivacyPolicyPage />}
+
       {screen === 'verify' && (
         <div className="card">
           <h2>
@@ -2374,6 +2385,17 @@ export default function App() {
           )}
         </div>
       )}
+
+      <footer className="app-footer">
+        <p className="app-footer-tagline muted">VeriLock · Sign together. Prove forever.</p>
+        <button
+          type="button"
+          className={`app-footer-link${screen === 'privacy' ? ' app-footer-link--active' : ''}`}
+          onClick={goPrivacy}
+        >
+          Privacy Policy
+        </button>
+      </footer>
     </div>
   )
 }
