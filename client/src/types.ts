@@ -1,3 +1,5 @@
+export type AppScreen = 'home' | 'agreements' | 'create' | 'document' | 'verify' | 'pricing'
+
 export interface DocumentParty {
   id: string
   role: string
@@ -41,8 +43,6 @@ export type DocumentMetadata = RentalMetadata | NotesMetadata
 
 export const DOCUMENT_TYPES = ['rental', 'contract', 'nda', 'other'] as const
 export type DocumentType = (typeof DOCUMENT_TYPES)[number]
-
-export const MAX_DOCUMENT_NOTES_LENGTH = 256
 
 export function documentTypeUsesNotes(type: string): boolean {
   return type === 'nda' || type === 'other'

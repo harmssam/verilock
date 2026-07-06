@@ -11,6 +11,7 @@ import {
   updateDocumentStatus,
   type AttestationRecord,
 } from './db.js'
+import { assertDocumentCreator } from './documents.js'
 import {
   buildAttestationPayload,
   isTransactionNotFoundError,
@@ -61,8 +62,7 @@ export async function submitAttestation(
   txHash: string,
   senderAddress: string,
 ): Promise<AttestationResult> {
-  const doc = getDocumentById(documentId)
-  if (!doc) throw new Error('Document not found')
+  const doc = assertDocumentCreator(documentId, senderAddress)
   if (!doc.finalSha256) throw new Error('Document not prepared for lock')
   if (doc.status !== 'ready_to_lock' && doc.status !== 'locking') {
     throw new Error('Document is not ready to lock')

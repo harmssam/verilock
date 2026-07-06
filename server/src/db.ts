@@ -208,6 +208,11 @@ export function markSessionVerified(token: string, publicKey: string): void {
   db.prepare('UPDATE sessions SET public_key = ?, verified = 1 WHERE token = ?').run(publicKey, token)
 }
 
+export function purgeExpiredSessions(): number {
+  const result = db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now())
+  return result.changes
+}
+
 function rowToDocument(row: Record<string, unknown>): DocumentRecord {
   const requiredSignatures = row.required_signatures as number | null | undefined
   return {

@@ -26,29 +26,42 @@ export function resolveCorsOrigin(): string | string[] | true {
   return raw.split(',').map(origin => origin.trim()).filter(Boolean)
 }
 
+/** Keep in sync with client/src/fieldLimits.ts */
+export const MAX_TITLE_LENGTH = 120
+export const MAX_DISPLAY_NAME_LENGTH = 48
+export const MAX_NOTE_LENGTH = 256
+export const MAX_RENTAL_FIELD_LENGTH = 120
+export const MAX_FILENAME_LENGTH = 255
+
+function stripControlChars(value: string): string {
+  return value.replace(/[\u0000-\u001f\u007f]/g, '')
+}
+
 export function sanitizeDisplayName(name: string | undefined, fallback: string): string {
-  const cleaned = (name ?? fallback)
-    .replace(/[\u0000-\u001f\u007f]/g, '')
+  const cleaned = stripControlChars(name ?? fallback)
     .trim()
-    .slice(0, 48)
+    .slice(0, MAX_DISPLAY_NAME_LENGTH)
+  return cleaned || fallback
+}
+
+export function sanitizeTitle(title: string | undefined, fallback = 'Untitled agreement'): string {
+  const cleaned = stripControlChars(title ?? '')
+    .trim()
+    .slice(0, MAX_TITLE_LENGTH)
   return cleaned || fallback
 }
 
 export function sanitizeFilename(name: string | undefined): string | null {
   if (!name) return null
-  const cleaned = name
-    .replace(/[\u0000-\u001f\u007f]/g, '')
+  const cleaned = stripControlChars(name)
     .replace(/[/\\]/g, '_')
     .trim()
-    .slice(0, 255)
+    .slice(0, MAX_FILENAME_LENGTH)
   return cleaned || null
 }
 
 export const DOCUMENT_TYPES = ['rental', 'contract', 'nda', 'other'] as const
 export type DocumentType = (typeof DOCUMENT_TYPES)[number]
-
-const MAX_NOTE_LENGTH = 256
-const MAX_RENTAL_FIELD_LENGTH = 120
 
 export function sanitizeDocumentType(type: string | undefined): DocumentType {
   if (type && (DOCUMENT_TYPES as readonly string[]).includes(type)) {
@@ -59,7 +72,7 @@ export function sanitizeDocumentType(type: string | undefined): DocumentType {
 
 function sanitizeMetadataString(value: unknown, maxLength: number): string | undefined {
   if (typeof value !== 'string') return undefined
-  const cleaned = value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, maxLength)
+  const cleaned = stripControlChars(value).trim().slice(0, maxLength)
   return cleaned || undefined
 }
 

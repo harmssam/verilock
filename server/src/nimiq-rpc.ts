@@ -202,6 +202,15 @@ export async function getBlockNumber(): Promise<number> {
   return rpcCall<number>('getBlockNumber', [])
 }
 
+export async function getWalletBalanceLuna(address: string): Promise<number> {
+  const client = await getBroadcastClient()
+  const account = await client.getAccount(normalizeAddress(address))
+  if ('balance' in account && typeof account.balance === 'number') {
+    return account.balance
+  }
+  return 0
+}
+
 export function normalizeRawTransactionHex(rawTx: string): string {
   const clean = rawTx.replace(/^0x/i, '').trim()
   if (!/^[0-9a-fA-F]+$/.test(clean) || clean.length % 2 !== 0) {

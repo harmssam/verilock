@@ -36,7 +36,10 @@ export function VerifyMatchesPanel({
     <div className="verify-matches">
       {matches.length > 1 && (
         <p className="verify-matches-intro muted">
-          This PDF fingerprint matches {matches.length} agreements on VeriLock. Compare dates and IDs below.
+          This PDF fingerprint matches {matches.length} agreements on VeriLock. Compare dates and IDs below
+          {matches.some(match => match.status === 'locked')
+            ? ' — prefer a sealed on-chain record when one exists.'
+            : '.'}
         </p>
       )}
       <ul className="verify-matches-list">

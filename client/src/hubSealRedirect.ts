@@ -10,9 +10,8 @@ import {
   type StoredRpcRequest,
 } from './hubRedirectParse'
 import { loadSealInFlight } from './sealRecovery'
+import type { BroadcastFallbackFactory, TransactionBroadcastFallback } from './nimiq'
 import { sealError, sealLog, sealWarn } from './sealDebug'
-export type TransactionBroadcastFallback = (serializedTx: string) => Promise<void>
-export type BroadcastFallbackFactory = (token: string) => TransactionBroadcastFallback
 
 const { RedirectRequestBehavior, RequestType } = HubApi
 
@@ -104,7 +103,7 @@ function completeLockRedirect(
     const lockWork = deps
       .finalizeHubLockTransaction(signed, {
         hubBroadcast,
-        broadcastFallback: createBroadcastFallback?.(token),
+        broadcastFallback: createBroadcastFallback?.(token, docId),
       })
       .then(async txHash => {
         sealLog('hub:lenientLockRelayed', { docId, txHash })

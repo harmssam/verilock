@@ -53,6 +53,7 @@ import {
   consumeHubReturnPath,
   documentSlugFromPath,
   isAgreementsPath,
+  isPricingPath,
   readHubReturnPath,
   verifySlugFromPath,
 } from './hubReturnPath'
@@ -62,7 +63,10 @@ import { FilePicker } from './FilePicker'
 import { PrivacyNotice } from './PrivacyNotice'
 import { NimiqPayOpenPanel } from './NimiqPayOpenPanel'
 import { NimiqLockInfo } from './NimiqLockInfo'
+import { PricePage } from './PricePage'
+import { evaluateSealFunds, insufficientSealFundsMessage } from './sealFunds'
 import { formatSealFeeNim, getSealPricing } from './sealPricing'
+import { useSealFunds } from './useSealFunds'
 import { ShareInviteCard } from './ShareInviteCard'
 import { DocumentNotesPanel } from './DocumentNotesPanel'
 import { SignaturesPanel } from './SignaturesPanel'
@@ -78,8 +82,15 @@ import {
   resolveSigningParty,
 } from './signing'
 import {
-  documentTypeUsesNotes,
+  clampField,
+  MAX_DISPLAY_NAME_LENGTH,
   MAX_DOCUMENT_NOTES_LENGTH,
+  MAX_RENTAL_FIELD_LENGTH,
+  MAX_TITLE_LENGTH,
+} from './fieldLimits'
+import {
+  documentTypeUsesNotes,
+  type AppScreen,
   type DocumentMetadata,
   type RentalMetadata,
   type SealDocument,
@@ -95,11 +106,9 @@ import {
 } from './WorkflowGuide'
 import './App.css'
 
-type Screen = 'home' | 'agreements' | 'create' | 'document' | 'verify'
-
-const createServerBroadcastFallback: BroadcastFallbackFactory = sessionToken => {
+const createServerBroadcastFallback: BroadcastFallbackFactory = (sessionToken, docId) => {
   return async serializedTx => {
-    await api.broadcastTransaction(sessionToken, serializedTx)
+    await api.broadcastTransaction(sessionToken, docId, serializedTx)
   }
 }
 
@@ -199,13 +208,14 @@ function SignaturePad({ onChange }: { onChange: (blob: Blob | null) => void }) {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('home')
+  const [screen, setScreen] = useState<AppScreen>('home')
   const [token, setToken] = useState<string | null>(null)
   const [address, setAddress] = useState<string | null>(null)
   const [nimiq, setNimiq] = useState<NimiqProvider | null>(null)
   const [documents, setDocuments] = useState<SealDocument[]>([])
   const [activeDoc, setActiveDoc] = useState<SealDocument | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [docNotice, setDocNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [inNimiqPay, setInNimiqPay] = useState(false)
 
@@ -274,6 +284,14 @@ export default function App() {
   const isCreatorOnDoc =
     workflowRole === 'creator' && screen === 'document' && activeDoc !== null
   const isInvitedSigner = workflowRole === 'signer' && screen === 'document' && activeDoc !== null
+  const shouldCheckSealFunds =
+    Boolean(token && address && activeDoc && isCreatorOnDoc && isSealingPhase(activeDoc) && activeDoc.status !== 'locked')
+  const {
+    status: sealFundsStatus,
+    loading: sealFundsLoading,
+    error: sealFundsError,
+    refresh: refreshSealFunds,
+  } = useSealFunds(token, shouldCheckSealFunds)
 
 
 
@@ -420,6 +438,11 @@ export default function App() {
     if (token) void refreshMe(token)
   }, [token, refreshMe])
 
+  const goPricing = useCallback(() => {
+    setScreen('pricing')
+    window.history.pushState({}, '', '/pricing')
+  }, [])
+
   useEffect(() => {
     if (screen === 'agreements' && token) {
       void refreshMe(token)
@@ -547,7 +570,7 @@ export default function App() {
       setPdfHash(hash)
       setPageCount(pages)
       if (!title.trim()) {
-        setTitle(file.name.replace(/\.pdf$/i, ''))
+        setTitle(clampField(file.name.replace(/\.pdf$/i, ''), MAX_TITLE_LENGTH))
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to read PDF')
@@ -613,32 +636,40 @@ export default function App() {
         role: otherRole,
         displayName:
           index === 0 && tenantName.trim()
-            ? tenantName.trim()
+            ? clampField(tenantName.trim(), MAX_DISPLAY_NAME_LENGTH)
             : otherDefaultName(index, extraSigners),
         required: true,
       }))
       let metadata: DocumentMetadata | undefined
       if (docType === 'rental') {
         const rental: RentalMetadata = {
-          propertyAddress: propertyAddress.trim() || undefined,
-          monthlyRent: monthlyRent.trim() || undefined,
-          deposit: deposit.trim() || undefined,
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
+          propertyAddress: propertyAddress.trim()
+            ? clampField(propertyAddress.trim(), MAX_RENTAL_FIELD_LENGTH)
+            : undefined,
+          monthlyRent: monthlyRent.trim()
+            ? clampField(monthlyRent.trim(), MAX_RENTAL_FIELD_LENGTH)
+            : undefined,
+          deposit: deposit.trim()
+            ? clampField(deposit.trim(), MAX_RENTAL_FIELD_LENGTH)
+            : undefined,
+          startDate: startDate
+            ? clampField(startDate, MAX_RENTAL_FIELD_LENGTH)
+            : undefined,
+          endDate: endDate ? clampField(endDate, MAX_RENTAL_FIELD_LENGTH) : undefined,
         }
         if (Object.values(rental).some(Boolean)) {
           metadata = rental
         }
       } else if (documentTypeUsesNotes(docType)) {
-        const notes = docNotes.trim().slice(0, MAX_DOCUMENT_NOTES_LENGTH)
+        const notes = clampField(docNotes.trim(), MAX_DOCUMENT_NOTES_LENGTH)
         if (notes) metadata = { notes }
       }
-      const { document } = await api.createDocument(token, {
-        title: title || pdfFile.name.replace(/\.pdf$/i, ''),
+      const { document, hashWarning } = await api.createDocument(token, {
+        title: clampField(title || pdfFile.name.replace(/\.pdf$/i, ''), MAX_TITLE_LENGTH),
         originalFileName: pdfFile.name,
         type: docType,
         creatorRole,
-        creatorDisplayName: myName.trim(),
+        creatorDisplayName: clampField(myName.trim(), MAX_DISPLAY_NAME_LENGTH),
         originalSha256: pdfHash,
         pageCount,
         requiredSignatures,
@@ -647,6 +678,7 @@ export default function App() {
       })
       seedSignPdfHashRef.current = pdfHash
       resetCreateForm()
+      setDocNotice(hashWarning ?? null)
       setActiveDoc(document)
       setScreen('document')
       window.history.pushState({}, '', `/d/${document.slug}`)
@@ -695,7 +727,9 @@ export default function App() {
         partyId: myParty.id,
         signatureType: sigBlob ? 'drawn' : 'typed',
         clientSha256: activeDoc.originalSha256,
-        displayName: partyNeedsSignerName(myParty) ? signerName.trim() : undefined,
+        displayName: partyNeedsSignerName(myParty)
+          ? clampField(signerName.trim(), MAX_DISPLAY_NAME_LENGTH)
+          : undefined,
         signatureImage,
       })
       setSigBlob(null)
@@ -754,6 +788,27 @@ export default function App() {
     scrollToSealedConfirmation()
   }
 
+  const ensureSealFunds = useCallback(async (): Promise<boolean> => {
+    if (!token) return false
+    try {
+      const result = await api.walletBalance(token)
+      if (result.sufficient) return true
+      const message = insufficientSealFundsMessage(evaluateSealFunds(result.balanceLuna))
+      setLockError(message)
+      setLockMessage(message)
+      setError(message)
+      void refreshSealFunds()
+      return false
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Could not verify wallet balance before sealing'
+      setLockError(message)
+      setLockMessage(message)
+      setError(message)
+      return false
+    }
+  }, [token, refreshSealFunds])
+
   const lockDocument = async (options?: { useRedirect?: boolean; preferPopup?: boolean }) => {
     if (peekHubRedirectInUrl()) {
       sealWarn('lockDocument:skipped (hub redirect response in URL)')
@@ -771,6 +826,17 @@ export default function App() {
       })
       return
     }
+
+    if (sealFundsStatus && !sealFundsStatus.sufficient) {
+      const message = insufficientSealFundsMessage(sealFundsStatus)
+      setLockError(message)
+      setLockMessage(message)
+      setError(message)
+      return
+    }
+
+    const funded = await ensureSealFunds()
+    if (!funded) return
 
     sealInFlightRef.current = true
     const finalHash = activeDoc.finalSha256 ?? activeDoc.originalSha256
@@ -826,7 +892,7 @@ export default function App() {
         txHash = await sendLockAttestationViaHub(address, activeDoc.id, finalHash, {
           preferRedirect,
           token,
-          broadcastFallback: createServerBroadcastFallback(token),
+          broadcastFallback: createServerBroadcastFallback(token, activeDoc.id),
         })
       }
 
@@ -911,6 +977,7 @@ export default function App() {
         busy,
         sealInFlight: sealInFlightRef.current,
         alreadyAttempted: autoLockAttemptedRef.current.has(activeDoc.id),
+        hasSufficientFunds: sealFundsStatus?.sufficient ?? false,
       })
     ) {
       return
@@ -928,6 +995,7 @@ export default function App() {
     token,
     address,
     busy,
+    sealFundsStatus?.sufficient,
   ])
 
   useEffect(() => {
@@ -1193,6 +1261,8 @@ export default function App() {
         pendingVerifyLookupRef.current = verifySlugFromUrl
       } else if (isAgreementsPath(path)) {
         setScreen('agreements')
+      } else if (isPricingPath(path)) {
+        setScreen('pricing')
       } else if (sessionToken && bootDocumentCount > 0 && path === '/') {
         setScreen('agreements')
         window.history.replaceState({}, '', '/agreements')
@@ -1351,7 +1421,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <div className="brand">
+        <button type="button" className="brand" onClick={goHome} aria-label="VeriLock home">
           <img
             className="brand-mark"
             src="/verilock-mark-96.png"
@@ -1364,9 +1434,17 @@ export default function App() {
             <h1>VeriLock</h1>
             <p>Sign together. Prove forever.</p>
           </div>
-        </div>
+        </button>
+        <div className="header-actions">
+          <button
+            type="button"
+            className={`header-pricing-link${screen === 'pricing' ? ' header-pricing-link--active' : ''}`}
+            onClick={goPricing}
+          >
+            Pricing
+          </button>
         {address ? (
-          <div className="header-actions">
+          <>
             <button
               type="button"
               className={`header-agreements-link${screen === 'agreements' ? ' header-agreements-link--active' : ''}`}
@@ -1386,7 +1464,7 @@ export default function App() {
               onClose={() => setWalletMenuOpen(false)}
               onSignOut={signOut}
             />
-          </div>
+          </>
         ) : (
           <button
             className={`btn btn-primary${walletConnecting ? ' btn--busy' : ''}`}
@@ -1404,6 +1482,7 @@ export default function App() {
             )}
           </button>
         )}
+        </div>
       </header>
 
       {walletStatus && (
@@ -1514,7 +1593,7 @@ export default function App() {
               onGoCreate={goToCreate}
             />
           )}
-          <NimiqLockInfo />
+          <NimiqLockInfo onOpenPricing={goPricing} />
         </>
       ) : screen === 'create' ? (
         <>
@@ -1650,7 +1729,8 @@ export default function App() {
             <label>Title</label>
             <input
               value={title}
-              onChange={e => setTitle(e.target.value)}
+              onChange={e => setTitle(clampField(e.target.value, MAX_TITLE_LENGTH))}
+              maxLength={MAX_TITLE_LENGTH}
               placeholder={
                 docType === 'rental'
                   ? '123 Main St — 12-month lease'
@@ -1681,7 +1761,8 @@ export default function App() {
             <label>Your full name</label>
             <input
               value={myName}
-              onChange={e => setMyName(e.target.value)}
+              onChange={e => setMyName(clampField(e.target.value, MAX_DISPLAY_NAME_LENGTH))}
+              maxLength={MAX_DISPLAY_NAME_LENGTH}
               placeholder="e.g. Alex Morgan"
               autoComplete="name"
             />
@@ -1716,7 +1797,8 @@ export default function App() {
             </label>
             <input
               value={tenantName}
-              onChange={e => setTenantName(e.target.value)}
+              onChange={e => setTenantName(clampField(e.target.value, MAX_DISPLAY_NAME_LENGTH))}
+              maxLength={MAX_DISPLAY_NAME_LENGTH}
               placeholder="Leave blank — they enter their name when signing"
             />
           </div>
@@ -1725,7 +1807,7 @@ export default function App() {
               <label>Notes (optional)</label>
               <textarea
                 value={docNotes}
-                onChange={e => setDocNotes(e.target.value.slice(0, MAX_DOCUMENT_NOTES_LENGTH))}
+                onChange={e => setDocNotes(clampField(e.target.value, MAX_DOCUMENT_NOTES_LENGTH))}
                 placeholder={
                   docType === 'nda'
                     ? 'e.g. Effective date, parties covered, or signing context'
@@ -1747,18 +1829,29 @@ export default function App() {
                 <label>Property address</label>
                 <input
                   value={propertyAddress}
-                  onChange={e => setPropertyAddress(e.target.value)}
+                  onChange={e => setPropertyAddress(clampField(e.target.value, MAX_RENTAL_FIELD_LENGTH))}
+                  maxLength={MAX_RENTAL_FIELD_LENGTH}
                   placeholder="123 Main St, Apt 4B"
                 />
               </div>
               <div className="row">
                 <div className="field" style={{ flex: 1 }}>
                   <label>Monthly rent</label>
-                  <input value={monthlyRent} onChange={e => setMonthlyRent(e.target.value)} placeholder="$1,200" />
+                  <input
+                    value={monthlyRent}
+                    onChange={e => setMonthlyRent(clampField(e.target.value, MAX_RENTAL_FIELD_LENGTH))}
+                    maxLength={MAX_RENTAL_FIELD_LENGTH}
+                    placeholder="$1,200"
+                  />
                 </div>
                 <div className="field" style={{ flex: 1 }}>
                   <label>Deposit</label>
-                  <input value={deposit} onChange={e => setDeposit(e.target.value)} placeholder="$1,200" />
+                  <input
+                    value={deposit}
+                    onChange={e => setDeposit(clampField(e.target.value, MAX_RENTAL_FIELD_LENGTH))}
+                    maxLength={MAX_RENTAL_FIELD_LENGTH}
+                    placeholder="$1,200"
+                  />
                 </div>
               </div>
               <div className="row">
@@ -1833,6 +1926,13 @@ export default function App() {
 
       {screen === 'document' && activeDoc && (
         <>
+          {docNotice && (
+            <div className="card doc-notice" role="status">
+              <CircleAlert size={18} strokeWidth={2.25} aria-hidden />
+              <p>{docNotice}</p>
+            </div>
+          )}
+
           {!token && (
             <div className="card banner-sign">
               <h2>Sign this agreement</h2>
@@ -2040,7 +2140,8 @@ export default function App() {
                     <label>Your full name</label>
                     <input
                       value={signerName}
-                      onChange={e => setSignerName(e.target.value)}
+                      onChange={e => setSignerName(clampField(e.target.value, MAX_DISPLAY_NAME_LENGTH))}
+                      maxLength={MAX_DISPLAY_NAME_LENGTH}
                       placeholder="e.g. Alex Tenant"
                       autoComplete="name"
                       disabled={!pdfVerified}
@@ -2075,6 +2176,10 @@ export default function App() {
               inNimiqPay={inNimiqPay}
               hasNimiqProvider={Boolean(nimiq)}
               showOpenInPay={showOpenInPay}
+              sealFunds={sealFundsStatus}
+              sealFundsLoading={sealFundsLoading}
+              sealFundsError={sealFundsError}
+              onRefreshFunds={() => void refreshSealFunds()}
               onSeal={() => void triggerSeal()}
               onSealPopup={() => void lockDocument({ preferPopup: true })}
             />
@@ -2143,6 +2248,8 @@ export default function App() {
           )}
         </>
       )}
+
+      {screen === 'pricing' && <PricePage />}
 
       {screen === 'verify' && (
         <div className="card">

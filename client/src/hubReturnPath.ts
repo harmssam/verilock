@@ -42,6 +42,10 @@ export function isAgreementsPath(path: string): boolean {
   return /^\/agreements\/?$/.test(path)
 }
 
+export function isPricingPath(path: string): boolean {
+  return /^\/pricing\/?$/.test(path)
+}
+
 export function resolveDocumentSlugFromLocation(pathname?: string): string | null {
   const path = pathname ?? (typeof window !== 'undefined' ? window.location.pathname : '')
   return documentSlugFromPath(path) ?? (readHubReturnPath() ? documentSlugFromPath(readHubReturnPath()!) : null)

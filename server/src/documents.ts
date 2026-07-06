@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid'
 import {
   deleteDocumentById,
+  findDocumentsByHash,
   getDocumentById,
   getDocumentBySlug,
   getPartiesForDocument,
@@ -28,12 +29,31 @@ import {
   sanitizeDocumentMetadata,
   sanitizeDocumentType,
   sanitizeFilename,
+  sanitizeTitle,
 } from './security.js'
 import { hashSignatureImage } from './signature-image.js'
 import { getSealPricing } from './sealPricing.js'
 
 function slugFromId(id: string): string {
   return id.replace(/-/g, '').slice(0, 12)
+}
+
+export function assertDocumentCreator(documentId: string, requesterAddress: string): DocumentRecord {
+  const doc = getDocumentById(documentId)
+  if (!doc) throw new Error('Document not found')
+  if (normalizeAddress(doc.creatorAddress) !== normalizeAddress(requesterAddress)) {
+    throw new Error('Only the creator can seal this agreement')
+  }
+  return doc
+}
+
+export function assertSealBroadcastAllowed(documentId: string, requesterAddress: string): DocumentRecord {
+  const doc = assertDocumentCreator(documentId, requesterAddress)
+  if (!doc.finalSha256) throw new Error('Document not prepared for lock')
+  if (doc.status !== 'ready_to_lock' && doc.status !== 'locking') {
+    throw new Error('Document is not in seal flow')
+  }
+  return doc
 }
 
 const MIN_REQUIRED_SIGNATURES = 1
@@ -224,7 +244,7 @@ export function createDocument(input: {
   const doc: DocumentRecord = {
     id,
     slug,
-    title: input.title.trim().slice(0, 120) || 'Untitled agreement',
+    title: sanitizeTitle(input.title),
     originalFilename: sanitizeFilename(input.originalFileName),
     type,
     status: 'collecting_signatures',
@@ -255,18 +275,26 @@ export function createDocument(input: {
   }
   insertParty(creatorParty)
 
+  const priorMatches = findDocumentsByHash(doc.originalSha256).filter(existing => existing.id !== id)
+  const hashWarning =
+    priorMatches.length > 0
+      ? `${priorMatches.length} other agreement(s) already use this PDF fingerprint. Verify the sealed record before trusting a match.`
+      : undefined
+
   const extraPartyCount = Math.max(0, requiredSignatures - 1)
   const providedParties = input.parties ?? []
 
   for (let index = 0; index < extraPartyCount; index++) {
     const provided = providedParties[index]
+    const fallbackName = defaultOtherDisplayName(otherRole, index, extraPartyCount)
+    const providedName = provided?.displayName?.trim()
     insertParty({
       id: uuid(),
       documentId: id,
       role: provided?.role || otherRole,
-      displayName:
-        provided?.displayName?.trim() ||
-        defaultOtherDisplayName(otherRole, index, extraPartyCount),
+      displayName: providedName
+        ? sanitizeDisplayName(providedName, fallbackName)
+        : fallbackName,
       walletAddress: provided?.walletAddress ? normalizeAddress(provided.walletAddress) : null,
       sortOrder: index + 1,
       required: true,
@@ -275,7 +303,7 @@ export function createDocument(input: {
     })
   }
 
-  return publicDocument(doc)
+  return { document: publicDocument(doc), hashWarning }
 }
 
 export function addSignature(input: {
@@ -370,9 +398,8 @@ export function addSignature(input: {
   return publicDocument(getDocumentById(input.documentId)!)
 }
 
-export function prepareLock(documentId: string, finalSha256: string) {
-  const doc = getDocumentById(documentId)
-  if (!doc) throw new Error('Document not found')
+export function prepareLock(documentId: string, finalSha256: string, requesterAddress: string) {
+  const doc = assertDocumentCreator(documentId, requesterAddress)
 
   if (doc.status === 'locking') {
     updateDocumentStatus(documentId, 'ready_to_lock')
@@ -394,9 +421,8 @@ export function prepareLock(documentId: string, finalSha256: string) {
   }
 }
 
-export function beginLock(documentId: string) {
-  const doc = getDocumentById(documentId)
-  if (!doc) throw new Error('Document not found')
+export function beginLock(documentId: string, requesterAddress: string) {
+  const doc = assertDocumentCreator(documentId, requesterAddress)
   if (!doc.finalSha256) throw new Error('Call prepare-lock first')
   updateDocumentStatus(documentId, 'locking')
   return publicDocument(getDocumentById(documentId)!)

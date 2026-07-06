@@ -1,5 +1,6 @@
 import { LoaderCircle, ShieldCheck } from 'lucide-react'
 import { NimiqPayOpenPanel } from './NimiqPayOpenPanel'
+import { insufficientSealFundsMessage, type SealFundsStatus } from './sealFunds'
 import { formatSealFeeSummary, getSealPricing } from './sealPricing'
 import type { SealDocument } from './types'
 import './SealCard.css'
@@ -13,6 +14,10 @@ interface SealCardProps {
   inNimiqPay: boolean
   hasNimiqProvider: boolean
   showOpenInPay: boolean
+  sealFunds: SealFundsStatus | null
+  sealFundsLoading?: boolean
+  sealFundsError?: string | null
+  onRefreshFunds?: () => void
   onSeal: () => void
   onSealPopup?: () => void
 }
@@ -30,19 +35,27 @@ export function SealCard({
   inNimiqPay,
   hasNimiqProvider,
   showOpenInPay,
+  sealFunds,
+  sealFundsLoading = false,
+  sealFundsError,
+  onRefreshFunds,
   onSeal,
   onSealPopup,
 }: SealCardProps) {
   const pricing = getSealPricing()
   const failedPrior = priorSealFailed(document)
   const interrupted = (document.status === 'locking' && !busy) || failedPrior
+  const insufficientFunds = sealFunds !== null && !sealFunds.sufficient
+  const canSeal = !busy && !insufficientFunds && !sealFundsLoading
   const title = busy
     ? 'Sealing on-chain…'
-    : failedPrior
-      ? 'Retry seal'
-      : interrupted
-        ? 'Seal interrupted'
-        : 'Ready to seal'
+    : insufficientFunds
+      ? 'Add NIM to seal'
+      : failedPrior
+        ? 'Retry seal'
+        : interrupted
+          ? 'Seal interrupted'
+          : 'Ready to seal'
 
   return (
     <div className={`card seal-card${busy ? ' seal-card--active' : ''}`}>
@@ -60,13 +73,15 @@ export function SealCard({
             {document.signingProgress.signed}/{document.signingProgress.required} signed —{' '}
             {busy
               ? 'approve the wallet prompt to finish.'
-              : failedPrior
-                ? 'your signatures are safe — the last transaction never reached the blockchain.'
-                : interrupted
-                  ? 'the last seal attempt did not finish. Try again.'
-                  : `approve one Nimiq transaction (${formatSealFeeSummary(pricing)}) to permanently record this document's fingerprint on-chain. Your PDF stays on your computer.`}
+              : insufficientFunds
+                ? 'Your wallet does not have enough NIM for the seal fee and network costs.'
+                : failedPrior
+                  ? 'your signatures are safe — the last transaction never reached the blockchain.'
+                  : interrupted
+                    ? 'the last seal attempt did not finish. Try again.'
+                    : `approve one Nimiq transaction (${formatSealFeeSummary(pricing)}) to permanently record this document's fingerprint on-chain. Your PDF stays on your computer.`}
           </p>
-          {!busy && !failedPrior && !interrupted && pricing.promoActive && (
+          {!busy && !failedPrior && !interrupted && !insufficientFunds && pricing.promoActive && (
             <p className="seal-card-promo">
               <span className="seal-card-promo-badge">{pricing.promoLabel}</span>
             </p>
@@ -74,7 +89,24 @@ export function SealCard({
         </div>
       </div>
 
-      {failedPrior && !busy && !lockError && (
+      {insufficientFunds && sealFunds && !busy && (
+        <p className="seal-card-funds-warning" role="alert">
+          {insufficientSealFundsMessage(sealFunds)}
+        </p>
+      )}
+
+      {sealFundsError && !sealFundsLoading && !busy && (
+        <p className="seal-card-notice" role="status">
+          Could not verify wallet balance ({sealFundsError}).{' '}
+          {onRefreshFunds && (
+            <button type="button" className="text-link" onClick={onRefreshFunds}>
+              Try again
+            </button>
+          )}
+        </p>
+      )}
+
+      {failedPrior && !busy && !lockError && !insufficientFunds && (
         <p className="seal-card-notice" role="status">
           Previous seal did not confirm on-chain. Tap below to sign a new transaction in Hub.
         </p>
@@ -104,7 +136,7 @@ export function SealCard({
         <button
           type="button"
           className={`btn btn-primary seal-card-btn${busy ? ' seal-card-btn--busy' : ''}`}
-          disabled={busy}
+          disabled={!canSeal}
           onClick={onSeal}
         >
           {busy ? (
@@ -112,6 +144,13 @@ export function SealCard({
               <LoaderCircle className="seal-card-btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
               Sealing…
             </>
+          ) : sealFundsLoading ? (
+            <>
+              <LoaderCircle className="seal-card-btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+              Checking balance…
+            </>
+          ) : insufficientFunds ? (
+            'Add NIM to continue'
           ) : interrupted ? (
             'Retry seal'
           ) : inNimiqPay || hasNimiqProvider ? (
@@ -124,10 +163,20 @@ export function SealCard({
           <button
             type="button"
             className="btn btn-secondary"
-            disabled={busy}
+            disabled={!canSeal}
             onClick={onSealPopup}
           >
             Try popup
+          </button>
+        )}
+        {onRefreshFunds && !busy && (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={sealFundsLoading}
+            onClick={onRefreshFunds}
+          >
+            Refresh balance
           </button>
         )}
       </div>

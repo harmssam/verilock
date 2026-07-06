@@ -71,7 +71,7 @@ export const api = {
     }),
 
   createDocument: (token: string, body: CreateDocumentBody) =>
-    request<{ document: SealDocument }>('/api/documents', {
+    request<{ document: SealDocument; hashWarning?: string }>('/api/documents', {
       method: 'POST',
       headers: { ...withAuth(token), 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -102,6 +102,16 @@ export const api = {
       promoLabel: string | null
       promoEndsLabel: string | null
     }>('/api/seal-pricing'),
+
+  walletBalance: (token: string) =>
+    request<{
+      address: string
+      balanceLuna: number
+      requiredLuna: number
+      sufficient: boolean
+    }>('/api/wallet-balance', {
+      headers: withAuth(token),
+    }),
 
   nimPrices: () =>
     request<{
@@ -139,11 +149,11 @@ export const api = {
       headers: { ...withAuth(token) },
     }),
 
-  broadcastTransaction: (token: string, serializedTx: string) =>
+  broadcastTransaction: (token: string, documentId: string, serializedTx: string) =>
     request<{ hash: string }>('/api/transactions/broadcast', {
       method: 'POST',
       headers: { ...withAuth(token), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ serializedTx }),
+      body: JSON.stringify({ documentId, serializedTx }),
     }),
 
   submitAttestation: (token: string, docId: string, txHash: string) =>

@@ -9,6 +9,7 @@ import express from 'express'
 import cors from 'cors'
 import { existsSync } from 'node:fs'
 import { v4 as uuid } from 'uuid'
+import { publicKeyBindingResult } from './auth-wallet.js'
 import { normalizeAddress } from './addresses.js'
 import {
   createSession,
@@ -20,6 +21,7 @@ import {
 } from './db.js'
 import {
   addSignature,
+  assertSealBroadcastAllowed,
   beginLock,
   createDocument,
   deleteDocument,
@@ -41,8 +43,11 @@ import {
   startAttestationPoller,
   submitAttestation,
 } from './attestations.js'
+import { applySecurityHeaders } from './http-headers.js'
 import { getNimPrices } from './nimPrices.js'
-import { getSealPricing } from './sealPricing.js'
+import { getWalletBalanceLuna } from './nimiq-rpc.js'
+import { getMinimumSealBalanceLuna, getSealPricing, hasSufficientSealBalance } from './sealPricing.js'
+import { startSessionCleanup } from './session-cleanup.js'
 
 assertSafeBootConfig()
 
@@ -54,6 +59,7 @@ const SKIP_CHAIN_VERIFY = process.env.SKIP_CHAIN_VERIFY === 'true'
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
 const app = express()
+applySecurityHeaders(app)
 app.use(cors({ origin: CORS_ORIGIN }))
 app.use(express.json({ limit: '2mb' }))
 
@@ -61,6 +67,19 @@ const authChallengeLimit = rateLimit(12, 60_000)
 const authVerifyLimit = rateLimit(24, 60_000)
 const docLimit = rateLimit(30, 60_000)
 const attestLimit = rateLimit(24, 60_000)
+const walletBalanceLimit = rateLimit(30, 60_000)
+const publicReadLimit = rateLimit(60, 60_000)
+const verifyHashLimit = rateLimit(20, 60_000)
+
+function lockErrorStatus(message: string): number {
+  if (message === 'Only the creator can seal this agreement') return 403
+  if (message === 'Document not found') return 404
+  return 400
+}
+
+function routeParam(value: string | string[]): string {
+  return Array.isArray(value) ? value[0]! : value
+}
 
 function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
   const token = req.headers.authorization?.replace('Bearer ', '')
@@ -94,6 +113,10 @@ function requireVerifiedWallet(
 }
 
 app.get('/api/health', (_req, res) => {
+  if (IS_PRODUCTION) {
+    res.json({ ok: true })
+    return
+  }
   res.json({
     ok: true,
     app: 'verilock',
@@ -117,6 +140,24 @@ app.get('/api/nim-prices', async (_req, res) => {
   } catch (err) {
     res.status(502).json({
       error: err instanceof Error ? err.message : 'Could not fetch NIM prices',
+    })
+  }
+})
+
+app.get('/api/wallet-balance', authMiddleware, requireVerifiedWallet, walletBalanceLimit, async (_req, res) => {
+  try {
+    const address = res.locals.address as string
+    const balanceLuna = await getWalletBalanceLuna(address)
+    const requiredLuna = getMinimumSealBalanceLuna()
+    res.json({
+      address,
+      balanceLuna,
+      requiredLuna,
+      sufficient: hasSufficientSealBalance(balanceLuna),
+    })
+  } catch (err) {
+    res.status(502).json({
+      error: err instanceof Error ? err.message : 'Could not fetch wallet balance',
     })
   }
 })
@@ -174,6 +215,16 @@ app.post('/api/auth/verify', authVerifyLimit, authMiddleware, async (req, res) =
     return
   }
 
+  const binding = publicKeyBindingResult(publicKey, session.address)
+  if (binding === 'mismatch') {
+    res.status(401).json({ error: 'Public key does not match the wallet address for this session' })
+    return
+  }
+  if (binding === 'invalid' && !SKIP_CHAIN_VERIFY) {
+    res.status(401).json({ error: 'Invalid public key' })
+    return
+  }
+
   markSessionVerified(token, publicKey)
   res.json({ ok: true, address: session.address, verified: true })
 })
@@ -209,7 +260,7 @@ app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req
     return
   }
 
-  const doc = createDocument({
+  const { document: doc, hashWarning } = createDocument({
     title: body.title ?? 'Untitled agreement',
     originalFileName: body.originalFileName,
     type: body.type ?? 'rental',
@@ -223,11 +274,11 @@ app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req
     requiredSignatures: body.requiredSignatures,
   })
 
-  res.status(201).json({ document: doc })
+  res.status(201).json({ document: doc, ...(hashWarning ? { hashWarning } : {}) })
 })
 
-app.get('/api/documents/:id', (req, res) => {
-  const doc = getDocumentPublic(req.params.id!)
+app.get('/api/documents/:id', publicReadLimit, (req, res) => {
+  const doc = getDocumentPublic(routeParam(req.params.id))
   if (!doc) {
     res.status(404).json({ error: 'Document not found' })
     return
@@ -238,7 +289,7 @@ app.get('/api/documents/:id', (req, res) => {
 app.delete('/api/documents/:id', docLimit, authMiddleware, requireVerifiedWallet, (req, res) => {
   const address = res.locals.address as string
   try {
-    deleteDocument(req.params.id!, address)
+    deleteDocument(routeParam(req.params.id), address)
     res.json({ ok: true })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Delete failed'
@@ -263,7 +314,7 @@ app.post('/api/documents/:id/signatures', docLimit, authMiddleware, requireVerif
   }
 
   const address = res.locals.address as string
-  const docId = req.params.id!
+  const docId = routeParam(req.params.id)
 
   try {
     let imageBuffer: Buffer | undefined
@@ -321,36 +372,47 @@ app.post('/api/documents/:id/prepare-lock', docLimit, authMiddleware, requireVer
     res.status(400).json({ error: 'Valid finalSha256 required' })
     return
   }
+  const address = res.locals.address as string
   try {
-    const result = prepareLock(req.params.id!, finalSha256.toLowerCase())
+    const result = prepareLock(routeParam(req.params.id), finalSha256.toLowerCase(), address)
     res.json(result)
   } catch (err) {
-    res.status(400).json({ error: err instanceof Error ? err.message : 'Prepare lock failed' })
+    const message = err instanceof Error ? err.message : 'Prepare lock failed'
+    res.status(lockErrorStatus(message)).json({ error: message })
   }
 })
 
 app.post('/api/transactions/broadcast', attestLimit, authMiddleware, requireVerifiedWallet, async (req, res) => {
-  const { serializedTx } = req.body as { serializedTx?: string }
+  const { serializedTx, documentId } = req.body as { serializedTx?: string; documentId?: string }
+  if (!documentId?.trim()) {
+    res.status(400).json({ error: 'documentId required' })
+    return
+  }
   if (!serializedTx?.trim()) {
     res.status(400).json({ error: 'serializedTx required' })
     return
   }
 
+  const address = res.locals.address as string
   try {
+    assertSealBroadcastAllowed(documentId, address)
     normalizeRawTransactionHex(serializedTx)
     const hash = await broadcastRawTransaction(serializedTx)
     res.json({ hash })
   } catch (err) {
-    res.status(400).json({ error: err instanceof Error ? err.message : 'Broadcast failed' })
+    const message = err instanceof Error ? err.message : 'Broadcast failed'
+    res.status(lockErrorStatus(message)).json({ error: message })
   }
 })
 
 app.post('/api/documents/:id/begin-lock', docLimit, authMiddleware, requireVerifiedWallet, (req, res) => {
+  const address = res.locals.address as string
   try {
-    const document = beginLock(req.params.id!)
+    const document = beginLock(routeParam(req.params.id), address)
     res.json({ document })
   } catch (err) {
-    res.status(400).json({ error: err instanceof Error ? err.message : 'Begin lock failed' })
+    const message = err instanceof Error ? err.message : 'Begin lock failed'
+    res.status(lockErrorStatus(message)).json({ error: message })
   }
 })
 
@@ -363,20 +425,21 @@ app.post('/api/documents/:id/attestations', attestLimit, authMiddleware, require
 
   const address = res.locals.address as string
   try {
-    const result = await submitAttestation(req.params.id!, txHash, address)
+    const result = await submitAttestation(routeParam(req.params.id), txHash, address)
     res.json(result)
   } catch (err) {
-    res.status(400).json({ error: err instanceof Error ? err.message : 'Attestation failed' })
+    const message = err instanceof Error ? err.message : 'Attestation failed'
+    res.status(lockErrorStatus(message)).json({ error: message })
   }
 })
 
 app.get('/api/attestations/status/:txHash', authMiddleware, async (req, res) => {
   try {
-    const result = await resolveAttestation(req.params.txHash!)
+    const result = await resolveAttestation(routeParam(req.params.txHash))
     res.json(result)
   } catch (err) {
     try {
-      const status = getAttestationStatus(req.params.txHash!)
+      const status = getAttestationStatus(routeParam(req.params.txHash))
       res.json(status)
     } catch {
       res.status(404).json({ error: err instanceof Error ? err.message : 'Not found' })
@@ -384,8 +447,8 @@ app.get('/api/attestations/status/:txHash', authMiddleware, async (req, res) => 
   }
 })
 
-app.get('/api/verify/:idOrSlug', (req, res) => {
-  const doc = getDocumentPublic(req.params.idOrSlug!)
+app.get('/api/verify/:idOrSlug', publicReadLimit, (req, res) => {
+  const doc = getDocumentPublic(routeParam(req.params.idOrSlug))
   if (!doc) {
     res.status(404).json({ error: 'Document not found' })
     return
@@ -409,8 +472,8 @@ app.get('/api/verify/:idOrSlug', (req, res) => {
   })
 })
 
-app.get('/api/documents/:id/certificate', (req, res) => {
-  const cert = buildCertificate(req.params.id!)
+app.get('/api/documents/:id/certificate', publicReadLimit, (req, res) => {
+  const cert = buildCertificate(routeParam(req.params.id))
   if (!cert) {
     res.status(404).json({ error: 'Document not found' })
     return
@@ -418,7 +481,7 @@ app.get('/api/documents/:id/certificate', (req, res) => {
   res.json(cert)
 })
 
-app.post('/api/verify/hash', (req, res) => {
+app.post('/api/verify/hash', verifyHashLimit, (req, res) => {
   const { sha256 } = req.body as { sha256?: string }
   if (!sha256 || !/^[a-f0-9]{64}$/i.test(sha256)) {
     res.status(400).json({ error: 'Valid sha256 required' })
@@ -438,6 +501,7 @@ app.post('/api/verify/hash', (req, res) => {
 })
 
 startAttestationPoller()
+startSessionCleanup()
 
 if (IS_PRODUCTION) {
   attachClientStatic(app)
