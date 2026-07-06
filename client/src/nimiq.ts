@@ -17,7 +17,8 @@ export type { HubLockRedirectResult }
 
 const HUB_ENDPOINT = import.meta.env.VITE_NIMIQ_HUB_URL ?? 'https://hub.nimiq.com'
 const NIMIQ_RPC_URL = import.meta.env.VITE_NIMIQ_RPC_URL ?? 'https://rpc.nimiqwatch.com'
-const APP_NAME = import.meta.env.VITE_APP_NAME ?? 'VeriLock'
+/** Shown in Nimiq Hub / Pay when approving login and seal transactions. */
+const APP_NAME = 'VeriLock'
 
 export type WalletMode = 'nimiq-pay' | 'hub'
 

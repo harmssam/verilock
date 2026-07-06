@@ -96,7 +96,7 @@ VeriLock uses a **challenge–response** pattern recommended for third-party Hub
 
 | Step | Endpoint | Implementation |
 |------|----------|----------------|
-| 1. Challenge | `POST /api/auth/challenge` | `server/src/index.ts` — nonce `seal-login:{uuid}:{timestamp}`, session token |
+| 1. Challenge | `POST /api/auth/challenge` | `server/src/index.ts` — nonce `VeriLock sign-in:{uuid}:{timestamp}`, session token |
 | 2. Verify | `POST /api/auth/verify` | Hub: `verifyHubSignedMessage` (`server/src/hub-signature.ts`); Pay: RPC `verifySignature` (`server/src/nimiq-rpc.ts`) |
 
 Hub messages use the Keyguard prefix documented in the [transactions guide — Message Prefixing](https://www.nimiq.dev/hub/guide/transactions#message-prefixing):
@@ -338,7 +338,7 @@ Background poller: every 5s, pending attestations younger than 120s (`startAttes
 |----------|---------|---------|
 | `VITE_NIMIQ_HUB_URL` | `https://hub.nimiq.com` | `client/src/nimiq.ts` — `HubApi` endpoint |
 | `VITE_NIMIQ_RPC_URL` | `https://rpc.nimiqwatch.com` | Client-side `sendRawTransaction` / tx lookup |
-| `VITE_APP_NAME` | `VeriLock` | Hub `appName` shown in Hub UI |
+| Hub `appName` | `VeriLock` (hardcoded in `client/src/nimiq.ts`) | Label shown in Hub / Pay approval dialogs |
 | `VITE_ATTESTATION_RECIPIENT` | Nimiq Foundation (see `getHubAttestationRecipient`) | Hub checkout recipient (must ≠ sender) |
 | `VITE_API_URL` | `''` (same origin) | `client/src/api.ts` — dev proxy vs production monolith |
 
