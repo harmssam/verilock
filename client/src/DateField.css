@@ -60,7 +60,7 @@
   border: 1px solid var(--border-bright);
   background:
     linear-gradient(145deg, rgba(20, 13, 46, 0.98), rgba(10, 6, 24, 0.98));
-  box-shadow: var(--shadow-soft), var(--shadow-glow-violet);
+  box-shadow: var(--shadow-soft), var(--shadow-glow-blue);
   backdrop-filter: blur(12px);
 }
 
@@ -128,7 +128,7 @@
 }
 
 .date-field-select option {
-  background: #140d2e;
+  background: var(--bg-mid);
   color: var(--text);
 }
 
@@ -198,8 +198,8 @@
 }
 
 .date-field-day:hover:not(:disabled) {
-  background: rgba(192, 132, 252, 0.14);
-  border-color: rgba(192, 132, 252, 0.25);
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(59, 130, 246, 0.24);
 }
 
 .date-field-day--today:not(.date-field-day--selected) {
@@ -209,7 +209,7 @@
 
 .date-field-day--selected {
   background: var(--gradient-brand);
-  color: #0a0618;
+  color: #0d112e;
   font-weight: 700;
   border-color: transparent;
   box-shadow: 0 4px 14px rgba(94, 234, 212, 0.25);
@@ -251,7 +251,7 @@
 }
 
 .date-field-footer-btn--primary {
-  color: #0a0618;
+  color: #0d112e;
   border-color: transparent;
   background: var(--gradient-brand);
 }
