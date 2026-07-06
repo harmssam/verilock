@@ -236,6 +236,7 @@ export default function App() {
   const [verifySlug, setVerifySlug] = useState('')
   const [verifyMatches, setVerifyMatches] = useState<VerifyResult[]>([])
   const [verifyFromLink, setVerifyFromLink] = useState(false)
+  const [deletingVerifyId, setDeletingVerifyId] = useState<string | null>(null)
   const pendingVerifyLookupRef = useRef<string | null>(null)
   const [shareLinkCopied, setShareLinkCopied] = useState(false)
 
@@ -1210,6 +1211,39 @@ export default function App() {
     }
   }
 
+  const deleteVerifyMatch = async (match: VerifyResult) => {
+    if (!token) return
+    const confirmed = window.confirm(
+      `Delete "${match.title}"?\n\nThis removes the agreement from VeriLock. Sealed agreements cannot be deleted.`,
+    )
+    if (!confirmed) return
+
+    setDeletingVerifyId(match.id)
+    setError(null)
+    try {
+      await api.deleteDocument(token, match.id)
+      const remaining = verifyMatches.filter(item => item.id !== match.id)
+      setVerifyMatches(remaining)
+      if (activeDoc?.id === match.id) {
+        setActiveDoc(null)
+      }
+      await refreshMe(token)
+      if (remaining.length === 0) {
+        setVerifyResult({
+          message: 'Agreement deleted.',
+          tone: 'neutral',
+        })
+        setVerifyHash(null)
+      } else {
+        setVerifyResult(buildVerifyMatchMessage(remaining))
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed')
+    } finally {
+      setDeletingVerifyId(null)
+    }
+  }
+
   const runVerifySlug = async (slugOverride?: string) => {
     const slug = slugOverride ?? verifySlug
     if (!slug) return
@@ -1256,7 +1290,7 @@ export default function App() {
           <span className="wallet-pill">
             {address.slice(0, 8)}…{address.slice(-4)}
           </span>
-        ) : screen !== 'verify' ? (
+        ) : (
           <button
             className={`btn btn-primary${walletConnecting ? ' btn--busy' : ''}`}
             onClick={() => void connectWallet()}
@@ -1272,7 +1306,7 @@ export default function App() {
               'Connect wallet'
             )}
           </button>
-        ) : null}
+        )}
       </header>
 
       {walletStatus && (
@@ -1932,7 +1966,7 @@ export default function App() {
           ) : (
             <p className="muted">
               No wallet needed. Load a PDF to fingerprint it locally and check it matches a locked agreement,
-              or look up a document by ID.
+              or look up a document by ID. Connect wallet to delete incomplete agreements you created.
             </p>
           )}
 
@@ -1951,6 +1985,9 @@ export default function App() {
             matches={verifyMatches}
             appUrl={appUrl}
             highlightSlug={verifyFromLink ? verifySlug : null}
+            walletAddress={address}
+            deletingId={deletingVerifyId}
+            onDelete={token ? match => void deleteVerifyMatch(match) : undefined}
           />
 
           {(verifyFromLink ? verifyMatches.length > 0 : true) && (

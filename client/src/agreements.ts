@@ -25,9 +25,20 @@ export const BUCKET_LABELS: Record<AgreementBucket, string> = {
   locked: 'Sealed',
 }
 
-export function isDocumentCreator(doc: SealDocument, address: string | null): boolean {
+export function isDocumentCreator(
+  doc: Pick<SealDocument, 'creatorAddress'>,
+  address: string | null,
+): boolean {
   if (!address) return false
   return normalizeAddress(doc.creatorAddress) === normalizeAddress(address)
+}
+
+export function canDeleteDocument(
+  doc: Pick<SealDocument, 'status' | 'creatorAddress'>,
+  address: string | null,
+): boolean {
+  if (!address || !isDocumentCreator(doc, address)) return false
+  return doc.status !== 'locked' && doc.status !== 'locking'
 }
 
 export function isCollectingSignatures(doc: SealDocument): boolean {
