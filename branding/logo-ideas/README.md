@@ -26,8 +26,8 @@ Five variants plus the original are in `logo-03-variations/`. Each has a `.jpg` 
 
 Re-run transparency conversion:
 
-***REMOVED***
+```
 branding/scripts/.venv/bin/python branding/scripts/jpg-to-transparent-png.py branding/logo-ideas/logo-03-variations/*.jpg -o branding/logo-ideas/logo-03-variations
-***REMOVED***
+```
 
 To swap after choosing: copy the winner into `client/public/` as `verilock-logo.png`, then resize to 96×96 for the favicon.

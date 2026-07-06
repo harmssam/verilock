@@ -16,7 +16,6 @@
     "better-sqlite3": "^11.8.1",
     "cors": "^2.8.5",
     "express": "^4.21.2",
-    "multer": "^1.4.5-lts.1",
     "tsx": "^4.19.3",
     "uuid": "^11.1.0"
   },
@@ -24,7 +23,6 @@
     "@types/better-sqlite3": "^7.6.12",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
-    "@types/multer": "^1.4.12",
     "@types/node": "^22.13.10",
     "@types/uuid": "^10.0.0",
     "typescript": "^5.8.2"
