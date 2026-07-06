@@ -350,6 +350,19 @@
   min-width: 0;
 }
 
+.workflow-step-card-label {
+  margin: 0 0 0.45rem;
+  line-height: 1.4;
+}
+
+.workflow-step-card-label strong {
+  display: inline;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--mint);
+}
+
 .workflow-next-body strong {
   display: block;
   margin-bottom: 0.3rem;

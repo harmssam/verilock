@@ -1,4 +1,4 @@
-import type { AttestationStatus, RentalMetadata, SealDocument, VerifyResult } from './types'
+import type { AttestationStatus, DocumentMetadata, SealDocument, VerifyResult } from './types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -34,7 +34,7 @@ export interface CreateDocumentBody {
   pageCount: number
   requiredSignatures: number
   parties?: Array<{ role: string; displayName: string; required?: boolean }>
-  metadata?: RentalMetadata
+  metadata?: DocumentMetadata
 }
 
 export interface SignDocumentBody {

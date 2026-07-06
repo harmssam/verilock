@@ -7,6 +7,7 @@ import {
   getAgreementView,
   groupAgreements,
   isDocumentCreator,
+  type AgreementBucket,
 } from './agreements'
 import type { SealDocument } from './types'
 import './AgreementsPanel.css'
@@ -28,6 +29,25 @@ function statusClass(bucket: string): string {
   return 'status-pending'
 }
 
+function visibleAgreementBuckets(
+  groups: Record<AgreementBucket, SealDocument[]>,
+  actionable: number,
+  compact?: boolean,
+): AgreementBucket[] {
+  if (compact) {
+    const buckets: AgreementBucket[] = ['needs_you', 'ready_to_seal']
+    if (groups.waiting.length > 0) buckets.push('waiting')
+    if (groups.locked.length > 0) buckets.push('locked')
+    return buckets
+  }
+
+  if (actionable === 0 && groups.locked.length > 0) {
+    return ['locked', 'waiting', 'needs_you', 'ready_to_seal']
+  }
+
+  return BUCKET_ORDER
+}
+
 export function AgreementsPanel({
   documents,
   address,
@@ -39,9 +59,8 @@ export function AgreementsPanel({
 }: AgreementsPanelProps) {
   const groups = groupAgreements(documents, address)
   const actionable = countActionable(documents, address)
-  const visibleBuckets = compact
-    ? BUCKET_ORDER.filter(bucket => bucket === 'needs_you' || bucket === 'ready_to_seal')
-    : BUCKET_ORDER
+  const visibleBuckets = visibleAgreementBuckets(groups, actionable, compact)
+  const sealedCount = groups.locked.length
 
   const renderItem = (doc: SealDocument) => {
     const view = getAgreementView(doc, address)
@@ -107,7 +126,15 @@ export function AgreementsPanel({
     <div className={`card agreements-panel${compact ? ' agreements-panel--compact' : ''}`}>
       <div className="agreements-panel-header">
         <div>
-          <h2>{compact ? 'Continue an agreement' : 'Your agreements'}</h2>
+          <h2>
+            {compact
+              ? actionable > 0
+                ? 'Continue an agreement'
+                : sealedCount > 0
+                  ? 'Your agreements'
+                  : 'Continue an agreement'
+              : 'Your agreements'}
+          </h2>
           {!compact && (
             <p className="muted agreements-panel-subtitle">
               {documents.length} total
@@ -123,8 +150,8 @@ export function AgreementsPanel({
         )}
       </div>
 
-      {compact && actionable === 0 && (
-        <p className="muted">No pending actions — pick an agreement below or start a new one.</p>
+      {compact && actionable === 0 && sealedCount === 0 && groups.waiting.length === 0 && (
+        <p className="muted">No agreements in progress — start a new one or open Agreements for your full list.</p>
       )}
 
       {visibleBuckets.map(bucket => {

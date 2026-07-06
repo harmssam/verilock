@@ -23,7 +23,12 @@ import {
 import { buildNimiqExplorerUrl } from './explorer.js'
 import { buildAttestationPayload } from './nimiq-rpc.js'
 import { normalizeAddress, shortAddress } from './addresses.js'
-import { sanitizeDisplayName, sanitizeFilename } from './security.js'
+import {
+  sanitizeDisplayName,
+  sanitizeDocumentMetadata,
+  sanitizeDocumentType,
+  sanitizeFilename,
+} from './security.js'
 import { hashSignatureImage } from './signature-image.js'
 import { getSealPricing } from './sealPricing.js'
 
@@ -210,22 +215,24 @@ export function createDocument(input: {
   const id = uuid()
   const slug = slugFromId(id)
   const now = Date.now()
-  const creatorRole = resolveCreatorRole(input.type, input.creatorRole)
-  const otherRole = resolveOtherRole(input.type, creatorRole)
+  const type = sanitizeDocumentType(input.type)
+  const creatorRole = resolveCreatorRole(type, input.creatorRole)
+  const otherRole = resolveOtherRole(type, creatorRole)
   const requiredSignatures = clampRequiredSignatures(input.requiredSignatures, 2)
+  const metadata = sanitizeDocumentMetadata(type, input.metadata)
 
   const doc: DocumentRecord = {
     id,
     slug,
     title: input.title.trim().slice(0, 120) || 'Untitled agreement',
     originalFilename: sanitizeFilename(input.originalFileName),
-    type: input.type || 'other',
+    type,
     status: 'collecting_signatures',
     creatorAddress: normalizeAddress(input.creatorAddress),
     originalSha256: input.originalSha256.toLowerCase(),
     finalSha256: null,
     pageCount: Math.max(1, input.pageCount),
-    metadata: input.metadata ?? null,
+    metadata,
     requiredSignatures,
     createdAt: now,
     lockedAt: null,

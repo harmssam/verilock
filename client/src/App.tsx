@@ -75,7 +75,14 @@ import {
   partyNeedsSignerName,
   resolveSigningParty,
 } from './signing'
-import type { RentalMetadata, SealDocument, VerifyResult } from './types'
+import {
+  documentTypeUsesNotes,
+  MAX_DOCUMENT_NOTES_LENGTH,
+  type DocumentMetadata,
+  type RentalMetadata,
+  type SealDocument,
+  type VerifyResult,
+} from './types'
 import {
   formatStepLabel,
   resolveCurrentStep,
@@ -215,6 +222,7 @@ export default function App() {
   const [deposit, setDeposit] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [docNotes, setDocNotes] = useState('')
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfHash, setPdfHash] = useState<string | null>(null)
   const [pdfLoading, setPdfLoading] = useState(false)
@@ -323,6 +331,7 @@ export default function App() {
     setDeposit('')
     setStartDate('')
     setEndDate('')
+    setDocNotes('')
     setPdfFile(null)
     setPdfHash(null)
     setPageCount(1)
@@ -407,6 +416,12 @@ export default function App() {
     window.history.pushState({}, '', '/agreements')
     if (token) void refreshMe(token)
   }, [token, refreshMe])
+
+  useEffect(() => {
+    if (screen === 'agreements' && token) {
+      void refreshMe(token)
+    }
+  }, [screen, token, refreshMe])
 
   const startOverWorkflow = useCallback(() => {
     setActiveDoc(null)
@@ -585,7 +600,7 @@ export default function App() {
             : otherDefaultName(index, extraSigners),
         required: true,
       }))
-      let metadata: RentalMetadata | undefined
+      let metadata: DocumentMetadata | undefined
       if (docType === 'rental') {
         const rental: RentalMetadata = {
           propertyAddress: propertyAddress.trim() || undefined,
@@ -597,6 +612,9 @@ export default function App() {
         if (Object.values(rental).some(Boolean)) {
           metadata = rental
         }
+      } else if (documentTypeUsesNotes(docType)) {
+        const notes = docNotes.trim().slice(0, MAX_DOCUMENT_NOTES_LENGTH)
+        if (notes) metadata = { notes }
       }
       const { document } = await api.createDocument(token, {
         title: title || pdfFile.name.replace(/\.pdf$/i, ''),
@@ -1591,7 +1609,19 @@ export default function App() {
           </p>
           <div className="field">
             <label>Title</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="123 Main St — 12-month lease" />
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder={
+                docType === 'rental'
+                  ? '123 Main St — 12-month lease'
+                  : docType === 'nda'
+                    ? 'Project Falcon — mutual NDA'
+                    : docType === 'contract'
+                      ? 'Vendor services agreement'
+                      : 'Agreement title'
+              }
+            />
           </div>
           <div className="field">
             <label>Type</label>
@@ -1601,10 +1631,12 @@ export default function App() {
                 const nextType = e.target.value
                 setDocType(nextType)
                 setMyRole(nextType === 'rental' ? 'landlord' : 'signer')
+                if (!documentTypeUsesNotes(nextType)) setDocNotes('')
               }}
             >
               <option value="rental">Rental agreement</option>
               <option value="contract">Contract</option>
+              <option value="nda">NDA</option>
               <option value="other">Other</option>
             </select>
           </div>
@@ -1666,6 +1698,26 @@ export default function App() {
               placeholder="Leave blank — they enter their name when signing"
             />
           </div>
+          {documentTypeUsesNotes(docType) && (
+            <div className="field">
+              <label>Notes (optional)</label>
+              <textarea
+                value={docNotes}
+                onChange={e => setDocNotes(e.target.value.slice(0, MAX_DOCUMENT_NOTES_LENGTH))}
+                placeholder={
+                  docType === 'nda'
+                    ? 'e.g. Effective date, parties covered, or signing context'
+                    : 'e.g. Context for signers or internal reference'
+                }
+                rows={3}
+                maxLength={MAX_DOCUMENT_NOTES_LENGTH}
+              />
+              <span className="muted">
+                Saved with this agreement and visible to all signers. Summarize context only — do not paste
+                passwords, keys, or confidential document text.
+              </span>
+            </div>
+          )}
           {docType === 'rental' && (
             <>
               <div className="field">
@@ -1831,6 +1883,14 @@ export default function App() {
                 </p>
               </div>
             )}
+            {documentTypeUsesNotes(activeDoc.type) &&
+              typeof activeDoc.metadata?.notes === 'string' &&
+              activeDoc.metadata.notes.trim() && (
+                <div className="document-notes">
+                  <span className="document-filename-label">Notes</span>
+                  <p className="document-notes-body muted">{activeDoc.metadata.notes}</p>
+                </div>
+              )}
             <p className="muted">
               Signatures: {activeDoc.signingProgress.signed}/{activeDoc.signingProgress.required}
               {isSigningComplete(activeDoc) && activeDoc.status !== 'locked' && (
