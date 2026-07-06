@@ -69,12 +69,26 @@ export interface AttestationStatus {
   error?: string
 }
 
+export interface VerifyHashMatch {
+  id: string
+  slug: string
+  title: string
+  originalFilename: string | null
+  status: string
+  finalSha256: string | null
+  lockedAt: number | null
+  createdAt: number
+}
+
 export interface VerifyResult {
+  id: string
+  slug: string
   title: string
   originalFilename: string | null
   status: string
   originalSha256: string
   finalSha256: string | null
+  createdAt: number
   lockedAt: number | null
   attestation: DocumentAttestation | null
   signatures: DocumentSignature[]

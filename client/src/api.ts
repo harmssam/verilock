@@ -163,6 +163,9 @@ export const api = {
         title: string
         originalFilename: string | null
         status: string
+        finalSha256: string | null
+        createdAt: number
+        lockedAt: number | null
       }>
     }>(
       '/api/verify/hash',
