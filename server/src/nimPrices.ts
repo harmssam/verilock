@@ -6,50 +6,81 @@ export interface NimPrices {
   eur: number
   cad: number
   lastUpdatedAt: number | null
-  source: 'coingecko'
+  source: 'fastspot'
 }
 
-const CACHE_TTL_MS = 60_000
-const COINGECKO_URL =
-  'https://api.coingecko.com/api/v3/simple/price?ids=nimiq-2&vs_currencies=usd,eur,cad&include_last_updated_at=true'
+const CACHE_TTL_MS = 5 * 60_000
+const REFERENCE_NIM = 1000
+const FASTSPOT_API_URL = process.env.FASTSPOT_API_URL?.trim() ?? 'https://api.go.fastspot.io/fast/v1'
+const FRANKFURTER_URL = 'https://api.frankfurter.app/latest?from=USD&to=CAD'
 
 let cache: { data: NimPrices; fetchedAt: number } | null = null
 let inflight: Promise<NimPrices> | null = null
 
-function parseCoinGeckoResponse(payload: unknown): NimPrices {
-  const root = payload as {
-    'nimiq-2'?: {
-      usd?: number
-      eur?: number
-      cad?: number
-      last_updated_at?: number
-    }
-  }
-  const nim = root['nimiq-2']
-  if (!nim || typeof nim.usd !== 'number' || typeof nim.eur !== 'number' || typeof nim.cad !== 'number') {
-    throw new Error('Unexpected CoinGecko response for NIM prices')
-  }
-  return {
-    usd: nim.usd,
-    eur: nim.eur,
-    cad: nim.cad,
-    lastUpdatedAt: typeof nim.last_updated_at === 'number' ? nim.last_updated_at : null,
-    source: 'coingecko',
-  }
+type FastspotEstimate = {
+  to?: Array<{ symbol?: string; amount?: string }>
 }
 
-async function fetchNimPricesFromCoinGecko(): Promise<NimPrices> {
-  const headers: Record<string, string> = { Accept: 'application/json' }
-  const apiKey = process.env.COINGECKO_API_KEY?.trim()
-  if (apiKey) {
-    headers['x-cg-demo-api-key'] = apiKey
+async function fetchNimToAssetRate(asset: 'EUR' | 'USDC'): Promise<number> {
+  const res = await fetch(`${FASTSPOT_API_URL}/estimates`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: { NIM: String(REFERENCE_NIM) },
+      to: asset,
+      includedFees: 'required',
+    }),
+  })
+
+  if (!res.ok) {
+    throw new Error(`Fastspot request failed (${res.status})`)
   }
 
-  const res = await fetch(COINGECKO_URL, { headers })
-  if (!res.ok) {
-    throw new Error(`CoinGecko request failed (${res.status})`)
+  const payload = (await res.json()) as FastspotEstimate[]
+  const amount = Number.parseFloat(payload[0]?.to?.[0]?.amount ?? '')
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error(`Unexpected Fastspot estimate for NIM→${asset}`)
   }
-  return parseCoinGeckoResponse(await res.json())
+
+  return amount / REFERENCE_NIM
+}
+
+async function fetchUsdToCadRate(): Promise<number> {
+  const res = await fetch(FRANKFURTER_URL, {
+    headers: { Accept: 'application/json' },
+    redirect: 'follow',
+  })
+
+  if (!res.ok) {
+    throw new Error(`Frankfurter request failed (${res.status})`)
+  }
+
+  const payload = (await res.json()) as { rates?: { CAD?: number } }
+  const rate = payload.rates?.CAD
+  if (typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0) {
+    throw new Error('Unexpected Frankfurter USD→CAD response')
+  }
+
+  return rate
+}
+
+async function fetchNimPricesFromFastspot(): Promise<NimPrices> {
+  const [usd, eur, usdToCad] = await Promise.all([
+    fetchNimToAssetRate('USDC'),
+    fetchNimToAssetRate('EUR'),
+    fetchUsdToCadRate(),
+  ])
+
+  return {
+    usd,
+    eur,
+    cad: usd * usdToCad,
+    lastUpdatedAt: Math.floor(Date.now() / 1000),
+    source: 'fastspot',
+  }
 }
 
 export async function getNimPrices(): Promise<NimPrices> {
@@ -58,7 +89,7 @@ export async function getNimPrices(): Promise<NimPrices> {
   }
 
   if (!inflight) {
-    inflight = fetchNimPricesFromCoinGecko()
+    inflight = fetchNimPricesFromFastspot()
       .then(data => {
         cache = { data, fetchedAt: Date.now() }
         return data

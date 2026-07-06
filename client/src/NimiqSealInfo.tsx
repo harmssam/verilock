@@ -75,7 +75,8 @@ export function NimiqSealInfo() {
           </div>
         )}
         <p className="muted nimiq-info-pricing-note">
-          Signing and verifying are free. You only pay when the agreement is sealed on-chain.
+          Signing and verifying are free. You only pay when the agreement is sealed on-chain. Fiat amounts
+          are approximate swap estimates from Nimiq Fastspot.
         </p>
       </div>
     </div>
