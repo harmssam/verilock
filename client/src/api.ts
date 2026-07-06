@@ -103,7 +103,7 @@ export const api = {
       eur: number
       cad: number
       lastUpdatedAt: number | null
-      source: 'coingecko'
+      source: 'fastspot'
     }>('/api/nim-prices'),
 
   prepareLock: (token: string, docId: string, finalSha256: string) =>
