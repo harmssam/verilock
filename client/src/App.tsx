@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CircleAlert, CircleCheck, FilePlus, Home, LoaderCircle, Search } from 'lucide-react'
+import { CircleAlert, CircleCheck, FilePlus, Files, LoaderCircle, Search } from 'lucide-react'
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 import { api } from './api'
 import {
@@ -374,6 +374,7 @@ export default function App() {
   }, [token, refreshMe])
 
   const actionableAgreementCount = countActionable(documents, address)
+  const walletConnecting = walletStatus !== null && !address
 
   const connectWallet = async (options?: { useRedirect?: boolean; usePopup?: boolean }) => {
     setBusy(true)
@@ -385,11 +386,14 @@ export default function App() {
       setWalletStatus(
         payHost
           ? 'Waiting for Nimiq Pay wallet… approve the dialog when it appears.'
-          : 'Connecting…',
+          : 'Opening Nimiq Hub…',
       )
 
       // window.nimiq may lag behind window.nimiqPay inside the Nimiq Pay WebView.
-      const inPay = payHost || (await probeNimiqPay(payHost ? 30_000 : 10_000))
+      let inPay = payHost || Boolean(typeof window !== 'undefined' && window.nimiq)
+      if (!inPay && payHost) {
+        inPay = await probeNimiqPay(30_000)
+      }
       setInNimiqPay(inPay || payHost)
 
       if (!inPay) {
@@ -1210,18 +1214,37 @@ export default function App() {
             {address.slice(0, 8)}…{address.slice(-4)}
           </span>
         ) : (
-          <button className="btn btn-primary" onClick={() => void connectWallet()} disabled={busy}>
-            Connect wallet
+          <button
+            className={`btn btn-primary${walletConnecting ? ' btn--busy' : ''}`}
+            onClick={() => void connectWallet()}
+            disabled={busy}
+            aria-busy={walletConnecting}
+          >
+            {walletConnecting ? (
+              <>
+                <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+                Connecting…
+              </>
+            ) : (
+              'Connect wallet'
+            )}
           </button>
         )}
       </header>
+
+      {walletStatus && (
+        <p className="wallet-status" role="status" aria-live="polite">
+          <LoaderCircle className="wallet-status-spinner" size={16} strokeWidth={2.5} aria-hidden />
+          {walletStatus}
+        </p>
+      )}
 
       <PrivacyNotice />
 
       <div className="tabs">
         <button className={`tab ${screen === 'home' ? 'active' : ''}`} onClick={() => goHome()}>
-          <Home className="tab-icon" size={16} strokeWidth={2.25} aria-hidden />
-          Home
+          <Files className="tab-icon" size={16} strokeWidth={2.25} aria-hidden />
+          Agreements
           {actionableAgreementCount > 0 && (
             <span className="tab-badge" aria-label={`${actionableAgreementCount} agreements need action`}>
               {actionableAgreementCount}
@@ -1280,12 +1303,12 @@ export default function App() {
           address={address}
           activeDoc={activeDoc}
           screen={screen}
+          walletConnecting={walletConnecting}
           onConnect={() => void connectWallet()}
           onGoCreate={goToCreate}
         />
       )}
 
-      {walletStatus && <p className="wallet-status">{walletStatus}</p>}
       {error && <p className="error">{error}</p>}
 
       {!address && !inNimiqPay && !isNimiqPayHost() && (
@@ -1532,8 +1555,20 @@ export default function App() {
                 You opened a shared agreement. Connect your Nimiq wallet, then choose the PDF the creator
                 sent you on your computer. It stays local — we only check that its fingerprint matches.
               </p>
-              <button className="btn btn-primary" onClick={() => void connectWallet()} disabled={busy}>
-                Connect wallet to sign
+              <button
+                className={`btn btn-primary${walletConnecting ? ' btn--busy' : ''}`}
+                onClick={() => void connectWallet()}
+                disabled={busy}
+                aria-busy={walletConnecting}
+              >
+                {walletConnecting ? (
+                  <>
+                    <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+                    Connecting…
+                  </>
+                ) : (
+                  'Connect wallet to sign'
+                )}
               </button>
             </div>
           )}

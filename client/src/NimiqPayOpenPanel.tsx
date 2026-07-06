@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ExternalLink, Smartphone } from 'lucide-react'
+import { ExternalLink, LoaderCircle, Smartphone } from 'lucide-react'
 import {
   copyNimiqPayDeepLink,
   getMiniAppWebUrl,
@@ -80,11 +80,19 @@ export function NimiqPayOpenPanel({
         {showHubFallback && onHubRedirect && !mobile && (
           <button
             type="button"
-            className="btn btn-primary"
+            className={`btn btn-primary${busy ? ' btn--busy' : ''}`}
             disabled={busy}
             onClick={onHubRedirect}
+            aria-busy={busy}
           >
-            Connect via Nimiq Hub
+            {busy ? (
+              <>
+                <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+                Opening Hub…
+              </>
+            ) : (
+              'Connect via Nimiq Hub'
+            )}
           </button>
         )}
         <a className="btn btn-secondary" href={NIMIQ_PAY_IOS_URL} target="_blank" rel="noreferrer">
@@ -109,11 +117,19 @@ export function NimiqPayOpenPanel({
         {showHubFallback && onHubRedirect && mobile && (
           <button
             type="button"
-            className="btn btn-secondary"
+            className={`btn btn-secondary${busy ? ' btn--busy' : ''}`}
             disabled={busy}
             onClick={onHubRedirect}
+            aria-busy={busy}
           >
-            Continue via Hub redirect
+            {busy ? (
+              <>
+                <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+                Opening Hub…
+              </>
+            ) : (
+              'Continue via Hub redirect'
+            )}
           </button>
         )}
       </div>

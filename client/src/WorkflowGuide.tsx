@@ -1,4 +1,4 @@
-import { Check, Sparkles } from 'lucide-react'
+import { Check, LoaderCircle, Sparkles } from 'lucide-react'
 import { normalizeAddress } from './addresses'
 import { formatSealFeeSummary } from './sealPricing'
 import type { SealDocument } from './types'
@@ -393,6 +393,7 @@ interface WorkflowNextActionProps {
   address?: string | null
   activeDoc: SealDocument | null
   screen: 'home' | 'create' | 'document' | 'verify'
+  walletConnecting?: boolean
   onConnect?: () => void
   onGoCreate?: () => void
 }
@@ -402,6 +403,7 @@ export function WorkflowNextAction({
   address,
   activeDoc,
   screen,
+  walletConnecting,
   onConnect,
   onGoCreate,
 }: WorkflowNextActionProps) {
@@ -469,8 +471,21 @@ export function WorkflowNextAction({
         <p className="muted">{body}</p>
       </div>
       {action?.onClick && (
-        <button type="button" className="btn btn-primary workflow-next-btn" onClick={action.onClick}>
-          {action.label}
+        <button
+          type="button"
+          className={`btn btn-primary workflow-next-btn${walletConnecting ? ' btn--busy' : ''}`}
+          onClick={action.onClick}
+          disabled={walletConnecting}
+          aria-busy={walletConnecting}
+        >
+          {walletConnecting ? (
+            <>
+              <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+              Connecting…
+            </>
+          ) : (
+            action.label
+          )}
         </button>
       )}
     </div>

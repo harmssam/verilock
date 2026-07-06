@@ -41,7 +41,7 @@ export function NimiqSealInfo() {
               <strong>Nimiq wallet</strong> — Nimiq Pay on mobile, or Nimiq Hub on desktop.
             </li>
             <li>
-              <strong>NIM balance</strong> — seal fee below plus a small network fee (~0.01 NIM).
+              <strong>NIM balance</strong> — for the seal fee below.
             </li>
             <li>
               <strong>PDF on your device</strong> — the same file every signer uses.
