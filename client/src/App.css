@@ -322,14 +322,21 @@
 
 .file-picker {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.65rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
   padding: 0.75rem;
   border-radius: var(--radius-sm);
   border: 1px dashed var(--border-bright);
   background: rgba(0, 0, 0, 0.2);
   transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.file-picker-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
 }
 
 .file-picker--has-file {
@@ -427,6 +434,12 @@
 
 .file-picker-hint {
   font-size: 0.82rem;
+}
+
+.file-picker-privacy {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 /* ── Chips & badges ── */
