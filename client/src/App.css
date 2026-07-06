@@ -703,6 +703,23 @@ a.hash-chip.text-link:focus-visible {
   cursor: not-allowed;
 }
 
+.tab--pulse:not(.active):not(:disabled) {
+  color: var(--mint);
+  animation: tab-pulse 2s ease-in-out infinite;
+}
+
+@keyframes tab-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(94, 234, 212, 0.35);
+    background: rgba(94, 234, 212, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(94, 234, 212, 0.12);
+    background: rgba(94, 234, 212, 0.16);
+  }
+}
+
 .tab-icon {
   flex-shrink: 0;
 }

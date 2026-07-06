@@ -462,6 +462,7 @@ export default function App() {
           const me = await refreshMe(result.token)
           setWalletStatus(null)
           if (me.documents.length > 0 && screen !== 'document') goAgreements()
+          else if (me.documents.length === 0 && screen === 'home') goToCreate()
           return
         } catch (hubErr) {
           if (isPopupBlockedError(hubErr)) {
@@ -483,6 +484,7 @@ export default function App() {
       const me = await refreshMe(sessionToken)
       setWalletStatus(null)
       if (me.documents.length > 0 && screen !== 'document') goAgreements()
+      else if (me.documents.length === 0 && screen === 'home') goToCreate()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Wallet connection failed'
       if (isHubRedirectError(err)) {
@@ -1392,10 +1394,15 @@ export default function App() {
           )}
         </button>
         <button
-          className={`tab ${screen === 'create' ? 'active' : ''}`}
+          className={`tab${screen === 'create' ? ' active' : ''}${token && workflowStep === 'create' && screen !== 'create' ? ' tab--pulse' : ''}`}
           onClick={() => goToCreate()}
           disabled={!token}
           title={!token ? 'Connect your Nimiq wallet first' : undefined}
+          aria-label={
+            token && workflowStep === 'create' && screen !== 'create'
+              ? 'New agreement — step 2, fingerprint your PDF'
+              : undefined
+          }
         >
           <FilePlus className="tab-icon" size={16} strokeWidth={2.25} aria-hidden />
           New
@@ -1451,12 +1458,24 @@ export default function App() {
             screen={screen}
             onConnect={() => void connectWallet()}
             walletConnecting={walletConnecting}
+            onGoCreate={goToCreate}
             onStartOver={startOverWorkflow}
             shareDoc={workflowShareDoc}
             shareUrl={workflowShareUrl}
             shareLinkCopied={shareLinkCopied}
             onCopyShareLink={() => void copyShareLink(workflowShareUrl)}
           />
+          {workflowStep === 'create' && (
+            <WorkflowNextAction
+              hasWallet={Boolean(token)}
+              address={address}
+              activeDoc={activeDoc}
+              screen={screen}
+              walletConnecting={walletConnecting}
+              onConnect={() => void connectWallet()}
+              onGoCreate={goToCreate}
+            />
+          )}
           <NimiqLockInfo />
         </>
       ) : screen === 'create' ? (
