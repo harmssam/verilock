@@ -377,11 +377,14 @@ app.get('/api/verify/:idOrSlug', (req, res) => {
     return
   }
   res.json({
+    id: doc.id,
+    slug: doc.slug,
     title: doc.title,
     originalFilename: doc.originalFilename,
     status: doc.status,
     originalSha256: doc.originalSha256,
     finalSha256: doc.finalSha256,
+    createdAt: doc.createdAt,
     lockedAt: doc.lockedAt,
     attestation: doc.attestation,
     signatures: doc.signatures,
@@ -411,6 +414,7 @@ app.post('/api/verify/hash', (req, res) => {
     originalFilename: doc.originalFilename,
     status: doc.status,
     finalSha256: doc.finalSha256,
+    createdAt: doc.createdAt,
     lockedAt: doc.lockedAt,
   }))
   res.json({ matches })
