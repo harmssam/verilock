@@ -1,6 +1,6 @@
 export const LUNA_PER_NIM = 100_000
-export const BASE_SEAL_FEE_NIM = 10
-export const JULY_PROMO_DISCOUNT = 0.9
+export const BASE_SEAL_FEE_NIM = 1000
+export const JULY_PROMO_DISCOUNT = 0.95
 
 export interface SealPricing {
   feeNim: number
@@ -34,13 +34,13 @@ export function getSealPricing(now = new Date()): SealPricing {
     feeLuna: getSealFeeLuna(now),
     baseFeeNim: BASE_SEAL_FEE_NIM,
     promoActive,
-    promoLabel: promoActive ? '90% off — July only' : null,
+    promoLabel: promoActive ? '95% off — July only' : null,
     promoEndsLabel: promoActive ? 'Promo ends August 1' : null,
   }
 }
 
-/** Legacy seals before paid sealing (self-send or 1-luna Hub checkout). */
-export const LEGACY_SEAL_FEE_LUNA = [0, 1] as const
+/** Legacy seal fees from earlier pricing (luna). */
+export const LEGACY_SEAL_FEE_LUNA = [0, 1, 100_000, 1_000_000] as const
 
 export function isValidSealFeeLuna(value: number, now = new Date()): boolean {
   if (LEGACY_SEAL_FEE_LUNA.includes(value as (typeof LEGACY_SEAL_FEE_LUNA)[number])) {
