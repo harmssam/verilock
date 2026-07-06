@@ -7,6 +7,7 @@ import {
   processLenientHubRedirect,
   type HubLockRedirectResult,
 } from './hubSealRedirect'
+import { saveHubReturnPath } from './hubReturnPath'
 import { peekHubRedirectInUrl, RPC_ID_SEARCH_PARAM } from './sealRecovery'
 import { sealError, sealLog, sealWarn } from './sealDebug'
 import { getSealFeeLuna } from './sealPricing'
@@ -502,6 +503,8 @@ function registerHubEventHandlers(
 
 export type HubRedirectSetupResult = {
   redirectHandled: boolean
+  loginHandled: boolean
+  lockHandled: boolean
   lockCompletion: Promise<void> | null
 }
 
@@ -582,8 +585,17 @@ export async function setupHubRedirectHandlers(
   }
 
   if (lenientHandled) {
-    sealLog('hub:lenientRedirectHandled', { lockCompletionAsync: Boolean(lockCompletion) })
-    return { redirectHandled: true, lockCompletion }
+    sealLog('hub:lenientRedirectHandled', {
+      lockCompletionAsync: Boolean(lockCompletion),
+      loginHandled: loginRedirectHandled,
+      lockHandled: lockRedirectHandled,
+    })
+    return {
+      redirectHandled: true,
+      loginHandled: loginRedirectHandled,
+      lockHandled: lockRedirectHandled,
+      lockCompletion,
+    }
   }
 
   sealLog('hub:checkRedirectResponse', {
@@ -594,7 +606,12 @@ export async function setupHubRedirectHandlers(
   await hub.checkRedirectResponse()
   const redirectHandled = loginRedirectHandled || lockRedirectHandled
   sealLog('hub:redirectHandlersReady', { redirectHandled, loginRedirectHandled, lockRedirectHandled })
-  return { redirectHandled, lockCompletion }
+  return {
+    redirectHandled,
+    loginHandled: loginRedirectHandled,
+    lockHandled: lockRedirectHandled,
+    lockCompletion,
+  }
 }
 
 export async function connectViaHub(
@@ -610,6 +627,7 @@ export async function connectViaHub(
   const hub = getHubApi()
 
   if (options?.preferRedirect) {
+    saveHubReturnPath()
     const behavior = RedirectRequestBehavior.withLocalState({ flow: 'login' })
     await hub.chooseAddress(
       { appName: APP_NAME },
@@ -770,6 +788,7 @@ export async function sendLockAttestationViaHub(
   }
 
   if (options?.preferRedirect) {
+    saveHubReturnPath()
     const behavior = RedirectRequestBehavior.withLocalState(lockState)
     await hub.signTransaction(
       request,

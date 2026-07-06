@@ -1,4 +1,4 @@
-import { FileText, Upload } from 'lucide-react'
+import { FileText, FolderOpen } from 'lucide-react'
 import { useId, useRef } from 'react'
 
 interface FilePickerProps {
@@ -12,7 +12,7 @@ interface FilePickerProps {
 export function FilePicker({
   accept,
   disabled,
-  emptyLabel = 'Choose PDF',
+  emptyLabel = 'Load PDF',
   file,
   onChange,
 }: FilePickerProps) {
@@ -21,46 +21,51 @@ export function FilePicker({
 
   return (
     <div className={`file-picker${file ? ' file-picker--has-file' : ''}`}>
-      <input
-        ref={inputRef}
-        id={id}
-        type="file"
-        className="file-picker-input"
-        accept={accept}
-        disabled={disabled}
-        onChange={e => onChange(e.target.files?.[0] ?? null)}
-      />
-      <label
-        htmlFor={id}
-        className={`file-picker-btn${disabled ? ' file-picker-btn--disabled' : ''}`}
-        onClick={() => {
-          if (!disabled && inputRef.current) {
-            inputRef.current.value = ''
-          }
-        }}
-      >
-        <Upload size={16} strokeWidth={2.25} aria-hidden />
-        {file ? 'Change file' : emptyLabel}
-      </label>
-      {file ? (
-        <div className="file-picker-meta">
-          <FileText size={15} strokeWidth={2.25} className="file-picker-meta-icon" aria-hidden />
-          <span className="file-picker-name">{file.name}</span>
-          <button
-            type="button"
-            className="file-picker-clear"
-            disabled={disabled}
-            onClick={() => {
-              onChange(null)
-              if (inputRef.current) inputRef.current.value = ''
-            }}
-          >
-            Remove
-          </button>
-        </div>
-      ) : (
-        <span className="file-picker-hint muted">PDF only · stays on your computer</span>
-      )}
+      <div className="file-picker-row">
+        <input
+          ref={inputRef}
+          id={id}
+          type="file"
+          className="file-picker-input"
+          accept={accept}
+          disabled={disabled}
+          onChange={e => onChange(e.target.files?.[0] ?? null)}
+        />
+        <label
+          htmlFor={id}
+          className={`file-picker-btn${disabled ? ' file-picker-btn--disabled' : ''}`}
+          onClick={() => {
+            if (!disabled && inputRef.current) {
+              inputRef.current.value = ''
+            }
+          }}
+        >
+          <FolderOpen size={16} strokeWidth={2.25} aria-hidden />
+          {file ? 'Change file' : emptyLabel}
+        </label>
+        {file ? (
+          <div className="file-picker-meta">
+            <FileText size={15} strokeWidth={2.25} className="file-picker-meta-icon" aria-hidden />
+            <span className="file-picker-name">{file.name}</span>
+            <button
+              type="button"
+              className="file-picker-clear"
+              disabled={disabled}
+              onClick={() => {
+                onChange(null)
+                if (inputRef.current) inputRef.current.value = ''
+              }}
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <span className="file-picker-hint muted">PDF only</span>
+        )}
+      </div>
+      <p className="file-picker-privacy muted" role="note">
+        Your PDF never leaves your computer — only the fingerprint is saved on our servers.
+      </p>
     </div>
   )
 }

@@ -48,6 +48,11 @@ import {
   RPC_ID_SEARCH_PARAM,
   shouldResumeHubSeal,
 } from './sealRecovery'
+import {
+  consumeHubReturnPath,
+  documentSlugFromPath,
+  readHubReturnPath,
+} from './hubReturnPath'
 import { clearSession, loadSession, saveSession } from './session'
 import { DateField } from './DateField'
 import { FilePicker } from './FilePicker'
@@ -849,7 +854,8 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false
-    let redirectLockHandled = false
+    let hubLoginHandled = false
+    let hubLockHandled = false
     let hubLockCompletion: Promise<void> | null = null
 
     const boot = async () => {
@@ -875,7 +881,7 @@ export default function App() {
 
       pruneExpiredSealInFlight()
       const sealInFlightAtBoot = loadSealInFlight()
-      const hubReturnPending = shouldResumeHubSeal()
+      let hubReturnPending = shouldResumeHubSeal()
       const resumeSlug = resolveHubSealResumeSlug(window.location.pathname, sealInFlightAtBoot)
       sealLog('boot:start', {
         path: window.location.pathname,
@@ -971,13 +977,29 @@ export default function App() {
         },
         createServerBroadcastFallback,
       )
-      redirectLockHandled = hubRedirectSetup.redirectHandled
+      hubLoginHandled = hubRedirectSetup.loginHandled
+      hubLockHandled = hubRedirectSetup.lockHandled
       hubLockCompletion = hubRedirectSetup.lockCompletion
 
       sealLog('boot:hubHandlersReady', {
-        redirectLockHandled,
+        hubLoginHandled,
+        hubLockHandled,
         awaitingLockCompletion: Boolean(hubLockCompletion),
       })
+
+      if (hubLoginHandled && sealInFlightAtBoot) {
+        const routeSlug =
+          documentSlugFromPath(window.location.pathname) ??
+          (readHubReturnPath() ? documentSlugFromPath(readHubReturnPath()!) : null)
+        if (routeSlug && routeSlug !== sealInFlightAtBoot.slug) {
+          sealLog('boot:clearedStaleSealForLoginReturn', {
+            routeSlug,
+            sealSlug: sealInFlightAtBoot.slug,
+          })
+          clearSealInFlight()
+          hubReturnPending = shouldResumeHubSeal()
+        }
+      }
 
       if (cancelled) return
 
@@ -1015,11 +1037,12 @@ export default function App() {
       if (sealInFlightAtBoot && !hasRedirectPayload && !hubLockCompletion) {
         sealLog('boot:clearedOrphanSealInFlight', { slug: sealInFlightAtBoot.slug })
         clearSealInFlight()
+        hubReturnPending = shouldResumeHubSeal()
       }
 
       if (resumeSlug) {
         setScreen('document')
-        if (!redirectLockHandled) {
+        if (!hubLockHandled) {
           setLockMessage('Completing seal after Hub…')
         }
         try {
@@ -1030,7 +1053,7 @@ export default function App() {
         }
       }
 
-      if (redirectLockHandled && hubReturnPending) {
+      if (hubLockHandled && hubReturnPending) {
         sealLog('boot:hubReturnFinishing', { slug: sealInFlightAtBoot?.slug })
         return
       }
@@ -1061,11 +1084,23 @@ export default function App() {
       if (cancelled) return
 
       const path = window.location.pathname
-      const docMatch = path.match(/^\/d\/([^/]+)/)
+      let routeSlug = documentSlugFromPath(path)
       const verifyMatch = path.match(/^\/v\/([^/]+)/)
-      if (docMatch) {
+
+      if (!routeSlug) {
+        const savedReturnPath = readHubReturnPath()
+        const savedSlug = savedReturnPath ? documentSlugFromPath(savedReturnPath) : null
+        if (savedSlug && savedReturnPath) {
+          window.history.replaceState({}, '', savedReturnPath)
+          routeSlug = savedSlug
+          sealLog('boot:restoredHubReturnPath', { savedReturnPath })
+        }
+      }
+
+      if (routeSlug) {
+        if (hubLoginHandled || hubLockHandled) consumeHubReturnPath()
         setScreen('document')
-        void loadDocument(docMatch[1]!)
+        void loadDocument(routeSlug)
       } else if (verifyMatch) {
         setScreen('verify')
         setVerifySlug(verifyMatch[1]!)
@@ -1317,11 +1352,9 @@ export default function App() {
           <p className="screen-step-label">
             {formatStepLabel({ role: 'creator', current: 'create', subtitle: 'Fingerprint locally' })}
           </p>
-          <PrivacyNotice variant="inline" />
           <p className="muted">
-            Choose your lease or contract PDF on this computer. The file is fingerprinted in your browser
-            and never uploaded. After you create the agreement, share the link and send the same PDF file
-            to other signers yourself (email, AirDrop, etc.).
+            Choose your lease or contract PDF on this computer. After you create the agreement, share the
+            link and send the same PDF file to other signers yourself (email, AirDrop, etc.).
           </p>
           <div className="field">
             <label>Title</label>
@@ -1451,7 +1484,7 @@ export default function App() {
               key={createFormKey}
               accept="application/pdf"
               file={pdfFile}
-              emptyLabel="Select PDF to seal"
+              emptyLabel="Load PDF to seal"
               disabled={pdfLoading || creating}
               onChange={file => void onPdfSelected(file)}
             />
@@ -1674,15 +1707,14 @@ export default function App() {
                 </p>
                 <p className="muted">
                   {`You are signing as the ${formatPartyRole(resolution.party.role)} with wallet ${shortAddress(address)}.`}{' '}
-                  Choose the PDF on your computer, confirm it matches the fingerprint, then draw your
-                  signature. The file never leaves your device.
+                  Load the PDF on your computer, confirm it matches the fingerprint, then draw your signature.
                 </p>
                 <div className="field">
-                  <label>Your copy of the PDF (stays on your computer)</label>
+                  <label>Your copy of the PDF</label>
                   <FilePicker
                     accept="application/pdf"
                     file={signPdfFile}
-                    emptyLabel="Choose PDF to verify"
+                    emptyLabel="Load PDF to verify"
                     disabled={signPdfLoading || busy}
                     onChange={file => void onSignPdfSelected(file)}
                   />
@@ -1813,17 +1845,16 @@ export default function App() {
           <p className="screen-step-label">
             {formatStepLabel({ role: 'verifier', current: 'verify', subtitle: 'Verify anytime' })}
           </p>
-          <PrivacyNotice variant="inline" />
           <p className="muted">
-            No wallet needed. Choose a PDF on your computer to fingerprint it locally and check it matches
-            a locked agreement, or look up a document by ID. The file is never sent to our servers.
+            No wallet needed. Load a PDF to fingerprint it locally and check it matches a locked agreement,
+            or look up a document by ID.
           </p>
           <div className="field">
             <label>PDF on your computer</label>
             <FilePicker
               accept="application/pdf"
               file={verifyFile}
-              emptyLabel="Choose PDF on your computer"
+              emptyLabel="Load PDF to verify"
               disabled={busy}
               onChange={setVerifyFile}
             />
