@@ -9,4 +9,12 @@ data/
 *.db-shm
 .env
 .DS_Store
+
+# Local design assets (production logos live in client/public/verilock-mark*)
 branding/
+logo-ideas/
+
+# Legacy interim logos (superseded by verilock-mark)
+client/public/verilock-logo.png
+client/public/verilock-logo-96.png
+client/public/nimiq-seal-logo.png
