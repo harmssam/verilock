@@ -53,6 +53,20 @@
   color: var(--text-muted);
 }
 
+.signatures-panel-address {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.signatures-panel-address:hover,
+.signatures-panel-address:focus-visible {
+  color: var(--mint);
+  text-decoration: underline;
+  text-decoration-color: rgba(94, 234, 212, 0.55);
+  text-underline-offset: 0.15em;
+}
+
 .signatures-panel-typed {
   font-size: 0.8rem;
   font-style: italic;

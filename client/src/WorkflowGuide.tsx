@@ -316,6 +316,8 @@ interface WorkflowGuideProps {
   screen: 'home' | 'create' | 'document' | 'verify'
   compact?: boolean
   onGoCreate?: () => void
+  onConnect?: () => void
+  walletConnecting?: boolean
 }
 
 export function WorkflowGuide({
@@ -325,6 +327,8 @@ export function WorkflowGuide({
   screen,
   compact,
   onGoCreate,
+  onConnect,
+  walletConnecting,
 }: WorkflowGuideProps) {
   const role = resolveRole({ hasWallet, address: address ?? null, activeDoc, screen })
   const steps = getStepsForRole(role)
@@ -381,7 +385,27 @@ export function WorkflowGuide({
                 {!isLast && <span className="workflow-timeline-line" />}
               </div>
               <div className="workflow-step-body">
-                <strong>{step.title}</strong>
+                <div className="workflow-step-title-row">
+                  <strong>{step.title}</strong>
+                  {step.id === 'connect' && !hasWallet && onConnect && (
+                    <button
+                      type="button"
+                      className={`btn btn-primary workflow-step-login${walletConnecting ? ' btn--busy' : ''}`}
+                      onClick={onConnect}
+                      disabled={walletConnecting}
+                      aria-busy={walletConnecting}
+                    >
+                      {walletConnecting ? (
+                        <>
+                          <LoaderCircle className="btn-spinner" size={12} strokeWidth={2.5} aria-hidden />
+                          Connecting…
+                        </>
+                      ) : (
+                        'Log in'
+                      )}
+                    </button>
+                  )}
+                </div>
                 <span className="muted">{step.short}</span>
               </div>
             </li>
