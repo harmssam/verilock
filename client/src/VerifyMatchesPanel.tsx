@@ -51,18 +51,18 @@ export function VerifyMatchesPanel({
               key={match.id}
               className={`verify-match-card${highlighted ? ' verify-match-card--highlighted' : ''}`}
             >
-              <div className="verify-match-header">
-                <h3 className="verify-match-title">{match.title}</h3>
+              <div className="verify-match-lead">
                 <span className={`verify-match-status verify-match-status--${match.status}`}>
                   {formatStatus(match.status)}
                 </span>
+                {match.originalFilename && (
+                  <p className="document-filename verify-match-filename">
+                    <span className="document-filename-label">PDF file</span>
+                    <span className="document-filename-value">{match.originalFilename}</span>
+                  </p>
+                )}
               </div>
-              {match.originalFilename && (
-                <p className="document-filename verify-match-filename">
-                  <span className="document-filename-label">PDF file</span>
-                  <span className="document-filename-value">{match.originalFilename}</span>
-                </p>
-              )}
+              <h3 className="verify-match-title">{match.title}</h3>
               {documentTypeUsesNotes(match.type) &&
                 typeof match.metadata?.notes === 'string' && (
                   <DocumentNotesPanel notes={match.metadata.notes} compact />

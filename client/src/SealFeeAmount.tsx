@@ -15,10 +15,17 @@ interface SealFeeAmountProps {
   feeNim: number
   baseFeeNim?: number
   showWas?: boolean
+  showFiatPicker?: boolean
   className?: string
 }
 
-export function SealFeeAmount({ feeNim, baseFeeNim, showWas = false, className }: SealFeeAmountProps) {
+export function SealFeeAmount({
+  feeNim,
+  baseFeeNim,
+  showWas = false,
+  showFiatPicker = true,
+  className,
+}: SealFeeAmountProps) {
   const { prices } = useNimPrices()
   const [currency, setCurrency] = useState<FiatCurrency>(readStoredFiatCurrency)
 
@@ -34,7 +41,7 @@ export function SealFeeAmount({ feeNim, baseFeeNim, showWas = false, className }
   return (
     <span className={['seal-fee-amount', className].filter(Boolean).join(' ')}>
       <span className="seal-fee-amount-nim">{formatSealFeeNim(feeNim)}</span>
-      {fiatAmount != null && (
+      {showFiatPicker && fiatAmount != null && (
         <span className="seal-fee-amount-fiat">
           <span className="seal-fee-amount-fiat-value">
             ≈ {formatFiatAmount(fiatAmount, currency)} (est.)
@@ -53,7 +60,7 @@ export function SealFeeAmount({ feeNim, baseFeeNim, showWas = false, className }
           </select>
         </span>
       )}
-      {showWas && baseFeeNim != null && (
+      {showFiatPicker && showWas && baseFeeNim != null && (
         <span className="seal-fee-amount-was">
           <span className="seal-fee-amount-was-nim">{formatSealFeeNim(baseFeeNim)}</span>
           {baseFiatAmount != null && (
