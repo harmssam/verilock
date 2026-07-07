@@ -22,9 +22,5 @@ client/public/nimiq-seal-logo.png
 # Competition / promo assets (local only)
 submission-assets/
 
-# SEO & Search Console (site-specific; keep locally, deploy as needed)
-client/public/robots.txt
-client/public/sitemap.xml
-client/public/site.webmanifest
+# Google Search Console HTML file verification (meta tag method used instead)
 client/public/google*.html
-client/src/seo.ts
