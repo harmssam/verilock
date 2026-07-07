@@ -203,7 +203,7 @@ app.post('/api/auth/verify', authVerifyLimit, authMiddleware, async (req, res) =
       ? true
       : authScheme === 'hub'
         ? verifyHubSignedMessage(session.nonce, publicKey, signature)
-        : await verifySignature(session.nonce, publicKey, signature, true)
+        : await verifySignature(session.nonce, publicKey, signature, false)
     if (!valid) {
       res.status(401).json({ error: 'Invalid signature' })
       return
