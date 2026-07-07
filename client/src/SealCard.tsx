@@ -68,13 +68,17 @@ export function SealCard({
         <div>
           <h2>{title}</h2>
           <p className="muted seal-card-subtitle">
-            {document.signingProgress.signed}/{document.signingProgress.required} signed —{' '}
+            {document.signingProgress.required === 0
+              ? 'Direct seal'
+              : `${document.signingProgress.signed}/${document.signingProgress.required} signed`} —{' '}
             {busy
               ? 'approve the wallet prompt to finish.'
               : insufficientFunds
                 ? 'Your wallet does not have enough NIM for the seal fee and network costs.'
                 : failedPrior
-                  ? 'your signatures are safe — the last transaction never reached the blockchain.'
+                  ? (document.signingProgress.required === 0
+                      ? 'the last transaction never reached the blockchain.'
+                      : 'your signatures are safe — the last transaction never reached the blockchain.')
                   : interrupted
                     ? 'the last seal attempt did not finish. Try again.'
                     : `approve one Nimiq transaction (${formatSealFeeSummary(pricing)}) to permanently record this document's fingerprint on-chain. Your PDF stays on your computer.`}
@@ -106,7 +110,7 @@ export function SealCard({
 
       {failedPrior && !busy && !lockError && !insufficientFunds && (
         <p className="seal-card-notice" role="status">
-          Previous seal did not confirm on-chain. Tap below to sign a new transaction in Hub.
+          Previous seal did not confirm on-chain. Tap below to submit a new transaction.
         </p>
       )}
 
@@ -152,7 +156,7 @@ export function SealCard({
           ) : interrupted ? (
             'Retry seal'
           ) : inNimiqPay || hasNimiqProvider ? (
-            'Seal agreement'
+            document.signingProgress.required === 0 ? 'Seal document' : 'Seal agreement'
           ) : (
             'Seal via Hub'
           )}

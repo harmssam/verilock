@@ -16,6 +16,7 @@ export interface SealInFlight {
   token: string
   address: string
   startedAt: number
+  finalSha256?: string
 }
 
 function readStorage(store: Storage, key: string): string | null {
@@ -157,7 +158,9 @@ export function hasHubReturnSignal(): boolean {
   if (typeof window === 'undefined') return false
   if (peekHubRedirectInUrl()) return true
   if (new URLSearchParams(window.location.search).has(RPC_ID_SEARCH_PARAM)) return true
-  return document.referrer.includes(HUB_REFERRER_HOST)
+  // Referrer intentionally omitted (unreliable per Hub integration review).
+  // Primary signals are the redirect hash/?rpcId and persisted seal-in-flight.
+  return false
 }
 
 /** Hub actually sent the user back and we have (or had) an in-flight seal to finish. */
@@ -169,4 +172,19 @@ export function staleSealMessage(docStatus: string): string {
   return docStatus === 'locking'
     ? 'Seal was interrupted in Hub. Your signatures are still saved — tap Retry seal to continue.'
     : 'Previous Hub redirect did not finish. Your signatures are still saved — tap Seal via Hub to try again.'
+}
+
+/** Returns false in private mode, storage blocked, or quota issues (common on iOS Safari PWA/WebView). */
+export function canUsePersistentStorage(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const k = '__verilock_test__'
+    localStorage.setItem(k, '1')
+    localStorage.removeItem(k)
+    sessionStorage.setItem(k, '1')
+    sessionStorage.removeItem(k)
+    return true
+  } catch {
+    return false
+  }
 }

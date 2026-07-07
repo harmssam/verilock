@@ -94,7 +94,7 @@ export function buildShareEmailBody(doc: SealDocument, shareUrl: string): string
     '',
     'Agreement details:',
     `• Title: ${content.title}`,
-    `• Signatures: ${content.signed}/${content.required} collected`,
+    `• Signatures: ${content.required === 0 ? 'none required (direct seal)' : `${content.signed}/${content.required} collected`}`,
     ...content.detailLines.map(line => `• ${line}`),
     ...(content.waitingOn.length > 0 ? [`• Still waiting on: ${content.waitingOn.join(', ')}`] : []),
     '',

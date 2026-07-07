@@ -28,9 +28,10 @@ export function ShareInviteCard({
     <div className={embedded ? 'share-card share-card--embedded' : 'card share-card'}>
       {!embedded && <h2>Invite signers</h2>}
       <p className="muted share-card-intro">
-        {document.signingProgress.signed}/{document.signingProgress.required} signed — share with the
-        other party. Attach <span className="share-pdf-name">{pdfName}</span> from your computer; VeriLock
-        never hosts the file.
+        {document.signingProgress.required === 0
+          ? 'Direct seal mode — no signers to invite.'
+          : `${document.signingProgress.signed}/${document.signingProgress.required} signed — share with the other party.`}{' '}
+        Attach <span className="share-pdf-name">{pdfName}</span> from your computer; VeriLock never hosts the file.
       </p>
 
       <div className="share-options">

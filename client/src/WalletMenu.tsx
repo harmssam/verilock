@@ -1,6 +1,7 @@
 import { LogOut } from 'lucide-react'
 import { useEffect, useId, useRef } from 'react'
 import { formatDisplayAddress, shortAddress } from './addresses'
+import { buildNimiqAddressExplorerUrl } from './explorer'
 import './WalletMenu.css'
 
 interface WalletMenuProps {
@@ -51,9 +52,16 @@ export function WalletMenu({ address, open, onToggle, onClose, onSignOut }: Wall
       {open && (
         <div className="wallet-menu-dropdown" id={menuId} role="menu">
           <p className="wallet-menu-label">Connected wallet</p>
-          <p className="wallet-menu-address" title={formatDisplayAddress(address)}>
+          <a
+            className="wallet-menu-address"
+            href={buildNimiqAddressExplorerUrl(address)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`View ${formatDisplayAddress(address)} on Nimiq`}
+            onClick={onClose}
+          >
             {formatDisplayAddress(address)}
-          </p>
+          </a>
           <button
             type="button"
             className="wallet-menu-signout"

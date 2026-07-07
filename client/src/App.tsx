@@ -3,26 +3,28 @@ import { CircleAlert, CircleCheck, FilePlus, Files, LoaderCircle, Search } from 
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 import { api } from './api'
 import {
+  buildLockRequestSync,
   canLockViaPay,
   connectNimiq,
   connectViaHub,
   HUB_REDIRECT_MESSAGE,
-  isMobileDevice,
-  launchNimiqPayMiniApp,
-  shouldUseHubRedirect,
+  isHubCancelError,
   isHubRedirectError,
+  isMobileDevice,
   isNimiqPayHost,
-  peekHubRedirectInUrl,
   isPopupBlockedError,
+  launchNimiqPayMiniApp,
+  peekHubRedirectInUrl,
   probeNimiqPay,
   ensureNimiqProvider,
   sendLockAttestation,
   sendLockAttestationViaHub,
   setSealProgressReporter,
   setupHubRedirectHandlers,
-  type BroadcastFallbackFactory,
+  shouldUseHubRedirect,
   signChallenge,
   warmNimiqProvider,
+  type BroadcastFallbackFactory,
 } from './nimiq'
 import { pollAttestation } from './pollAttestation'
 import { sealError, sealLog, sealWarn } from './sealDebug'
@@ -46,6 +48,7 @@ import {
 } from './sealFlow'
 import { clearStaleHubRpcStateIfIdle, hasPendingHubRedirect } from './hubRedirectParse'
 import {
+  canUsePersistentStorage,
   clearSealInFlight,
   loadSealInFlight,
   pruneExpiredSealInFlight,
@@ -243,6 +246,7 @@ export default function App() {
   const [myRole, setMyRole] = useState<'landlord' | 'tenant' | 'signer'>('landlord')
   const [myName, setMyName] = useState('')
   const [requiredSignatures, setRequiredSignatures] = useState(2)
+  const [directSeal, setDirectSeal] = useState(false)
   const [tenantName, setTenantName] = useState('')
   const [propertyAddress, setPropertyAddress] = useState('')
   const [monthlyRent, setMonthlyRent] = useState('')
@@ -250,6 +254,16 @@ export default function App() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [docNotes, setDocNotes] = useState('')
+
+  // Global floor for selectable dates: no more than 6 months in the past
+  const sixMonthsAgo = (() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - 6)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  })()
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfHash, setPdfHash] = useState<string | null>(null)
   const [pdfLoading, setPdfLoading] = useState(false)
@@ -390,6 +404,7 @@ export default function App() {
     setMyRole('landlord')
     setMyName('')
     setRequiredSignatures(2)
+    setDirectSeal(false)
     setTenantName('')
     setPropertyAddress('')
     setMonthlyRent('')
@@ -540,9 +555,10 @@ export default function App() {
       )
 
       // window.nimiq may lag behind window.nimiqPay inside the Nimiq Pay WebView.
-      let inPay = payHost || Boolean(typeof window !== 'undefined' && window.nimiq)
+      // Sync check only; background probe to avoid yielding before Hub gesture.
+      let inPay = payHost || Boolean(typeof window !== 'undefined' && (window as any).nimiq)
       if (!inPay && payHost) {
-        inPay = await probeNimiqPay(30_000)
+        void probeNimiqPay(30_000).then(d => { if (d) setInNimiqPay(true) }).catch(() => {})
       }
       setInNimiqPay(inPay || payHost)
 
@@ -579,6 +595,9 @@ export default function App() {
           return
         }
 
+        // For Hub path, set flag and call connectViaHub directly. Inside connectViaHub the
+        // first await is the hub.chooseAddress (after only sync clear/save). Prior probes
+        // moved out so gesture reaches Hub method sooner.
         hubConnectInFlightRef.current = true
         const preferRedirect = shouldUseHubRedirect(options)
         await connectViaHub(async addr => api.challenge(addr), { preferRedirect })
@@ -602,6 +621,12 @@ export default function App() {
       if (isHubRedirectError(err)) {
         setError(null)
         setWalletStatus(HUB_REDIRECT_MESSAGE)
+        return
+      }
+      if (isHubCancelError(err)) {
+        setError(null)
+        setWalletStatus('Login cancelled in Hub.')
+        hubConnectInFlightRef.current = false
         return
       }
       hubConnectInFlightRef.current = false
@@ -667,7 +692,7 @@ export default function App() {
 
   const createAgreement = async () => {
     if (!token || !pdfFile || !pdfHash || pdfLoading || creating) return
-    if (!myName.trim()) {
+    if (!directSeal && !myName.trim()) {
       setError('Enter your full name before creating the agreement')
       return
     }
@@ -675,6 +700,7 @@ export default function App() {
     setCreating(true)
     setError(null)
     try {
+      const effectiveRequired = directSeal ? 0 : requiredSignatures
       const creatorRole = docType === 'rental' ? myRole : 'signer'
       const otherRole =
         docType === 'rental'
@@ -691,15 +717,17 @@ export default function App() {
         }
         return total === 1 ? 'Invited signer' : `Invited signer ${index + 1}`
       }
-      const extraSigners = Math.max(0, requiredSignatures - 1)
-      const parties = Array.from({ length: extraSigners }, (_, index) => ({
-        role: otherRole,
-        displayName:
-          index === 0 && tenantName.trim()
-            ? clampField(tenantName.trim(), MAX_DISPLAY_NAME_LENGTH)
-            : otherDefaultName(index, extraSigners),
-        required: true,
-      }))
+      const extraSigners = Math.max(0, effectiveRequired - 1)
+      const parties = directSeal
+        ? []
+        : Array.from({ length: extraSigners }, (_, index) => ({
+            role: otherRole,
+            displayName:
+              index === 0 && tenantName.trim()
+                ? clampField(tenantName.trim(), MAX_DISPLAY_NAME_LENGTH)
+                : otherDefaultName(index, extraSigners),
+            required: true,
+          }))
       let metadata: DocumentMetadata | undefined
       if (docType === 'rental') {
         const rental: RentalMetadata = {
@@ -732,7 +760,7 @@ export default function App() {
         creatorDisplayName: clampField(myName.trim(), MAX_DISPLAY_NAME_LENGTH),
         originalSha256: pdfHash,
         pageCount,
-        requiredSignatures,
+        requiredSignatures: effectiveRequired,
         parties: parties.length > 0 ? parties : undefined,
         metadata,
       })
@@ -740,6 +768,9 @@ export default function App() {
       resetCreateForm()
       setDocNotice(hashWarning ?? null)
       setActiveDoc(document)
+      if (document.signingProgress.required === 0) {
+        setLockMessage('Document created for direct seal. Review details then seal the hash on-chain.')
+      }
       setScreen('document')
       window.history.pushState({}, '', `/d/${document.slug}`)
       await refreshMe(token)
@@ -869,6 +900,26 @@ export default function App() {
     }
   }, [token, refreshSealFunds])
 
+  // Aggressively pre-warm everything needed for bulletproof Hub gesture + return handling:
+  // - block height (sync buildLockRequestSync for validityStartHeight)
+  // - prepareLock on server (so beginLock never fails with "Call prepare-lock first")
+  // - funds status
+  // This runs when readyToLock so explicit Seal tap has zero prep latency and reliable state.
+  useEffect(() => {
+    if (!activeDoc?.signingProgress.readyToLock || !token || !address) return
+    const finalHash = activeDoc.finalSha256 ?? activeDoc.originalSha256
+    const docId = activeDoc.id
+
+    // Block for sync prebuilt
+    try { buildLockRequestSync?.(address, docId, finalHash) } catch {}
+
+    // Fire prepare early (critical for redirect roundtrips)
+    void api.prepareLock(token, docId, finalHash).catch((e) => sealWarn('prewarm:prepareLock', e))
+
+    // Funds (optimistic path for redirect)
+    void refreshSealFunds().catch(() => {})
+  }, [activeDoc?.id, activeDoc?.signingProgress.readyToLock, address, token, refreshSealFunds])
+
   const lockDocument = async (options?: { useRedirect?: boolean }) => {
     if (peekHubRedirectInUrl()) {
       sealWarn('lockDocument:skipped (hub redirect response in URL)')
@@ -895,8 +946,16 @@ export default function App() {
       return
     }
 
-    const funded = await ensureSealFunds()
-    if (!funded) return
+    // For redirect gesture path, skip blocking funds await to keep Hub call sync from click.
+    // Use the pre-fetched sealFundsStatus (optimistic); server/Hub will surface insufficient.
+    // Always kick a refresh.
+    const willUseRedirectForGesture = shouldUseHubRedirect(options) && !(isNimiqPayHost() || Boolean(typeof window !== 'undefined' && (window as any).nimiq))
+    if (willUseRedirectForGesture) {
+      void ensureSealFunds().catch(() => {})
+    } else {
+      const funded = await ensureSealFunds()
+      if (!funded) return
+    }
 
     sealInFlightRef.current = true
     const finalHash = activeDoc.finalSha256 ?? activeDoc.originalSha256
@@ -919,10 +978,26 @@ export default function App() {
     })
 
     try {
-      sealLog('lockDocument:prepareLock')
-      await api.prepareLock(token, activeDoc.id, finalHash)
+      // For redirect (gesture-sensitive): fire prepare (will ensure on return if needed).
+      // For popup/Pay: await it so beginLock after sign is safe.
+      const willUseRedirectForPrepare = shouldUseHubRedirect(options) && !(isNimiqPayHost() || Boolean(typeof window !== 'undefined' && (window as any).nimiq))
+      if (willUseRedirectForPrepare) {
+        void api.prepareLock(token, activeDoc.id, finalHash).catch((e) => {
+          sealWarn('lockDocument:prepareLockFireAndForget', e)
+        })
+      } else {
+        await api.prepareLock(token, activeDoc.id, finalHash)
+      }
 
-      const usePay = await canLockViaPay(nimiq)
+      // Sync-first decision to avoid probe await before Hub call on the common (non-Pay) path.
+      // Probe only if might be Pay; for standard Hub users we go straight to redirect initiation.
+      let usePay = isNimiqPayHost() || Boolean(typeof window !== 'undefined' && (window as any).nimiq)
+      if (!usePay) {
+        // kick probe in background; rare late switch won't affect this gesture
+        void canLockViaPay(nimiq).then((p) => {
+          if (p) sealLog('lockDocument:lateDetectedPay', {})
+        }).catch(() => {})
+      }
       sealLog('lockDocument:walletPath', { usePay, hasNimiq: Boolean(nimiq) })
       let txHash: string
 
@@ -940,6 +1015,7 @@ export default function App() {
             docId: activeDoc.id,
             token,
             address,
+            finalSha256: finalHash,
           })
         }
         setLockMessage(
@@ -948,10 +1024,14 @@ export default function App() {
             : `Hub popup opened — confirm the ${formatSealFeeNim(getSealPricing().feeNim)} seal transaction there. Keep this tab open.`,
         )
         sealLog('lockDocument:hubSign', { preferRedirect, address })
+        // Pass prebuilt if a recent block is cached to keep build path non-awaited before hub.sign.
+        const prebuilt = buildLockRequestSync(address, activeDoc.id, finalHash)
         txHash = await sendLockAttestationViaHub(address, activeDoc.id, finalHash, {
           preferRedirect,
           token,
           broadcastFallback: createServerBroadcastFallback(token, activeDoc.id),
+          prebuiltRequest: prebuilt,
+          finalSha256: finalHash,
         })
       }
 
@@ -965,11 +1045,25 @@ export default function App() {
         setLockError(null)
         setLockMessage(HUB_REDIRECT_MESSAGE)
         sealLog('lockDocument:redirectingToHub')
+        // Attach simple guards (Issue 12) — warn on close during redirect roundtrip.
+        try {
+          const guard = (e: BeforeUnloadEvent) => {
+            e.preventDefault()
+            ;(e as any).returnValue = 'Seal via Hub in progress. Return to this tab after approving.'
+          }
+          window.addEventListener('beforeunload', guard, { once: false })
+          // auto remove after reasonable timeout or on next boot handling
+          setTimeout(() => window.removeEventListener('beforeunload', guard), 5 * 60_000)
+        } catch {}
         return
       }
       const message = err instanceof Error ? err.message : 'Lock failed'
       sealError('lockDocument:failed', err)
-      if (isPopupBlockedError(err)) {
+      if (isHubCancelError(err)) {
+        setLockError(null)
+        setLockMessage('Cancelled in Hub. Tap Seal to try again.')
+        // no recovery spam per guide
+      } else if (isPopupBlockedError(err)) {
         setShowOpenInPay(true)
         setLockError(message)
         setLockMessage('Popup blocked — use Open Hub (full page) below.')
@@ -977,7 +1071,7 @@ export default function App() {
         setError(message)
         setLockError(message)
         setLockMessage(
-          `Seal interrupted: ${message}. Your signatures are still saved — tap Retry seal to continue.`,
+          `Seal interrupted: ${message}. ${activeDoc && activeDoc.signingProgress.required === 0 ? 'The document is ready' : 'Your signatures are still saved'} — tap Retry seal to continue.`,
         )
         await recoverSealAfterError(activeDoc?.id)
       }
@@ -990,7 +1084,75 @@ export default function App() {
     }
   }
 
-  const triggerSeal = async (slug?: string) => {
+  // Synchronous initiator for Hub redirect seal.
+  // MUST be called directly from user click handler (no async wrapper in the call stack)
+  // so that hub.signTransaction(..., RedirectRequestBehavior) executes while
+  // the browser transient activation is still valid. This is the key to bulletproof
+  // cross-platform (no popup/redirect blocks on Safari, iOS, etc.).
+  const initiateHubSealRedirect = () => {
+    if (peekHubRedirectInUrl() || sealInFlightRef.current || busy) return
+    if (!token || !activeDoc || !address) return
+
+    const finalHash = activeDoc.finalSha256 ?? activeDoc.originalSha256
+
+    // Rely on pre-warmed status from the readyToLock effect + SealCard disabled state.
+    // Re-check latest known to be safe; do not await anything.
+    if (sealFundsStatus && !sealFundsStatus.sufficient) {
+      const msg = insufficientSealFundsMessage(sealFundsStatus)
+      setLockError(msg)
+      setLockMessage(msg)
+      setError(msg)
+      return
+    }
+
+    // Already pre-fired in effect, but fire again to be sure (non-blocking).
+    void api.prepareLock(token, activeDoc.id, finalHash).catch((e) =>
+      sealWarn('initiate:prepareLock', e)
+    )
+
+    saveSession({ token, address })
+    markSealRedirectStarted({
+      slug: activeDoc.slug,
+      docId: activeDoc.id,
+      token,
+      address,
+      finalSha256: finalHash,
+    })
+
+    setBusy(true)
+    setError(null)
+    setLockError(null)
+    setLockMessage('Redirecting to Nimiq Hub…')
+    sealInFlightRef.current = true
+
+    const prebuilt = buildLockRequestSync(address, activeDoc.id, finalHash)
+
+    // Call without top-level await. The async fn body will run synchronously
+    // up to the internal `await hub.signTransaction(...)` (or the redirect throw).
+    // The redirect behavior performs the navigation synchronously from this call.
+    sendLockAttestationViaHub(address, activeDoc.id, finalHash, {
+      preferRedirect: true,
+      token,
+      broadcastFallback: createServerBroadcastFallback(token, activeDoc.id),
+      prebuiltRequest: prebuilt,
+      finalSha256: finalHash,
+    }).catch((err) => {
+      if (isHubRedirectError(err)) {
+        // Expected: page is navigating away to Hub. inFlight stays true.
+        sealLog('initiate:redirectToHub')
+        return
+      }
+      // Real error before navigation
+      sealError('initiateHubSealRedirect:failed', err)
+      sealInFlightRef.current = false
+      setBusy(false)
+      const msg = err instanceof Error ? err.message : 'Failed to redirect to Hub'
+      setLockError(msg)
+      setLockMessage(msg)
+    })
+  }
+
+  const triggerSeal = (slug?: string) => {
     if (!token || !address || sealInFlightRef.current || busy) return
     const targetSlug = slug ?? activeDoc?.slug
     if (!targetSlug) return
@@ -1002,7 +1164,19 @@ export default function App() {
     }
 
     autoLockAttemptedRef.current.delete(activeDoc.id)
-    await lockDocument()
+
+    // For Hub redirect (the main cross-platform path), use the *synchronous* initiator
+    // directly so the Hub call happens in the click activation context.
+    const looksLikePay = isNimiqPayHost() || Boolean(typeof window !== 'undefined' && (window as any).nimiq)
+    const willRedirect = shouldUseHubRedirect() && !looksLikePay
+
+    if (willRedirect) {
+      initiateHubSealRedirect()
+      return
+    }
+
+    // Pay or popup paths can be async.
+    void lockDocument()
   }
 
   useEffect(() => {
@@ -1010,9 +1184,11 @@ export default function App() {
     if (activeDoc.slug !== pendingSealSlugRef.current) return
     if (!token || !address || busy || sealInFlightRef.current) return
     if (peekHubRedirectInUrl()) return
+    // Do NOT auto-invoke lockDocument here: navigation from list click spent the
+    // original user gesture. Require explicit tap on SealCard to initiate Hub
+    // (ensures sync gesture for redirect/popup on all platforms).
     pendingSealSlugRef.current = null
-    autoLockAttemptedRef.current.delete(activeDoc.id)
-    void lockDocument()
+    // Leave autoLockAttempted as-is; user must click to start.
   }, [activeDoc?.id, activeDoc?.slug, token, address, busy])
 
   useEffect(() => {
@@ -1044,6 +1220,18 @@ export default function App() {
 
     autoLockAttemptedRef.current.add(activeDoc.id)
     sealLog('autoLock:start', { docId: activeDoc.id, slug: activeDoc.slug })
+
+    // Never auto-invoke for Hub redirect from effect (no user gesture).
+    // Always require explicit Seal button tap for the critical Hub action.
+    // This guarantees the synchronous initiate path above is used.
+    const looksLikePay = isNimiqPayHost() || Boolean(typeof window !== 'undefined' && (window as any).nimiq)
+    const willRedirect = shouldUseHubRedirect() && !looksLikePay
+    if (willRedirect) {
+      // Set a helpful message; user taps the (now enabled) Seal button.
+      setLockMessage('Ready to seal — tap the button below to continue in Nimiq Hub.')
+      return
+    }
+
     void lockDocument()
   }, [
     activeDoc?.id,
@@ -1087,6 +1275,15 @@ export default function App() {
       if (stored) {
         setToken(stored.token)
         setAddress(stored.address)
+      }
+
+      if (!canUsePersistentStorage() && !isNimiqPayHost()) {
+        sealWarn('boot:noPersistentStorage', 'local/sessionStorage unavailable — Hub redirects may fail on return (private mode / strict browser). Prefer Nimiq Pay.')
+        // Do not hard error here to not block Pay path, but Hub users will see issues on return.
+      }
+
+      if (typeof window !== 'undefined' && (window as any).crossOriginIsolated) {
+        sealWarn('boot:crossOriginIsolated', 'window.crossOriginIsolated=true — COOP/COEP headers may break Nimiq Hub popup/redirect. Check server and CDN headers.')
       }
 
       pruneExpiredSealInFlight()
@@ -1152,6 +1349,10 @@ export default function App() {
             setActiveDoc(document)
             setScreen('document')
             window.history.replaceState({}, '', `/d/${document.slug}`)
+            const inFlightForReturn = loadSealInFlight()
+            const finalForPrepare = document.finalSha256 ?? inFlightForReturn?.finalSha256 ?? document.originalSha256
+            sealLog('hubRedirect:ensurePrepare', { docId: lockResult.docId })
+            await api.prepareLock(lockResult.token, lockResult.docId, finalForPrepare).catch(e => sealWarn('return:prepare', e))
             sealLog('hubRedirect:beginLock', { docId: lockResult.docId })
             await api.beginLock(lockResult.token, lockResult.docId)
             sealLog('hubRedirect:finishLock', { docId: lockResult.docId, txHash: lockResult.txHash })
@@ -1163,7 +1364,7 @@ export default function App() {
             setError(message)
             setLockError(message)
             setLockMessage(
-              `Seal interrupted: ${message}. Your signatures are still saved — tap Retry seal to continue.`,
+              `Seal interrupted: ${message}. ${activeDoc && activeDoc.signingProgress.required === 0 ? 'The document is ready' : 'Your signatures are still saved'} — tap Retry seal to continue.`,
             )
             await recoverSealAfterError(lockResult.docId)
             clearSealInFlight()
@@ -1183,7 +1384,7 @@ export default function App() {
           setError(err.message)
           setLockError(err.message)
           setLockMessage(
-            `Seal interrupted: ${err.message}. Your signatures are still saved — tap Retry seal to continue.`,
+            `Seal interrupted: ${err.message}. ${activeDoc && activeDoc.signingProgress.required === 0 ? 'The document is ready' : 'Your signatures are still saved'} — tap Retry seal to continue.`,
           )
           await recoverSealAfterError(failedDocId)
           sealInFlightRef.current = false
@@ -1200,6 +1401,16 @@ export default function App() {
         hubLockHandled,
         awaitingLockCompletion: Boolean(hubLockCompletion),
       })
+
+      // Improve recovery for lost state (lenient missing request) per review.
+      const hasRedirectPayload =
+        peekHubRedirectInUrl() ||
+        new URLSearchParams(window.location.search).has(RPC_ID_SEARCH_PARAM)
+      if (hasRedirectPayload && !hubLoginHandled && !hubLockHandled && !hubLockCompletion) {
+        sealWarn('boot:redirectPayloadWithoutHandler', 'Hub returned but state (rpcRequests or seal-in-flight) lost.')
+        setLockMessage('Hub response received but state lost — tap Retry seal or refresh.')
+        clearSealInFlight()
+      }
 
       if (hubLoginHandled && sealInFlightAtBoot) {
         const routeSlug =
@@ -1245,10 +1456,14 @@ export default function App() {
         return
       }
 
-      const hasRedirectPayload =
-        peekHubRedirectInUrl() ||
-        new URLSearchParams(window.location.search).has(RPC_ID_SEARCH_PARAM)
-      if (sealInFlightAtBoot && !hasRedirectPayload && !hubLockCompletion) {
+      if (
+        sealInFlightAtBoot &&
+        !(
+          peekHubRedirectInUrl() ||
+          new URLSearchParams(window.location.search).has(RPC_ID_SEARCH_PARAM)
+        ) &&
+        !hubLockCompletion
+      ) {
         sealLog('boot:clearedOrphanSealInFlight', { slug: sealInFlightAtBoot.slug })
         clearSealInFlight()
         hubReturnPending = shouldResumeHubSeal()
@@ -1785,8 +2000,9 @@ export default function App() {
             {formatStepLabel({ role: 'creator', current: 'create', subtitle: 'Fingerprint locally' })}
           </p>
           <p className="muted">
-            Choose your lease or contract PDF on this computer. After you create the agreement, share the
-            link and send the same PDF file to other signers yourself (email, AirDrop, etc.).
+            {directSeal
+              ? 'Choose your PDF on this computer. It will be fingerprinted locally. After creating, you can immediately seal (anchor) its hash on the Nimiq blockchain with one transaction. No sharing or other signers involved.'
+              : 'Choose your lease or contract PDF on this computer. After you create the agreement, share the link and send the same PDF file to other signers yourself (email, AirDrop, etc.).'}
           </p>
           <div className="field">
             <label>Type</label>
@@ -1832,56 +2048,91 @@ export default function App() {
                 <option value="landlord">Landlord</option>
                 <option value="tenant">Tenant</option>
               </select>
-              <span className="muted">Your role in this lease — you still sign as one required party.</span>
+              {!directSeal && (
+                <span className="muted">Your role in this lease — you still sign as one required party.</span>
+              )}
             </div>
           ) : (
-            <p className="muted">You&apos;ll sign as a party on this agreement.</p>
+            !directSeal && <p className="muted">You&apos;ll sign as a party on this agreement.</p>
           )}
           <div className="field">
-            <label>Your full name</label>
+            <label>Your full name{directSeal ? ' (optional for direct seal)' : ''}</label>
             <input
               value={myName}
               onChange={e => setMyName(clampField(e.target.value, MAX_DISPLAY_NAME_LENGTH))}
               maxLength={MAX_DISPLAY_NAME_LENGTH}
-              placeholder="e.g. Alex Morgan"
+              placeholder={directSeal ? 'e.g. Alex Morgan (recorded with the seal)' : 'e.g. Alex Morgan'}
               autoComplete="name"
             />
+            {directSeal && <span className="muted">Name is optional; the sealing wallet address serves as the on-chain attestor.</span>}
           </div>
-          <div className="field">
-            <label>Signatures required</label>
-            <select
-              value={requiredSignatures}
-              onChange={e => setRequiredSignatures(Number(e.target.value))}
-            >
-              {Array.from({ length: 10 }, (_, index) => {
-                const count = index + 1
-                return (
-                  <option key={count} value={count}>
-                    {count} {count === 1 ? 'signature' : 'signatures'} (you + {Math.max(0, count - 1)} other
-                    {count - 1 === 1 ? '' : 's'})
-                  </option>
-                )
-              })}
-            </select>
-            <span className="muted">
-              Includes your signature. When all required signatures are in, sealing starts automatically.
-            </span>
-          </div>
-          <div className="field">
-            <label>
-              {docType === 'rental'
-                ? myRole === 'landlord'
-                  ? 'Tenant name (optional)'
-                  : 'Landlord name (optional)'
-                : 'Other party name (optional)'}
+
+          <div className="field" style={{ background: 'rgba(15, 23, 42, 0.04)', padding: '0.75rem', borderRadius: '8px' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={directSeal}
+                onChange={e => {
+                  const checked = e.target.checked
+                  setDirectSeal(checked)
+                  if (checked) {
+                    setRequiredSignatures(0)
+                  } else if (requiredSignatures === 0) {
+                    setRequiredSignatures(1)
+                  }
+                }}
+                style={{ marginTop: '0.2rem' }}
+              />
+              <span>
+                <strong>Seal directly — no signatures needed</strong>
+                <br />
+                <span className="muted">
+                  Use this when the PDF is already fully signed by everyone, or signatures are not required.
+                  You will anchor the document hash on the Nimiq blockchain immediately. No parties or invites.
+                </span>
+              </span>
             </label>
-            <input
-              value={tenantName}
-              onChange={e => setTenantName(clampField(e.target.value, MAX_DISPLAY_NAME_LENGTH))}
-              maxLength={MAX_DISPLAY_NAME_LENGTH}
-              placeholder="Leave blank — they enter their name when signing"
-            />
           </div>
+
+          {!directSeal && (
+            <>
+              <div className="field">
+                <label>Signatures required</label>
+                <select
+                  value={requiredSignatures}
+                  onChange={e => setRequiredSignatures(Number(e.target.value))}
+                >
+                  {Array.from({ length: 10 }, (_, index) => {
+                    const count = index + 1
+                    return (
+                      <option key={count} value={count}>
+                        {count} {count === 1 ? 'signature' : 'signatures'} (you + {Math.max(0, count - 1)} other
+                        {count - 1 === 1 ? '' : 's'})
+                      </option>
+                    )
+                  })}
+                </select>
+                <span className="muted">
+                  Includes your signature. When all required signatures are in, sealing starts automatically.
+                </span>
+              </div>
+              <div className="field">
+                <label>
+                  {docType === 'rental'
+                    ? myRole === 'landlord'
+                      ? 'Tenant name (optional)'
+                      : 'Landlord name (optional)'
+                    : 'Other party name (optional)'}
+                </label>
+                <input
+                  value={tenantName}
+                  onChange={e => setTenantName(clampField(e.target.value, MAX_DISPLAY_NAME_LENGTH))}
+                  maxLength={MAX_DISPLAY_NAME_LENGTH}
+                  placeholder="Leave blank — they enter their name when signing"
+                />
+              </div>
+            </>
+          )}
           {documentTypeUsesNotes(docType) && (
             <div className="field">
               <label>Notes (optional)</label>
@@ -1940,6 +2191,7 @@ export default function App() {
                   <DateField
                     value={startDate}
                     placeholder="Lease start"
+                    min={sixMonthsAgo}
                     max={endDate || undefined}
                     onChange={next => {
                       setStartDate(next)
@@ -1952,7 +2204,7 @@ export default function App() {
                   <DateField
                     value={endDate}
                     placeholder="Lease end"
-                    min={startDate || undefined}
+                    min={startDate && startDate > sixMonthsAgo ? startDate : sixMonthsAgo}
                     onChange={setEndDate}
                   />
                 </div>
@@ -1980,10 +2232,14 @@ export default function App() {
           )}
           <button
             className="btn btn-primary"
-            disabled={!pdfHash || pdfLoading || creating || !myName.trim()}
+            disabled={!pdfHash || pdfLoading || creating || (!directSeal && !myName.trim())}
             onClick={() => void createAgreement()}
           >
-            {creating ? 'Creating…' : 'Create agreement'}
+            {creating
+              ? 'Creating…'
+              : directSeal
+                ? 'Create & prepare for direct seal'
+                : 'Create agreement'}
           </button>
         </div>
       )}
@@ -2090,23 +2346,31 @@ export default function App() {
               typeof activeDoc.metadata?.notes === 'string' && (
                 <DocumentNotesPanel notes={activeDoc.metadata.notes} />
               )}
-            <p className="muted">
-              Signatures: {activeDoc.signingProgress.signed}/{activeDoc.signingProgress.required}
-              {isSigningComplete(activeDoc) && activeDoc.status !== 'locked' && (
-                <span className="all-signed-note"> · All signatures collected</span>
-              )}
-            </p>
-            <ul className="party-list">
-              {activeDoc.parties.map(party => (
-                <li key={party.id} className="party-item">
-                  <span>
-                    {party.displayName}{' '}
-                    <span className="muted">({formatPartyRole(party.role)})</span>
-                  </span>
-                  <span className={`status-badge ${statusClass(party.status)}`}>{party.status}</span>
-                </li>
-              ))}
-            </ul>
+            {activeDoc.signingProgress.required > 0 ? (
+              <>
+                <p className="muted">
+                  Signatures: {activeDoc.signingProgress.signed}/{activeDoc.signingProgress.required}
+                  {isSigningComplete(activeDoc) && activeDoc.status !== 'locked' && (
+                    <span className="all-signed-note"> · All signatures collected</span>
+                  )}
+                </p>
+                <ul className="party-list">
+                  {activeDoc.parties.map(party => (
+                    <li key={party.id} className="party-item">
+                      <span>
+                        {party.displayName}{' '}
+                        <span className="muted">({formatPartyRole(party.role)})</span>
+                      </span>
+                      <span className={`status-badge ${statusClass(party.status)}`}>{party.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="muted">
+                Direct seal — no signatures or parties required. The creator anchors the document hash on-chain.
+              </p>
+            )}
             {activeDoc.signatures.length > 0 && (
               <SignaturesPanel
                 signatures={activeDoc.signatures}
@@ -2128,12 +2392,14 @@ export default function App() {
               if (!resolution.ok) {
                 return (
                   <div className="card verify-ok">
-                    <h2>{activeDoc.status === 'locking' ? 'Sealing on-chain' : 'All signed'}</h2>
+                    <h2>{activeDoc.status === 'locking' ? 'Sealing on-chain' : (activeDoc.signingProgress.required === 0 ? 'Direct seal' : 'All signed')}</h2>
                     <p className="muted">
                       {activeDoc.status === 'locking'
                         ? lockMessage ||
                           'Confirm the transaction in your wallet, or wait for block confirmation…'
-                        : 'Everyone has signed. The agreement will be sealed on-chain shortly — no further action needed from you.'}
+                        : (activeDoc.signingProgress.required === 0
+                      ? 'This document is sealed directly by its creator (no signatures).'
+                      : 'Everyone has signed. The agreement will be sealed on-chain shortly — no further action needed from you.')}
                     </p>
                     <button
                       type="button"

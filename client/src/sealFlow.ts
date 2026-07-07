@@ -13,6 +13,7 @@ export function markSealRedirectStarted(input: {
   docId: string
   token: string
   address: string
+  finalSha256?: string
 }): void {
   saveSealInFlight(input)
 }
@@ -61,6 +62,9 @@ export function shouldAutoStartSeal(input: {
   if (busy || sealInFlight) return false
   if (sealFlowIsBlocked()) return false
   if (alreadyAttempted) return false
+  // Direct seal (0 signatures) must be explicitly triggered via Seal button click
+  // to ensure a fresh user gesture for the Hub redirect/popup (cross-platform reliability).
+  if (doc.signingProgress.required === 0) return false
   return true
 }
 
