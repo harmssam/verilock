@@ -15,9 +15,49 @@
 }
 
 .nimiq-info-lead {
-  margin: 0 0 1rem;
+  margin: 0;
   font-size: 0.88rem;
   line-height: 1.55;
+}
+
+.nimiq-info-details {
+  margin-top: 0.85rem;
+}
+
+.nimiq-info-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.nimiq-info-summary::-webkit-details-marker {
+  display: none;
+}
+
+.nimiq-info-summary:hover,
+.nimiq-info-details[open] > .nimiq-info-summary {
+  color: var(--mint);
+}
+
+.nimiq-info-summary-icon {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.nimiq-info-details[open] .nimiq-info-summary-icon {
+  transform: rotate(180deg);
+}
+
+.nimiq-info-details-body {
+  margin-top: 0.85rem;
 }
 
 .nimiq-info-grid {
