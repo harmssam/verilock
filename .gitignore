@@ -18,3 +18,13 @@ logo-ideas/
 client/public/verilock-logo.png
 client/public/verilock-logo-96.png
 client/public/nimiq-seal-logo.png
+
+# Competition / promo assets (local only)
+submission-assets/
+
+# SEO & Search Console (site-specific; keep locally, deploy as needed)
+client/public/robots.txt
+client/public/sitemap.xml
+client/public/site.webmanifest
+client/public/google*.html
+client/src/seo.ts
