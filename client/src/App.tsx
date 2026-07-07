@@ -1695,7 +1695,7 @@ export default function App() {
 
       {!address && !inNimiqPay && !isNimiqPayHost() && screen !== 'verify' && (
         <div id={CONNECT_PANEL_ID} className="card banner-pay connect-panel">
-          <h2>Connect with Nimiq Pay or Hub</h2>
+          <h2>{isMobileDevice() ? 'Open in Nimiq Pay' : 'Connect with Nimiq Hub'}</h2>
           <NimiqPayOpenPanel
             appUrl={appUrl}
             showHubFallback

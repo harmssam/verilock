@@ -62,11 +62,11 @@ export function NimiqPayOpenPanel({
         <p className="muted pay-open-lead">
           {mobile
             ? showHubFallback
-              ? 'Open in Nimiq Pay for the best experience, or connect via Nimiq Hub.'
+              ? 'Open VeriLock in Nimiq Pay for the best experience, or connect via Nimiq Hub.'
               : 'Wallet actions work best inside the Nimiq Pay app.'
             : showHubFallback
-              ? 'Connect via Nimiq Hub below, or install Nimiq Pay on your phone and open this app there.'
-              : 'Nimiq Pay runs on your phone — desktop browsers cannot open nimiqpay:// links.'}
+              ? 'Connect your Nimiq wallet in the browser — no app install needed.'
+              : 'Nimiq Pay runs on your phone — use a mobile browser to open the app there.'}
         </p>
       )}
 
@@ -95,15 +95,23 @@ export function NimiqPayOpenPanel({
             )}
           </button>
         )}
-        <a className="btn btn-secondary" href={NIMIQ_PAY_IOS_URL} target="_blank" rel="noreferrer">
-          <ExternalLink size={15} strokeWidth={2.25} aria-hidden />
-          App Store
-        </a>
-        <a className="btn btn-secondary" href={NIMIQ_PAY_ANDROID_URL} target="_blank" rel="noreferrer">
-          <ExternalLink size={15} strokeWidth={2.25} aria-hidden />
-          Google Play
-        </a>
       </div>
+
+      {mobile && (
+        <div className="pay-open-store">
+          <p className="muted pay-open-store-label">Don&apos;t have Nimiq Pay yet? Get the app:</p>
+          <div className="pay-open-actions row">
+            <a className="btn btn-secondary" href={NIMIQ_PAY_IOS_URL} target="_blank" rel="noreferrer">
+              <ExternalLink size={15} strokeWidth={2.25} aria-hidden />
+              Get on App Store
+            </a>
+            <a className="btn btn-secondary" href={NIMIQ_PAY_ANDROID_URL} target="_blank" rel="noreferrer">
+              <ExternalLink size={15} strokeWidth={2.25} aria-hidden />
+              Get on Google Play
+            </a>
+          </div>
+        </div>
+      )}
 
       <div className="pay-open-actions row">
         <button type="button" className="btn btn-ghost" onClick={() => void copyWebUrl()}>
@@ -138,9 +146,18 @@ export function NimiqPayOpenPanel({
 
       {!compact && (
         <ol className="pay-open-steps muted">
-          <li>Install Nimiq Pay on your phone (links above).</li>
-          <li>Copy the app link and open it inside Nimiq Pay, or tap Open in Nimiq Pay on mobile.</li>
-          <li>On desktop, connect and lock via Nimiq Hub — no phone required.</li>
+          {mobile ? (
+            <>
+              <li>Download Nimiq Pay if you don&apos;t have it yet (links above).</li>
+              <li>Tap Open in Nimiq Pay, or copy the app link and open it inside the app.</li>
+              {showHubFallback && <li>Prefer a browser wallet? Use Continue via Hub redirect below.</li>}
+            </>
+          ) : (
+            <>
+              <li>Click Connect via Nimiq Hub to sign in with your wallet.</li>
+              <li>No phone or app install required — Hub works right in your browser.</li>
+            </>
+          )}
         </ol>
       )}
     </div>

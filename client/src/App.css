@@ -908,6 +908,18 @@ a.hash-chip.text-link:focus-visible {
   line-height: 1.45;
 }
 
+.pay-open-store {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.pay-open-store-label {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
 .pay-open-actions {
   margin: 0;
 }
