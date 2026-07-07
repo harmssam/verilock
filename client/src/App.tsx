@@ -56,6 +56,7 @@ import {
   consumeHubReturnPath,
   documentSlugFromPath,
   isAgreementsPath,
+  isKnownAppPath,
   isPricingPath,
   isPrivacyPath,
   readHubReturnPath,
@@ -109,6 +110,7 @@ import {
   WorkflowNextAction,
   WorkflowProgress,
 } from './WorkflowGuide'
+import { applyPageMeta, documentPageMeta, PAGE_META } from './seo'
 import './App.css'
 
 const createServerBroadcastFallback: BroadcastFallbackFactory = (sessionToken, docId) => {
@@ -295,6 +297,34 @@ export default function App() {
     activeDoc,
     screen,
   })
+  useEffect(() => {
+    const path = window.location.pathname
+
+    if (screen === 'document' && activeDoc) {
+      applyPageMeta({
+        ...documentPageMeta(activeDoc.title, 'sign'),
+        path: `/d/${activeDoc.slug}`,
+      })
+      return
+    }
+
+    if (screen === 'verify' && verifyFromLink) {
+      const match = verifyMatches.length === 1 ? verifyMatches[0] : null
+      if (match) {
+        applyPageMeta({
+          ...documentPageMeta(match.title, 'verify'),
+          path,
+        })
+        return
+      }
+      applyPageMeta({ ...PAGE_META.verify, path })
+      return
+    }
+
+    const meta = PAGE_META[screen] ?? PAGE_META.home
+    applyPageMeta({ ...meta, path: meta.path || path })
+  }, [screen, activeDoc, verifyFromLink, verifyMatches])
+
   const isCreatorOnDoc =
     workflowRole === 'creator' && screen === 'document' && activeDoc !== null
   const isInvitedSigner = workflowRole === 'signer' && screen === 'document' && activeDoc !== null
@@ -1298,6 +1328,8 @@ export default function App() {
         setScreen('pricing')
       } else if (isPrivacyPath(path)) {
         setScreen('privacy')
+      } else if (!isKnownAppPath(path)) {
+        window.location.replace('/404.html')
       } else if (sessionToken && bootDocumentCount > 0 && path === '/') {
         setScreen('agreements')
         window.history.replaceState({}, '', '/agreements')

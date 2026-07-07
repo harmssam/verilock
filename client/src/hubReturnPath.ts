@@ -50,6 +50,16 @@ export function isPrivacyPath(path: string): boolean {
   return /^\/privacy\/?$/.test(path)
 }
 
+export function isKnownAppPath(path: string): boolean {
+  if (path === '/' || path === '') return true
+  if (isAgreementsPath(path)) return true
+  if (isPricingPath(path)) return true
+  if (isPrivacyPath(path)) return true
+  if (documentSlugFromPath(path)) return true
+  if (verifySlugFromPath(path)) return true
+  return false
+}
+
 export function resolveDocumentSlugFromLocation(pathname?: string): string | null {
   const path = pathname ?? (typeof window !== 'undefined' ? window.location.pathname : '')
   return documentSlugFromPath(path) ?? (readHubReturnPath() ? documentSlugFromPath(readHubReturnPath()!) : null)
