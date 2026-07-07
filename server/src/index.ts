@@ -255,7 +255,8 @@ app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req
 
   const address = res.locals.address as string
 
-  if (!body.creatorDisplayName?.trim()) {
+  const isDirect = (body.requiredSignatures ?? 2) === 0
+  if (!body.creatorDisplayName?.trim() && !isDirect) {
     res.status(400).json({ error: 'Your name is required' })
     return
   }

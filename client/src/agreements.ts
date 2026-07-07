@@ -43,15 +43,20 @@ export function canDeleteDocument(
 
 export function isCollectingSignatures(doc: SealDocument): boolean {
   if (doc.status === 'locked') return false
+  if (doc.signingProgress.required === 0) return false
   return doc.signingProgress.signed < doc.signingProgress.required
 }
 
 export function isSigningComplete(doc: SealDocument): boolean {
+  if (doc.signingProgress.required === 0) return true
   return doc.signingProgress.signed >= doc.signingProgress.required
 }
 
 export function isSealingPhase(doc: SealDocument): boolean {
   if (doc.status === 'locked' || doc.attestation?.status === 'confirmed') return false
+  if (doc.signingProgress.required === 0) {
+    return doc.status !== 'locked'
+  }
   return (
     doc.status === 'locking' ||
     doc.status === 'ready_to_lock' ||
@@ -61,7 +66,7 @@ export function isSealingPhase(doc: SealDocument): boolean {
 
 export function getAgreementView(doc: SealDocument, address: string | null): AgreementView {
   const { signed, required, readyToLock } = doc.signingProgress
-  const progress = `${signed}/${required} signed`
+  const progress = required === 0 ? 'direct seal' : `${signed}/${required} signed`
 
   if (doc.status === 'locked' || doc.attestation?.status === 'confirmed') {
     return {
@@ -94,9 +99,10 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
 
   if (readyToLock || doc.status === 'ready_to_lock') {
     if (creator) {
+      const headline = doc.signingProgress.required === 0 ? 'Ready to seal on-chain' : 'All signed — seal on-chain'
       return {
         bucket: 'ready_to_seal',
-        headline: 'All signed — seal on-chain',
+        headline,
         detail: progress,
         cta: 'Seal now',
       }
@@ -131,7 +137,7 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
       return creator
         ? {
             bucket: 'ready_to_seal',
-            headline: 'All signed — seal on-chain',
+            headline: doc.signingProgress.required === 0 ? 'Ready to seal on-chain' : 'All signed — seal on-chain',
             detail: progress,
             cta: 'Seal now',
           }
@@ -145,6 +151,14 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
   }
 
   if (creator) {
+    if (doc.signingProgress.required === 0) {
+      return {
+        bucket: 'ready_to_seal',
+        headline: 'Ready to seal on-chain',
+        detail: progress,
+        cta: 'Seal now',
+      }
+    }
     return {
       bucket: 'waiting',
       headline: 'Waiting for signatures',

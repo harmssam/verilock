@@ -127,6 +127,9 @@ function hubRedirectBehavior(localState: Record<string, unknown>) {
 export function shouldUseHubRedirect(options?: { useRedirect?: boolean; usePopup?: boolean }): boolean {
   if (options?.usePopup === true) return false
   if (options?.useRedirect === false) return false
+  // Per integration guide: prefer redirects for mobile/kiosk to avoid popup blockers.
+  // Force redirect on detected mobile to make cross-platform reliable.
+  if (isMobileDevice()) return true
   return true
 }
 
@@ -135,6 +138,12 @@ export const HUB_REDIRECT_MESSAGE = 'Redirecting to Nimiq Hub…'
 export function isHubRedirectError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err)
   return message === HUB_REDIRECT_MESSAGE
+}
+
+/** Per Nimiq Hub integration guide: explicit cancel vs error. */
+export function isHubCancelError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return message === 'Request was cancelled' || /cancelled by user/i.test(message)
 }
 
 function normalizeTxHash(hash: string): string {
@@ -208,6 +217,74 @@ const BROADCAST_VERIFY_MS = 4_000
 const BROADCAST_VERIFY_POLL_MS = 500
 const HUB_CHECKOUT_NETWORK_WAIT_MS = 30_000
 const RELAY_NETWORK_SOFT_WAIT_MS = 20_000
+
+/** Cache for recent block height to allow sync access during user gesture for Hub calls.
+ *  Refreshed in background; allows Hub request to be prepared without await in click path.
+ *  We keep a lastKnown fallback (even if older) because validityStartHeight is usually
+ *  tolerant, and we always refresh async. This makes the seal gesture path never block on RPC.
+ */
+let cachedBlock: { height: number; fetchedAt: number } | null = null
+let lastKnownBlock: number | null = null
+const BLOCK_CACHE_MS = 60_000 // generous for long redirects
+
+async function refreshBlockHeight(): Promise<number> {
+  try {
+    const h = await nimiqRpcCall<number>('getBlockNumber', [])
+    cachedBlock = { height: h, fetchedAt: Date.now() }
+    lastKnownBlock = h
+    return h
+  } catch (e) {
+    sealWarn('hub:blockRefreshFailed', e)
+    if (cachedBlock) return cachedBlock.height
+    if (lastKnownBlock != null) return lastKnownBlock
+    throw e
+  }
+}
+
+/** Sync read of recent block (or triggers background refresh). Used to avoid await before Hub sign in gesture.
+ *  Falls back to lastKnown (possibly slightly stale) rather than blocking — Hub/Keyguard tolerate it.
+ */
+function getRecentBlockHeightSync(): number | null {
+  const now = Date.now()
+  if (cachedBlock && now - cachedBlock.fetchedAt < BLOCK_CACHE_MS) {
+    void refreshBlockHeight().catch(() => {})
+    lastKnownBlock = cachedBlock.height
+    return cachedBlock.height
+  }
+  // Always refresh in background
+  void refreshBlockHeight().catch(() => {})
+  if (cachedBlock) {
+    lastKnownBlock = cachedBlock.height
+    return cachedBlock.height
+  }
+  return lastKnownBlock
+}
+
+/** Build request synchronously using cached or last-known block.
+ *  Never returns null — falls back so the gesture path can always proceed.
+ *  (Slightly stale validityStartHeight is tolerated by the network/Hub.)
+ */
+export function buildLockRequestSync(
+  address: string,
+  docId: string,
+  finalSha256: string,
+): Awaited<ReturnType<typeof buildHubLockSignRequest>> {
+  let h = getRecentBlockHeightSync()
+  if (h == null) {
+    // last resort: use 0 or a very old safe value; will be refreshed async
+    h = lastKnownBlock ?? 0
+  }
+  const recipient = getHubAttestationRecipient()
+  return {
+    appName: APP_NAME,
+    sender: address,
+    recipient,
+    value: getSealFeeLuna(),
+    flags: 0,
+    extraData: buildAttestationPayloadBytes(docId, finalSha256.toLowerCase()),
+    validityStartHeight: h,
+  }
+}
 
 let sealProgressReporter: ((message: string) => void) | null = null
 
@@ -340,7 +417,12 @@ export function getHubAttestationRecipient(): string {
 }
 
 async function buildHubLockSignRequest(address: string, docId: string, finalSha256: string) {
-  const blockNumber = await nimiqRpcCall<number>('getBlockNumber', [])
+  // Always return a request without blocking the caller if possible.
+  // getRecent... will use cache or lastKnown; only await on cold start with no history.
+  let blockNumber = getRecentBlockHeightSync()
+  if (blockNumber == null) {
+    blockNumber = await refreshBlockHeight()
+  }
   const recipient = getHubAttestationRecipient()
   return {
     appName: APP_NAME,
@@ -785,10 +867,15 @@ export async function sendLockAttestationViaHub(
     preferRedirect?: boolean
     token?: string
     broadcastFallback?: TransactionBroadcastFallback
+    /** Prebuilt request (from cache) to avoid await inside gesture path for redirect. */
+    prebuiltRequest?: Awaited<ReturnType<typeof buildHubLockSignRequest>>
+    finalSha256?: string
   },
 ): Promise<string> {
   const hub = getHubApi()
-  const request = await buildHubLockSignRequest(address, docId, finalSha256)
+  const request =
+    options?.prebuiltRequest ??
+    (await buildHubLockSignRequest(address, docId, finalSha256))
 
   sealLog('hub:signTransactionRequest', {
     docId,
@@ -803,6 +890,7 @@ export async function sendLockAttestationViaHub(
     flow: 'lock' as const,
     token: options?.token,
     docId,
+    finalSha256: options?.finalSha256 ?? finalSha256,
   }
 
   const preferRedirect = options?.preferRedirect ?? true
@@ -810,6 +898,8 @@ export async function sendLockAttestationViaHub(
     clearStaleHubRpcStateIfIdle()
     saveHubReturnPath()
     const behavior = hubRedirectBehavior(lockState)
+    // The hub.signTransaction call (with redirect behavior) must be reached with no
+    // preceding await in the user gesture call stack for cross-browser reliability.
     await hub.signTransaction(
       request,
       behavior as Parameters<typeof hub.signTransaction>[1],

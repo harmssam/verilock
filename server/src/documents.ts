@@ -56,7 +56,7 @@ export function assertSealBroadcastAllowed(documentId: string, requesterAddress:
   return doc
 }
 
-const MIN_REQUIRED_SIGNATURES = 1
+const MIN_REQUIRED_SIGNATURES = 0
 const MAX_REQUIRED_SIGNATURES = 10
 
 function clampRequiredSignatures(value: number | undefined, fallback: number): number {
@@ -123,6 +123,7 @@ function countSignedRequiredParties(parties: PartyRecord[]): number {
 
 function signaturesComplete(doc: DocumentRecord, parties: PartyRecord[]): boolean {
   const requiredCount = resolveRequiredSignatureCount(doc, parties)
+  if (requiredCount === 0) return true
   return countSignedRequiredParties(parties) >= requiredCount
 }
 
@@ -241,13 +242,14 @@ export function createDocument(input: {
   const requiredSignatures = clampRequiredSignatures(input.requiredSignatures, 2)
   const metadata = sanitizeDocumentMetadata(type, input.metadata)
 
+  const isDirectSeal = requiredSignatures === 0
   const doc: DocumentRecord = {
     id,
     slug,
     title: sanitizeTitle(input.title),
     originalFilename: sanitizeFilename(input.originalFileName),
     type,
-    status: 'collecting_signatures',
+    status: isDirectSeal ? 'ready_to_lock' : 'collecting_signatures',
     creatorAddress: normalizeAddress(input.creatorAddress),
     originalSha256: input.originalSha256.toLowerCase(),
     finalSha256: null,
@@ -259,21 +261,24 @@ export function createDocument(input: {
   }
   insertDocument(doc)
 
-  const creatorParty: PartyRecord = {
-    id: uuid(),
-    documentId: id,
-    role: creatorRole,
-    displayName: sanitizeDisplayName(
-      input.creatorDisplayName,
-      shortAddress(input.creatorAddress),
-    ),
-    walletAddress: normalizeAddress(input.creatorAddress),
-    sortOrder: 0,
-    required: true,
-    status: 'pending',
-    signedAt: null,
+  // For direct seal (0 signatures), we skip parties entirely — creator seals directly.
+  if (!isDirectSeal) {
+    const creatorParty: PartyRecord = {
+      id: uuid(),
+      documentId: id,
+      role: creatorRole,
+      displayName: sanitizeDisplayName(
+        input.creatorDisplayName,
+        shortAddress(input.creatorAddress),
+      ),
+      walletAddress: normalizeAddress(input.creatorAddress),
+      sortOrder: 0,
+      required: true,
+      status: 'pending',
+      signedAt: null,
+    }
+    insertParty(creatorParty)
   }
-  insertParty(creatorParty)
 
   const priorMatches = findDocumentsByHash(doc.originalSha256).filter(existing => existing.id !== id)
   const hashWarning =
@@ -281,26 +286,28 @@ export function createDocument(input: {
       ? `${priorMatches.length} other agreement(s) already use this PDF fingerprint. Verify the sealed record before trusting a match.`
       : undefined
 
-  const extraPartyCount = Math.max(0, requiredSignatures - 1)
-  const providedParties = input.parties ?? []
+  if (!isDirectSeal) {
+    const extraPartyCount = Math.max(0, requiredSignatures - 1)
+    const providedParties = input.parties ?? []
 
-  for (let index = 0; index < extraPartyCount; index++) {
-    const provided = providedParties[index]
-    const fallbackName = defaultOtherDisplayName(otherRole, index, extraPartyCount)
-    const providedName = provided?.displayName?.trim()
-    insertParty({
-      id: uuid(),
-      documentId: id,
-      role: provided?.role || otherRole,
-      displayName: providedName
-        ? sanitizeDisplayName(providedName, fallbackName)
-        : fallbackName,
-      walletAddress: provided?.walletAddress ? normalizeAddress(provided.walletAddress) : null,
-      sortOrder: index + 1,
-      required: true,
-      status: 'pending',
-      signedAt: null,
-    })
+    for (let index = 0; index < extraPartyCount; index++) {
+      const provided = providedParties[index]
+      const fallbackName = defaultOtherDisplayName(otherRole, index, extraPartyCount)
+      const providedName = provided?.displayName?.trim()
+      insertParty({
+        id: uuid(),
+        documentId: id,
+        role: provided?.role || otherRole,
+        displayName: providedName
+          ? sanitizeDisplayName(providedName, fallbackName)
+          : fallbackName,
+        walletAddress: provided?.walletAddress ? normalizeAddress(provided.walletAddress) : null,
+        sortOrder: index + 1,
+        required: true,
+        status: 'pending',
+        signedAt: null,
+      })
+    }
   }
 
   return { document: publicDocument(doc), hashWarning }
@@ -407,7 +414,8 @@ export function prepareLock(documentId: string, finalSha256: string, requesterAd
 
   const parties = getPartiesForDocument(documentId)
   if (!signaturesComplete(doc, parties)) {
-    const remaining = resolveRequiredSignatureCount(doc, parties) - countSignedRequiredParties(parties)
+    const requiredCount = resolveRequiredSignatureCount(doc, parties)
+    const remaining = requiredCount - countSignedRequiredParties(parties)
     throw new Error(`${remaining} required signature(s) still pending`)
   }
 

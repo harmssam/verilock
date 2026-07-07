@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import './DateField.css'
 
@@ -50,17 +50,19 @@ function compareIso(a: string, b: string): number {
 
 function yearRange(min?: string, max?: string, anchorYear?: number): number[] {
   const current = new Date().getFullYear()
-  let start = current - 10
-  let end = current + 20
 
   const minDate = min ? parseIsoDate(min) : null
   const maxDate = max ? parseIsoDate(max) : null
-  if (minDate) start = Math.min(start, minDate.getFullYear())
-  if (maxDate) end = Math.max(end, maxDate.getFullYear())
+
+  let start = minDate ? minDate.getFullYear() : current - 10
+  let end = maxDate ? maxDate.getFullYear() : current + 20
+
   if (anchorYear !== undefined) {
     start = Math.min(start, anchorYear)
     end = Math.max(end, anchorYear)
   }
+
+  if (start > end) start = end
 
   const years: number[] = []
   for (let year = end; year >= start; year--) {
@@ -89,6 +91,7 @@ export function DateField({
   const fieldId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
+  const [popoverPos, setPopoverPos] = useState<null | { top: number; left: number; width: number }>(null)
 
   const selected = parseIsoDate(value)
   const todayIso = toIsoDate(new Date())
@@ -115,6 +118,66 @@ export function DateField({
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [open])
 
+  useLayoutEffect(() => {
+    if (!open) {
+      setPopoverPos(null)
+      return
+    }
+    const el = rootRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const vw = window.innerWidth || 360
+    const width = Math.min(320, Math.max(280, vw - 32))
+    let left = rect.left
+    if (left + width > vw - 16) {
+      left = Math.max(16, vw - width - 16)
+    }
+    const top = rect.bottom + 8
+    setPopoverPos({ top, left, width })
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    window.addEventListener('resize', close)
+    window.addEventListener('scroll', close, true)
+    return () => {
+      window.removeEventListener('resize', close)
+      window.removeEventListener('scroll', close, true)
+    }
+  }, [open])
+
+  // If min/max change (e.g. linked fields), clamp current view to allowed range
+  useEffect(() => {
+    const minD = min ? parseIsoDate(min) : null
+    const maxD = max ? parseIsoDate(max) : null
+    let y = viewYear
+    let m = viewMonth
+    let changed = false
+    if (minD) {
+      const my = minD.getFullYear()
+      const mm = minD.getMonth()
+      if (y < my || (y === my && m < mm)) {
+        y = my
+        m = mm
+        changed = true
+      }
+    }
+    if (maxD) {
+      const my = maxD.getFullYear()
+      const mm = maxD.getMonth()
+      if (y > my || (y === my && m > mm)) {
+        y = my
+        m = mm
+        changed = true
+      }
+    }
+    if (changed) {
+      setViewYear(y)
+      setViewMonth(m)
+    }
+  }, [min, max])
+
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
   const firstWeekday = new Date(viewYear, viewMonth, 1).getDay()
   const cells: Array<{ iso: string; day: number; inMonth: boolean }> = []
@@ -130,10 +193,34 @@ export function DateField({
     cells.push({ iso: '', day: 0, inMonth: false })
   }
 
+  const minDate = min ? parseIsoDate(min) : null
+  const maxDate = max ? parseIsoDate(max) : null
+
   const shiftMonth = (delta: number) => {
-    const next = new Date(viewYear, viewMonth + delta, 1)
-    setViewYear(next.getFullYear())
-    setViewMonth(next.getMonth())
+    let nextYear = viewYear
+    let nextMonth = viewMonth + delta
+    nextYear += Math.floor(nextMonth / 12)
+    nextMonth = ((nextMonth % 12) + 12) % 12
+
+    if (minDate) {
+      const minY = minDate.getFullYear()
+      const minM = minDate.getMonth()
+      if (nextYear < minY || (nextYear === minY && nextMonth < minM)) {
+        nextYear = minY
+        nextMonth = minM
+      }
+    }
+    if (maxDate) {
+      const maxY = maxDate.getFullYear()
+      const maxM = maxDate.getMonth()
+      if (nextYear > maxY || (nextYear === maxY && nextMonth > maxM)) {
+        nextYear = maxY
+        nextMonth = maxM
+      }
+    }
+
+    setViewYear(nextYear)
+    setViewMonth(nextMonth)
   }
 
   const isDisabledDay = (iso: string) => {
@@ -169,7 +256,21 @@ export function DateField({
       </button>
 
       {open && (
-        <div className="date-field-popover" role="dialog" aria-labelledby={fieldId}>
+        <div
+          className="date-field-popover"
+          role="dialog"
+          aria-labelledby={fieldId}
+          style={
+            popoverPos
+              ? {
+                  position: 'fixed',
+                  top: `${popoverPos.top}px`,
+                  left: `${popoverPos.left}px`,
+                  width: `${popoverPos.width}px`,
+                }
+              : undefined
+          }
+        >
           <div className="date-field-header">
             <button
               type="button"

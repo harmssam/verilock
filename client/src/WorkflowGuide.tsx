@@ -37,7 +37,7 @@ export const CREATOR_STEPS: StepDef[] = [
     id: 'create',
     title: 'Fingerprint PDF',
     short: 'New agreement tab',
-    detail: 'Open New agreement, choose your PDF on your computer, and tap Create agreement. The file never leaves your device — only the fingerprint is saved.',
+    detail: 'Open New agreement, choose your PDF on your computer, and tap Create. Use the "Seal directly" option if the document is already signed or needs no signatures — the hash is anchored on-chain with one transaction.',
   },
   {
     id: 'share',
@@ -55,7 +55,7 @@ export const CREATOR_STEPS: StepDef[] = [
     id: 'lock',
     title: 'Lock on-chain',
     short: 'Nimiq seal transaction',
-    detail: `When all required signatures are in, approve one Nimiq transaction (${formatSealFeeSummary()}) to permanently record the file hash on-chain.`,
+    detail: `For signature agreements: when all required signatures are in. Or use direct seal (no signatures) — approve one Nimiq transaction (${formatSealFeeSummary()}) to permanently record the file hash on-chain.`,
   },
   {
     id: 'verify',
@@ -262,7 +262,11 @@ export function getWorkflowHint(input: {
     return `Step ${index}: Verify your PDF locally, draw your signature, and submit (${signed}/${required} signed so far).`
   }
   if (current === 'lock') {
-    return `Step ${index}: All signatures collected — approve the wallet prompt to seal on-chain.`
+    const req = input.activeDoc?.signingProgress.required ?? 0
+    const msg = req === 0
+      ? 'Document ready — approve the wallet prompt to seal the hash on-chain.'
+      : 'All signatures collected — approve the wallet prompt to seal on-chain.'
+    return `Step ${index}: ${msg}`
   }
   if (current === 'verify' && input.activeDoc?.status === 'locked') {
     return 'Done! Share the verification link or download the certificate. Your PDF stays on your device.'

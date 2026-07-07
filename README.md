@@ -9,10 +9,11 @@ Built for the [Mini Apps Competition](https://miniappscompetition.com/).
 ## What it does
 
 1. **Fingerprint** a PDF locally (rental agreement, contract, etc.) — the file never leaves your device
-2. **Share** the agreement link and send the same PDF to other signers out-of-band
-3. **Sign** — each party verifies their PDF matches, then signs via Nimiq wallet
-4. **Lock** — zero-fee Nimiq transaction anchors `seal:v1:lock:{docId}:{sha256}` on-chain
-5. **Verify** — anyone can upload a PDF or enter a doc ID to check integrity
+2. **(Optional)** Share the agreement link and send the same PDF to other signers out-of-band
+3. **Sign** (optional) — each party verifies their PDF matches, then signs via Nimiq wallet
+4. **Direct seal option** — for already-signed PDFs or docs that need no signatures: just fingerprint and seal the hash yourself in one step
+5. **Lock** — Nimiq transaction anchors `seal:v1:lock:{docId}:{sha256}` on-chain (creator attests)
+6. **Verify** — anyone can upload a PDF or enter a doc ID to check integrity
 
 ## Quick start (local)
 
