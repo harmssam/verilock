@@ -100,7 +100,9 @@ export async function connectNimiq() {
 }
 
 export async function signChallenge(nimiq: Awaited<ReturnType<typeof init>>, nonce: string) {
-  const signatureResult = await nimiq.sign(nonce)
+  // Pass as object with isHex:false so the provider treats the nonce as a plain text/UTF-8 message
+  // (not a hex string). This must match the isHex:false passed to verifySignature on the server for 'pay'.
+  const signatureResult = await nimiq.sign({ message: nonce, isHex: false })
   const signatureError = getProviderErrorMessage(signatureResult)
   if (signatureError) throw new Error(signatureError)
   const { publicKey, signature } = signatureResult as { publicKey: string; signature: string }
