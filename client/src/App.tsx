@@ -2007,6 +2007,7 @@ export default function App() {
           <div className="field">
             <label>Type</label>
             <select
+              className="form-select"
               value={docType}
               onChange={e => {
                 const nextType = e.target.value
@@ -2042,6 +2043,7 @@ export default function App() {
             <div className="field">
               <label>You are the</label>
               <select
+                className="form-select"
                 value={myRole === 'signer' ? 'landlord' : myRole}
                 onChange={e => setMyRole(e.target.value as 'landlord' | 'tenant')}
               >
@@ -2099,6 +2101,7 @@ export default function App() {
               <div className="field">
                 <label>Signatures required</label>
                 <select
+                  className="form-select"
                   value={requiredSignatures}
                   onChange={e => setRequiredSignatures(Number(e.target.value))}
                 >

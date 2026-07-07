@@ -475,6 +475,34 @@ a.hash-chip.text-link:focus-visible {
   box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.15);
 }
 
+/* Styled dropdowns for step 2 form (Type, Role, Signatures required) */
+.form-select {
+  width: 100%;
+  appearance: none;
+  padding: 0.7rem 2.25rem 0.7rem 0.85rem;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--mint) 50%),
+    linear-gradient(135deg, var(--mint) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) calc(50% + 2px),
+    calc(100% - 9px) calc(50% + 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.form-select:hover {
+  border-color: var(--border-bright);
+}
+
+.form-select option {
+  background: var(--bg-mid);
+  color: var(--text);
+}
+
 /* ── File picker ── */
 
 .file-picker {
