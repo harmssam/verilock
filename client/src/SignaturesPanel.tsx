@@ -95,8 +95,8 @@ export function SignaturesPanel({
       </h3>
       {!showPrivate && (
         <p className="muted signatures-panel-privacy-note">
-          Names and signature images are only visible when you connect a wallet that created or
-          signed this agreement.
+          Signer names and signature images are private. If you created this agreement or signed it,
+          connect with that same Nimiq wallet to unlock the full details.
         </p>
       )}
       <ul className="signatures-panel-list">
@@ -132,10 +132,14 @@ export function SignaturesPanel({
                   <span className="signatures-panel-typed muted">Typed acknowledgment</span>
                 )}
                 {hasHiddenImage && (
-                  <span className="signatures-panel-typed muted">Signature image hidden</span>
+                  <span className="signatures-panel-typed muted">
+                    Signature image private — connect as a party to view
+                  </span>
                 )}
                 {!showPrivate && sig.signatureType === 'typed' && !hasHiddenImage && (
-                  <span className="signatures-panel-typed muted">Signed (details private)</span>
+                  <span className="signatures-panel-typed muted">
+                    Signed — name private until you connect as a party
+                  </span>
                 )}
               </div>
               {imageUrl && authToken ? (
