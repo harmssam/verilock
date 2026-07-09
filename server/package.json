@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node --import tsx src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "test:concurrent-sign": "node --import tsx scripts/test-concurrent-sign.mjs"
   },
   "engines": {
     "node": ">=22"
@@ -17,6 +18,7 @@
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "helmet": "^8.2.0",
+    "resend": "^6.17.2",
     "tsx": "^4.19.3",
     "uuid": "^11.1.0"
   },

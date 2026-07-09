@@ -1,0 +1,14 @@
+# Service B only — journey UI at SPA root.
+# In Railway service settings → Config-as-code path: /railway.service-b.toml
+# Do not point service A (VeriLock) at this file.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.service-b"
+
+[deploy]
+startCommand = "node --import tsx src/index.ts"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 60
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5

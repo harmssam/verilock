@@ -3,3 +3,72 @@
   font-size: 0.9rem;
   line-height: 1.55;
 }
+
+.price-page-why {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.price-page-why-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.price-page-nimiq-mark {
+  flex-shrink: 0;
+  display: block;
+  width: 1.15rem;
+  height: auto;
+}
+
+.price-page-why > p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.price-page-why-list {
+  margin: 0.75rem 0 0;
+  padding-left: 1.15rem;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.price-page-why-list li + li {
+  margin-top: 0.45rem;
+}
+
+.price-page-why-list strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.price-page-why-cta {
+  margin: 0.9rem 0 0;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.price-page-nimiq-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--mint);
+  font-weight: 600;
+  text-decoration: none;
+  text-underline-offset: 0.15em;
+}
+
+.price-page-nimiq-link:hover,
+.price-page-nimiq-link:focus-visible {
+  text-decoration: underline;
+  text-decoration-color: rgba(94, 234, 212, 0.55);
+}

@@ -5,6 +5,7 @@ import {
   getDocumentById,
   getDocumentBySlug,
   getPartiesForDocument,
+  getPartyById,
   getSignaturesForDocument,
   getSignatureImageIdsForDocument,
   getAttestationForDocument,
@@ -13,10 +14,13 @@ import {
   insertSignature,
   insertSignatureImage,
   listDocumentsForAddress,
-  assignPartyWallet,
+  claimPartyWalletIfOpen,
+  isUniqueConstraintError,
+  runInTransaction,
   updatePartyDisplayName,
   markPartySigned,
   setDocumentFinalSha256,
+  setDocumentNotifyEmail,
   updateDocumentStatus,
   type DocumentRecord,
   type PartyRecord,
@@ -73,9 +77,17 @@ const PLACEHOLDER_PARTY_NAMES = new Set([
   'landlord',
 ])
 
+/** Matches "Invited signer", "Invited tenant 2", etc. */
+const PLACEHOLDER_PARTY_NAME_RE =
+  /^(invited\s+)?(signer|tenant|landlord)(\s+\d+)?$/i
+
 function isPlaceholderPartyName(name: string): boolean {
   const trimmed = name.trim().toLowerCase()
-  return !trimmed || PLACEHOLDER_PARTY_NAMES.has(trimmed)
+  return (
+    !trimmed ||
+    PLACEHOLDER_PARTY_NAMES.has(trimmed) ||
+    PLACEHOLDER_PARTY_NAME_RE.test(trimmed)
+  )
 }
 
 function looksLikeAddressLabel(name: string): boolean {
@@ -232,6 +244,8 @@ export function createDocument(input: {
   metadata?: Record<string, unknown>
   requiredSignatures?: number
   parties?: Array<{ role: string; displayName: string; walletAddress?: string; required?: boolean }>
+  /** Optional; stored for ready-to-seal email (never returned in public document). */
+  creatorNotifyEmail?: string | null
 }) {
   const id = uuid()
   const slug = slugFromId(id)
@@ -258,6 +272,8 @@ export function createDocument(input: {
     requiredSignatures,
     createdAt: now,
     lockedAt: null,
+    creatorNotifyEmail: input.creatorNotifyEmail ?? null,
+    readyToSealEmailSentAt: null,
   }
   insertDocument(doc)
 
@@ -313,6 +329,104 @@ export function createDocument(input: {
   return { document: publicDocument(doc), hashWarning }
 }
 
+/**
+ * Resolve which party this wallet should sign as, claiming an open slot atomically
+ * when needed. If the client preferred a slot that was just taken, fall through to
+ * the next free open party so concurrent co-signers don't both stick to "party 1".
+ */
+function resolveAndClaimParty(
+  documentId: string,
+  preferredPartyId: string,
+  signer: string,
+): PartyRecord {
+  const signatures = getSignaturesForDocument(documentId)
+  if (signatures.some(sig => normalizeAddress(sig.signerAddress) === signer)) {
+    throw new Error('You already signed this agreement')
+  }
+
+  const parties = getPartiesForDocument(documentId)
+
+  // Wallet already bound to a pending party (prior partial claim / invite).
+  const alreadyMine = parties.find(
+    p =>
+      p.status === 'pending' &&
+      p.walletAddress &&
+      normalizeAddress(p.walletAddress) === signer,
+  )
+  if (alreadyMine) {
+    if (signatures.some(sig => sig.partyId === alreadyMine.id)) {
+      markPartySigned(alreadyMine.id)
+      throw new Error('You already signed this agreement')
+    }
+    return alreadyMine
+  }
+
+  const tryClaim = (partyId: string): PartyRecord | null => {
+    if (!claimPartyWalletIfOpen(partyId, signer)) return null
+    const claimed = getPartyById(partyId)
+    if (!claimed || claimed.status !== 'pending') return null
+    if (!claimed.walletAddress || normalizeAddress(claimed.walletAddress) !== signer) {
+      return null
+    }
+    return claimed
+  }
+
+  const preferred = parties.find(p => p.id === preferredPartyId)
+  if (preferred) {
+    if (preferred.documentId !== documentId) {
+      throw new Error('Party not found')
+    }
+    if (preferred.status === 'pending') {
+      if (preferred.walletAddress) {
+        if (normalizeAddress(preferred.walletAddress) === signer) {
+          return preferred
+        }
+        // Preferred slot belongs to someone else — fall through to next open.
+      } else {
+        const claimed = tryClaim(preferred.id)
+        if (claimed) return claimed
+        // Lost the race for the preferred slot — claim another open party.
+      }
+    }
+  }
+
+  // Prefer lowest sort_order among currently open pending parties.
+  const openParties = getPartiesForDocument(documentId).filter(
+    p => p.status === 'pending' && !p.walletAddress,
+  )
+  for (const open of openParties) {
+    const claimed = tryClaim(open.id)
+    if (claimed) return claimed
+  }
+
+  // Re-check assignment after races (another writer may have bound us, or only
+  // pre-assigned wallets remain).
+  const refreshed = getPartiesForDocument(documentId)
+  const bound = refreshed.find(
+    p =>
+      p.status === 'pending' &&
+      p.walletAddress &&
+      normalizeAddress(p.walletAddress) === signer,
+  )
+  if (bound) return bound
+
+  const pending = refreshed.filter(p => p.required && p.status === 'pending')
+  if (pending.length === 0) {
+    throw new Error('No signatures are pending on this document.')
+  }
+
+  const waitingOn = pending
+    .map(p =>
+      p.walletAddress
+        ? `${p.displayName} (${shortAddress(p.walletAddress)})`
+        : p.displayName,
+    )
+    .join(', ')
+  throw new Error(
+    `This wallet is not assigned to sign. Still waiting on: ${waitingOn}. Connect with the wallet that created the agreement, or the invited signer.`,
+  )
+}
+
 export function addSignature(input: {
   documentId: string
   partyId: string
@@ -323,86 +437,106 @@ export function addSignature(input: {
   signatureImage?: Buffer
   signatureImageSha256?: string
 }) {
-  const doc = getDocumentById(input.documentId)
-  if (!doc) throw new Error('Document not found')
-  if (doc.status === 'locked' || doc.status === 'locking') {
-    throw new Error('Document is already locked')
-  }
+  try {
+    let becameReadyToLock = false
+    const publicDoc = runInTransaction(() => {
+      const doc = getDocumentById(input.documentId)
+      if (!doc) throw new Error('Document not found')
+      if (doc.status === 'locked' || doc.status === 'locking') {
+        throw new Error('Document is already locked')
+      }
 
-  const parties = getPartiesForDocument(input.documentId)
-  const party = parties.find(p => p.id === input.partyId)
-  if (!party) throw new Error('Party not found')
-  if (party.status === 'signed') throw new Error('Party already signed')
+      if (input.clientSha256.toLowerCase() !== doc.originalSha256) {
+        throw new Error('Document hash mismatch — reload the PDF before signing')
+      }
 
-  const signer = normalizeAddress(input.signerAddress)
+      const signer = normalizeAddress(input.signerAddress)
+      const party = resolveAndClaimParty(input.documentId, input.partyId, signer)
 
-  if (party.walletAddress) {
-    if (normalizeAddress(party.walletAddress) !== signer) {
-      throw new Error('Wallet does not match assigned party')
-    }
-  } else {
-    assignPartyWallet(input.partyId, signer)
-  }
+      const existingForParty = getSignaturesForDocument(input.documentId).find(
+        sig => sig.partyId === party.id,
+      )
+      if (existingForParty) {
+        markPartySigned(party.id)
+        reconcileDocumentParties(input.documentId)
+        throw new Error('This party already signed — refresh the page to continue.')
+      }
 
-  const existingForParty = getSignaturesForDocument(input.documentId).find(
-    sig => sig.partyId === input.partyId,
-  )
-  if (existingForParty) {
-    markPartySigned(input.partyId)
-    reconcileDocumentParties(input.documentId)
-    throw new Error('This party already signed — refresh the page to continue.')
-  }
+      // Refresh display-name needs from post-claim row.
+      const partyRow = getPartyById(party.id) ?? party
+      if (partyNeedsDisplayName(partyRow)) {
+        const name = input.displayName?.trim()
+        if (!name) {
+          throw new Error('Your name is required before signing')
+        }
+        updatePartyDisplayName(party.id, sanitizeDisplayName(name, partyRow.displayName))
+      }
 
-  if (input.clientSha256.toLowerCase() !== doc.originalSha256) {
-    throw new Error('Document hash mismatch — reload the PDF before signing')
-  }
+      const sigId = uuid()
+      insertSignature({
+        id: sigId,
+        documentId: input.documentId,
+        partyId: party.id,
+        signerAddress: signer,
+        signatureType: input.signatureType,
+        clientSha256: input.clientSha256.toLowerCase(),
+        signedAt: Date.now(),
+      })
 
-  if (partyNeedsDisplayName(party)) {
-    const name = input.displayName?.trim()
-    if (!name) {
-      throw new Error('Your name is required before signing')
-    }
-    updatePartyDisplayName(
-      input.partyId,
-      sanitizeDisplayName(name, party.displayName),
-    )
-  }
+      if (input.signatureImage) {
+        if (input.signatureType !== 'drawn') {
+          throw new Error('Signature image is only allowed for drawn signatures')
+        }
+        insertSignatureImage({
+          signatureId: sigId,
+          imageBlob: input.signatureImage,
+          contentType: 'image/png',
+          byteSize: input.signatureImage.length,
+          imageSha256: input.signatureImageSha256 ?? hashSignatureImage(input.signatureImage),
+        })
+      }
 
-  const sigId = uuid()
-  insertSignature({
-    id: sigId,
-    documentId: input.documentId,
-    partyId: input.partyId,
-    signerAddress: normalizeAddress(input.signerAddress),
-    signatureType: input.signatureType,
-    clientSha256: input.clientSha256.toLowerCase(),
-    signedAt: Date.now(),
-  })
+      markPartySigned(party.id)
 
-  if (input.signatureImage) {
-    if (input.signatureType !== 'drawn') {
-      throw new Error('Signature image is only allowed for drawn signatures')
-    }
-    insertSignatureImage({
-      signatureId: sigId,
-      imageBlob: input.signatureImage,
-      contentType: 'image/png',
-      byteSize: input.signatureImage.length,
-      imageSha256: input.signatureImageSha256 ?? hashSignatureImage(input.signatureImage),
+      const updatedParties = getPartiesForDocument(input.documentId)
+      const updatedDoc = getDocumentById(input.documentId)!
+      if (signaturesComplete(updatedDoc, updatedParties)) {
+        // Already filtered out locked/locking above — only notify on first transition.
+        becameReadyToLock = doc.status !== 'ready_to_lock'
+        updateDocumentStatus(input.documentId, 'ready_to_lock')
+      } else if (doc.status === 'draft') {
+        updateDocumentStatus(input.documentId, 'collecting_signatures')
+      }
+
+      return publicDocument(getDocumentById(input.documentId)!)
     })
+
+    if (becameReadyToLock) {
+      // Lazy import avoids circular deps; fire-and-forget so sign response is fast
+      void import('./email/readyToSeal.js').then(({ notifyCreatorReadyToSeal }) =>
+        notifyCreatorReadyToSeal(input.documentId),
+      )
+    }
+
+    return publicDoc
+  } catch (err) {
+    if (isUniqueConstraintError(err)) {
+      throw new Error(
+        'Another signer claimed this slot at the same time. Refresh and try again if you still need to sign.',
+      )
+    }
+    throw err
   }
+}
 
-  markPartySigned(input.partyId)
-
-  const updatedParties = getPartiesForDocument(input.documentId)
-  const updatedDoc = getDocumentById(input.documentId)!
-  if (signaturesComplete(updatedDoc, updatedParties)) {
-    updateDocumentStatus(input.documentId, 'ready_to_lock')
-  } else if (doc.status === 'draft') {
-    updateDocumentStatus(input.documentId, 'collecting_signatures')
-  }
-
-  return publicDocument(getDocumentById(input.documentId)!)
+export function setCreatorNotifyEmail(
+  documentId: string,
+  requesterAddress: string,
+  email: string | null,
+) {
+  assertDocumentCreator(documentId, requesterAddress)
+  setDocumentNotifyEmail(documentId, email)
+  return { ok: true as const }
 }
 
 export function prepareLock(documentId: string, finalSha256: string, requesterAddress: string) {

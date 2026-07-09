@@ -74,7 +74,6 @@ import { NimiqLockInfo } from './NimiqLockInfo'
 import { PricePage } from './PricePage'
 import { PrivacyPolicyPage } from './PrivacyPolicyPage'
 import { evaluateSealFunds, insufficientSealFundsMessage } from './sealFunds'
-import { FEATURES } from './features'
 import { formatSealFeeNim, getSealPricing } from './sealPricing'
 import { useSealFunds } from './useSealFunds'
 import { ShareInviteCard } from './ShareInviteCard'
@@ -246,7 +245,6 @@ export default function App() {
   const [docType, setDocType] = useState('rental')
   const [myRole, setMyRole] = useState<'landlord' | 'tenant' | 'signer'>('landlord')
   const [myName, setMyName] = useState('')
-  const [creatorNotifyEmail, setCreatorNotifyEmail] = useState('')
   const [requiredSignatures, setRequiredSignatures] = useState(2)
   const [directSeal, setDirectSeal] = useState(false)
   const [tenantName, setTenantName] = useState('')
@@ -405,7 +403,6 @@ export default function App() {
     setDocType('rental')
     setMyRole('landlord')
     setMyName('')
-    setCreatorNotifyEmail('')
     setRequiredSignatures(2)
     setDirectSeal(false)
     setTenantName('')
@@ -755,10 +752,6 @@ export default function App() {
         const notes = clampField(docNotes.trim(), MAX_DOCUMENT_NOTES_LENGTH)
         if (notes) metadata = { notes }
       }
-      const notifyEmail =
-        FEATURES.emailNotifyUi && creatorNotifyEmail.trim()
-          ? creatorNotifyEmail.trim()
-          : undefined
       const { document, hashWarning } = await api.createDocument(token, {
         title: clampField(title || pdfFile.name.replace(/\.pdf$/i, ''), MAX_TITLE_LENGTH),
         originalFileName: pdfFile.name,
@@ -770,7 +763,6 @@ export default function App() {
         requiredSignatures: effectiveRequired,
         parties: parties.length > 0 ? parties : undefined,
         metadata,
-        ...(notifyEmail ? { creatorNotifyEmail: notifyEmail } : {}),
       })
       seedSignPdfHashRef.current = pdfHash
       resetCreateForm()
@@ -843,15 +835,7 @@ export default function App() {
         setLockMessage('All signatures collected — tap Seal agreement when you are ready.')
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Sign failed'
-      setError(message)
-      // Slot races / already-signed: pull latest party assignment so retry targets the right slot.
-      if (
-        /already signed|claimed this slot|refresh/i.test(message) &&
-        activeDoc?.slug
-      ) {
-        void loadDocument(activeDoc.slug)
-      }
+      setError(err instanceof Error ? err.message : 'Sign failed')
     } finally {
       setBusy(false)
     }
@@ -2084,21 +2068,6 @@ export default function App() {
             />
             {directSeal && <span className="muted">Name is optional; the sealing wallet address serves as the on-chain attestor.</span>}
           </div>
-          {FEATURES.emailNotifyUi && !directSeal && (
-            <div className="field">
-              <label>Email when everyone has signed (optional)</label>
-              <input
-                type="email"
-                value={creatorNotifyEmail}
-                onChange={e => setCreatorNotifyEmail(e.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
-              />
-              <span className="muted">
-                We only use this to notify you when the agreement is ready to seal. Never required.
-              </span>
-            </div>
-          )}
 
           <div className="field" style={{ background: 'rgba(15, 23, 42, 0.04)', padding: '0.75rem', borderRadius: '8px' }}>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer' }}>

@@ -60,6 +60,20 @@ export function sanitizeFilename(name: string | undefined): string | null {
   return cleaned || null
 }
 
+const EMAIL_MAX_LENGTH = 254
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** Optional creator notify email — returns null if empty; throws if invalid. */
+export function sanitizeNotifyEmail(value: string | undefined | null): string | null {
+  if (value == null) return null
+  const cleaned = stripControlChars(value).trim().toLowerCase().slice(0, EMAIL_MAX_LENGTH)
+  if (!cleaned) return null
+  if (!EMAIL_RE.test(cleaned) || cleaned.includes('..')) {
+    throw new Error('Invalid notification email address')
+  }
+  return cleaned
+}
+
 export const DOCUMENT_TYPES = ['rental', 'contract', 'nda', 'other'] as const
 export type DocumentType = (typeof DOCUMENT_TYPES)[number]
 

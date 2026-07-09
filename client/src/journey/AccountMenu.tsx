@@ -1,23 +1,15 @@
 import { Check, ChevronDown, Copy, LogOut, Wallet } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { formatDisplayAddress } from '../addresses'
-import type { JourneyAccount } from './types'
+import type { DemoAccount } from './types'
 
 interface AccountMenuProps {
-  account: JourneyAccount | null
+  account: DemoAccount | null
   connecting: boolean
-  walletStatus?: string | null
   onConnect: () => void
   onDisconnect: () => void
 }
 
-export function AccountMenu({
-  account,
-  connecting,
-  walletStatus,
-  onConnect,
-  onDisconnect,
-}: AccountMenuProps) {
+export function AccountMenu({ account, connecting, onConnect, onDisconnect }: AccountMenuProps) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -45,7 +37,6 @@ export function AccountMenu({
         className={`btn btn-primary exp-connect-btn${connecting ? ' btn--busy' : ''}`}
         onClick={onConnect}
         disabled={connecting}
-        title={walletStatus ?? undefined}
       >
         <Wallet size={16} strokeWidth={2.25} aria-hidden />
         {connecting ? 'Connecting…' : 'Connect wallet'}
@@ -59,7 +50,7 @@ export function AccountMenu({
         type="button"
         className="exp-account-trigger"
         aria-expanded={open}
-        aria-hasPopup="menu"
+        aria-haspopup="menu"
         onClick={() => setOpen(v => !v)}
       >
         <span className="exp-account-dot" aria-hidden />
@@ -70,8 +61,8 @@ export function AccountMenu({
       {open && (
         <div className="exp-account-menu" role="menu">
           <div className="exp-account-menu-head">
-            <span className="exp-account-menu-label">Connected</span>
-            <code className="exp-account-menu-full">{formatDisplayAddress(account.address)}</code>
+            <span className="exp-account-menu-label">Connected (demo)</span>
+            <code className="exp-account-menu-full">{account.address}</code>
           </div>
           <button
             type="button"

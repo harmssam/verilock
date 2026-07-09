@@ -35,6 +35,8 @@ export interface CreateDocumentBody {
   requiredSignatures: number
   parties?: Array<{ role: string; displayName: string; required?: boolean }>
   metadata?: DocumentMetadata
+  /** Optional ready-to-seal notification email (UI hidden until domain ready). */
+  creatorNotifyEmail?: string
 }
 
 export interface SignDocumentBody {
@@ -75,6 +77,20 @@ export const api = {
       method: 'POST',
       headers: { ...withAuth(token), 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+    }),
+
+  features: () =>
+    request<{
+      emailNotifyUi: boolean
+      emailNotifySendEnabled: boolean
+      emailNotifyConfigured: boolean
+    }>('/api/features'),
+
+  setDocumentNotifyEmail: (token: string, docId: string, email: string | null) =>
+    request<{ ok: boolean }>(`/api/documents/${docId}/notify-email`, {
+      method: 'PATCH',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
     }),
 
   getDocument: (id: string) =>

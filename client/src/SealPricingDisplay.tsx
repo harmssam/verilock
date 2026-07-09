@@ -92,7 +92,7 @@ export function SealPricingDisplay({ className, showAllCurrencies = false }: Sea
         </div>
       )}
       <p className="muted seal-pricing-display-note">
-        Signing and verifying are free. You only pay when the agreement is sealed on-chain.
+        Signing and verifying are free. You only pay the seal fee when the agreement is locked on-chain.
       </p>
     </div>
   )
