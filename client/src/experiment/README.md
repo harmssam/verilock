@@ -1,6 +1,8 @@
-# VeriLock UI experiment - Document Journey
+# VeriLock Journey Edition (production UI)
 
-**This is production UI.** Served at `/` via default `npm run build` (journey packaging).
+**This is the primary product frontend.** All UI work belongs here unless someone explicitly asks for the legacy SPA (`client/src/App.tsx`).
+
+Served at `/` via default `npm run build` / `npm run dev` (journey packaging). See repo root **`AGENTS.md`**.
 
 ## Concept (v2)
 

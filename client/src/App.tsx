@@ -1,3 +1,10 @@
+/**
+ * LEGACY SPA — pre-Journey Edition. NOT production UI.
+ *
+ * Production frontend is Journey: client/src/experiment/ (+ vite.journey.config.ts).
+ * Do not add features here unless the user explicitly asks for the legacy app.
+ * See AGENTS.md and client/src/archive/ for historical reference.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CircleAlert, CircleCheck, FilePlus, Files, LoaderCircle, Search } from 'lucide-react'
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'

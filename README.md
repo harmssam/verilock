@@ -6,6 +6,9 @@ Built for the [Mini Apps Competition](https://miniappscompetition.com/).
 
 **Live demo:** [https://verilock.online/](https://verilock.online/) (Railway)
 
+> **UI source of truth:** **Journey Edition** in `client/src/experiment/` (default `npm run dev` / `npm run build`).  
+> The pre-journey SPA (`client/src/App.tsx`) is legacy/recovery only. Contributors and agents: see **`AGENTS.md`**.
+
 ## What it does
 
 1. **Fingerprint** a PDF locally (rental agreement, contract, etc.) — the file never leaves your device
