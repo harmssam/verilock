@@ -23,11 +23,24 @@ export function attachClientStatic(app: Express): boolean {
 
   app.use(
     express.static(distDir, {
-      maxAge: '1h',
+      // Default short; hashed /assets/* get long immutable cache below.
+      maxAge: 0,
       index: false,
       setHeaders(res, filePath) {
         if (filePath.endsWith('.mjs')) {
           res.setHeader('Content-Type', 'application/javascript; charset=utf-8')
+        }
+        // HTML must revalidate so deploys don't leave tabs on dead chunk hashes.
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache')
+          return
+        }
+        // Vite content-hashed assets (journey-xxx.js, pdf-xxx.js, …)
+        if (
+          filePath.includes(`${join(distDir, 'assets')}`) ||
+          /[\\/]assets[\\/]/.test(filePath)
+        ) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
         }
       },
     }),
@@ -41,6 +54,7 @@ export function attachClientStatic(app: Express): boolean {
       res.status(404).type('text/plain').send('Not found')
       return
     }
+    res.setHeader('Cache-Control', 'no-cache')
     if (!isKnownAppPath(req.path) && existsSync(notFoundPage)) {
       res.status(404).sendFile(notFoundPage)
       return
