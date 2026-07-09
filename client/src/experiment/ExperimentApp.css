@@ -2087,6 +2087,97 @@ a.hash-chip.text-link:focus-visible {
   color: var(--coral);
 }
 
+/* ── Nimiq Pay open panel (ported from App.css for journey shell) ── */
+
+.row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.pay-open-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pay-open-panel--compact {
+  gap: 0.55rem;
+}
+
+.pay-open-lead {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.pay-open-store {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.pay-open-store-label {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.pay-open-actions {
+  margin: 0;
+}
+
+.pay-open-notice {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm, 8px);
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  font-size: 0.85rem;
+}
+
+.pay-open-steps {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.journey-pay-panel {
+  margin-top: 0.35rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  background: linear-gradient(145deg, rgba(125, 211, 252, 0.1), rgba(37, 99, 235, 0.06));
+}
+
+.journey-pay-panel--compact {
+  padding: 0.65rem 0.75rem;
+}
+
+.journey-pay-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-sm, 8px);
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+}
+
+.journey-pay-store {
+  margin: 0;
+}
+
+.journey-pay-store .btn {
+  flex: 1 1 auto;
+  min-width: min(100%, 8rem);
+}
+
+.journey-seal-hint {
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 640px) {
@@ -2108,6 +2199,15 @@ a.hash-chip.text-link:focus-visible {
 
   .doc-card {
     height: 220px;
+  }
+
+  .row {
+    gap: 0.5rem;
+  }
+
+  .pay-open-actions.row .btn {
+    flex: 1 1 auto;
+    min-width: min(100%, 9rem);
   }
 }
 

@@ -10,6 +10,10 @@ import {
   saveJourneyIntent,
   syncIntentToUrl,
 } from './journeyIntent'
+import {
+  journeyConnectOptions,
+  resolveJourneyConnectMode,
+} from './journeyConnectUi'
 import { useJourneyWallet } from './useJourneyWallet'
 
 type ShellScreen = 'journey' | 'pricing' | 'privacy'
@@ -66,6 +70,12 @@ export function ExperimentApp() {
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
+  const connectMode = resolveJourneyConnectMode({
+    inNimiqPay: wallet.inNimiqPay,
+    mobilePayConnect: wallet.mobilePayConnect,
+    showOpenInPay: wallet.showOpenInPay,
+  })
+
   const connectPreservingPath = () => {
     // Prefer session intent only if already mid-path (do not rehydrate from sticky storage alone).
     const intent = resolveIntentForConnect(null)
@@ -74,7 +84,7 @@ export function ExperimentApp() {
       syncIntentToUrl(intent)
     }
     saveHubReturnPath()
-    void wallet.connect()
+    void wallet.connect(journeyConnectOptions(connectMode))
   }
 
   return (
@@ -106,6 +116,7 @@ export function ExperimentApp() {
             account={wallet.account}
             connecting={wallet.connecting}
             walletStatus={wallet.walletStatus}
+            connectMode={connectMode}
             onConnect={connectPreservingPath}
             onDisconnect={wallet.disconnect}
           />

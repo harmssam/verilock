@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 import { api } from '../api'
 import {
@@ -42,7 +42,24 @@ export interface UseJourneyWalletResult {
     handler: (result: { txHash: string; token: string; docId: string }) => Promise<void>,
   ) => void
   registerHubLockError: (handler: (err: Error) => Promise<void> | void) => void
+  /** User is inside Nimiq Pay WebView (host probe or window.nimiq). */
+  inNimiqPay: boolean
+  /**
+   * Mobile device, not in Pay, not connected — use “Open in Nimiq Pay” copy
+   * and deeplink-first connect (legacy mobilePayConnect).
+   */
+  mobilePayConnect: boolean
+  /**
+   * True after deeplink launch fails or user returns without a session
+   * (~2.5s visibility check). Surfaces install / copy / Hub options.
+   */
+  showOpenInPay: boolean
 }
+
+const PAY_DEEPLINK_FALLBACK_MS = 2500
+/** Shown after mobile deeplink fails; primary button becomes “Continue with Nimiq Hub”. */
+const PAY_INSTALL_HINT =
+  'Nimiq Pay did not open. Install the app for the best experience, then try again — or continue with Nimiq Hub.'
 
 /**
  * Production wallet session for the journey SPA (Nimiq Pay + Hub).
@@ -57,17 +74,30 @@ export function useJourneyWallet(): UseJourneyWalletResult {
   const [error, setError] = useState<string | null>(null)
   const [bootReady, setBootReady] = useState(false)
   const [hubLockCompletion, setHubLockCompletion] = useState<Promise<void> | null>(null)
+  const [inNimiqPay, setInNimiqPay] = useState(() =>
+    typeof window !== 'undefined' ? isNimiqPayHost() : false,
+  )
+  const [showOpenInPay, setShowOpenInPay] = useState(false)
 
   const hubConnectInFlightRef = useRef(false)
   const lockCompleteRef = useRef<
     ((result: { txHash: string; token: string; docId: string }) => Promise<void>) | null
   >(null)
   const lockErrorRef = useRef<((err: Error) => Promise<void> | void) | null>(null)
+  const deeplinkFallbackTimerRef = useRef<number | null>(null)
+
+  const clearDeeplinkFallbackTimer = useCallback(() => {
+    if (deeplinkFallbackTimerRef.current != null) {
+      window.clearTimeout(deeplinkFallbackTimerRef.current)
+      deeplinkFallbackTimerRef.current = null
+    }
+  }, [])
 
   const applySession = useCallback((sessionToken: string, addr: string) => {
     saveSession({ token: sessionToken, address: addr })
     setToken(sessionToken)
     setAddress(addr)
+    setShowOpenInPay(false)
   }, [])
 
   const disconnect = useCallback(() => {
@@ -77,8 +107,10 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     setNimiq(null)
     setError(null)
     setWalletStatus(null)
+    setShowOpenInPay(false)
     hubConnectInFlightRef.current = false
-  }, [])
+    clearDeeplinkFallbackTimer()
+  }, [clearDeeplinkFallbackTimer])
 
   const registerHubLockComplete = useCallback(
     (handler: (result: { txHash: string; token: string; docId: string }) => Promise<void>) => {
@@ -99,6 +131,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
 
     const boot = async () => {
       if (isNimiqPayHost()) {
+        setInNimiqPay(true)
         warmNimiqProvider()
       }
 
@@ -119,7 +152,9 @@ export function useJourneyWallet(): UseJourneyWalletResult {
 
       void probeNimiqPay(isNimiqPayHost() ? 15_000 : 5_000).then(detected => {
         if (cancelled) return
-        if ((detected || isNimiqPayHost()) && window.nimiq) {
+        const inPay = detected || isNimiqPayHost()
+        setInNimiqPay(inPay)
+        if (inPay && window.nimiq) {
           setNimiq(window.nimiq)
         }
       })
@@ -173,8 +208,20 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     void boot()
     return () => {
       cancelled = true
+      clearDeeplinkFallbackTimer()
     }
-  }, [applySession])
+  }, [applySession, clearDeeplinkFallbackTimer])
+
+  const scheduleDeeplinkFallback = useCallback(() => {
+    clearDeeplinkFallbackTimer()
+    deeplinkFallbackTimerRef.current = window.setTimeout(() => {
+      deeplinkFallbackTimerRef.current = null
+      if (document.visibilityState !== 'visible') return
+      if (loadSession()?.token) return
+      setShowOpenInPay(true)
+      setError(PAY_INSTALL_HINT)
+    }, PAY_DEEPLINK_FALLBACK_MS)
+  }, [clearDeeplinkFallbackTimer])
 
   const connect = useCallback(
     async (options?: { useRedirect?: boolean }) => {
@@ -186,23 +233,33 @@ export function useJourneyWallet(): UseJourneyWalletResult {
       setConnecting(true)
       setError(null)
       setWalletStatus(null)
+      setShowOpenInPay(false)
+      clearDeeplinkFallbackTimer()
 
       try {
         const payHost = isNimiqPayHost()
+        const explicitHubRedirect = options?.useRedirect === true
         setWalletStatus(
           payHost
             ? 'Waiting for Nimiq Pay wallet… approve the dialog when it appears.'
-            : 'Connecting via Nimiq Hub…',
+            : isMobileDevice() && !explicitHubRedirect
+              ? 'Opening Nimiq Pay…'
+              : 'Connecting via Nimiq Hub…',
         )
 
+        // window.nimiq may lag behind window.nimiqPay inside the Nimiq Pay WebView.
         let inPay = payHost || Boolean(typeof window !== 'undefined' && window.nimiq)
         if (!inPay && payHost) {
           void probeNimiqPay(30_000)
             .then(d => {
-              if (d && window.nimiq) setNimiq(window.nimiq)
+              if (d && window.nimiq) {
+                setNimiq(window.nimiq)
+                setInNimiqPay(true)
+              }
             })
             .catch(() => {})
         }
+        setInNimiqPay(inPay || payHost)
 
         if (!inPay) {
           if (payHost) {
@@ -211,16 +268,25 @@ export function useJourneyWallet(): UseJourneyWalletResult {
             )
           }
 
-          if (isMobileDevice() && !shouldUseHubRedirect(options)) {
+          // Mobile default: try Nimiq Pay deeplink first. Explicit useRedirect skips to Hub
+          // (NimiqPayOpenPanel “Continue via Hub redirect”). Note: shouldUseHubRedirect() is
+          // true by default for desktop Hub reliability — do not gate Pay on that flag.
+          if (isMobileDevice() && !explicitHubRedirect) {
             setWalletStatus('Opening Nimiq Pay…')
             const appUrl = window.location.origin
             const payResult = launchNimiqPayMiniApp(appUrl)
             if (payResult === 'already-in-pay') return
             if (payResult === 'launched') {
               setWalletStatus(null)
+              // If the user stays (or returns) without a session, surface install/copy/Hub.
+              scheduleDeeplinkFallback()
               return
             }
-            // Fall through to Hub on desktop-like environments
+            // Deeplink unavailable — show panel, do not fall through to Hub on mobile.
+            setShowOpenInPay(true)
+            setWalletStatus(null)
+            setError(PAY_INSTALL_HINT)
+            return
           }
 
           hubConnectInFlightRef.current = true
@@ -240,6 +306,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
           authScheme: 'pay',
         })
         setNimiq(provider)
+        setInNimiqPay(true)
         applySession(sessionToken, verified.address)
         setWalletStatus(null)
       } catch (err) {
@@ -263,10 +330,15 @@ export function useJourneyWallet(): UseJourneyWalletResult {
         }
       }
     },
-    [applySession],
+    [applySession, clearDeeplinkFallbackTimer, scheduleDeeplinkFallback],
   )
 
   const account = address ? toJourneyAccount(address) : null
+
+  const mobilePayConnect = useMemo(
+    () => isMobileDevice() && !inNimiqPay && !isNimiqPayHost() && !address,
+    [inNimiqPay, address],
+  )
 
   return {
     account,
@@ -285,5 +357,8 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     hubLockCompletion,
     registerHubLockComplete,
     registerHubLockError,
+    inNimiqPay,
+    mobilePayConnect,
+    showOpenInPay,
   }
 }

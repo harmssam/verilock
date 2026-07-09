@@ -1,5 +1,6 @@
 import {
   Check,
+  ExternalLink,
   Fingerprint,
   HelpCircle,
   LoaderCircle,
@@ -19,6 +20,7 @@ import { FEATURES } from '../features'
 import { clampField, MAX_DISPLAY_NAME_LENGTH, MAX_TITLE_LENGTH } from '../fieldLimits'
 import { getPdfPageCount, sha256Hex, shortHash } from '../pdf/hashPdf'
 import { prepareSignatureImageUpload } from '../signatureImage'
+import { isMobileDevice, NIMIQ_PAY_ANDROID_URL, NIMIQ_PAY_IOS_URL } from '../nimiq'
 import { SealPricingDisplay } from '../SealPricingDisplay'
 import { ShareInviteCard } from '../ShareInviteCard'
 import {
@@ -37,6 +39,12 @@ import {
   saveJourneyIntent,
   syncIntentToUrl,
 } from './journeyIntent'
+import {
+  journeyConnectLabels,
+  journeyConnectLead,
+  journeyConnectOptions,
+  resolveJourneyConnectMode,
+} from './journeyConnectUi'
 import { finishJourneyLock, sealJourneyDocument } from './journeySeal'
 import { formatFileSize } from './PdfDropZone'
 import { SignaturePad } from './SignaturePad'
@@ -106,6 +114,9 @@ export function DocumentJourney({ wallet }: DocumentJourneyProps) {
     registerHubLockComplete,
     registerHubLockError,
     bootReady,
+    inNimiqPay,
+    mobilePayConnect,
+    showOpenInPay,
   } = wallet
 
   // Restore path after Hub login redirect (full page reload loses React state)
@@ -719,6 +730,13 @@ export function DocumentJourney({ wallet }: DocumentJourneyProps) {
     }
   }
 
+  const connectMode = resolveJourneyConnectMode({
+    inNimiqPay,
+    mobilePayConnect,
+    showOpenInPay,
+  })
+  const connectLabels = journeyConnectLabels(connectMode)
+
   const connectFromPath = () => {
     // Stamp intent into URL only when connecting (Hub return needs it).
     if (role) {
@@ -726,7 +744,8 @@ export function DocumentJourney({ wallet }: DocumentJourneyProps) {
       syncIntentToUrl(role)
     }
     saveHubReturnPath()
-    void connect()
+    // Single button: Pay-first on mobile, Hub on desktop / after Pay fallback.
+    void connect(journeyConnectOptions(connectMode))
   }
 
   /** Invited path: resolve agreement by PDF fingerprint when there is no /d/ link yet. */
@@ -977,13 +996,9 @@ export function DocumentJourney({ wallet }: DocumentJourneyProps) {
               {step === 'connect' && (
                 <div className="action-stack">
                   <p className="muted" style={{ margin: 0 }}>
-                    Connect with Nimiq Pay (in-app) or Nimiq Hub.
-                    {role === 'signer'
-                      ? ' After connect you can drop the shared PDF to open the agreement.'
-                      : role === 'verifier'
-                        ? ' Wallet is optional for verify - connect only if you need it.'
-                        : ' After connect, step 2 opens the PDF stage.'}
+                    {journeyConnectLead(connectMode, role)}
                   </p>
+                  {/* Single primary CTA — platform decides Pay vs Hub (see journeyConnectUi). */}
                   <button
                     type="button"
                     className={`btn btn-primary btn-lg${connecting ? ' btn--busy' : ''}`}
@@ -993,15 +1008,44 @@ export function DocumentJourney({ wallet }: DocumentJourneyProps) {
                     {connecting ? (
                       <>
                         <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                        Connecting…
+                        {connectLabels.busy}
                       </>
                     ) : (
                       <>
                         <Wallet size={18} strokeWidth={2.25} />
-                        Connect Nimiq wallet
+                        {connectLabels.idle}
                       </>
                     )}
                   </button>
+                  {/* Mobile only: after Pay deeplink fails, show install help (not a second connect). */}
+                  {connectMode === 'hub-fallback' && role !== 'verifier' && (
+                    <div className="journey-pay-fallback" role="status">
+                      <p className="muted" style={{ margin: 0 }}>
+                        Don&apos;t have Nimiq Pay yet? Install it, then open VeriLock from the app —
+                        or use the button above to continue with Nimiq Hub.
+                      </p>
+                      <div className="journey-pay-store row">
+                        <a
+                          className="btn btn-secondary"
+                          href={NIMIQ_PAY_IOS_URL}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <ExternalLink size={15} strokeWidth={2.25} aria-hidden />
+                          App Store
+                        </a>
+                        <a
+                          className="btn btn-secondary"
+                          href={NIMIQ_PAY_ANDROID_URL}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <ExternalLink size={15} strokeWidth={2.25} aria-hidden />
+                          Google Play
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1186,8 +1230,17 @@ export function DocumentJourney({ wallet }: DocumentJourneyProps) {
                               onClick={connectFromPath}
                               disabled={connecting}
                             >
-                              <Wallet size={16} strokeWidth={2.25} />
-                              Connect to sign
+                              {connecting ? (
+                                <>
+                                  <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
+                                  {connectLabels.busy}
+                                </>
+                              ) : (
+                                <>
+                                  <Wallet size={16} strokeWidth={2.25} />
+                                  {connectLabels.idle}
+                                </>
+                              )}
                             </button>
                           )}
 
@@ -1340,10 +1393,17 @@ export function DocumentJourney({ wallet }: DocumentJourneyProps) {
                     ) : (
                       <>
                         <Lock size={18} strokeWidth={2.25} />
-                        Seal fingerprint on-chain
+                        {inNimiqPay || nimiq ? 'Seal fingerprint on-chain' : 'Seal via Hub'}
                       </>
                     )}
                   </button>
+                  {!inNimiqPay && !nimiq && (
+                    <p className="muted journey-seal-hint" style={{ margin: 0 }}>
+                      {isMobileDevice()
+                        ? 'Sealing works best inside Nimiq Pay. In the browser, this seal uses Nimiq Hub — keep VeriLock open until you return and the on-chain proof is confirmed.'
+                        : 'Sealing redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the on-chain proof is confirmed.'}
+                    </p>
+                  )}
                 </div>
               )}
 
