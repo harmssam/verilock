@@ -1,5 +1,5 @@
 import { FileText, Upload } from 'lucide-react'
-import { useCallback, useId, useRef, useState, type DragEvent, type ChangeEvent } from 'react'
+import { useCallback, useId, useState, type ChangeEvent, type DragEvent } from 'react'
 
 export interface PdfDropZoneProps {
   file: File | null
@@ -7,17 +7,18 @@ export interface PdfDropZoneProps {
   disabled?: boolean
   label?: string
   hint?: string
-  /** Accept attribute; default PDF only, structured for multi-file later */
   accept?: string
   multiple?: boolean
   onFiles?: (files: File[]) => void
+  /** larger hero drop target */
+  size?: 'default' | 'hero'
 }
 
 function isPdf(file: File): boolean {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
 }
 
-function formatSize(bytes: number): string {
+export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
@@ -28,13 +29,13 @@ export function PdfDropZone({
   onChange,
   disabled,
   label = 'Drop PDF here',
-  hint = 'or click to browse — file never leaves your device',
+  hint = 'or click to browse — never leaves this device',
   accept = 'application/pdf,.pdf',
   multiple = false,
   onFiles,
+  size = 'default',
 }: PdfDropZoneProps) {
   const inputId = useId()
-  const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -61,15 +62,13 @@ export function PdfDropZone({
   const onDragEnter = (e: DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    if (disabled) return
-    setDragging(true)
+    if (!disabled) setDragging(true)
   }
 
   const onDragOver = (e: DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    if (disabled) return
-    setDragging(true)
+    if (!disabled) setDragging(true)
   }
 
   const onDragLeave = (e: DragEvent) => {
@@ -83,8 +82,7 @@ export function PdfDropZone({
     e.preventDefault()
     e.stopPropagation()
     setDragging(false)
-    if (disabled) return
-    applyFiles(e.dataTransfer.files)
+    if (!disabled) applyFiles(e.dataTransfer.files)
   }
 
   const onInputChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -93,11 +91,12 @@ export function PdfDropZone({
   }
 
   return (
-    <div className="pdf-drop-wrap">
+    <div className={`pdf-drop-wrap${size === 'hero' ? ' pdf-drop-wrap--hero' : ''}`}>
       <label
         htmlFor={inputId}
         className={[
           'pdf-drop',
+          size === 'hero' ? 'pdf-drop--hero' : '',
           dragging ? 'pdf-drop--dragging' : '',
           file ? 'pdf-drop--has-file' : '',
           disabled ? 'pdf-drop--disabled' : '',
@@ -110,7 +109,6 @@ export function PdfDropZone({
         onDrop={onDrop}
       >
         <input
-          ref={inputRef}
           id={inputId}
           type="file"
           className="pdf-drop-input"
@@ -123,11 +121,11 @@ export function PdfDropZone({
         {file ? (
           <div className="pdf-drop-file">
             <span className="pdf-drop-icon pdf-drop-icon--file" aria-hidden>
-              <FileText size={22} strokeWidth={2.25} />
+              <FileText size={size === 'hero' ? 28 : 22} strokeWidth={2.25} />
             </span>
             <div className="pdf-drop-file-meta">
               <strong className="pdf-drop-file-name">{file.name}</strong>
-              <span className="pdf-drop-file-size muted">{formatSize(file.size)}</span>
+              <span className="pdf-drop-file-size muted">{formatFileSize(file.size)}</span>
             </div>
             <button
               type="button"
@@ -146,7 +144,7 @@ export function PdfDropZone({
         ) : (
           <div className="pdf-drop-empty">
             <span className="pdf-drop-icon" aria-hidden>
-              <Upload size={22} strokeWidth={2.25} />
+              <Upload size={size === 'hero' ? 28 : 22} strokeWidth={2.25} />
             </span>
             <strong className="pdf-drop-label">{label}</strong>
             <span className="pdf-drop-hint muted">{hint}</span>
