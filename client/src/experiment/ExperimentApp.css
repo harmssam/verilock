@@ -368,6 +368,29 @@
   font-size: 0.9rem;
 }
 
+.field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.field textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 4.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font: inherit;
+}
+
+.field textarea:focus {
+  outline: none;
+  border-color: rgba(94, 234, 212, 0.45);
+}
+
 /* ── Buttons ── */
 
 .btn {
