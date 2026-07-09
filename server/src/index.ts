@@ -32,6 +32,7 @@ import {
   getMyDocuments,
   prepareLock,
   setCreatorNotifyEmail,
+  viewerMayAccessSignatureImage,
 } from './documents.js'
 import { emailFeaturesPublic } from './email/config.js'
 import { verifyHubSignedMessage } from './hub-signature.js'
@@ -106,6 +107,14 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
   res.locals.address = session.address
   res.locals.token = token
   next()
+}
+
+/** Optional session for public reads — never 401s; attaches address when token is valid. */
+function optionalViewerAddress(req: express.Request): string | null {
+  const token = req.headers.authorization?.replace('Bearer ', '')?.trim()
+  if (!token) return null
+  const session = getSession(token)
+  return session?.address ?? null
 }
 
 function requireVerifiedWallet(
@@ -331,7 +340,8 @@ app.patch(
 )
 
 app.get('/api/documents/:id', publicReadLimit, (req, res) => {
-  const doc = getDocumentPublic(routeParam(req.params.id))
+  const viewer = optionalViewerAddress(req)
+  const doc = getDocumentPublic(routeParam(req.params.id), viewer)
   if (!doc) {
     res.status(404).json({ error: 'Document not found' })
     return
@@ -402,6 +412,15 @@ app.get('/api/documents/:docId/signatures/:sigId/image', (req, res) => {
     return
   }
 
+  // Names + ink are private to creator and signees (not public share viewers).
+  const viewer = optionalViewerAddress(req)
+  if (!viewerMayAccessSignatureImage(docId, viewer)) {
+    res.status(403).json({
+      error: 'Signature images are only visible to the creator and parties on this agreement',
+    })
+    return
+  }
+
   const image = getSignatureImage(sigId)
   if (!image) {
     res.status(404).json({ error: 'Signature image not found' })
@@ -410,7 +429,8 @@ app.get('/api/documents/:docId/signatures/:sigId/image', (req, res) => {
 
   res.setHeader('Content-Type', image.contentType)
   res.setHeader('Content-Length', String(image.byteSize))
-  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+  // Private images — do not cache on shared CDNs / public browsers as anonymous.
+  res.setHeader('Cache-Control', 'private, max-age=3600')
   res.setHeader('ETag', `"${image.imageSha256}"`)
   if (req.headers['if-none-match'] === `"${image.imageSha256}"`) {
     res.status(304).end()
@@ -501,7 +521,8 @@ app.get('/api/attestations/status/:txHash', authMiddleware, async (req, res) => 
 })
 
 app.get('/api/verify/:idOrSlug', publicReadLimit, (req, res) => {
-  const doc = getDocumentPublic(routeParam(req.params.idOrSlug))
+  const viewer = optionalViewerAddress(req)
+  const doc = getDocumentPublic(routeParam(req.params.idOrSlug), viewer)
   if (!doc) {
     res.status(404).json({ error: 'Document not found' })
     return
@@ -522,6 +543,7 @@ app.get('/api/verify/:idOrSlug', publicReadLimit, (req, res) => {
     attestation: doc.attestation,
     signatures: doc.signatures,
     parties: doc.parties,
+    participantDetailsRevealed: doc.participantDetailsRevealed,
   })
 })
 

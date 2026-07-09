@@ -38,6 +38,7 @@ import { sealError, sealLog, sealWarn } from './sealDebug'
 import { shortAddress } from './addresses'
 import { buildNimiqExplorerUrl } from './explorer'
 import {
+  canRevealParticipantDetails,
   countActionable,
   isCollectingSignatures,
   isDocumentCreator,
@@ -2417,6 +2418,8 @@ export default function App() {
                 signatures={activeDoc.signatures}
                 parties={activeDoc.parties}
                 compact={activeDoc.status !== 'locked'}
+                revealPrivate={canRevealParticipantDetails(activeDoc, address)}
+                authToken={token}
               />
             )}
           </div>

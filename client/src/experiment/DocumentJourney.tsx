@@ -14,8 +14,9 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { normalizeAddress } from '../addresses'
-import { isDocumentCreator } from '../agreements'
+import { canRevealParticipantDetails, isDocumentCreator } from '../agreements'
 import { api } from '../api'
+import { SignaturesPanel } from '../SignaturesPanel'
 import { FEATURES } from '../features'
 import { clampField, MAX_DISPLAY_NAME_LENGTH, MAX_TITLE_LENGTH } from '../fieldLimits'
 import { getPdfPageCount, sha256Hex, shortHash } from '../pdf/hashPdf'
@@ -98,9 +99,12 @@ function verifySlugFromPath(pathname: string): string | null {
   return m?.[1] ?? null
 }
 
-async function loadVerifyDetails(slugs: string[]): Promise<VerifyResult[]> {
+async function loadVerifyDetails(
+  slugs: string[],
+  token?: string | null,
+): Promise<VerifyResult[]> {
   const unique = [...new Set(slugs)]
-  const details = await Promise.all(unique.map(slug => api.verifyDocument(slug)))
+  const details = await Promise.all(unique.map(slug => api.verifyDocument(slug, token)))
   return details.sort((a, b) => (b.lockedAt ?? b.createdAt) - (a.lockedAt ?? a.createdAt))
 }
 
@@ -230,7 +234,7 @@ export function DocumentJourney({
       let cancelled = false
       void (async () => {
         try {
-          const details = await loadVerifyDetails([vSlug])
+          const details = await loadVerifyDetails([vSlug], token)
           if (cancelled || details.length === 0) return
           setRole('verifier')
           const first = details[0]!
@@ -244,7 +248,7 @@ export function DocumentJourney({
           })
           // Also load journey doc so stage/card can reflect sealed state
           try {
-            const { document } = await api.getDocument(vSlug)
+            const { document } = await api.getDocument(vSlug, token)
             if (!cancelled) setActiveFromSeal(document)
           } catch {
             /* verify record is enough */
@@ -272,7 +276,8 @@ export function DocumentJourney({
     let cancelled = false
     void (async () => {
       try {
-        const { document } = await api.getDocument(docSlug)
+        // Pass session when present so names + signature images unlock for parties.
+        const { document } = await api.getDocument(docSlug, token)
         if (cancelled) return
         setActiveFromSeal(document)
         setLocalError(null)
@@ -292,9 +297,17 @@ export function DocumentJourney({
               signed > 0 ||
               required === 0,
           )
-        } else {
+        } else if (address && canRevealParticipantDetails(document, address)) {
           setRole('signer')
           saveJourneyIntent('signer')
+          setSharedAck(true)
+        } else if (address) {
+          // Logged in but not a party — still open as read-only viewer
+          setRole(prev => prev ?? 'verifier')
+          setSharedAck(true)
+        } else {
+          // Public share link
+          setRole(prev => prev ?? 'verifier')
           setSharedAck(true)
         }
         // Strip preferSeal from URL after apply (clean shareable /d/ links)
@@ -310,7 +323,7 @@ export function DocumentJourney({
     return () => {
       cancelled = true
     }
-  }, [bootReady, address, setActiveFromSeal, navEpoch])
+  }, [bootReady, address, token, setActiveFromSeal, navEpoch])
 
   // Hub seal return
   useEffect(() => {
@@ -320,7 +333,7 @@ export function DocumentJourney({
         setLockMessage('Finishing seal from Nimiq Hub…')
         const me = await api.me(result.token)
         applySession(result.token, me.address)
-        const { document: current } = await api.getDocument(result.docId)
+        const { document: current } = await api.getDocument(result.docId, result.token)
         const finalHash = current.finalSha256 ?? current.originalSha256
         await api.prepareLock(result.token, result.docId, finalHash).catch(() => {})
         await api.beginLock(result.token, result.docId)
@@ -372,6 +385,10 @@ export function DocumentJourney({
   }, [role, account, doc, sharedAck, address])
 
   const pathStages = useMemo(() => stagesForRole(role), [role])
+
+  const revealParticipantPrivate = Boolean(
+    doc && canRevealParticipantDetails(doc.source, address),
+  )
 
   const activeStage =
     pathStages.find(s => s.id === step) ??
@@ -1196,7 +1213,7 @@ export function DocumentJourney({
               {step === 'share' && doc && (
                 <div className="action-stack">
                   <DocumentStage step={step} doc={doc} file={pdfFile} accepting={false} />
-                  <PartyList doc={doc} />
+                  <PartyList doc={doc} revealNames={revealParticipantPrivate} />
                   <ShareInviteCard
                     document={doc.source}
                     shareUrl={doc.shareUrl}
@@ -1254,7 +1271,7 @@ export function DocumentJourney({
                         </div>
                       </div>
 
-                      <PartyList doc={doc} />
+                      <PartyList doc={doc} revealNames={revealParticipantPrivate} />
 
                       {allSigned(doc) ? (
                         <div className="result-banner result-banner--ok">
@@ -1404,7 +1421,18 @@ export function DocumentJourney({
                     accepting={false}
                     sealing={busy}
                   />
-                  {!doc.directSeal && <PartyList doc={doc} />}
+                  {!doc.directSeal && (
+                    <PartyList doc={doc} revealNames={revealParticipantPrivate} />
+                  )}
+                  {doc.source.signatures.length > 0 && (
+                    <SignaturesPanel
+                      signatures={doc.source.signatures}
+                      parties={doc.source.parties}
+                      compact
+                      revealPrivate={revealParticipantPrivate}
+                      authToken={token}
+                    />
+                  )}
                   <div className="seal-summary">
                     <p>
                       <strong>{doc.title}</strong>
@@ -1498,6 +1526,20 @@ export function DocumentJourney({
                       </div>
                     </div>
                   )}
+
+                  {doc && !doc.directSeal && (step === 'done' || (step === 'verify' && doc.sealed)) && (
+                    <PartyList doc={doc} revealNames={revealParticipantPrivate} />
+                  )}
+                  {doc &&
+                    doc.source.signatures.length > 0 &&
+                    (step === 'done' || (step === 'verify' && doc.sealed)) && (
+                      <SignaturesPanel
+                        signatures={doc.source.signatures}
+                        parties={doc.source.parties}
+                        revealPrivate={revealParticipantPrivate}
+                        authToken={token}
+                      />
+                    )}
 
                   <DocumentStage
                     step={step}
@@ -1593,6 +1635,7 @@ export function DocumentJourney({
                             }
                             highlightSlug={verifyOutcome.matches[0]?.slug}
                             walletAddress={address}
+                            authToken={token}
                           />
                           <div className="journey-verify-actions">
                             {verifyOutcome.matches.map(m => (
@@ -1718,7 +1761,14 @@ export function DocumentJourney({
   )
 }
 
-function PartyList({ doc }: { doc: JourneyDoc }) {
+function PartyList({
+  doc,
+  revealNames = true,
+}: {
+  doc: JourneyDoc
+  /** When false, hide display names (public share viewers). */
+  revealNames?: boolean
+}) {
   if (doc.directSeal || doc.parties.length === 0) return null
   return (
     <ul className="party-list">
@@ -1729,7 +1779,9 @@ function PartyList({ doc }: { doc: JourneyDoc }) {
           </span>
           <div>
             <strong>{p.roleLabel}</strong>
-            {p.displayName ? <span className="muted"> · {p.displayName}</span> : null}
+            {revealNames && p.displayName ? (
+              <span className="muted"> · {p.displayName}</span>
+            ) : null}
             {p.walletShort ? (
               <span className="muted"> · {p.walletShort}</span>
             ) : (

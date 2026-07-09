@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { shortAddress } from './addresses'
 import { buildNimiqAddressExplorerUrl } from './explorer'
 import { formatPartyRole } from './signing'
@@ -16,29 +17,105 @@ interface SignaturesPanelProps {
   signatures: DocumentSignature[]
   parties: DocumentParty[]
   compact?: boolean
+  /**
+   * When false (public viewer), hide names and ink even if the API leaked them.
+   * Prefer server `participantDetailsRevealed`; this is defense-in-depth.
+   */
+  revealPrivate?: boolean
+  /** Session token — required to load private signature images. */
+  authToken?: string | null
 }
 
-export function SignaturesPanel({ signatures, parties, compact }: SignaturesPanelProps) {
+function PrivateSignatureImage({
+  src,
+  alt,
+  token,
+}: {
+  src: string
+  alt: string
+  token: string
+}) {
+  // Authenticated fetch so gated image routes work (img src cannot send Bearer).
+  const [objectUrl, setObjectUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let revoked: string | null = null
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(resolveImageUrl(src), {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok || cancelled) return
+        const blob = await res.blob()
+        if (cancelled) return
+        const url = URL.createObjectURL(blob)
+        revoked = url
+        setObjectUrl(url)
+      } catch {
+        /* ignore */
+      }
+    })()
+    return () => {
+      cancelled = true
+      if (revoked) URL.revokeObjectURL(revoked)
+    }
+  }, [src, token])
+
+  if (!objectUrl) {
+    return <span className="signatures-panel-typed muted">Loading signature…</span>
+  }
+  return (
+    <img
+      className="signatures-panel-image"
+      src={objectUrl}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+    />
+  )
+}
+
+export function SignaturesPanel({
+  signatures,
+  parties,
+  compact,
+  revealPrivate = true,
+  authToken,
+}: SignaturesPanelProps) {
   if (signatures.length === 0) return null
 
   const partyById = new Map(parties.map(party => [party.id, party]))
+  const showPrivate = revealPrivate
 
   return (
     <div className={`signatures-panel${compact ? ' signatures-panel--compact' : ''}`}>
-      <h3 className="signatures-panel-title">Recorded signatures</h3>
+      <h3 className="signatures-panel-title">
+        {showPrivate ? 'Recorded signatures' : 'Signatures on this agreement'}
+      </h3>
+      {!showPrivate && (
+        <p className="muted signatures-panel-privacy-note">
+          Names and signature images are only visible when you connect a wallet that created or
+          signed this agreement.
+        </p>
+      )}
       <ul className="signatures-panel-list">
         {signatures.map(sig => {
           const party = partyById.get(sig.partyId)
-          const label = party?.displayName ?? shortAddress(sig.signerAddress)
-          const role = party ? formatPartyRole(party.role) : 'signer'
+          const role = party ? formatPartyRole(party.role) : 'Signer'
           const signedAt = new Date(sig.signedAt).toLocaleString()
+          const name =
+            showPrivate && party?.displayName?.trim() ? party.displayName.trim() : null
+          const label = name ?? role
+          const imageUrl = showPrivate ? sig.imageUrl : null
+          const hasHiddenImage = !showPrivate && Boolean(sig.hasImage ?? sig.imageUrl)
 
           return (
             <li key={sig.id} className="signatures-panel-item">
               <div className="signatures-panel-meta">
                 <strong>{label}</strong>
                 <span className="muted">
-                  {role} ·{' '}
+                  {name ? `${role} · ` : null}
                   <a
                     className="signatures-panel-address"
                     href={buildNimiqAddressExplorerUrl(sig.signerAddress)}
@@ -51,14 +128,26 @@ export function SignaturesPanel({ signatures, parties, compact }: SignaturesPane
                   {' · '}
                   {signedAt}
                 </span>
-                {sig.signatureType === 'typed' && !sig.imageUrl && (
+                {showPrivate && sig.signatureType === 'typed' && !imageUrl && (
                   <span className="signatures-panel-typed muted">Typed acknowledgment</span>
                 )}
+                {hasHiddenImage && (
+                  <span className="signatures-panel-typed muted">Signature image hidden</span>
+                )}
+                {!showPrivate && sig.signatureType === 'typed' && !hasHiddenImage && (
+                  <span className="signatures-panel-typed muted">Signed (details private)</span>
+                )}
               </div>
-              {sig.imageUrl ? (
+              {imageUrl && authToken ? (
+                <PrivateSignatureImage
+                  src={imageUrl}
+                  alt={`Signature of ${label}`}
+                  token={authToken}
+                />
+              ) : imageUrl ? (
                 <img
                   className="signatures-panel-image"
-                  src={resolveImageUrl(sig.imageUrl)}
+                  src={resolveImageUrl(imageUrl)}
                   alt={`Signature of ${label}`}
                   loading="lazy"
                   decoding="async"
