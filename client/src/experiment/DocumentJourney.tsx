@@ -1501,11 +1501,12 @@ export function DocumentJourney({
                                   {' '}
                                   ·{' '}
                                   <a
+                                    className="inline-link"
                                     href={doc.source.attestation.explorerUrl}
                                     target="_blank"
                                     rel="noreferrer"
                                   >
-                                    view on explorer
+                                    View on explorer
                                   </a>
                                 </>
                               ) : null}
@@ -1615,6 +1616,7 @@ export function DocumentJourney({
                             <>
                               <br />
                               <a
+                                className="inline-link"
                                 href={verifyOutcome.explorerUrl}
                                 target="_blank"
                                 rel="noreferrer"
