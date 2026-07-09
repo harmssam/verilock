@@ -1629,9 +1629,32 @@ a.hash-chip.text-link:focus-visible {
   white-space: nowrap;
 }
 
+.agreements-page-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.agreements-page-cancel {
+  color: var(--coral);
+  font-size: 0.8rem;
+}
+
+.agreements-page-cancel:hover:not(:disabled) {
+  color: #fecdd3;
+  background: rgba(251, 113, 133, 0.1);
+}
+
 @media (max-width: 640px) {
   .agreements-page-item {
     flex-direction: column;
+  }
+
+  .agreements-page-actions {
+    width: 100%;
   }
 
   .agreements-page-cta {
