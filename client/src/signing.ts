@@ -14,9 +14,17 @@ const PLACEHOLDER_PARTY_NAMES = new Set([
   'landlord',
 ])
 
+/** Matches "Invited signer", "Invited tenant 2", etc. */
+const PLACEHOLDER_PARTY_NAME_RE =
+  /^(invited\s+)?(signer|tenant|landlord)(\s+\d+)?$/i
+
 export function isPlaceholderPartyName(name: string): boolean {
   const trimmed = name.trim().toLowerCase()
-  return !trimmed || PLACEHOLDER_PARTY_NAMES.has(trimmed)
+  return (
+    !trimmed ||
+    PLACEHOLDER_PARTY_NAMES.has(trimmed) ||
+    PLACEHOLDER_PARTY_NAME_RE.test(trimmed)
+  )
 }
 
 export function looksLikeAddressLabel(name: string): boolean {

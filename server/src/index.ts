@@ -1,3 +1,6 @@
+import { loadEnvFile } from './loadEnv.js'
+loadEnvFile()
+
 console.log('[seal] boot', {
   node: process.version,
   port: process.env.PORT,
@@ -28,11 +31,18 @@ import {
   getDocumentPublic,
   getMyDocuments,
   prepareLock,
+  setCreatorNotifyEmail,
 } from './documents.js'
+import { emailFeaturesPublic } from './email/config.js'
 import { verifyHubSignedMessage } from './hub-signature.js'
 import { rateLimit } from './rate-limit.js'
 import { broadcastRawTransaction, normalizeRawTransactionHex, verifySignature } from './nimiq-rpc.js'
-import { assertSafeBootConfig, resolveCorsOrigin, sanitizeDisplayName } from './security.js'
+import {
+  assertSafeBootConfig,
+  resolveCorsOrigin,
+  sanitizeDisplayName,
+  sanitizeNotifyEmail,
+} from './security.js'
 import { buildCertificate } from './certificate.js'
 import { hashSignatureImage, parseSignatureImageBase64 } from './signature-image.js'
 import { getClientDistDir, getDataDir, getDatabasePath } from './paths.js'
@@ -69,7 +79,8 @@ const docLimit = rateLimit(30, 60_000)
 const attestLimit = rateLimit(24, 60_000)
 const walletBalanceLimit = rateLimit(30, 60_000)
 const publicReadLimit = rateLimit(60, 60_000)
-const verifyHashLimit = rateLimit(20, 60_000)
+// Hash verify is read-only and easy to double-fire from UI retries; allow a higher burst.
+const verifyHashLimit = rateLimit(60, 60_000)
 
 function lockErrorStatus(message: string): number {
   if (message === 'Only the creator can seal this agreement') return 403
@@ -234,6 +245,10 @@ app.get('/api/me', authMiddleware, (req, res) => {
   res.json({ address, documents: getMyDocuments(address) })
 })
 
+app.get('/api/features', (_req, res) => {
+  res.json(emailFeaturesPublic())
+})
+
 app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req, res) => {
   const body = req.body as {
     title?: string
@@ -246,6 +261,7 @@ app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req
     requiredSignatures?: number
     creatorRole?: string
     creatorDisplayName?: string
+    creatorNotifyEmail?: string
   }
 
   if (!body.originalSha256 || !/^[a-f0-9]{64}$/i.test(body.originalSha256)) {
@@ -261,6 +277,14 @@ app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req
     return
   }
 
+  let creatorNotifyEmail: string | null = null
+  try {
+    creatorNotifyEmail = sanitizeNotifyEmail(body.creatorNotifyEmail)
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : 'Invalid email' })
+    return
+  }
+
   const { document: doc, hashWarning } = createDocument({
     title: body.title ?? 'Untitled agreement',
     originalFileName: body.originalFileName,
@@ -273,10 +297,38 @@ app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req
     metadata: body.metadata,
     parties: body.parties,
     requiredSignatures: body.requiredSignatures,
+    creatorNotifyEmail,
   })
 
   res.status(201).json({ document: doc, ...(hashWarning ? { hashWarning } : {}) })
 })
+
+/** Creator-only: set/clear optional ready-to-seal notification email. */
+app.patch(
+  '/api/documents/:id/notify-email',
+  docLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  (req, res) => {
+    const body = req.body as { email?: string | null }
+    const address = res.locals.address as string
+    try {
+      const email = sanitizeNotifyEmail(body.email ?? null)
+      setCreatorNotifyEmail(routeParam(req.params.id), address, email)
+      res.json({ ok: true })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Update failed'
+      const status =
+        message === 'Only the creator can modify this agreement' ||
+        message.includes('Only the creator')
+          ? 403
+          : message === 'Document not found'
+            ? 404
+            : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
 
 app.get('/api/documents/:id', publicReadLimit, (req, res) => {
   const doc = getDocumentPublic(routeParam(req.params.id))

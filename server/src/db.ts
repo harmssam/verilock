@@ -97,6 +97,57 @@ if (!documentColumns.some(col => col.name === 'required_signatures')) {
 if (!documentColumns.some(col => col.name === 'original_filename')) {
   db.exec('ALTER TABLE documents ADD COLUMN original_filename TEXT')
 }
+if (!documentColumns.some(col => col.name === 'creator_notify_email')) {
+  db.exec('ALTER TABLE documents ADD COLUMN creator_notify_email TEXT')
+}
+if (!documentColumns.some(col => col.name === 'ready_to_seal_email_sent_at')) {
+  db.exec('ALTER TABLE documents ADD COLUMN ready_to_seal_email_sent_at INTEGER')
+}
+
+/** Drop duplicate rows so unique indexes can be applied on existing DBs. */
+function dedupeSignaturesForUniqueness(): void {
+  db.exec(`
+    DELETE FROM signature_images
+    WHERE signature_id IN (
+      SELECT s.id FROM signatures s
+      WHERE s.rowid NOT IN (
+        SELECT MIN(rowid) FROM signatures GROUP BY party_id
+      )
+    );
+
+    DELETE FROM signatures
+    WHERE rowid NOT IN (
+      SELECT MIN(rowid) FROM signatures GROUP BY party_id
+    );
+
+    DELETE FROM signature_images
+    WHERE signature_id IN (
+      SELECT s.id FROM signatures s
+      WHERE s.rowid NOT IN (
+        SELECT MIN(rowid) FROM signatures
+        GROUP BY document_id, UPPER(REPLACE(signer_address, ' ', ''))
+      )
+    );
+
+    DELETE FROM signatures
+    WHERE rowid NOT IN (
+      SELECT MIN(rowid) FROM signatures
+      GROUP BY document_id, UPPER(REPLACE(signer_address, ' ', ''))
+    );
+  `)
+}
+
+dedupeSignaturesForUniqueness()
+
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_signatures_party_unique
+    ON signatures(party_id);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_signatures_doc_signer_unique
+    ON signatures(document_id, UPPER(REPLACE(signer_address, ' ', '')));
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_parties_doc_wallet_unique
+    ON document_parties(document_id, UPPER(REPLACE(wallet_address, ' ', '')))
+    WHERE wallet_address IS NOT NULL;
+`)
 
 export type DocumentStatus =
   | 'draft'
@@ -129,6 +180,9 @@ export interface DocumentRecord {
   requiredSignatures: number
   createdAt: number
   lockedAt: number | null
+  /** Optional creator email for ready-to-seal notify (never public). */
+  creatorNotifyEmail: string | null
+  readyToSealEmailSentAt: number | null
 }
 
 export interface PartyRecord {
@@ -230,13 +284,24 @@ function rowToDocument(row: Record<string, unknown>): DocumentRecord {
     requiredSignatures: requiredSignatures ?? 0,
     createdAt: row.created_at as number,
     lockedAt: (row.locked_at as number | null) ?? null,
+    creatorNotifyEmail: (row.creator_notify_email as string | null) ?? null,
+    readyToSealEmailSentAt:
+      (row.ready_to_seal_email_sent_at as number | null | undefined) ?? null,
   }
 }
 
 export function insertDocument(doc: DocumentRecord): void {
   db.prepare(`
-    INSERT INTO documents (id, slug, title, original_filename, type, status, creator_address, original_sha256, final_sha256, page_count, metadata, required_signatures, created_at, locked_at)
-    VALUES (@id, @slug, @title, @originalFilename, @type, @status, @creatorAddress, @originalSha256, @finalSha256, @pageCount, @metadata, @requiredSignatures, @createdAt, @lockedAt)
+    INSERT INTO documents (
+      id, slug, title, original_filename, type, status, creator_address,
+      original_sha256, final_sha256, page_count, metadata, required_signatures,
+      created_at, locked_at, creator_notify_email, ready_to_seal_email_sent_at
+    )
+    VALUES (
+      @id, @slug, @title, @originalFilename, @type, @status, @creatorAddress,
+      @originalSha256, @finalSha256, @pageCount, @metadata, @requiredSignatures,
+      @createdAt, @lockedAt, @creatorNotifyEmail, @readyToSealEmailSentAt
+    )
   `).run({
     id: doc.id,
     slug: doc.slug,
@@ -252,7 +317,35 @@ export function insertDocument(doc: DocumentRecord): void {
     requiredSignatures: doc.requiredSignatures,
     createdAt: doc.createdAt,
     lockedAt: doc.lockedAt,
+    creatorNotifyEmail: doc.creatorNotifyEmail,
+    readyToSealEmailSentAt: doc.readyToSealEmailSentAt,
   })
+}
+
+export function setDocumentNotifyEmail(documentId: string, email: string | null): void {
+  db.prepare('UPDATE documents SET creator_notify_email = ? WHERE id = ?').run(email, documentId)
+}
+
+/** Returns email only if ready-to-seal mail has not already been sent. */
+export function getDocumentNotifyEmail(documentId: string): string | null {
+  const row = db
+    .prepare(
+      `SELECT creator_notify_email, ready_to_seal_email_sent_at
+       FROM documents WHERE id = ?`,
+    )
+    .get(documentId) as
+    | { creator_notify_email: string | null; ready_to_seal_email_sent_at: number | null }
+    | undefined
+  if (!row) return null
+  if (row.ready_to_seal_email_sent_at) return null
+  const email = row.creator_notify_email?.trim()
+  return email || null
+}
+
+export function markReadyToSealEmailSent(documentId: string, at = Date.now()): void {
+  db.prepare(
+    'UPDATE documents SET ready_to_seal_email_sent_at = ? WHERE id = ? AND ready_to_seal_email_sent_at IS NULL',
+  ).run(at, documentId)
 }
 
 export function getDocumentById(id: string): DocumentRecord | null {
@@ -365,6 +458,60 @@ export function assignPartyWallet(partyId: string, walletAddress: string): void 
     normalizeAddress(walletAddress),
     partyId,
   )
+}
+
+/**
+ * Atomically claim an open party slot for a wallet.
+ * Succeeds only when the party is still pending and unassigned.
+ * Safe under concurrent multi-process writers (UPDATE … WHERE wallet_address IS NULL).
+ */
+export function claimPartyWalletIfOpen(partyId: string, walletAddress: string): boolean {
+  const wallet = normalizeAddress(walletAddress)
+  try {
+    const result = db
+      .prepare(
+        `UPDATE document_parties
+         SET wallet_address = ?
+         WHERE id = ?
+           AND wallet_address IS NULL
+           AND status = 'pending'`,
+      )
+      .run(wallet, partyId)
+    return result.changes === 1
+  } catch (err) {
+    // Unique index on (document_id, wallet) — this wallet already owns another party.
+    const message = err instanceof Error ? err.message.toLowerCase() : ''
+    if (message.includes('unique')) return false
+    throw err
+  }
+}
+
+export function getPartyById(partyId: string): PartyRecord | null {
+  const row = db
+    .prepare('SELECT * FROM document_parties WHERE id = ?')
+    .get(partyId) as Record<string, unknown> | undefined
+  if (!row) return null
+  return {
+    id: row.id as string,
+    documentId: row.document_id as string,
+    role: row.role as string,
+    displayName: row.display_name as string,
+    walletAddress: (row.wallet_address as string | null) ?? null,
+    sortOrder: row.sort_order as number,
+    required: Boolean(row.required),
+    status: row.status as PartyRecord['status'],
+    signedAt: (row.signed_at as number | null) ?? null,
+  }
+}
+
+/** Run work inside an IMMEDIATE SQLite transaction (serialized writers). */
+export function runInTransaction<T>(fn: () => T): T {
+  return db.transaction(fn).immediate()
+}
+
+export function isUniqueConstraintError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase()
+  return message.includes('unique')
 }
 
 export function updatePartyDisplayName(partyId: string, displayName: string): void {

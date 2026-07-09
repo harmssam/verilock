@@ -30,5 +30,5 @@ export function evaluateSealFunds(balanceLuna: number, now = new Date()): SealFu
 export function insufficientSealFundsMessage(status: SealFundsStatus): string {
   const have = formatSealFeeNim(status.balanceNim)
   const need = formatSealFeeNim(status.requiredLuna / LUNA_PER_NIM)
-  return `Your wallet has ${have} but sealing requires at least ${need} (seal fee plus network fees). Add NIM to your wallet, then try again.`
+  return `Your wallet has ${have} but sealing requires at least ${need} (seal fee). Add NIM to your wallet, then try again.`
 }

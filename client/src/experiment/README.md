@@ -1,4 +1,4 @@
-# VeriLock UI experiment — Document Journey
+# VeriLock UI experiment - Document Journey
 
 Parallel prototype. **Production files stay untouched.**
 
@@ -8,7 +8,7 @@ Not a thinner clone of the production step list.
 
 | Idea | What you get |
 |------|----------------|
-| **Path-first** | Create / Invited / Verify — pick intent, then a focused action dock |
+| **Path-first** | Create / Invited / Verify - pick intent, then a focused action dock |
 | **Document stage** | Visual PDF card that gains fingerprint, signatures, and a seal stamp |
 | **One action at a time** | Controls live in the dock; stage rail shows progress |
 | **Account chrome** | Connect pill, full address, copy, disconnect / log out |
