@@ -18,7 +18,12 @@ import { canRevealParticipantDetails, isDocumentCreator } from '../agreements'
 import { api } from '../api'
 import { SignaturesPanel } from '../SignaturesPanel'
 import { FEATURES } from '../features'
-import { clampField, MAX_DISPLAY_NAME_LENGTH, MAX_TITLE_LENGTH } from '../fieldLimits'
+import {
+  clampField,
+  MAX_DISPLAY_NAME_LENGTH,
+  MAX_DOCUMENT_NOTES_LENGTH,
+  MAX_TITLE_LENGTH,
+} from '../fieldLimits'
 import { getPdfPageCount, sha256Hex, shortHash } from '../pdf/hashPdf'
 import { prepareSignatureImageUpload } from '../signatureImage'
 import { isMobileDevice, NIMIQ_PAY_ANDROID_URL, NIMIQ_PAY_IOS_URL } from '../nimiq'
@@ -29,7 +34,12 @@ import {
   partyNeedsSignerName,
   resolveSigningParty,
 } from '../signing'
-import type { SealDocument, VerifyResult } from '../types'
+import {
+  documentTypeUsesNotes,
+  type DocumentType,
+  type SealDocument,
+  type VerifyResult,
+} from '../types'
 import { VerifyMatchesPanel } from '../VerifyMatchesPanel'
 import { DocumentStage } from './DocumentStage'
 import { FeatureRotator } from './FeatureRotator'
@@ -140,6 +150,12 @@ export function DocumentJourney({
   const [creatorName, setCreatorName] = useState('')
   /** Optional ready-to-seal email — collected only when FEATURES.emailNotifyUi is on. */
   const [creatorNotifyEmail, setCreatorNotifyEmail] = useState('')
+  const [docType, setDocType] = useState<DocumentType>('contract')
+  /** Rental only: creator’s party role. */
+  const [creatorRole, setCreatorRole] = useState<'landlord' | 'tenant'>('landlord')
+  /** Optional display names for other parties (index 0 = first co-signer). */
+  const [coSignerNames, setCoSignerNames] = useState<string[]>([''])
+  const [docNotes, setDocNotes] = useState('')
   const [directSeal, setDirectSeal] = useState(false)
   const [requiredSigners, setRequiredSigners] = useState(2)
   const [busy, setBusy] = useState(false)
@@ -582,6 +598,11 @@ export function DocumentJourney({
     setPdfHash(null)
     setTitle('')
     setCreatorName('')
+    setCreatorNotifyEmail('')
+    setDocType('contract')
+    setCreatorRole('landlord')
+    setCoSignerNames([''])
+    setDocNotes('')
     setDirectSeal(false)
     setRequiredSigners(2)
     setDoc(null)
@@ -618,36 +639,55 @@ export function DocumentJourney({
     try {
       const effectiveRequired = directSeal ? 0 : requiredSigners
       const extraSigners = Math.max(0, effectiveRequired - 1)
+      // Creator is always a required party; remaining slots are co-signers.
       const parties = directSeal
         ? []
-        : Array.from({ length: extraSigners }, (_, index) => ({
-            role: 'signer',
-            displayName:
-              extraSigners === 1 ? 'Invited signer' : `Invited signer ${index + 1}`,
-            required: true,
-          }))
+        : Array.from({ length: extraSigners }, (_, index) => {
+            const named = coSignerNames[index]?.trim()
+            const fallback =
+              extraSigners === 1 ? 'Invited signer' : `Invited signer ${index + 1}`
+            // Rental: first co-signer is the other role; further parties are generic signers.
+            let role = 'signer'
+            if (docType === 'rental' && index === 0) {
+              role = creatorRole === 'landlord' ? 'tenant' : 'landlord'
+            }
+            return {
+              role,
+              displayName: clampField(named || fallback, MAX_DISPLAY_NAME_LENGTH),
+              required: true,
+            }
+          })
 
       const notifyEmail =
         FEATURES.emailNotifyUi && creatorNotifyEmail.trim()
           ? creatorNotifyEmail.trim()
           : undefined
 
+      const metadata =
+        documentTypeUsesNotes(docType) && docNotes.trim()
+          ? { notes: clampField(docNotes.trim(), MAX_DOCUMENT_NOTES_LENGTH) }
+          : undefined
+
       const { document, hashWarning } = await api.createDocument(token, {
         title: clampField(title || pdfFile.name.replace(/\.pdf$/i, ''), MAX_TITLE_LENGTH),
         originalFileName: pdfFile.name,
-        type: 'other',
-        creatorRole: 'creator',
+        type: docType,
+        creatorRole: docType === 'rental' ? creatorRole : 'creator',
         creatorDisplayName: clampField(creatorName.trim(), MAX_DISPLAY_NAME_LENGTH),
         originalSha256: pdfHash,
         pageCount,
         requiredSignatures: effectiveRequired,
         parties: parties.length > 0 ? parties : undefined,
+        ...(metadata ? { metadata } : {}),
         ...(notifyEmail ? { creatorNotifyEmail: notifyEmail } : {}),
       })
 
       if (hashWarning) setLocalError(hashWarning)
       setActiveFromSeal(document, pdfFile.size)
       setSharedAck(false)
+      // Keep create-time PDF available for the creator’s own sign step
+      setSignFile(pdfFile)
+      setSignHash(pdfHash)
       bumpAgreements()
       window.history.pushState({}, '', `/d/${document.slug}`)
     } catch (err) {
@@ -662,11 +702,20 @@ export function DocumentJourney({
     try {
       await navigator.clipboard.writeText(doc.shareUrl)
       setLinkCopied(true)
-      setSharedAck(true)
+      // Do not advance off share — copy alone should not open the sign/PDF step.
       window.setTimeout(() => setLinkCopied(false), 1800)
     } catch {
-      setSharedAck(true)
+      setLocalError('Could not copy link — select and copy it manually if needed.')
     }
+  }
+
+  /** Leave share step; reuse create PDF so creator is not asked to re-drop it. */
+  const continueAfterShare = () => {
+    if (pdfFile && pdfHash) {
+      setSignFile(pdfFile)
+      setSignHash(pdfHash)
+    }
+    setSharedAck(true)
   }
 
   const signAsCurrentUser = async () => {
@@ -1135,15 +1184,49 @@ export function DocumentJourney({
                     )}
                   </p>
                   <label className="field">
+                    <span className="field-label">Agreement type</span>
+                    <select
+                      value={docType}
+                      onChange={e => {
+                        const next = e.target.value as DocumentType
+                        setDocType(next)
+                        if (next === 'rental') setCreatorRole('landlord')
+                        if (!documentTypeUsesNotes(next)) setDocNotes('')
+                      }}
+                    >
+                      <option value="rental">Rental agreement</option>
+                      <option value="contract">Contract</option>
+                      <option value="nda">NDA</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                  {docType === 'rental' && (
+                    <label className="field">
+                      <span className="field-label">You are the</span>
+                      <select
+                        value={creatorRole}
+                        onChange={e =>
+                          setCreatorRole(e.target.value as 'landlord' | 'tenant')
+                        }
+                      >
+                        <option value="landlord">Landlord</option>
+                        <option value="tenant">Tenant</option>
+                      </select>
+                    </label>
+                  )}
+                  <label className="field">
                     <span className="field-label">Your full name</span>
                     <input
                       value={creatorName}
-                      onChange={e => setCreatorName(e.target.value)}
+                      onChange={e =>
+                        setCreatorName(clampField(e.target.value, MAX_DISPLAY_NAME_LENGTH))
+                      }
                       placeholder="Alex Rivera"
                       autoComplete="name"
+                      maxLength={MAX_DISPLAY_NAME_LENGTH}
                     />
                   </label>
-                  {FEATURES.emailNotifyUi && (
+                  {FEATURES.emailNotifyUi && !directSeal && (
                     <label className="field">
                       <span className="field-label">Email when everyone has signed (optional)</span>
                       <input
@@ -1162,31 +1245,124 @@ export function DocumentJourney({
                     <span className="field-label">Title (optional)</span>
                     <input
                       value={title}
-                      onChange={e => setTitle(e.target.value)}
-                      placeholder="Lease - 12 Maple St"
+                      onChange={e => setTitle(clampField(e.target.value, MAX_TITLE_LENGTH))}
+                      maxLength={MAX_TITLE_LENGTH}
+                      placeholder={
+                        docType === 'rental'
+                          ? '123 Main St — 12-month lease'
+                          : docType === 'nda'
+                            ? 'Project Falcon — mutual NDA'
+                            : docType === 'contract'
+                              ? 'Vendor services agreement'
+                              : 'Agreement title'
+                      }
                     />
                   </label>
                   <label className="check-row">
                     <input
                       type="checkbox"
                       checked={directSeal}
-                      onChange={e => setDirectSeal(e.target.checked)}
+                      onChange={e => {
+                        const checked = e.target.checked
+                        setDirectSeal(checked)
+                        if (checked) setRequiredSigners(1)
+                        else if (requiredSigners < 1) setRequiredSigners(2)
+                      }}
                     />
-                    <span>Seal directly - no co-signers</span>
+                    <span>Seal directly — no co-signers (hash only)</span>
                   </label>
                   {!directSeal && (
+                    <>
+                      <label className="field">
+                        <span className="field-label">How many parties must sign?</span>
+                        <select
+                          value={requiredSigners}
+                          onChange={e => {
+                            const n = Number(e.target.value)
+                            setRequiredSigners(n)
+                            const others = Math.max(0, n - 1)
+                            setCoSignerNames(prev => {
+                              const next = prev.slice(0, others)
+                              while (next.length < others) next.push('')
+                              return next
+                            })
+                          }}
+                        >
+                          {[1, 2, 3, 4].map(n => (
+                            <option key={n} value={n}>
+                              {n} {n === 1 ? 'signature' : 'signatures'} (you
+                              {n > 1 ? ` + ${n - 1} other${n - 1 === 1 ? '' : 's'}` : ''})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {Math.max(0, requiredSigners - 1) > 0 && (
+                        <div className="field-stack">
+                          <span className="field-label">
+                            Co-signer name{requiredSigners - 1 > 1 ? 's' : ''} (optional)
+                          </span>
+                          <p className="muted" style={{ margin: '0 0 0.45rem', fontSize: '0.8rem' }}>
+                            Leave blank if they will enter their name when they sign.
+                          </p>
+                          {Array.from({ length: Math.max(0, requiredSigners - 1) }, (_, index) => {
+                            const rentalOther =
+                              docType === 'rental' && index === 0
+                                ? creatorRole === 'landlord'
+                                  ? 'Tenant'
+                                  : 'Landlord'
+                                : null
+                            return (
+                              <label key={index} className="field">
+                                <span className="field-label">
+                                  {rentalOther ?? `Party ${index + 2}`} name
+                                </span>
+                                <input
+                                  value={coSignerNames[index] ?? ''}
+                                  onChange={e => {
+                                    const value = clampField(
+                                      e.target.value,
+                                      MAX_DISPLAY_NAME_LENGTH,
+                                    )
+                                    setCoSignerNames(prev => {
+                                      const next = [...prev]
+                                      while (next.length <= index) next.push('')
+                                      next[index] = value
+                                      return next
+                                    })
+                                  }}
+                                  maxLength={MAX_DISPLAY_NAME_LENGTH}
+                                  placeholder={
+                                    rentalOther
+                                      ? `${rentalOther} full name`
+                                      : 'Name (optional)'
+                                  }
+                                />
+                              </label>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {documentTypeUsesNotes(docType) && (
                     <label className="field">
-                      <span className="field-label">How many parties must sign?</span>
-                      <select
-                        value={requiredSigners}
-                        onChange={e => setRequiredSigners(Number(e.target.value))}
-                      >
-                        {[1, 2, 3, 4].map(n => (
-                          <option key={n} value={n}>
-                            {n} {n === 1 ? 'party' : 'parties'} (multi-party when 2+)
-                          </option>
-                        ))}
-                      </select>
+                      <span className="field-label">Notes (optional)</span>
+                      <textarea
+                        value={docNotes}
+                        onChange={e =>
+                          setDocNotes(clampField(e.target.value, MAX_DOCUMENT_NOTES_LENGTH))
+                        }
+                        placeholder={
+                          docType === 'nda'
+                            ? 'e.g. Effective date, parties covered, or signing context'
+                            : 'e.g. Context for signers or internal reference'
+                        }
+                        rows={3}
+                        maxLength={MAX_DOCUMENT_NOTES_LENGTH}
+                      />
+                      <span className="muted" style={{ fontSize: '0.78rem' }}>
+                        Visible to signers. Do not paste secrets or full contract text.
+                      </span>
                     </label>
                   )}
                   <button
@@ -1221,9 +1397,17 @@ export function DocumentJourney({
                     onCopyLink={() => void copyLink()}
                     embedded
                   />
-                  <button type="button" className="btn btn-primary btn-lg" onClick={() => setSharedAck(true)}>
-                    I&apos;ve shared - open multi-party signing
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-lg"
+                    onClick={continueAfterShare}
+                  >
+                    I&apos;ve shared — continue to sign
                   </button>
+                  <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                    Copying the link keeps you here so you can share the PDF next. Continue when
+                    you are ready to sign as the creator.
+                  </p>
                 </div>
               )}
 
