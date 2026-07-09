@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { isPricingPath, isPrivacyPath, saveHubReturnPath } from '../hubReturnPath'
+import {
+  isAgreementsPath,
+  isPricingPath,
+  isPrivacyPath,
+  saveHubReturnPath,
+} from '../hubReturnPath'
+import type { SealDocument } from '../types'
 import { PricePage } from '../PricePage'
 import { PrivacyPolicyPage } from '../PrivacyPolicyPage'
 import { AccountMenu } from './AccountMenu'
+import { AgreementsPage } from './AgreementsPage'
 import { DocumentJourney } from './DocumentJourney'
 import {
   clearJourneyIntent,
@@ -16,11 +23,12 @@ import {
 } from './journeyConnectUi'
 import { useJourneyWallet } from './useJourneyWallet'
 
-type ShellScreen = 'journey' | 'pricing' | 'privacy'
+type ShellScreen = 'journey' | 'pricing' | 'privacy' | 'agreements'
 
 function screenFromPath(pathname: string): ShellScreen {
   if (isPricingPath(pathname)) return 'pricing'
   if (isPrivacyPath(pathname)) return 'privacy'
+  if (isAgreementsPath(pathname)) return 'agreements'
   return 'journey'
 }
 
@@ -32,11 +40,17 @@ export function ExperimentApp() {
   const journeyReturnPathRef = useRef('/')
   /** Bump to remount DocumentJourney when returning home (clears stuck signer path). */
   const [journeyEpoch, setJourneyEpoch] = useState(0)
+  /** Bumps on shell pushState so DocumentJourney re-reads /d/:slug deep links. */
+  const [navEpoch, setNavEpoch] = useState(0)
 
   const rememberJourneyPath = useCallback(() => {
     if (typeof window === 'undefined') return
     const path = `${window.location.pathname}${window.location.search}`
-    if (!isPricingPath(window.location.pathname) && !isPrivacyPath(window.location.pathname)) {
+    if (
+      !isPricingPath(window.location.pathname) &&
+      !isPrivacyPath(window.location.pathname) &&
+      !isAgreementsPath(window.location.pathname)
+    ) {
       journeyReturnPathRef.current = path || '/'
     }
   }, [])
@@ -48,6 +62,7 @@ export function ExperimentApp() {
     journeyReturnPathRef.current = '/'
     setJourneyEpoch(n => n + 1)
     window.history.pushState({}, '', '/')
+    setNavEpoch(n => n + 1)
   }, [])
 
   const goPricing = useCallback(() => {
@@ -62,9 +77,35 @@ export function ExperimentApp() {
     window.history.pushState({}, '', '/privacy')
   }, [rememberJourneyPath])
 
+  const goAgreements = useCallback(() => {
+    rememberJourneyPath()
+    setScreen('agreements')
+    window.history.pushState({}, '', '/agreements')
+  }, [rememberJourneyPath])
+
+  /** Open a wallet agreement inside Journey document flow. */
+  const openAgreement = useCallback((doc: SealDocument, preferSeal = false) => {
+    setScreen('journey')
+    // preferSeal is applied after load via query flag consumed in DocumentJourney
+    const q = preferSeal ? '?preferSeal=1' : ''
+    window.history.pushState({}, '', `/d/${doc.slug}${q}`)
+    setNavEpoch(n => n + 1)
+  }, [])
+
+  /** Start create path from agreements empty / new button. */
+  const startCreate = useCallback(() => {
+    clearJourneyIntent()
+    saveJourneyIntent('creator')
+    setScreen('journey')
+    setJourneyEpoch(n => n + 1)
+    window.history.pushState({}, '', '/?intent=creator')
+    setNavEpoch(n => n + 1)
+  }, [])
+
   useEffect(() => {
     const onPopState = () => {
       setScreen(screenFromPath(window.location.pathname))
+      setNavEpoch(n => n + 1)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -105,6 +146,15 @@ export function ExperimentApp() {
         </button>
 
         <div className="exp-header-actions">
+          {wallet.account && (
+            <button
+              type="button"
+              className={`exp-pricing-link${screen === 'agreements' ? ' exp-pricing-link--active' : ''}`}
+              onClick={screen === 'agreements' ? goJourney : goAgreements}
+            >
+              Agreements
+            </button>
+          )}
           <button
             type="button"
             className={`exp-pricing-link${screen === 'pricing' ? ' exp-pricing-link--active' : ''}`}
@@ -119,6 +169,7 @@ export function ExperimentApp() {
             connectMode={connectMode}
             onConnect={connectPreservingPath}
             onDisconnect={wallet.disconnect}
+            onAgreements={wallet.account ? goAgreements : undefined}
           />
         </div>
       </header>
@@ -132,16 +183,32 @@ export function ExperimentApp() {
         </p>
       )}
 
-      {(screen === 'pricing' || screen === 'privacy') && (
+      {(screen === 'pricing' || screen === 'privacy' || screen === 'agreements') && (
         <button type="button" className="exp-back-home" onClick={goJourney}>
           ← Back to home
         </button>
       )}
       {screen === 'pricing' && <PricePage />}
       {screen === 'privacy' && <PrivacyPolicyPage />}
-      {/* Keep journey mounted so in-progress state survives pricing/privacy visits */}
+      {screen === 'agreements' && (
+        <AgreementsPage
+          token={wallet.token}
+          address={wallet.address}
+          connecting={wallet.connecting}
+          connectMode={connectMode}
+          onConnect={connectPreservingPath}
+          onOpen={openAgreement}
+          onCreate={startCreate}
+        />
+      )}
+      {/* Keep journey mounted so in-progress state survives pricing/privacy/agreements visits */}
       <div hidden={screen !== 'journey'}>
-        <DocumentJourney key={journeyEpoch} wallet={wallet} />
+        <DocumentJourney
+          key={journeyEpoch}
+          wallet={wallet}
+          navEpoch={navEpoch}
+          onOpenAgreements={goAgreements}
+        />
       </div>
 
       <footer className="exp-footer">

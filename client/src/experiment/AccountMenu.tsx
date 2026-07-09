@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Copy, LogOut, Wallet } from 'lucide-react'
+import { Check, ChevronDown, Copy, Files, LogOut, Wallet } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { formatDisplayAddress } from '../addresses'
 import { journeyConnectLabels, type JourneyConnectMode } from './journeyConnectUi'
@@ -12,6 +12,7 @@ interface AccountMenuProps {
   connectMode?: JourneyConnectMode
   onConnect: () => void
   onDisconnect: () => void
+  onAgreements?: () => void
 }
 
 export function AccountMenu({
@@ -21,6 +22,7 @@ export function AccountMenu({
   connectMode = 'hub',
   onConnect,
   onDisconnect,
+  onAgreements,
 }: AccountMenuProps) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -79,6 +81,20 @@ export function AccountMenu({
             <span className="exp-account-menu-label">Connected</span>
             <code className="exp-account-menu-full">{formatDisplayAddress(account.address)}</code>
           </div>
+          {onAgreements && (
+            <button
+              type="button"
+              className="exp-account-item"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false)
+                onAgreements()
+              }}
+            >
+              <Files size={15} strokeWidth={2.25} />
+              My agreements
+            </button>
+          )}
           <button
             type="button"
             className="exp-account-item"
