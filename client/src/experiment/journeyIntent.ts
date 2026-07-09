@@ -84,8 +84,14 @@ export function resolveJourneyIntent(): PathRole | null {
     return readJourneyIntent()
   }
 
-  // Clean home (or pricing/privacy): do not rehydrate sticky signer/creator intent
-  if (isHomePath(pathname) || pathname === '/pricing' || pathname === '/privacy') {
+  // Clean home / shell pages: do not rehydrate sticky signer/creator intent
+  if (
+    isHomePath(pathname) ||
+    pathname === '/pricing' ||
+    pathname === '/privacy' ||
+    pathname === '/agreements' ||
+    pathname.startsWith('/agreements/')
+  ) {
     clearJourneyIntent()
     return null
   }

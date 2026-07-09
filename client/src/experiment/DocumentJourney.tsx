@@ -66,6 +66,10 @@ import type { UseJourneyWalletResult } from './useJourneyWallet'
 
 interface DocumentJourneyProps {
   wallet: UseJourneyWalletResult
+  /** Shell pushState navigation epoch — re-read /d/:slug deep links. */
+  navEpoch?: number
+  /** Open full agreements page (header / welcome strip). */
+  onOpenAgreements?: () => void
 }
 
 type VerifyOutcome =
@@ -100,7 +104,11 @@ async function loadVerifyDetails(slugs: string[]): Promise<VerifyResult[]> {
   return details.sort((a, b) => (b.lockedAt ?? b.createdAt) - (a.lockedAt ?? a.createdAt))
 }
 
-export function DocumentJourney({ wallet }: DocumentJourneyProps) {
+export function DocumentJourney({
+  wallet,
+  navEpoch = 0,
+  onOpenAgreements,
+}: DocumentJourneyProps) {
   const {
     account,
     token,
@@ -208,11 +216,15 @@ export function DocumentJourney({ wallet }: DocumentJourneyProps) {
     setRole(prev => prev ?? intent)
   }, [bootReady, address])
 
-  // Deep-link /d/:slug (invite) or /v/:slug (verify record)
+  // Deep-link /d/:slug (invite) or /v/:slug (verify record).
+  // navEpoch re-runs when shell navigates via pushState (e.g. Agreements → open).
   useEffect(() => {
     if (!bootReady) return
     const docSlug = slugFromPath(window.location.pathname)
     const vSlug = verifySlugFromPath(window.location.pathname)
+    const preferSeal =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('preferSeal') === '1'
 
     if (vSlug) {
       let cancelled = false
@@ -248,6 +260,13 @@ export function DocumentJourney({ wallet }: DocumentJourneyProps) {
       }
     }
 
+    // Home / agreements with ?intent=creator (from Agreements “New”)
+    if (!docSlug && !vSlug) {
+      const intent = resolveJourneyIntent()
+      if (intent) setRole(intent)
+      return
+    }
+
     if (!docSlug) return
 
     let cancelled = false
@@ -256,12 +275,32 @@ export function DocumentJourney({ wallet }: DocumentJourneyProps) {
         const { document } = await api.getDocument(docSlug)
         if (cancelled) return
         setActiveFromSeal(document)
-        setSharedAck(true)
+        setLocalError(null)
+        setLockMessage(null)
         const isCreator =
           address &&
           document.creatorAddress.replace(/\s/g, '').toUpperCase() ===
             address.replace(/\s/g, '').toUpperCase()
-        setRole(isCreator ? 'creator' : 'signer')
+        if (isCreator) {
+          setRole('creator')
+          saveJourneyIntent('creator')
+          const { signed, required, readyToLock } = document.signingProgress
+          setSharedAck(
+            preferSeal ||
+              readyToLock ||
+              document.status === 'ready_to_lock' ||
+              signed > 0 ||
+              required === 0,
+          )
+        } else {
+          setRole('signer')
+          saveJourneyIntent('signer')
+          setSharedAck(true)
+        }
+        // Strip preferSeal from URL after apply (clean shareable /d/ links)
+        if (preferSeal) {
+          window.history.replaceState({}, '', `/d/${document.slug}`)
+        }
       } catch (err) {
         if (!cancelled) {
           setLocalError(err instanceof Error ? err.message : 'Could not open agreement link')
@@ -271,7 +310,7 @@ export function DocumentJourney({ wallet }: DocumentJourneyProps) {
     return () => {
       cancelled = true
     }
-  }, [bootReady, address, setActiveFromSeal])
+  }, [bootReady, address, setActiveFromSeal, navEpoch])
 
   // Hub seal return
   useEffect(() => {
@@ -869,6 +908,7 @@ export function DocumentJourney({ wallet }: DocumentJourneyProps) {
           refreshKey={agreementsRefreshKey}
           onOpen={document => openAgreementFromList(document, false)}
           onSeal={document => openAgreementFromList(document, true)}
+          onViewAll={onOpenAgreements}
         />
       )}
 

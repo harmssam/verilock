@@ -16,6 +16,8 @@ interface JourneyAgreementsProps {
   refreshKey?: number
   onOpen: (doc: SealDocument) => void
   onSeal: (doc: SealDocument) => void
+  /** Open full agreements history page. */
+  onViewAll?: () => void
 }
 
 export function JourneyAgreements({
@@ -24,6 +26,7 @@ export function JourneyAgreements({
   refreshKey = 0,
   onOpen,
   onSeal,
+  onViewAll,
 }: JourneyAgreementsProps) {
   const [documents, setDocuments] = useState<SealDocument[]>([])
   const [loading, setLoading] = useState(false)
@@ -89,13 +92,30 @@ export function JourneyAgreements({
   }
 
   if (actionable === 0) {
-    if (documents.length === 0) return null
+    if (documents.length === 0) {
+      if (!onViewAll) return null
+      return (
+        <section className="journey-agreements journey-agreements--quiet" aria-label="Your agreements">
+          <p className="muted" style={{ margin: 0 }}>
+            No agreements for this wallet yet.
+          </p>
+          <button type="button" className="text-btn journey-agreements-all" onClick={onViewAll}>
+            View agreements →
+          </button>
+        </section>
+      )
+    }
     return (
       <section className="journey-agreements journey-agreements--quiet" aria-label="Your agreements">
         <p className="muted" style={{ margin: 0 }}>
           {documents.length} agreement{documents.length === 1 ? '' : 's'} for this wallet — nothing
           needs action right now.
         </p>
+        {onViewAll && (
+          <button type="button" className="text-btn journey-agreements-all" onClick={onViewAll}>
+            View all →
+          </button>
+        )}
       </section>
     )
   }
@@ -186,6 +206,14 @@ export function JourneyAgreements({
               )
             })}
           </ul>
+        </div>
+      )}
+
+      {onViewAll && (
+        <div className="journey-agreements-footer">
+          <button type="button" className="text-btn journey-agreements-all" onClick={onViewAll}>
+            View all agreements →
+          </button>
         </div>
       )}
     </section>
