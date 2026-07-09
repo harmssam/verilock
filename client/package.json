@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "build:journey": "tsc -b && vite build --config vite.journey.config.ts",
+    "package:service-b": "node scripts/package-service-b.mjs",
+    "test:service-b": "node scripts/verify-journey-service-b.mjs",
+    "preview": "vite preview",
+    "preview:journey": "vite preview --config vite.journey.config.ts"
   },
   "dependencies": {
     "@nimiq/hub-api": "1.14.0",

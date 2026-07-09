@@ -12,9 +12,12 @@
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
     "build": "npm install --prefix server && npm install --prefix client && npm run build --prefix client",
+    "build:service-b": "npm install --prefix server && npm install --prefix client && npm run package:service-b --prefix client",
+    "test:service-b": "npm run test:service-b --prefix client",
     "start": "NODE_ENV=production npm run start --prefix server",
     "start:local": "npm run start --prefix server",
-    "start:prod-local": "NODE_ENV=production PORT=3003 CORS_ORIGIN=http://localhost:3003 DATA_DIR=./server/data npm run start --prefix server"
+    "start:prod-local": "NODE_ENV=production PORT=3003 CORS_ORIGIN=http://localhost:3003 DATA_DIR=./server/data npm run start --prefix server",
+    "start:service-b-local": "NODE_ENV=production PORT=3004 CORS_ORIGIN=http://localhost:3004 DATA_DIR=./server/data npm run start --prefix server"
   },
   "engines": {
     "node": ">=22"

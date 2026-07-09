@@ -3,6 +3,8 @@ node_modules/
 .railway/
 dist/
 client/dist/
+client/dist-journey/
+client/dist-experiment/
 data/
 *.db
 *.db-wal

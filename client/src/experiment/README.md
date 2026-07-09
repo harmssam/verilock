@@ -44,3 +44,12 @@ client/src/experiment/
 ## Promote later
 
 Wire real wallet/API into `DocumentJourney` + replace production home/create split with this model.
+
+## Service B packaging (journey as `/`)
+
+See [docs/service-b-journey.md](../../../docs/service-b-journey.md).
+
+```bash
+npm run package:service-b --prefix client   # journey → client/dist
+npm run build --prefix client               # production App → client/dist (service A)
+```
