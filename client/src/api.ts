@@ -93,8 +93,11 @@ export const api = {
       body: JSON.stringify({ email }),
     }),
 
-  getDocument: (id: string) =>
-    request<{ document: SealDocument }>(`/api/documents/${id}`),
+  getDocument: (id: string, token?: string | null) =>
+    request<{ document: SealDocument }>(
+      `/api/documents/${id}`,
+      token ? { headers: withAuth(token) } : {},
+    ),
 
   deleteDocument: (token: string, docId: string) =>
     request<{ ok: boolean }>(`/api/documents/${docId}`, {
@@ -184,8 +187,11 @@ export const api = {
       headers: withAuth(token),
     }),
 
-  verifyDocument: (idOrSlug: string) =>
-    request<VerifyResult>(`/api/verify/${idOrSlug}`),
+  verifyDocument: (idOrSlug: string, token?: string | null) =>
+    request<VerifyResult>(
+      `/api/verify/${idOrSlug}`,
+      token ? { headers: withAuth(token) } : {},
+    ),
 
   verifyHash: (sha256: string) =>
     request<{

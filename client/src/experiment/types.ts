@@ -174,6 +174,7 @@ export function toJourneyDoc(doc: SealDocument, fileSize = 0): JourneyDoc {
     return {
       id: p.id,
       roleLabel: partyLabel(p),
+      // Server nulls displayName for non-participants
       displayName: p.displayName || null,
       signed: p.status === 'signed' || Boolean(sig),
       walletShort: p.walletAddress
@@ -181,7 +182,7 @@ export function toJourneyDoc(doc: SealDocument, fileSize = 0): JourneyDoc {
         : sig
           ? shortAddress(sig.signerAddress)
           : null,
-      hasInk: Boolean(sig?.imageUrl),
+      hasInk: Boolean(sig?.imageUrl || sig?.hasImage),
       walletAddress: p.walletAddress,
       required: p.required,
     }

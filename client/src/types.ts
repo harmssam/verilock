@@ -17,6 +17,8 @@ export interface DocumentSignature {
   signatureType: string
   signedAt: number
   imageUrl?: string | null
+  /** True when an ink image exists but may be redacted for this viewer. */
+  hasImage?: boolean
 }
 
 export interface DocumentAttestation {
@@ -87,6 +89,11 @@ export interface SealDocument {
   attestation: DocumentAttestation | null
   shareUrl: string
   verifyUrl: string
+  /**
+   * Server-side: true when this response includes display names + signature images
+   * (viewer is creator or a signee). Omitted/false for public viewers.
+   */
+  participantDetailsRevealed?: boolean
 }
 
 export interface AttestationStatus {
@@ -125,4 +132,5 @@ export interface VerifyResult {
   attestation: DocumentAttestation | null
   signatures: DocumentSignature[]
   parties: DocumentParty[]
+  participantDetailsRevealed?: boolean
 }

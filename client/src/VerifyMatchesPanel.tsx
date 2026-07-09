@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react'
-import { canDeleteDocument } from './agreements'
+import { canDeleteDocument, canRevealParticipantDetails } from './agreements'
 import { DocumentNotesPanel } from './DocumentNotesPanel'
 import { SignaturesPanel } from './SignaturesPanel'
 import { documentTypeUsesNotes, type VerifyResult } from './types'
@@ -18,6 +18,7 @@ interface VerifyMatchesPanelProps {
   appUrl: string
   highlightSlug?: string | null
   walletAddress?: string | null
+  authToken?: string | null
   deletingId?: string | null
   onDelete?: (match: VerifyResult) => void
 }
@@ -27,6 +28,7 @@ export function VerifyMatchesPanel({
   appUrl,
   highlightSlug,
   walletAddress = null,
+  authToken = null,
   deletingId = null,
   onDelete,
 }: VerifyMatchesPanelProps) {
@@ -90,7 +92,13 @@ export function VerifyMatchesPanel({
                 </div>
               </dl>
               {match.signatures.length > 0 && (
-                <SignaturesPanel signatures={match.signatures} parties={match.parties} compact />
+                <SignaturesPanel
+                  signatures={match.signatures}
+                  parties={match.parties}
+                  compact
+                  revealPrivate={canRevealParticipantDetails(match, walletAddress)}
+                  authToken={authToken}
+                />
               )}
               {deletable && onDelete && (
                 <div className="verify-match-actions">

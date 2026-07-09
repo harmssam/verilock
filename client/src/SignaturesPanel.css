@@ -11,6 +11,12 @@
   color: var(--text);
 }
 
+.signatures-panel-privacy-note {
+  margin: -0.35rem 0 0.85rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .signatures-panel-list {
   list-style: none;
   margin: 0;

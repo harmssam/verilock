@@ -33,6 +33,29 @@ export function isDocumentCreator(
   return normalizeAddress(doc.creatorAddress) === normalizeAddress(address)
 }
 
+/**
+ * Creator or any party/signer wallet may see display names + signature images.
+ * Prefer server `participantDetailsRevealed` when present.
+ */
+export function canRevealParticipantDetails(
+  doc: Pick<SealDocument, 'creatorAddress' | 'parties' | 'signatures' | 'participantDetailsRevealed'>,
+  address: string | null,
+): boolean {
+  if (typeof doc.participantDetailsRevealed === 'boolean') {
+    return doc.participantDetailsRevealed
+  }
+  if (!address) return false
+  if (isDocumentCreator(doc, address)) return true
+  const me = normalizeAddress(address)
+  if (doc.parties.some(p => p.walletAddress && normalizeAddress(p.walletAddress) === me)) {
+    return true
+  }
+  if (doc.signatures.some(s => normalizeAddress(s.signerAddress) === me)) {
+    return true
+  }
+  return false
+}
+
 export function canDeleteDocument(
   doc: Pick<SealDocument, 'status' | 'creatorAddress'>,
   address: string | null,

@@ -143,7 +143,33 @@ function signatureImageUrl(documentId: string, signatureId: string): string {
   return `/api/documents/${documentId}/signatures/${signatureId}/image`
 }
 
-export function publicDocument(doc: DocumentRecord) {
+export interface PublicDocumentOptions {
+  /**
+   * When set and matches creator or any party/signer wallet, reveal display names
+   * and signature image URLs. Anonymous / unrelated wallets get redacted PII.
+   */
+  viewerAddress?: string | null
+}
+
+/**
+ * True if viewer may see participant display names and signature ink images.
+ * Public links stay useful (roles, wallets, seal proof) without exposing PII.
+ */
+export function canRevealParticipantDetails(
+  doc: Pick<DocumentRecord, 'creatorAddress'>,
+  parties: Array<Pick<PartyRecord, 'walletAddress'>>,
+  signatures: Array<{ signerAddress: string }>,
+  viewerAddress: string | null | undefined,
+): boolean {
+  if (!viewerAddress) return false
+  const me = normalizeAddress(viewerAddress)
+  if (normalizeAddress(doc.creatorAddress) === me) return true
+  if (parties.some(p => p.walletAddress && normalizeAddress(p.walletAddress) === me)) return true
+  if (signatures.some(s => normalizeAddress(s.signerAddress) === me)) return true
+  return false
+}
+
+export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOptions) {
   reconcileDocumentParties(doc.id)
   const parties = getPartiesForDocument(doc.id)
   const signatures = getSignaturesForDocument(doc.id)
@@ -152,6 +178,12 @@ export function publicDocument(doc: DocumentRecord) {
   const requiredParties = parties.filter(p => p.required)
   const signedRequired = countSignedRequiredParties(parties)
   const requiredCount = resolveRequiredSignatureCount(doc, parties)
+  const revealPrivate = canRevealParticipantDetails(
+    doc,
+    parties,
+    signatures,
+    options?.viewerAddress,
+  )
 
   return {
     id: doc.id,
@@ -168,14 +200,28 @@ export function publicDocument(doc: DocumentRecord) {
     createdAt: doc.createdAt,
     lockedAt: doc.lockedAt,
     requiredSignatures: requiredCount,
-    parties: parties.map(publicParty),
+    /** Whether names + signature images are included for this viewer. */
+    participantDetailsRevealed: revealPrivate,
+    parties: parties.map(party => {
+      const base = publicParty(party)
+      return {
+        ...base,
+        // Always redact human names for non-participants (even placeholders that look real).
+        displayName: revealPrivate ? base.displayName : null,
+      }
+    }),
     signatures: signatures.map(sig => ({
       id: sig.id,
       partyId: sig.partyId,
       signerAddress: sig.signerAddress,
       signatureType: sig.signatureType,
       signedAt: sig.signedAt,
-      imageUrl: signatureImageIds.has(sig.id) ? signatureImageUrl(doc.id, sig.id) : null,
+      // Ink images are only for creator / signees — not public share links.
+      imageUrl:
+        revealPrivate && signatureImageIds.has(sig.id)
+          ? signatureImageUrl(doc.id, sig.id)
+          : null,
+      hasImage: signatureImageIds.has(sig.id),
     })),
     signingProgress: {
       signed: signedRequired,
@@ -326,7 +372,10 @@ export function createDocument(input: {
     }
   }
 
-  return { document: publicDocument(doc), hashWarning }
+  return {
+    document: publicDocument(doc, { viewerAddress: input.creatorAddress }),
+    hashWarning,
+  }
 }
 
 /**
@@ -508,7 +557,9 @@ export function addSignature(input: {
         updateDocumentStatus(input.documentId, 'collecting_signatures')
       }
 
-      return publicDocument(getDocumentById(input.documentId)!)
+      return publicDocument(getDocumentById(input.documentId)!, {
+        viewerAddress: signer,
+      })
     })
 
     if (becameReadyToLock) {
@@ -557,7 +608,9 @@ export function prepareLock(documentId: string, finalSha256: string, requesterAd
   setDocumentFinalSha256(documentId, hash, 'ready_to_lock')
 
   return {
-    document: publicDocument(getDocumentById(documentId)!),
+    document: publicDocument(getDocumentById(documentId)!, {
+      viewerAddress: requesterAddress,
+    }),
     attestationPayload: buildAttestationPayload(documentId, hash),
     pricing: getSealPricing(),
   }
@@ -567,17 +620,33 @@ export function beginLock(documentId: string, requesterAddress: string) {
   const doc = assertDocumentCreator(documentId, requesterAddress)
   if (!doc.finalSha256) throw new Error('Call prepare-lock first')
   updateDocumentStatus(documentId, 'locking')
-  return publicDocument(getDocumentById(documentId)!)
+  return publicDocument(getDocumentById(documentId)!, {
+    viewerAddress: requesterAddress,
+  })
 }
 
 export function getMyDocuments(address: string) {
-  return listDocumentsForAddress(address).map(publicDocument)
+  return listDocumentsForAddress(address).map(doc =>
+    publicDocument(doc, { viewerAddress: address }),
+  )
 }
 
-export function getDocumentPublic(idOrSlug: string) {
+export function getDocumentPublic(idOrSlug: string, viewerAddress?: string | null) {
   const doc = getDocumentById(idOrSlug) ?? getDocumentBySlug(idOrSlug)
   if (!doc) return null
-  return publicDocument(doc)
+  return publicDocument(doc, { viewerAddress })
+}
+
+/** Used by signature-image route — load raw records and check membership. */
+export function viewerMayAccessSignatureImage(
+  documentId: string,
+  viewerAddress: string | null | undefined,
+): boolean {
+  const doc = getDocumentById(documentId) ?? getDocumentBySlug(documentId)
+  if (!doc) return false
+  const parties = getPartiesForDocument(doc.id)
+  const signatures = getSignaturesForDocument(doc.id)
+  return canRevealParticipantDetails(doc, parties, signatures, viewerAddress)
 }
 
 export function deleteDocument(idOrSlug: string, requesterAddress: string): void {
