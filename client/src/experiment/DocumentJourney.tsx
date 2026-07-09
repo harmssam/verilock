@@ -330,6 +330,9 @@ export function DocumentJourney({
           address &&
           document.creatorAddress.replace(/\s/g, '').toUpperCase() ===
             address.replace(/\s/g, '').toUpperCase()
+        const sealed =
+          document.status === 'locked' || document.attestation?.status === 'confirmed'
+
         if (isCreator) {
           setRole('creator')
           saveJourneyIntent('creator')
@@ -341,17 +344,15 @@ export function DocumentJourney({
               signed > 0 ||
               required === 0,
           )
-        } else if (address && canRevealParticipantDetails(document, address)) {
-          setRole('signer')
-          saveJourneyIntent('signer')
-          setSharedAck(true)
-        } else if (address) {
-          // Logged in but not a party — still open as read-only viewer
-          setRole(prev => prev ?? 'verifier')
-          setSharedAck(true)
         } else {
-          // Public share link
-          setRole(prev => prev ?? 'verifier')
+          // /d/:slug is the invite path — land on signer flow (connect → sign), not verify.
+          // Unclaimed co-signers may not match canRevealParticipantDetails until they sign.
+          if (sealed && address && !canRevealParticipantDetails(document, address)) {
+            setRole(prev => (prev === 'creator' ? prev : 'verifier'))
+          } else {
+            setRole('signer')
+            saveJourneyIntent('signer')
+          }
           setSharedAck(true)
         }
         // Strip preferSeal from URL after apply (clean shareable /d/ links)
@@ -476,7 +477,7 @@ export function DocumentJourney({
         setPdfHash(hash)
         setPageCount(pages)
         setTitle(prev =>
-          prev.trim()
+          (prev ?? '').trim()
             ? prev
             : clampField(pdfFile.name.replace(/\.pdf$/i, ''), MAX_TITLE_LENGTH),
         )

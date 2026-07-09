@@ -1,11 +1,12 @@
 import './DocumentNotesPanel.css'
 
 interface DocumentNotesPanelProps {
-  notes: string
+  notes: string | null | undefined
   compact?: boolean
 }
 
 export function DocumentNotesPanel({ notes, compact }: DocumentNotesPanelProps) {
+  if (typeof notes !== 'string') return null
   const trimmed = notes.trim()
   if (!trimmed) return null
 

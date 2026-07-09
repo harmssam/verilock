@@ -18,7 +18,9 @@ const PLACEHOLDER_PARTY_NAMES = new Set([
 const PLACEHOLDER_PARTY_NAME_RE =
   /^(invited\s+)?(signer|tenant|landlord)(\s+\d+)?$/i
 
-export function isPlaceholderPartyName(name: string): boolean {
+export function isPlaceholderPartyName(name: string | null | undefined): boolean {
+  // null/undefined: treat as needing a real name (or redacted for public viewers).
+  if (name == null) return true
   const trimmed = name.trim().toLowerCase()
   return (
     !trimmed ||
@@ -27,7 +29,8 @@ export function isPlaceholderPartyName(name: string): boolean {
   )
 }
 
-export function looksLikeAddressLabel(name: string): boolean {
+export function looksLikeAddressLabel(name: string | null | undefined): boolean {
+  if (name == null) return false
   return /^NQ[1-9A-HJ-NP-Z]{2,}…[1-9A-HJ-NP-Z]{4}$/i.test(name.trim())
 }
 
