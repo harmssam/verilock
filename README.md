@@ -28,12 +28,14 @@ npm install --prefix client
 SKIP_CHAIN_VERIFY=true npm run dev
 ```
 
-- **UI:** http://localhost:5174 (Vite dev server)
+- **UI:** http://localhost:5176 (journey SPA — production UI)
 - **API:** http://localhost:3002/api/health
+
+Legacy (pre-journey) UI: `npm run dev:legacy` → http://localhost:5174
 
 ### Try in Nimiq Pay
 
-1. Run `npm run dev` and note the **Network** URL (e.g. `http://192.168.1.42:5174`)
+1. Run `npm run dev` and note the **Network** URL (e.g. `http://192.168.1.42:5176`)
 2. Open **Nimiq Pay** → **Mini Apps** → enter that URL
 3. Connect wallet, upload a PDF, sign, and lock
 
@@ -74,11 +76,11 @@ Do **not** set `SKIP_CHAIN_VERIFY` in production.
 
 ### 4. Build & deploy
 
-Railway reads `railway.toml` automatically:
+Railway reads `railway.toml` automatically. Default build packages the **journey UI** into `client/dist`:
 
 ```toml
 buildCommand = npm install && … && npm run build --prefix client
-startCommand = NODE_ENV=production npm run start --prefix server
+startCommand = node --import tsx src/index.ts
 healthcheckPath = /api/health
 ```
 
@@ -89,12 +91,14 @@ docker build -t verilock .
 docker run -p 3002:3002 -v verilock-data:/data -e DATA_DIR=/data -e NODE_ENV=production verilock
 ```
 
+Production packaging details: [docs/service-b-journey.md](docs/service-b-journey.md).
+
 ### 5. Test production locally
 
 ```bash
 npm run build
 npm run start:prod-local
-# → http://localhost:3003 (API + UI same origin; stop dev server if port conflicts)
+# → http://localhost:3003 (API + journey UI same origin; stop dev server if port conflicts)
 ```
 
 ### 6. Open in Nimiq Pay

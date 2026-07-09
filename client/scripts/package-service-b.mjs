@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Service B packaging: journey SPA → client/dist for Express static serve.
+ * Production packaging: journey SPA → client/dist for Express static serve.
  *
- * Does not run the default production (service A) Vite build.
  * Usage (from client/): node scripts/package-service-b.mjs
- * Or: npm run package:service-b --prefix client
+ * Or: npm run build --prefix client
+ * Alias: npm run package:service-b --prefix client
  */
 import { cpSync, existsSync, mkdirSync, renameSync, rmSync, readFileSync, unlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -22,7 +22,7 @@ function run(cmd, args) {
   }
 }
 
-console.log('[service-b] Building journey SPA (base: /)…')
+console.log('[production] Building journey SPA (base: /)…')
 run('npx', ['tsc', '-b'])
 run('npx', ['vite', 'build', '--config', 'vite.journey.config.ts'])
 
@@ -35,20 +35,20 @@ if (existsSync(journeyHtml)) {
 }
 
 if (!existsSync(indexHtml)) {
-  console.error('[service-b] Missing dist-journey/index.html after journey build')
+  console.error('[production] Missing dist-journey/index.html after journey build')
   process.exit(1)
 }
 
 const html = readFileSync(join(distJourney, 'index.html'), 'utf8')
 if (!html.includes('data-verilock-surface="journey"') && !html.includes('verilock-app" content="journey"')) {
-  console.error('[service-b] Journey index.html missing journey surface markers')
+  console.error('[production] Journey index.html missing journey surface markers')
   process.exit(1)
 }
 
-console.log('[service-b] Installing journey build into client/dist …')
+console.log('[production] Installing journey build into client/dist …')
 rmSync(dist, { recursive: true, force: true })
 mkdirSync(dist, { recursive: true })
 cpSync(distJourney, dist, { recursive: true })
 
-console.log('[service-b] Ready: client/dist/index.html is the journey shell')
-console.log('[service-b] Start server with NODE_ENV=production (same as service A start path)')
+console.log('[production] Ready: client/dist/index.html is the journey shell')
+console.log('[production] Start server with NODE_ENV=production')

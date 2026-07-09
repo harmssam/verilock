@@ -1,3 +1,7 @@
+# Production — journey UI at SPA root.
+# VeriLock-Journey may use config-as-code path /railway.service-b.toml or
+# RAILWAY_DOCKERFILE_PATH=Dockerfile.service-b (same journey packaging).
+
 [build]
 builder = "nixpacks"
 buildCommand = "npm install && npm install --prefix server && npm install --prefix client && npm run build --prefix client"

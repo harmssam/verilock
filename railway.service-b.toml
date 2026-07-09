@@ -1,6 +1,6 @@
-# Service B only — journey UI at SPA root.
-# In Railway service settings → Config-as-code path: /railway.service-b.toml
-# Do not point service A (VeriLock) at this file.
+# Alias of railway.toml (journey UI at SPA root).
+# Existing services may still point config-as-code path here.
+# Prefer /railway.toml for new setup.
 
 [build]
 builder = "DOCKERFILE"

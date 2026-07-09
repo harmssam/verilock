@@ -5,19 +5,21 @@ import type { Connect, Plugin } from 'vite'
 import { defineConfig } from 'vite'
 
 /**
- * Service B — journey UI as the sole SPA root.
+ * Production SPA — journey UI as the sole root.
  *
- * Does NOT replace production vite.config.ts (service A).
+ * Build (default):
+ *   npm run build --prefix client
+ *   → client/dist/index.html  (journey shell)
  *
- * Build:
+ * Intermediate:
  *   npm run build:journey --prefix client
  *   → client/dist-journey/index.html  (base: '/')
  *
- * Package into Express-expected client/dist (service B only):
- *   npm run package:service-b --prefix client
+ * Legacy production App (pre-journey):
+ *   npm run build:legacy --prefix client
  *
  * Dev:
- *   npx vite --config vite.journey.config.ts
+ *   npm run dev --prefix client
  *   → http://localhost:5176/
  */
 function renameHtmlToIndex(): Plugin {

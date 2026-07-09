@@ -4,10 +4,42 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0d112e" />
-    <meta name="robots" content="noindex, nofollow" />
-    <!-- Unique shell marker for service-B packaging verification -->
+    <meta
+      name="description"
+      content="Sign PDF agreements together and permanently anchor document fingerprints on the Nimiq blockchain. Your PDF never leaves your device — verify integrity anytime without a wallet."
+    />
+    <meta
+      name="keywords"
+      content="PDF signing, blockchain document verification, Nimiq, digital signature, document integrity, contract signing, hash anchoring"
+    />
+    <meta name="author" content="VeriLock" />
+    <meta name="robots" content="index, follow" />
+    <meta name="google-site-verification" content="etHLvn8AfLM9WSOfCT4SZS1PWcpcWwN2eCe_3TBNYVA" />
+    <!-- Surface marker for packaging verification -->
     <meta name="verilock-app" content="journey" />
-    <title>VeriLock Journey</title>
+
+    <title>VeriLock — Sign PDFs &amp; Seal Document Hashes on Nimiq</title>
+    <link rel="canonical" href="https://verilock.online/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="VeriLock" />
+    <meta property="og:title" content="VeriLock — Sign PDFs &amp; Seal Document Hashes on Nimiq" />
+    <meta
+      property="og:description"
+      content="Sign PDF agreements together and permanently anchor document fingerprints on the Nimiq blockchain. Your PDF never leaves your device."
+    />
+    <meta property="og:url" content="https://verilock.online/" />
+    <meta property="og:image" content="https://verilock.online/verilock-mark.png" />
+    <meta property="og:locale" content="en_US" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="VeriLock — Sign PDFs &amp; Seal Document Hashes on Nimiq" />
+    <meta
+      name="twitter:description"
+      content="Sign PDF agreements together and permanently anchor document fingerprints on the Nimiq blockchain."
+    />
+    <meta name="twitter:image" content="https://verilock.online/verilock-mark.png" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -15,9 +47,46 @@
       rel="stylesheet"
     />
     <link rel="icon" type="image/png" href="/verilock-mark-96.png" />
+    <link rel="apple-touch-icon" href="/verilock-mark-96.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "VeriLock",
+        "url": "https://verilock.online/",
+        "description": "Sign PDF agreements together and permanently anchor document fingerprints on the Nimiq blockchain. Your PDF never leaves your device.",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web browser",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "description": "Free to sign; one-time Nimiq seal fee to anchor the document hash on-chain"
+        },
+        "featureList": [
+          "Local PDF fingerprinting — files never leave your device",
+          "Multi-party Nimiq wallet signatures",
+          "On-chain document hash sealing",
+          "Public verification without a wallet"
+        ]
+      }
+    </script>
   </head>
   <body data-verilock-surface="journey">
     <div id="root"></div>
+    <noscript>
+      <h1>VeriLock</h1>
+      <p>Sign together. Prove forever.</p>
+      <p>
+        VeriLock lets you sign PDF agreements together and permanently seal document fingerprints on the
+        Nimiq blockchain. Fingerprint your PDF locally, share the signing link, collect wallet signatures,
+        and anchor the final hash on-chain. Anyone can verify a document later by fingerprinting their copy —
+        no wallet required.
+      </p>
+      <p><a href="/pricing">Pricing</a> · <a href="/privacy">Privacy Policy</a></p>
+    </noscript>
     <script type="module" src="/src/experiment/main.tsx"></script>
   </body>
 </html>
