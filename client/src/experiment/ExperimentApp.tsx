@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   isAgreementsPath,
+  isKnownAppPath,
   isPricingPath,
   isPrivacyPath,
   saveHubReturnPath,
@@ -11,6 +12,7 @@ import { PrivacyPolicyPage } from '../PrivacyPolicyPage'
 import { AccountMenu } from './AccountMenu'
 import { AgreementsPage } from './AgreementsPage'
 import { DocumentJourney } from './DocumentJourney'
+import { NotFoundPage } from './NotFoundPage'
 import {
   clearJourneyIntent,
   resolveIntentForConnect,
@@ -23,12 +25,14 @@ import {
 } from './journeyConnectUi'
 import { useJourneyWallet } from './useJourneyWallet'
 
-type ShellScreen = 'journey' | 'pricing' | 'privacy' | 'agreements'
+type ShellScreen = 'journey' | 'pricing' | 'privacy' | 'agreements' | 'not-found'
 
 function screenFromPath(pathname: string): ShellScreen {
   if (isPricingPath(pathname)) return 'pricing'
   if (isPrivacyPath(pathname)) return 'privacy'
   if (isAgreementsPath(pathname)) return 'agreements'
+  // Unknown paths (e.g. /foo) — do not fall through to the path picker as “home”.
+  if (!isKnownAppPath(pathname)) return 'not-found'
   return 'journey'
 }
 
@@ -183,7 +187,10 @@ export function ExperimentApp() {
         </p>
       )}
 
-      {(screen === 'pricing' || screen === 'privacy' || screen === 'agreements') && (
+      {(screen === 'pricing' ||
+        screen === 'privacy' ||
+        screen === 'agreements' ||
+        screen === 'not-found') && (
         <button type="button" className="exp-back-home" onClick={goJourney}>
           ← Back to home
         </button>
@@ -201,6 +208,12 @@ export function ExperimentApp() {
           onCreate={startCreate}
         />
       )}
+      {screen === 'not-found' && (
+        <NotFoundPage
+          path={typeof window !== 'undefined' ? window.location.pathname : null}
+          onHome={goJourney}
+        />
+      )}
       {/* Keep journey mounted so in-progress state survives pricing/privacy/agreements visits */}
       <div hidden={screen !== 'journey'}>
         <DocumentJourney
@@ -208,6 +221,7 @@ export function ExperimentApp() {
           wallet={wallet}
           navEpoch={navEpoch}
           onOpenAgreements={goAgreements}
+          onHome={goJourney}
         />
       </div>
 
