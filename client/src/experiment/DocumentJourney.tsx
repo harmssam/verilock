@@ -49,6 +49,7 @@ import { VerifyMatchesPanel } from '../VerifyMatchesPanel'
 import { DocumentStage } from './DocumentStage'
 import { FeatureRotator } from './FeatureRotator'
 import { JourneyAgreements } from './JourneyAgreements'
+import { NotFoundPage } from './NotFoundPage'
 import {
   clearJourneyIntent,
   resolveJourneyIntent,
@@ -86,6 +87,8 @@ interface DocumentJourneyProps {
   navEpoch?: number
   /** Open full agreements page (header / welcome strip). */
   onOpenAgreements?: () => void
+  /** Return to home (invalid deep link). */
+  onHome?: () => void
 }
 
 type VerifyOutcome =
@@ -127,6 +130,7 @@ export function DocumentJourney({
   wallet,
   navEpoch = 0,
   onOpenAgreements,
+  onHome,
 }: DocumentJourneyProps) {
   const {
     account,
@@ -179,6 +183,8 @@ export function DocumentJourney({
   const [localError, setLocalError] = useState<string | null>(null)
   const [lockMessage, setLockMessage] = useState<string | null>(null)
   const [agreementsRefreshKey, setAgreementsRefreshKey] = useState(0)
+  /** Deep-link /d/ or /v/ slug that does not resolve on the server. */
+  const [missingDeepLink, setMissingDeepLink] = useState<string | null>(null)
   const fileSizeByDocIdRef = useRef<Record<string, number>>({})
 
   const bumpAgreements = useCallback(() => {
@@ -251,12 +257,26 @@ export function DocumentJourney({
       typeof window !== 'undefined' &&
       new URLSearchParams(window.location.search).get('preferSeal') === '1'
 
+    // Leaving deep-link routes clears missing state
+    if (!docSlug && !vSlug) {
+      setMissingDeepLink(null)
+      const intent = resolveJourneyIntent()
+      if (intent) setRole(intent)
+      return
+    }
+
     if (vSlug) {
       let cancelled = false
       void (async () => {
         try {
           const details = await loadVerifyDetails([vSlug], token)
-          if (cancelled || details.length === 0) return
+          if (cancelled) return
+          if (details.length === 0) {
+            setMissingDeepLink(`/v/${vSlug}`)
+            setDoc(null)
+            return
+          }
+          setMissingDeepLink(null)
           setRole('verifier')
           const first = details[0]!
           setVerifyOutcome({
@@ -276,20 +296,22 @@ export function DocumentJourney({
           }
         } catch (err) {
           if (!cancelled) {
-            setLocalError(err instanceof Error ? err.message : 'Could not open verify link')
+            const message = err instanceof Error ? err.message : 'Could not open verify link'
+            if (
+              /not found|404/i.test(message) ||
+              (err as Error & { status?: number }).status === 404
+            ) {
+              setMissingDeepLink(`/v/${vSlug}`)
+              setDoc(null)
+            } else {
+              setLocalError(message)
+            }
           }
         }
       })()
       return () => {
         cancelled = true
       }
-    }
-
-    // Home / agreements with ?intent=creator (from Agreements “New”)
-    if (!docSlug && !vSlug) {
-      const intent = resolveJourneyIntent()
-      if (intent) setRole(intent)
-      return
     }
 
     if (!docSlug) return
@@ -300,6 +322,7 @@ export function DocumentJourney({
         // Pass session when present so names + signature images unlock for parties.
         const { document } = await api.getDocument(docSlug, token)
         if (cancelled) return
+        setMissingDeepLink(null)
         setActiveFromSeal(document)
         setLocalError(null)
         setLockMessage(null)
@@ -337,7 +360,17 @@ export function DocumentJourney({
         }
       } catch (err) {
         if (!cancelled) {
-          setLocalError(err instanceof Error ? err.message : 'Could not open agreement link')
+          const message = err instanceof Error ? err.message : 'Could not open agreement link'
+          if (
+            /not found|404/i.test(message) ||
+            (err as Error & { status?: number }).status === 404
+          ) {
+            setMissingDeepLink(`/d/${docSlug}`)
+            setDoc(null)
+            setLocalError(null)
+          } else {
+            setLocalError(message)
+          }
         }
       }
     })()
@@ -971,6 +1004,26 @@ export function DocumentJourney({
 
   const signFileMatches = Boolean(signHash && doc && signHash === doc.fingerprint)
   const displayError = localError
+
+  if (missingDeepLink) {
+    return (
+      <div className="journey">
+        <NotFoundPage
+          title="Agreement not found"
+          message="This invite or verify link is not valid. The agreement may have been cancelled, or the URL may be incomplete."
+          path={missingDeepLink}
+          onHome={() => {
+            setMissingDeepLink(null)
+            setRole(null)
+            clearJourneyIntent()
+            syncIntentToUrl(null)
+            if (onHome) onHome()
+            else window.history.pushState({}, '', '/')
+          }}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="journey">

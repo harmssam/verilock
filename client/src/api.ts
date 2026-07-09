@@ -4,9 +4,16 @@ const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, options)
-  const data = await res.json()
+  let data: unknown = null
+  try {
+    data = await res.json()
+  } catch {
+    data = null
+  }
   if (!res.ok) {
-    const message = (data as { error?: string }).error ?? `Request failed (${res.status})`
+    const message =
+      (data as { error?: string } | null)?.error ??
+      (res.status === 404 ? 'Document not found' : `Request failed (${res.status})`)
     if (
       path.includes('prepare-lock') ||
       path.includes('begin-lock') ||
@@ -15,7 +22,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ) {
       console.error('[verilock] api:error', { path, status: res.status, message, data })
     }
-    throw new Error(message)
+    const err = new Error(message) as Error & { status?: number }
+    err.status = res.status
+    throw err
   }
   return data as T
 }
