@@ -4,13 +4,15 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "vite --config vite.journey.config.ts",
+    "dev:legacy": "vite",
+    "build": "node scripts/package-service-b.mjs",
     "build:journey": "tsc -b && vite build --config vite.journey.config.ts",
+    "build:legacy": "tsc -b && vite build",
     "package:service-b": "node scripts/package-service-b.mjs",
     "test:service-b": "node scripts/verify-journey-service-b.mjs",
-    "preview": "vite preview",
-    "preview:journey": "vite preview --config vite.journey.config.ts"
+    "preview": "vite preview --config vite.journey.config.ts",
+    "preview:legacy": "vite preview"
   },
   "dependencies": {
     "@nimiq/hub-api": "1.14.0",

@@ -1,6 +1,6 @@
 # VeriLock UI experiment - Document Journey
 
-Parallel prototype. **Production files stay untouched.**
+**This is production UI.** Served at `/` via default `npm run build` (journey packaging).
 
 ## Concept (v2)
 
@@ -41,15 +41,12 @@ client/src/experiment/
   README.md
 ```
 
-## Promote later
-
-Wire real wallet/API into `DocumentJourney` + replace production home/create split with this model.
-
-## Service B packaging (journey as `/`)
+## Production packaging (journey as `/`)
 
 See [docs/service-b-journey.md](../../../docs/service-b-journey.md).
 
 ```bash
-npm run package:service-b --prefix client   # journey → client/dist
-npm run build --prefix client               # production App → client/dist (service A)
+npm run build --prefix client               # journey → client/dist (default)
+npm run build:legacy --prefix client        # pre-journey App → client/dist
+npm run dev --prefix client                 # journey at http://localhost:5176
 ```

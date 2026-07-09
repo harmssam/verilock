@@ -1,3 +1,7 @@
+# Production — journey UI as SPA root (same server + client/dist).
+# VeriLock-Journey on Railway may still set RAILWAY_DOCKERFILE_PATH=Dockerfile.service-b
+# (identical packaging). Prefer this Dockerfile for new deploys.
+
 FROM node:22-bookworm-slim AS build
 
 WORKDIR /app
@@ -10,6 +14,7 @@ RUN npm ci --prefix client && npm ci --prefix server
 COPY client ./client
 COPY server ./server
 
+# Journey packaging → client/dist
 RUN npm run build --prefix client
 
 FROM node:22-bookworm-slim
