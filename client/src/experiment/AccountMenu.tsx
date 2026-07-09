@@ -1,12 +1,15 @@
 import { Check, ChevronDown, Copy, LogOut, Wallet } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { formatDisplayAddress } from '../addresses'
+import { journeyConnectLabels, type JourneyConnectMode } from './journeyConnectUi'
 import type { JourneyAccount } from './types'
 
 interface AccountMenuProps {
   account: JourneyAccount | null
   connecting: boolean
   walletStatus?: string | null
+  /** Resolved single-button connect mode (desktop Hub / mobile Pay / fallback). */
+  connectMode?: JourneyConnectMode
   onConnect: () => void
   onDisconnect: () => void
 }
@@ -15,6 +18,7 @@ export function AccountMenu({
   account,
   connecting,
   walletStatus,
+  connectMode = 'hub',
   onConnect,
   onDisconnect,
 }: AccountMenuProps) {
@@ -48,7 +52,9 @@ export function AccountMenu({
         title={walletStatus ?? undefined}
       >
         <Wallet size={16} strokeWidth={2.25} aria-hidden />
-        {connecting ? 'Connecting…' : 'Connect wallet'}
+        {connecting
+          ? journeyConnectLabels(connectMode).busy
+          : journeyConnectLabels(connectMode).idle}
       </button>
     )
   }

@@ -48,8 +48,9 @@ function serveJourneyAsRoot(): Plugin {
     const pathOnly = raw.split('?')[0] ?? '/'
     const search = raw.includes('?') ? raw.slice(raw.indexOf('?')) : ''
 
-    // Never rewrite Vite internals, source, node_modules, or files with extensions
+    // Never rewrite API (proxied to server), Vite internals, source, or assets
     if (
+      pathOnly.startsWith('/api') ||
       pathOnly.startsWith('/@') ||
       pathOnly.startsWith('/src/') ||
       pathOnly.startsWith('/node_modules/') ||
@@ -79,6 +80,7 @@ function serveJourneyAsRoot(): Plugin {
         const pathOnly = raw.split('?')[0] ?? '/'
         const search = raw.includes('?') ? raw.slice(raw.indexOf('?')) : ''
         if (
+          pathOnly.startsWith('/api') ||
           pathOnly.startsWith('/assets/') ||
           pathOnly === '/favicon.ico' ||
           /\.[a-zA-Z0-9]+$/.test(pathOnly)
