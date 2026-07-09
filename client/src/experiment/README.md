@@ -1,33 +1,29 @@
-# VeriLock UI experiment
+# VeriLock UI experiment — Document Journey
 
-Parallel interactive workflow prototype. **Production files are untouched.**
+Parallel prototype. **Production files stay untouched.**
+
+## Concept (v2)
+
+Not a thinner clone of the production step list.
+
+| Idea | What you get |
+|------|----------------|
+| **Path-first** | Create / Invited / Verify — pick intent, then a focused action dock |
+| **Document stage** | Visual PDF card that gains fingerprint, signatures, and a seal stamp |
+| **One action at a time** | Controls live in the dock; stage rail shows progress |
+| **Account chrome** | Connect pill, full address, copy, disconnect / log out |
+| **Privacy always on** | Expandable trust bar + per-step privacy note |
+| **How it works** | Collapsible 6-beat story with privacy lines |
+| **Drag & drop** | Hero PDF drop zones; multi-file hooks reserved |
 
 ## Run
 
-From `client/`:
-
 ```bash
-npx vite --config vite.experiment.config.ts
+cd client
+./node_modules/.bin/vite --config vite.experiment.config.ts
 ```
 
-Opens **http://localhost:5175/experiment.html** (port **5175** so it won’t clash with the main app on 5174).
-
-Build (optional):
-
-```bash
-npx vite build --config vite.experiment.config.ts
-# → client/dist-experiment/
-```
-
-## What’s new
-
-| Idea | Implementation |
-|------|----------------|
-| Steps 1–6 are self-contained | Expandable timeline; each step embeds its actions (connect, PDF drop, share, sign, seal, verify) |
-| Less static | Subtle expand/collapse, drop-zone highlight, step progress states |
-| Drag and drop | `PdfDropZone` — PDF-first; `multiple` / `onFiles` ready for multi-file later |
-
-Demo state only (no real wallet/API).
+Open **http://localhost:5175/experiment.html**
 
 ## Files
 
@@ -36,19 +32,15 @@ client/experiment.html
 client/vite.experiment.config.ts
 client/src/experiment/
   main.tsx
-  ExperimentApp.tsx
-  ExperimentApp.css
-  InteractiveWorkflow.tsx
-  InteractiveWorkflow.css
+  ExperimentApp.tsx|css
+  DocumentJourney.tsx      # main flow
+  DocumentStage.tsx        # visual document metaphor
+  AccountMenu.tsx
   PdfDropZone.tsx
   types.ts
   README.md
 ```
 
-## Promote to production later
+## Promote later
 
-1. Port `InteractiveWorkflow` + `PdfDropZone` into the main app (replace `WorkflowGuide` home view + create tab split).
-2. Wire real `connectNimiq`, `api.createDocument`, hash PDF, seal flow, etc.
-3. Delete or keep this entry as a playground.
-
-No changes to `App.tsx`, `WorkflowGuide.tsx`, or `vite.config.ts` are required for this sandbox.
+Wire real wallet/API into `DocumentJourney` + replace production home/create split with this model.

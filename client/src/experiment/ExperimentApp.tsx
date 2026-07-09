@@ -1,6 +1,23 @@
-import { InteractiveWorkflow } from './InteractiveWorkflow'
+import { useState } from 'react'
+import { AccountMenu } from './AccountMenu'
+import { DocumentJourney } from './DocumentJourney'
+import { demoAddress, type DemoAccount } from './types'
 
 export function ExperimentApp() {
+  const [account, setAccount] = useState<DemoAccount | null>(null)
+  const [connecting, setConnecting] = useState(false)
+
+  const connect = async () => {
+    setConnecting(true)
+    await new Promise(r => setTimeout(r, 750))
+    setAccount(demoAddress())
+    setConnecting(false)
+  }
+
+  const disconnect = () => {
+    setAccount(null)
+  }
+
   return (
     <div className="exp-app">
       <header className="exp-header">
@@ -14,24 +31,39 @@ export function ExperimentApp() {
           />
           <div className="exp-brand-text">
             <h1>VeriLock</h1>
-            <p>Experiment · interactive workflow</p>
+            <p>Journey experiment</p>
           </div>
         </div>
-        <a className="exp-back" href="/">
-          ← Production app
-        </a>
+
+        <div className="exp-header-actions">
+          <a className="exp-back" href="/">
+            Production
+          </a>
+          <AccountMenu
+            account={account}
+            connecting={connecting}
+            onConnect={() => void connect()}
+            onDisconnect={disconnect}
+          />
+        </div>
       </header>
 
       <p className="exp-banner" role="note">
-        Sandbox UI only — not wired to wallet or API. Safe to click through.
+        <strong>Sandbox</strong> — demo wallet &amp; local state only. UI playground, not the live
+        app.
       </p>
 
-      <InteractiveWorkflow />
+      <DocumentJourney
+        account={account}
+        connecting={connecting}
+        onConnect={() => void connect()}
+        onDisconnect={disconnect}
+      />
 
       <footer className="exp-footer">
         <p className="muted">
-          Parallel entry: <code>experiment.html</code> · styles live under{' '}
-          <code>src/experiment/</code>
+          Experiment entry <code>experiment.html</code> · promote later by wiring real APIs into{' '}
+          <code>DocumentJourney</code>
         </p>
       </footer>
     </div>
