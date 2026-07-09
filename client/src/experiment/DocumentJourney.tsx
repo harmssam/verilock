@@ -831,7 +831,14 @@ export function DocumentJourney({
       setSigPadKey(k => k + 1)
       bumpAgreements()
       if (document.signingProgress.readyToLock) {
-        setLockMessage('All signatures collected - continue to seal.')
+        // Only the creator seals — co-signers should not be told to continue to seal.
+        if (isDocumentCreator(document, address)) {
+          setLockMessage('All signatures collected — continue to seal.')
+        } else {
+          setLockMessage(
+            'All signatures are in. The creator can seal this agreement on the Nimiq blockchain.',
+          )
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign failed'
@@ -1582,7 +1589,9 @@ export function DocumentJourney({
                       {allSigned(doc) ? (
                         <div className="result-banner result-banner--ok">
                           <Check size={18} strokeWidth={2.5} />
-                          All parties signed - continue to seal
+                          {role === 'creator'
+                            ? 'All parties signed — continue to seal'
+                            : 'All parties have signed. The creator can seal this on Nimiq.'}
                         </div>
                       ) : (
                         <>
@@ -1820,9 +1829,10 @@ export function DocumentJourney({
                             </>
                           ) : role === 'signer' ? (
                             <>
-                              Waiting for remaining signers
-                              {allSigned(doc) ? ' and the on-chain seal' : ''}. Keep{' '}
-                              <em>{doc.fileName}</em> — you can verify anytime after sealing.
+                              {allSigned(doc) || doc.readyToLock
+                                ? 'Your signature is recorded. The creator can seal the fingerprint on Nimiq when ready.'
+                                : 'Waiting for remaining signers. Keep your PDF — you can verify anytime after sealing.'}{' '}
+                              <em>{doc.fileName}</em>
                             </>
                           ) : (
                             <>
