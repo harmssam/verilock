@@ -663,5 +663,14 @@ export function deleteDocument(idOrSlug: string, requesterAddress: string): void
   if (doc.status === 'locking') {
     throw new Error('Agreements being sealed cannot be deleted')
   }
+  // Only cancel before anyone has signed — protects partial multi-party work.
+  const signatures = getSignaturesForDocument(doc.id)
+  if (signatures.length > 0) {
+    throw new Error('Cannot cancel after a signature has been recorded')
+  }
+  const parties = getPartiesForDocument(doc.id)
+  if (parties.some(p => p.status === 'signed')) {
+    throw new Error('Cannot cancel after a signature has been recorded')
+  }
   deleteDocumentById(doc.id)
 }

@@ -56,12 +56,21 @@ export function canRevealParticipantDetails(
   return false
 }
 
+/**
+ * Creator may cancel only before anyone has signed (and never once sealing/sealed).
+ */
 export function canDeleteDocument(
-  doc: Pick<SealDocument, 'status' | 'creatorAddress'>,
+  doc: Pick<SealDocument, 'status' | 'creatorAddress' | 'signatures' | 'parties'> & {
+    signingProgress?: SealDocument['signingProgress']
+  },
   address: string | null,
 ): boolean {
   if (!address || !isDocumentCreator(doc, address)) return false
-  return doc.status !== 'locked' && doc.status !== 'locking'
+  if (doc.status === 'locked' || doc.status === 'locking') return false
+  if (doc.signatures.length > 0) return false
+  if (doc.parties.some(p => p.status === 'signed')) return false
+  if (doc.signingProgress && doc.signingProgress.signed > 0) return false
+  return true
 }
 
 export function isCollectingSignatures(doc: SealDocument): boolean {

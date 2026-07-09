@@ -8,13 +8,18 @@ import {
   RotateCcw,
   Shield,
   ShieldCheck,
+  Trash2,
   Upload,
   Users,
   Wallet,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { normalizeAddress } from '../addresses'
-import { canRevealParticipantDetails, isDocumentCreator } from '../agreements'
+import {
+  canDeleteDocument,
+  canRevealParticipantDetails,
+  isDocumentCreator,
+} from '../agreements'
 import { api } from '../api'
 import { SignaturesPanel } from '../SignaturesPanel'
 import { FEATURES } from '../features'
@@ -405,6 +410,7 @@ export function DocumentJourney({
   const revealParticipantPrivate = Boolean(
     doc && canRevealParticipantDetails(doc.source, address),
   )
+  const canCancelCurrent = Boolean(doc && canDeleteDocument(doc.source, address))
 
   const activeStage =
     pathStages.find(s => s.id === step) ??
@@ -716,6 +722,36 @@ export function DocumentJourney({
       setSignHash(pdfHash)
     }
     setSharedAck(true)
+  }
+
+  /** Creator-only: cancel before anyone has signed. */
+  const cancelCurrentAgreement = async () => {
+    if (!token || !doc || !canDeleteDocument(doc.source, address)) return
+    const ok = window.confirm(
+      `Cancel “${doc.title}”? This removes the agreement permanently. Only possible before anyone signs.`,
+    )
+    if (!ok) return
+    setBusy(true)
+    setLocalError(null)
+    try {
+      await api.deleteDocument(token, doc.id)
+      setDoc(null)
+      setSharedAck(false)
+      setSignFile(null)
+      setSignHash(null)
+      setPdfFile(null)
+      setPdfHash(null)
+      setRole(null)
+      clearJourneyIntent()
+      syncIntentToUrl(null)
+      bumpAgreements()
+      window.history.pushState({}, '', '/')
+      setLockMessage(null)
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Could not cancel agreement')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const signAsCurrentUser = async () => {
@@ -1404,9 +1440,29 @@ export function DocumentJourney({
                   >
                     I&apos;ve shared — continue to sign
                   </button>
+                  {canCancelCurrent && (
+                    <button
+                      type="button"
+                      className={`btn btn-ghost${busy ? ' btn--busy' : ''}`}
+                      disabled={busy}
+                      onClick={() => void cancelCurrentAgreement()}
+                    >
+                      {busy ? (
+                        <>
+                          <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
+                          Cancelling…
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 size={16} strokeWidth={2.25} aria-hidden />
+                          Cancel agreement
+                        </>
+                      )}
+                    </button>
+                  )}
                   <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
                     Copying the link keeps you here so you can share the PDF next. Continue when
-                    you are ready to sign as the creator.
+                    you are ready to sign as the creator. You can cancel until someone signs.
                   </p>
                 </div>
               )}
@@ -1456,6 +1512,18 @@ export function DocumentJourney({
                       </div>
 
                       <PartyList doc={doc} revealNames={revealParticipantPrivate} />
+
+                      {canCancelCurrent && role === 'creator' && (
+                        <button
+                          type="button"
+                          className={`btn btn-ghost${busy ? ' btn--busy' : ''}`}
+                          disabled={busy}
+                          onClick={() => void cancelCurrentAgreement()}
+                        >
+                          <Trash2 size={16} strokeWidth={2.25} aria-hidden />
+                          Cancel agreement
+                        </button>
+                      )}
 
                       {allSigned(doc) ? (
                         <div className="result-banner result-banner--ok">

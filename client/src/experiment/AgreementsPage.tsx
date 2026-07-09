@@ -4,6 +4,7 @@ import {
   Lock,
   PenLine,
   Files,
+  Trash2,
   Wallet,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -11,6 +12,7 @@ import { shortAddress } from '../addresses'
 import {
   BUCKET_LABELS,
   BUCKET_ORDER,
+  canDeleteDocument,
   countActionable,
   getAgreementView,
   groupAgreements,
@@ -54,6 +56,7 @@ export function AgreementsPage({
   const [documents, setDocuments] = useState<SealDocument[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!token) {
@@ -78,6 +81,24 @@ export function AgreementsPage({
   useEffect(() => {
     void load()
   }, [load])
+
+  const cancelAgreement = async (doc: SealDocument) => {
+    if (!token || !canDeleteDocument(doc, address)) return
+    const ok = window.confirm(
+      `Cancel “${doc.title}”? This removes the agreement permanently. Only possible before anyone signs.`,
+    )
+    if (!ok) return
+    setCancellingId(doc.id)
+    setError(null)
+    try {
+      await api.deleteDocument(token, doc.id)
+      setDocuments(prev => prev.filter(d => d.id !== doc.id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not cancel agreement')
+    } finally {
+      setCancellingId(null)
+    }
+  }
 
   const groups = useMemo(() => groupAgreements(documents, address), [documents, address])
   const actionable = useMemo(() => countActionable(documents, address), [documents, address])
@@ -204,6 +225,8 @@ export function AgreementsPage({
                 const view = getAgreementView(doc, address)
                 const creator = isDocumentCreator(doc, address)
                 const preferSeal = view.cta === 'Seal now' && creator
+                const canCancel = canDeleteDocument(doc, address)
+                const cancelling = cancellingId === doc.id
                 return (
                   <li
                     key={doc.id}
@@ -232,25 +255,52 @@ export function AgreementsPage({
                       </span>
                       <span className="agreements-page-headline">{view.headline}</span>
                     </button>
-                    <button
-                      type="button"
-                      className={`btn ${preferSeal ? 'btn-primary' : 'btn-secondary'} agreements-page-cta`}
-                      onClick={() => onOpen(doc, preferSeal)}
-                    >
-                      {preferSeal ? (
-                        <>
-                          <Lock size={15} strokeWidth={2.25} aria-hidden />
-                          Seal now
-                        </>
-                      ) : view.cta === 'Sign now' ? (
-                        <>
-                          <PenLine size={15} strokeWidth={2.25} aria-hidden />
-                          Sign now
-                        </>
-                      ) : (
-                        view.cta
+                    <div className="agreements-page-actions">
+                      <button
+                        type="button"
+                        className={`btn ${preferSeal ? 'btn-primary' : 'btn-secondary'} agreements-page-cta`}
+                        onClick={() => onOpen(doc, preferSeal)}
+                      >
+                        {preferSeal ? (
+                          <>
+                            <Lock size={15} strokeWidth={2.25} aria-hidden />
+                            Seal now
+                          </>
+                        ) : view.cta === 'Sign now' ? (
+                          <>
+                            <PenLine size={15} strokeWidth={2.25} aria-hidden />
+                            Sign now
+                          </>
+                        ) : (
+                          view.cta
+                        )}
+                      </button>
+                      {canCancel && (
+                        <button
+                          type="button"
+                          className={`btn btn-ghost agreements-page-cancel${cancelling ? ' btn--busy' : ''}`}
+                          disabled={Boolean(cancellingId)}
+                          onClick={() => void cancelAgreement(doc)}
+                        >
+                          {cancelling ? (
+                            <>
+                              <LoaderCircle
+                                className="btn-spinner"
+                                size={15}
+                                strokeWidth={2.5}
+                                aria-hidden
+                              />
+                              Cancelling…
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 size={15} strokeWidth={2.25} aria-hidden />
+                              Cancel
+                            </>
+                          )}
+                        </button>
                       )}
-                    </button>
+                    </div>
                   </li>
                 )
               })}
