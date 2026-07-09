@@ -1262,6 +1262,15 @@
   padding: 1.1rem 1.15rem 1.2rem;
 }
 
+/* Alerts between dock header border and body (e.g. duplicate fingerprint warning) */
+.action-dock > .result-banner {
+  margin: 0.85rem 1.15rem 0;
+}
+
+.action-dock > .result-banner + .action-dock-body {
+  padding-top: 0.85rem;
+}
+
 .action-stack {
   display: flex;
   flex-direction: column;
