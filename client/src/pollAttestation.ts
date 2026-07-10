@@ -2,7 +2,8 @@ import { api } from './api'
 import type { AttestationStatus } from './types'
 
 const DEFAULT_INTERVAL_MS = 3_000
-const DEFAULT_TIMEOUT_MS = 120_000
+/** Align with server poller window (see attestations.ts POLL_TIMEOUT_MS). */
+const DEFAULT_TIMEOUT_MS = 180_000
 
 export interface PollAttestationOptions {
   token: string

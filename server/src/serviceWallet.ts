@@ -12,6 +12,7 @@ import {
   buildAttestationPayloadBytes,
   getBlockNumber,
   getBroadcastClientForService,
+  waitForTransactionVisible,
 } from './nimiq-rpc.js'
 
 const MAX_PROOF_LUNA = 2
@@ -92,13 +93,28 @@ export async function broadcastCreditSealProof(input: {
   tx.sign(keyPair, undefined)
 
   const hex = tx.toHex()
+  const expectedHash = normalizeTxHashFromCore(tx.hash())
   console.log('[credits] service wallet broadcasting proof', {
     documentId: input.documentId,
     sender: senderAddress,
     valueLuna,
+    expectedHash: expectedHash.slice(0, 16),
   })
   const txHash = await broadcastRawTransaction(hex)
+
+  // Ensure the public RPC can see the proof before we create a pending attestation.
+  const visible = await waitForTransactionVisible(txHash, 60_000, 2_000)
+  if (!visible) {
+    throw new Error(
+      `Credit seal proof was broadcast (tx ${txHash.slice(0, 12)}…) but is not visible on the Nimiq network yet. Wait a moment and retry seal.`,
+    )
+  }
+
   return { txHash, senderAddress }
+}
+
+function normalizeTxHashFromCore(hash: string): string {
+  return hash.replace(/^0x/i, '').toLowerCase()
 }
 
 /** Prefer getBlockNumber from RPC module if client height fails. */

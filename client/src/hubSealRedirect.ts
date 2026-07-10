@@ -73,7 +73,9 @@ function lockContextFromRequest(
 function lockContextFromSealInFlight(): { token: string; docId: string; hubBroadcast: boolean } | null {
   const seal = loadSealInFlight()
   if (!seal) return null
-  return { token: seal.token, docId: seal.docId, hubBroadcast: false }
+  // Lock seals use Hub checkout (broadcasts). Prefer hubBroadcast:true so we wait
+  // for network visibility before falling back to rebroadcast.
+  return { token: seal.token, docId: seal.docId, hubBroadcast: true }
 }
 
 function completeLockRedirect(

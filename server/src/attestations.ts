@@ -27,11 +27,14 @@ import { getServiceWalletAddress } from './serviceWallet.js'
 
 const SKIP_CHAIN_VERIFY = process.env.SKIP_CHAIN_VERIFY === 'true'
 const POLL_INTERVAL_MS = 5_000
-const POLL_TIMEOUT_MS = 120_000
-const NOT_FOUND_FAIL_AFTER_MS = 45_000
+const POLL_TIMEOUT_MS = 180_000
+/** Give Hub/client broadcasts more time — Albatross can lag public RPC briefly. */
+const NOT_FOUND_FAIL_AFTER_MS = 90_000
 
-const TX_NOT_ON_CHAIN_MESSAGE =
+const TX_NOT_ON_CHAIN_MESSAGE_HUB =
   'Seal transaction was not found on the Nimiq blockchain. Tap Retry seal to sign again in Hub.'
+const TX_NOT_ON_CHAIN_MESSAGE_CREDIT =
+  'Credit seal proof was not found on the Nimiq blockchain yet. Tap Retry seal — your credit is returned if the proof never lands.'
 
 export type AttestationResult =
   | { status: 'confirmed'; txHash: string; blockNumber?: number; payload: string }
@@ -221,7 +224,16 @@ export async function resolveAttestation(txHash: string): Promise<AttestationRes
     const message = err instanceof Error ? err.message : String(err)
     if (isPendingError(message)) {
       if (isTransactionNotFoundError(message) && Date.now() - att.createdAt > NOT_FOUND_FAIL_AFTER_MS) {
-        return markAttestationFailed(txHash, TX_NOT_ON_CHAIN_MESSAGE)
+        const creditRes = getCreditReservation(att.documentId)
+        const isCredit =
+          creditRes &&
+          (creditRes.status === 'held' ||
+            creditRes.status === 'captured' ||
+            creditRes.serviceTxHash === att.txHash)
+        return markAttestationFailed(
+          txHash,
+          isCredit ? TX_NOT_ON_CHAIN_MESSAGE_CREDIT : TX_NOT_ON_CHAIN_MESSAGE_HUB,
+        )
       }
       return { status: 'pending', txHash, message }
     }
