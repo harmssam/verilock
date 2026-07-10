@@ -4,6 +4,97 @@
   line-height: 1.55;
 }
 
+.price-page-lead strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Credit-first pricing model (1 seal = 1 credit) */
+.price-page-model {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.95rem 1.05rem;
+  border-radius: var(--radius-sm, 12px);
+  border: 1px solid rgba(94, 234, 212, 0.25);
+  background: rgba(94, 234, 212, 0.06);
+}
+
+.price-page-model-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.price-page-model-row + .price-page-model-row {
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(94, 234, 212, 0.16);
+}
+
+.price-page-model-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.price-page-model-primary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.55rem;
+}
+
+.price-page-model-credits {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--mint);
+  letter-spacing: -0.02em;
+}
+
+.price-page-model-per {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.price-page-model-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.price-page-model-promo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.15rem;
+}
+
+.price-page-model-promo-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--gradient-warm);
+  color: #0d112e;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.price-page-model-promo-note {
+  font-size: 0.8rem;
+}
+
+.price-page-model-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .price-page-credits {
   margin-top: 1.35rem;
   display: flex;

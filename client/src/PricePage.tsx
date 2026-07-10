@@ -3,8 +3,9 @@ import { Coins, ExternalLink } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from './api'
 import { NimiqHexagonIcon } from './NimiqHexagonIcon'
+import { SealFeeAmount } from './SealFeeAmount'
 import { SealPricingDisplay } from './SealPricingDisplay'
-import { formatSealFeeNim, getSealPricing } from './sealPricing'
+import { getSealPricing } from './sealPricing'
 import { CreditsPanel } from './experiment/CreditsPanel'
 import {
   journeyLoginEntryLabels,
@@ -14,12 +15,11 @@ import { LoginSheet } from './experiment/LoginSheet'
 import './PricePage.css'
 
 const NIMIQ_URL = 'https://www.nimiq.com'
+const FASTSPOT_URL = 'https://www.fastspot.io/'
 
 interface CreditsPublicInfo {
   enabled: boolean
   stripeMarkup: number
-  creditNimCost: number
-  promoActive: boolean
 }
 
 export interface PricePageProps {
@@ -43,7 +43,7 @@ export function PricePage({
   onConnect,
   onCreditsPurchased,
 }: PricePageProps = {}) {
-  const basePricing = getSealPricing()
+  const pricing = getSealPricing()
   const [creditsInfo, setCreditsInfo] = useState<CreditsPublicInfo | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -54,37 +54,73 @@ export function PricePage({
         setCreditsInfo({
           enabled: cfg.enabled,
           stripeMarkup: cfg.stripeMarkup,
-          creditNimCost: basePricing.feeNim,
-          promoActive: basePricing.promoActive,
         })
       } catch {
         if (!cancelled) {
-          setCreditsInfo({
-            enabled: true,
-            stripeMarkup: 2,
-            creditNimCost: basePricing.feeNim,
-            promoActive: basePricing.promoActive,
-          })
+          setCreditsInfo({ enabled: true, stripeMarkup: 2 })
         }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [basePricing.feeNim, basePricing.promoActive])
+  }, [])
 
   const signedIn = Boolean(token && address)
+  const creditsEnabled = creditsInfo?.enabled !== false
 
   return (
     <div className="card price-page">
       <h2>Pricing</h2>
       <p className="muted price-page-lead">
-        One flat fee seals a document fingerprint on Nimiq. Pay with NIM when you seal, or buy prepaid
-        credits. Your PDF never leaves your device.
+        Signing and verifying are free. Sealing costs <strong>1 credit</strong> — buy packs ahead of
+        time, or pay the current credit value in NIM when you seal.
       </p>
-      <SealPricingDisplay />
 
-      {creditsInfo?.enabled !== false && (
+      {creditsEnabled ? (
+        <div className="price-page-model" aria-labelledby="price-model-heading">
+          <div className="price-page-model-row">
+            <span className="price-page-model-label" id="price-model-heading">
+              Seal cost
+            </span>
+            <div className="price-page-model-primary">
+              <span className="price-page-model-credits">1 credit</span>
+              <span className="price-page-model-per">per document</span>
+            </div>
+          </div>
+
+          <div className="price-page-model-row">
+            <span className="price-page-model-label">1 credit is currently worth</span>
+            <div className="price-page-model-value">
+              <SealFeeAmount
+                feeNim={pricing.feeNim}
+                baseFeeNim={pricing.baseFeeNim}
+                showWas={pricing.promoActive}
+                showFiatPicker
+              />
+            </div>
+            {pricing.promoActive && (
+              <div className="price-page-model-promo">
+                <span className="price-page-model-promo-badge">{pricing.promoLabel}</span>
+                {pricing.promoEndsLabel && (
+                  <span className="muted price-page-model-promo-note">{pricing.promoEndsLabel}</span>
+                )}
+              </div>
+            )}
+            <p className="muted price-page-model-hint">
+              Same amount whether you spend a credit or pay with NIM at seal time. Fiat estimates from{' '}
+              <a href={FASTSPOT_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
+                Fastspot
+              </a>
+              .
+            </p>
+          </div>
+        </div>
+      ) : (
+        <SealPricingDisplay showNote={false} />
+      )}
+
+      {creditsEnabled && (
         <section className="price-page-credits" id="buy-credits" aria-labelledby="price-credits-heading">
           <div className="price-page-credits-intro">
             <h3 id="price-credits-heading" className="price-page-credits-title">
@@ -92,10 +128,11 @@ export function PricePage({
               Buy credits
             </h3>
             <p className="muted price-page-credits-lead">
-              1 credit = 1 seal · NIM {formatSealFeeNim(creditsInfo?.creditNimCost ?? basePricing.feeNim)}
-              each
-              {creditsInfo?.promoActive ? ' (promo)' : ''} · Card ~{creditsInfo?.stripeMarkup ?? 2}× in
-              USD
+              Prepaid packs (10–100). Pay with NIM or card
+              {creditsInfo?.stripeMarkup != null && creditsInfo.stripeMarkup > 1
+                ? ` (card ≈${creditsInfo.stripeMarkup}× in USD)`
+                : ''}
+              .
             </p>
           </div>
 
@@ -149,8 +186,8 @@ export function PricePage({
             the browser or Nimiq Pay.
           </li>
           <li>
-            <strong>Cheap permanent proof</strong> - Network costs stay low, so a one-time seal fee can
-            anchor a document fingerprint without enterprise blockchain pricing.
+            <strong>Cheap permanent proof</strong> - Network costs stay low, so one credit can anchor a
+            document fingerprint without enterprise blockchain pricing.
           </li>
           <li>
             <strong>Your PDF never leaves your device</strong> - Only a SHA-256 fingerprint is written
