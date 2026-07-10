@@ -168,7 +168,7 @@ export function ExperimentApp() {
 
   return (
     <div className="exp-app">
-      <header className="exp-header">
+      <header className={`exp-header${wallet.account ? ' exp-header--connected' : ''}`}>
         <button type="button" className="exp-brand" onClick={goJourney} aria-label="VeriLock home">
           <img
             className="exp-brand-mark"
@@ -187,7 +187,7 @@ export function ExperimentApp() {
           {wallet.account && (
             <button
               type="button"
-              className={`exp-pricing-link${screen === 'agreements' ? ' exp-pricing-link--active' : ''}`}
+              className={`exp-pricing-link exp-nav-link${screen === 'agreements' ? ' exp-pricing-link--active' : ''}`}
               onClick={screen === 'agreements' ? goJourney : goAgreements}
             >
               Agreements
@@ -195,7 +195,7 @@ export function ExperimentApp() {
           )}
           <button
             type="button"
-            className={`exp-pricing-link${screen === 'pricing' ? ' exp-pricing-link--active' : ''}`}
+            className={`exp-pricing-link exp-nav-link${screen === 'pricing' ? ' exp-pricing-link--active' : ''}`}
             onClick={screen === 'pricing' ? goJourney : goPricing}
           >
             Pricing

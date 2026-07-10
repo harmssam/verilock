@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Coins, Copy, Files, LogOut, Wallet } from 'lucide-react'
+import { Check, ChevronDown, Coins, Copy, Files, LogOut, Tag, Wallet } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { formatDisplayAddress } from '../addresses'
 import { journeyConnectLabels, type JourneyConnectMode } from './journeyConnectUi'
@@ -103,18 +103,24 @@ export function AccountMenu({
               <span className="exp-account-menu-label">Connected</span>
               <code className="exp-account-menu-full">{formatDisplayAddress(account.address)}</code>
             </div>
-            {showCredits && (
+            {onCredits && (
               <button
                 type="button"
                 className="exp-account-item"
                 role="menuitem"
                 onClick={() => {
                   setOpen(false)
-                  onCredits?.()
+                  onCredits()
                 }}
               >
-                <Coins size={15} strokeWidth={2.25} />
-                {creditBalance} credit{creditBalance === 1 ? '' : 's'} — buy more
+                {showCredits ? (
+                  <Coins size={15} strokeWidth={2.25} />
+                ) : (
+                  <Tag size={15} strokeWidth={2.25} />
+                )}
+                {showCredits
+                  ? `${creditBalance} credit${creditBalance === 1 ? '' : 's'} — buy more`
+                  : 'Pricing'}
               </button>
             )}
             {onAgreements && (

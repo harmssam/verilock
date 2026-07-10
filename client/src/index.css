@@ -58,7 +58,14 @@ body {
     radial-gradient(ellipse 60% 40% at 90% 10%, rgba(94, 234, 212, 0.16), transparent 50%),
     radial-gradient(ellipse 50% 35% at 50% 100%, rgba(20, 184, 166, 0.1), transparent 55%),
     linear-gradient(180deg, var(--bg-mid) 0%, var(--bg-deep) 100%);
-  background-attachment: fixed;
+  /* fixed is fine on desktop; on mobile Safari it fights scrolled layers + blur blobs */
+  background-attachment: scroll;
+}
+
+@media (min-width: 900px) {
+  body {
+    background-attachment: fixed;
+  }
 }
 
 button,
@@ -85,7 +92,8 @@ button {
   filter: blur(80px);
   pointer-events: none;
   z-index: 0;
-  animation: blob-drift 18s ease-in-out infinite alternate;
+  /* Static on small screens — animated blurs + stacked body gradients flash on mobile GPUs */
+  opacity: 0.55;
 }
 
 #root::before {
@@ -102,7 +110,18 @@ button {
   bottom: 10%;
   left: -80px;
   background: rgba(94, 234, 212, 0.2);
-  animation-delay: -9s;
+}
+
+@media (min-width: 900px) {
+  #root::before,
+  #root::after {
+    opacity: 1;
+    animation: blob-drift 18s ease-in-out infinite alternate;
+  }
+
+  #root::after {
+    animation-delay: -9s;
+  }
 }
 
 @keyframes blob-drift {
@@ -111,5 +130,12 @@ button {
   }
   to {
     transform: translate(24px, 16px) scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root::before,
+  #root::after {
+    animation: none !important;
   }
 }
