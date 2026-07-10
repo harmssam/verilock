@@ -26,6 +26,8 @@ interface CreditsPanelProps {
   setNimiq?: (p: NimiqProvider | null) => void
   refreshKey?: number
   compact?: boolean
+  /** Prefer showing card price on pack chips (pricing page). */
+  preferCardPrice?: boolean
   /** Called when balance changes after a purchase — not on every poll. */
   onBalanceChange?: (balance: number) => void
 }
@@ -37,6 +39,7 @@ export function CreditsPanel({
   setNimiq,
   refreshKey = 0,
   compact = false,
+  preferCardPrice = false,
   onBalanceChange,
 }: CreditsPanelProps) {
   const [enabled, setEnabled] = useState(false)
@@ -45,7 +48,7 @@ export function CreditsPanel({
   const [packs, setPacks] = useState<number[]>(DEFAULT_PACKS)
   const [selectedPack, setSelectedPack] = useState(10)
   const [packQuotes, setPackQuotes] = useState<PackQuote[]>([])
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<'nim' | 'card' | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const lastNotifiedBalance = useRef<number | null>(null)
@@ -83,9 +86,8 @@ export function CreditsPanel({
           setPacks(data.packs)
           setSelectedPack(prev => (data.packs!.includes(prev) ? prev : data.packs![0]!))
         }
-        // Do not notify parent on routine refresh — avoids refreshKey loops.
       } catch {
-        // Keep last known UI state (e.g. 429)
+        /* keep last known UI on 429 */
       }
     },
     [token],
@@ -106,14 +108,14 @@ export function CreditsPanel({
         notifyBalance(detail.balance)
         setStatus(
           detail.creditsMinted > 0
-            ? `Added ${detail.creditsMinted} credit${detail.creditsMinted === 1 ? '' : 's'}.`
+            ? `+${detail.creditsMinted} credit${detail.creditsMinted === 1 ? '' : 's'}`
             : null,
         )
         setError(null)
       } else {
-        setError(detail.message || 'Credit top-up failed')
+        setError(detail.message || 'Purchase failed')
       }
-      setBusy(false)
+      setBusy(null)
     }
     window.addEventListener('verilock:credits-topup', onTopup)
     return () => window.removeEventListener('verilock:credits-topup', onTopup)
@@ -144,12 +146,21 @@ export function CreditsPanel({
     }
   }, [enabled, token])
 
+  const packPriceLabel = (pack: number): string => {
+    const q = packQuotes.find(p => p.pack === pack)
+    if (!q) return '…'
+    if (preferCardPrice && stripeEnabled) {
+      return `≈$${q.creditStripeUsdTotal.toFixed(2)}`
+    }
+    return formatSealFeeNim(q.creditNimCostTotal)
+  }
+
   const buyWithNim = async () => {
     if (!token || !address) {
       setError('Connect your wallet first')
       return
     }
-    setBusy(true)
+    setBusy('nim')
     setError(null)
     setStatus(null)
     const result = await buyCreditsWithNim({
@@ -166,10 +177,10 @@ export function CreditsPanel({
       notifyBalance(result.balance)
       setStatus(
         result.alreadyClaimed
-          ? 'Credits already claimed for that transaction.'
-          : `Added ${result.creditsMinted} credit${result.creditsMinted === 1 ? '' : 's'}.`,
+          ? 'Already claimed'
+          : `+${result.creditsMinted} credit${result.creditsMinted === 1 ? '' : 's'}`,
       )
-      setBusy(false)
+      setBusy(null)
       return
     }
     if (result.redirecting) {
@@ -178,12 +189,12 @@ export function CreditsPanel({
     }
     setError(result.message)
     setStatus(null)
-    setBusy(false)
+    setBusy(null)
   }
 
   const buyWithCard = async () => {
     if (!token) return
-    setBusy(true)
+    setBusy('card')
     setError(null)
     setStatus(null)
     try {
@@ -191,23 +202,27 @@ export function CreditsPanel({
       window.location.href = url
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Checkout failed')
-      setBusy(false)
+      setBusy(null)
     }
   }
 
   if (!token) {
     return (
-      <div className={`journey-credits${compact ? ' journey-credits--compact' : ''}`}>
-        <div className="journey-credits-head">
-          <Coins size={16} strokeWidth={2.25} aria-hidden />
-          <span>Seal credits</span>
+      <div
+        className={[
+          'journey-credits',
+          'journey-credits--guest',
+          compact ? 'journey-credits--compact' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        <div className="journey-credits-top-label">
+          <Coins size={15} strokeWidth={2.25} aria-hidden />
+          Seal credits
         </div>
-        <p className="muted journey-credits-note" style={{ margin: 0, fontSize: '0.8rem' }}>
-          Connect your wallet to buy packs. See{' '}
-          <a href="/pricing" className="inline-link">
-            Pricing
-          </a>
-          .
+        <p className="muted journey-credits-guest-text">
+          Connect your wallet to buy packs (10–100). 1 credit = 1 seal.
         </p>
       </div>
     )
@@ -215,75 +230,92 @@ export function CreditsPanel({
 
   if (!enabled) return null
 
+  const busyAny = busy != null
+
   return (
-    <div className={`journey-credits${compact ? ' journey-credits--compact' : ''}`}>
-      <div className="journey-credits-head">
-        <Coins size={16} strokeWidth={2.25} aria-hidden />
-        <span>
-          <strong>{balance}</strong> credit{balance === 1 ? '' : 's'}
-        </span>
+    <div className={['journey-credits', compact ? 'journey-credits--compact' : ''].filter(Boolean).join(' ')}>
+      <div className="journey-credits-top">
+        <div className="journey-credits-top-label">
+          <Coins size={15} strokeWidth={2.25} aria-hidden />
+          Your balance
+        </div>
+        <div className="journey-credits-balance">
+          <span className="journey-credits-balance-n">{balance}</span>
+          <span className="journey-credits-balance-unit">
+            credit{balance === 1 ? '' : 's'}
+          </span>
+        </div>
       </div>
 
-      <div className="journey-credits-packs" role="group" aria-label="Credit pack size">
-        {packs.map(pack => (
-          <button
-            key={pack}
-            type="button"
-            className={`journey-credits-pack${selectedPack === pack ? ' journey-credits-pack--active' : ''}`}
-            disabled={busy}
-            onClick={() => setSelectedPack(pack)}
-          >
-            <span className="journey-credits-pack-n">{pack}</span>
-            <span className="muted journey-credits-pack-label">credits</span>
-          </button>
-        ))}
+      <div className="journey-credits-packs" role="radiogroup" aria-label="Pack size">
+        {packs.map(pack => {
+          const active = selectedPack === pack
+          return (
+            <button
+              key={pack}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              className={`journey-credits-pack${active ? ' journey-credits-pack--active' : ''}`}
+              disabled={busyAny}
+              onClick={() => setSelectedPack(pack)}
+            >
+              <span className="journey-credits-pack-n">{pack}</span>
+              <span className="journey-credits-pack-price">{packPriceLabel(pack)}</span>
+            </button>
+          )
+        })}
       </div>
 
-      <div className="journey-credits-buy row" style={{ gap: '0.5rem', flexWrap: 'wrap' }}>
+      <div
+        className={[
+          'journey-credits-actions',
+          !stripeEnabled ? 'journey-credits-actions--single' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
         <button
           type="button"
-          className={`btn btn-primary${busy ? ' btn--busy' : ''}`}
-          disabled={busy || !address}
+          className={`btn btn-primary${busy === 'nim' ? ' btn--busy' : ''}`}
+          disabled={busyAny || !address}
           onClick={() => void buyWithNim()}
-          title={!address ? 'Connect wallet first' : undefined}
         >
-          {busy ? (
+          {busy === 'nim' ? (
             <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
           ) : (
             <Wallet size={16} strokeWidth={2.25} />
           )}
-          Buy {selectedPack} with NIM
+          {selectedQuote
+            ? `NIM · ${formatSealFeeNim(selectedQuote.creditNimCostTotal)}`
+            : 'Pay with NIM'}
         </button>
         {stripeEnabled && (
           <button
             type="button"
-            className={`btn btn-secondary${busy ? ' btn--busy' : ''}`}
-            disabled={busy}
+            className={`btn btn-secondary${busy === 'card' ? ' btn--busy' : ''}`}
+            disabled={busyAny}
             onClick={() => void buyWithCard()}
           >
-            {busy ? (
+            {busy === 'card' ? (
               <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
             ) : (
               <CreditCard size={16} strokeWidth={2.25} />
             )}
-            Buy {selectedPack} with card
+            {selectedQuote
+              ? `Card · $${selectedQuote.creditStripeUsdTotal.toFixed(2)}`
+              : 'Pay with card'}
           </button>
         )}
       </div>
 
-      {selectedQuote && (
-        <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>
-          NIM {formatSealFeeNim(selectedQuote.creditNimCostTotal)}
-          {stripeEnabled ? ` · Card ≈ $${selectedQuote.creditStripeUsdTotal.toFixed(2)}` : ''}
-        </p>
-      )}
       {status && (
-        <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }} aria-live="polite">
+        <p className="muted journey-credits-msg" aria-live="polite">
           {status}
         </p>
       )}
       {error && (
-        <p className="error" role="alert" style={{ margin: 0, fontSize: '0.85rem' }}>
+        <p className="journey-credits-msg journey-credits-msg--error" role="alert">
           {error}
         </p>
       )}

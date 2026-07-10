@@ -1,5 +1,5 @@
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
-import { Coins, ExternalLink, ShoppingCart, Wallet } from 'lucide-react'
+import { Coins, ExternalLink, Wallet } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from './api'
 import { SealPricingDisplay } from './SealPricingDisplay'
@@ -13,22 +13,11 @@ import './PricePage.css'
 
 const NIMIQ_URL = 'https://www.nimiq.com'
 
-interface PackRow {
-  pack: number
-  nimTotal: number
-  usdTotal: number | null
-  cardOk: boolean
-}
-
 interface CreditsPublicInfo {
   enabled: boolean
-  stripeEnabled: boolean
   stripeMarkup: number
-  feeNim: number
   creditNimCost: number
   promoActive: boolean
-  stripeMinChargeCents: number
-  packs: PackRow[]
 }
 
 export interface PricePageProps {
@@ -58,50 +47,21 @@ export function PricePage({
     let cancelled = false
     void (async () => {
       try {
-        const [cfg, catalog] = await Promise.all([
-          api.creditsConfig(),
-          api.creditsPackQuotes().catch(() => null),
-        ])
+        const cfg = await api.creditsConfig()
         if (cancelled) return
-        const packs: PackRow[] =
-          catalog?.packs.map(p => ({
-            pack: p.pack,
-            nimTotal: p.creditNimCostTotal,
-            usdTotal: p.creditStripeUsdTotal,
-            cardOk: p.meetsStripeMinimum,
-          })) ??
-          (cfg.packs ?? [10, 25, 50, 100]).map(pack => ({
-            pack,
-            nimTotal: basePricing.feeNim * pack,
-            usdTotal: null,
-            cardOk: true,
-          }))
         setCreditsInfo({
           enabled: cfg.enabled,
-          stripeEnabled: cfg.stripeEnabled,
           stripeMarkup: cfg.stripeMarkup,
-          feeNim: catalog?.feeNim ?? basePricing.feeNim,
-          creditNimCost: catalog?.feeNim ?? basePricing.feeNim,
-          promoActive: catalog?.promoActive ?? basePricing.promoActive,
-          stripeMinChargeCents: catalog?.stripeMinChargeCents ?? cfg.stripeMinChargeCents ?? 50,
-          packs,
+          creditNimCost: basePricing.feeNim,
+          promoActive: basePricing.promoActive,
         })
       } catch {
         if (!cancelled) {
           setCreditsInfo({
             enabled: true,
-            stripeEnabled: false,
             stripeMarkup: 2,
-            feeNim: basePricing.feeNim,
             creditNimCost: basePricing.feeNim,
             promoActive: basePricing.promoActive,
-            stripeMinChargeCents: 50,
-            packs: [10, 25, 50, 100].map(pack => ({
-              pack,
-              nimTotal: basePricing.feeNim * pack,
-              usdTotal: null,
-              cardOk: true,
-            })),
           })
         }
       }
@@ -123,83 +83,51 @@ export function PricePage({
       <SealPricingDisplay />
 
       {creditsInfo?.enabled !== false && (
-        <section className="price-page-credits" aria-labelledby="price-credits-heading">
-          <h3 id="price-credits-heading" className="price-page-credits-title">
-            <Coins size={18} strokeWidth={2.25} aria-hidden />
-            Seal credits
-          </h3>
-          <p className="muted price-page-credits-lead">
-            <strong>1 credit = 1 seal.</strong> NIM:{' '}
-            {formatSealFeeNim(creditsInfo?.creditNimCost ?? basePricing.feeNim)} each
-            {creditsInfo?.promoActive ? ' (promo)' : ''}. Card: about {creditsInfo?.stripeMarkup ?? 2}×
-            that in USD (at least $
-            {((creditsInfo?.stripeMinChargeCents ?? 50) / 100).toFixed(2)} per pack). Credits never
-            convert back to NIM.
-          </p>
-          {creditsInfo?.packs && creditsInfo.packs.length > 0 && (
-            <div className="price-page-packs" aria-label="Credit pack prices">
-              <table className="price-page-packs-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Pack</th>
-                    <th scope="col">NIM</th>
-                    <th scope="col">Card (est.)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {creditsInfo.packs.map(row => (
-                    <tr key={row.pack}>
-                      <td>
-                        <strong>{row.pack}</strong> credits
-                      </td>
-                      <td>{formatSealFeeNim(row.nimTotal)}</td>
-                      <td>{row.usdTotal != null ? `≈ $${row.usdTotal.toFixed(2)}` : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <section className="price-page-credits" id="buy-credits" aria-labelledby="price-credits-heading">
+          <div className="price-page-credits-intro">
+            <h3 id="price-credits-heading" className="price-page-credits-title">
+              <Coins size={18} strokeWidth={2.25} aria-hidden />
+              Buy credits
+            </h3>
+            <p className="muted price-page-credits-lead">
+              1 credit = 1 seal · NIM {formatSealFeeNim(creditsInfo?.creditNimCost ?? basePricing.feeNim)}
+              each
+              {creditsInfo?.promoActive ? ' (promo)' : ''} · Card ~{creditsInfo?.stripeMarkup ?? 2}× in
+              USD
+            </p>
+          </div>
 
-          <div className="price-page-credits-cta" id="buy-credits">
-            <div className="price-page-credits-cta-head">
-              <ShoppingCart size={18} strokeWidth={2.25} aria-hidden />
-              <div>
-                <strong>Buy credits</strong>
-                <p className="muted" style={{ margin: '0.15rem 0 0', fontSize: '0.84rem' }}>
-                  {signedIn
-                    ? 'Choose a pack — NIM or card.'
-                    : 'Connect your wallet to buy a pack.'}
-                </p>
-              </div>
-            </div>
-
-            {!signedIn && onConnect && (
+          {!signedIn && onConnect && (
+            <div className="price-page-credits-connect">
+              <p className="muted" style={{ margin: 0, fontSize: '0.86rem' }}>
+                Connect your wallet to choose a pack.
+              </p>
               <button
                 type="button"
-                className={`btn btn-primary btn-lg${connecting ? ' btn--busy' : ''}`}
+                className={`btn btn-primary${connecting ? ' btn--busy' : ''}`}
                 disabled={connecting}
                 onClick={onConnect}
               >
-                <Wallet size={18} strokeWidth={2.25} />
+                <Wallet size={16} strokeWidth={2.25} />
                 {connecting
                   ? journeyConnectLabels(connectMode).busy
                   : journeyConnectLabels(connectMode).idle}
               </button>
-            )}
+            </div>
+          )}
 
-            {signedIn && (
-              <CreditsPanel
-                token={token}
-                address={address}
-                nimiq={nimiq}
-                setNimiq={setNimiq}
-                onBalanceChange={() => {
-                  onCreditsPurchased?.()
-                }}
-              />
-            )}
-          </div>
+          {signedIn && (
+            <CreditsPanel
+              token={token}
+              address={address}
+              nimiq={nimiq}
+              setNimiq={setNimiq}
+              preferCardPrice
+              onBalanceChange={() => {
+                onCreditsPurchased?.()
+              }}
+            />
+          )}
         </section>
       )}
 
