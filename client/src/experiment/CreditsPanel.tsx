@@ -1,7 +1,11 @@
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 import { Coins, CreditCard, LoaderCircle, Wallet } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
+import {
+  loadCreditsBalance,
+  writeCreditsBalanceCache,
+} from '../creditsBalanceCache'
 import { formatSealFeeNim } from '../sealPricing'
 import { buyCreditsWithNim } from './journeyCreditTopup'
 
@@ -22,6 +26,7 @@ interface CreditsPanelProps {
   setNimiq?: (p: NimiqProvider | null) => void
   refreshKey?: number
   compact?: boolean
+  /** Called when balance changes after a purchase — not on every poll. */
   onBalanceChange?: (balance: number) => void
 }
 
@@ -43,35 +48,51 @@ export function CreditsPanel({
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const lastNotifiedBalance = useRef<number | null>(null)
+  const onBalanceChangeRef = useRef(onBalanceChange)
+  onBalanceChangeRef.current = onBalanceChange
 
   const selectedQuote = useMemo(
     () => packQuotes.find(p => p.pack === selectedPack) ?? null,
     [packQuotes, selectedPack],
   )
 
-  const refresh = useCallback(async () => {
-    if (!token) {
-      setBalance(0)
-      setEnabled(false)
-      return
-    }
-    try {
-      const data = await api.creditsBalance(token)
-      setEnabled(data.enabled)
-      setStripeEnabled(data.stripeEnabled)
-      setBalance(data.balance)
-      if (Array.isArray(data.packs) && data.packs.length > 0) {
-        setPacks(data.packs)
-        setSelectedPack(prev => (data.packs.includes(prev) ? prev : data.packs[0]!))
+  const notifyBalance = useCallback((next: number) => {
+    if (lastNotifiedBalance.current === next) return
+    lastNotifiedBalance.current = next
+    onBalanceChangeRef.current?.(next)
+  }, [])
+
+  const refresh = useCallback(
+    async (force = false) => {
+      if (!token) {
+        setBalance(0)
+        setEnabled(false)
+        return
       }
-      onBalanceChange?.(data.balance)
-    } catch {
-      setEnabled(false)
-    }
-  }, [token, onBalanceChange])
+      try {
+        const data = await loadCreditsBalance(
+          token,
+          () => api.creditsBalance(token),
+          { force },
+        )
+        setEnabled(data.enabled)
+        setStripeEnabled(data.stripeEnabled)
+        setBalance(data.balance)
+        if (Array.isArray(data.packs) && data.packs.length > 0) {
+          setPacks(data.packs)
+          setSelectedPack(prev => (data.packs!.includes(prev) ? prev : data.packs![0]!))
+        }
+        // Do not notify parent on routine refresh — avoids refreshKey loops.
+      } catch {
+        // Keep last known UI state (e.g. 429)
+      }
+    },
+    [token],
+  )
 
   useEffect(() => {
-    void refresh()
+    void refresh(refreshKey > 0)
   }, [refresh, refreshKey])
 
   useEffect(() => {
@@ -80,15 +101,15 @@ export function CreditsPanel({
         | { ok: true; balance: number; creditsMinted: number }
         | { ok: false; message: string }
       if (detail.ok) {
+        if (token) writeCreditsBalanceCache(token, detail.balance)
         setBalance(detail.balance)
-        onBalanceChange?.(detail.balance)
+        notifyBalance(detail.balance)
         setStatus(
           detail.creditsMinted > 0
             ? `Added ${detail.creditsMinted} credit${detail.creditsMinted === 1 ? '' : 's'}.`
             : null,
         )
         setError(null)
-        void refresh()
       } else {
         setError(detail.message || 'Credit top-up failed')
       }
@@ -96,10 +117,10 @@ export function CreditsPanel({
     }
     window.addEventListener('verilock:credits-topup', onTopup)
     return () => window.removeEventListener('verilock:credits-topup', onTopup)
-  }, [onBalanceChange, refresh])
+  }, [notifyBalance, token])
 
   useEffect(() => {
-    if (!enabled && token) return
+    if (!token || !enabled) return
     let cancelled = false
     void (async () => {
       try {
@@ -140,15 +161,15 @@ export function CreditsPanel({
       onProgress: setStatus,
     })
     if (result.ok) {
+      writeCreditsBalanceCache(token, result.balance)
       setBalance(result.balance)
-      onBalanceChange?.(result.balance)
+      notifyBalance(result.balance)
       setStatus(
         result.alreadyClaimed
           ? 'Credits already claimed for that transaction.'
           : `Added ${result.creditsMinted} credit${result.creditsMinted === 1 ? '' : 's'}.`,
       )
       setBusy(false)
-      void refresh()
       return
     }
     if (result.redirecting) {
@@ -253,9 +274,7 @@ export function CreditsPanel({
       {selectedQuote && (
         <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>
           NIM {formatSealFeeNim(selectedQuote.creditNimCostTotal)}
-          {stripeEnabled
-            ? ` · Card ≈ $${selectedQuote.creditStripeUsdTotal.toFixed(2)}`
-            : ''}
+          {stripeEnabled ? ` · Card ≈ $${selectedQuote.creditStripeUsdTotal.toFixed(2)}` : ''}
         </p>
       )}
       {status && (

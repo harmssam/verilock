@@ -100,6 +100,8 @@ export async function sealJourneyDocumentWithCredit(args: {
 
     if (typeof result.balance === 'number') {
       try {
+        const { writeCreditsBalanceCache } = await import('../creditsBalanceCache')
+        writeCreditsBalanceCache(token, result.balance)
         window.dispatchEvent(
           new CustomEvent('verilock:credits-topup', {
             detail: { ok: true, balance: result.balance, creditsMinted: 0 },

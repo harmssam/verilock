@@ -102,7 +102,10 @@ const authVerifyLimit = rateLimit(24, 60_000)
 const docLimit = rateLimit(30, 60_000)
 const attestLimit = rateLimit(24, 60_000)
 const walletBalanceLimit = rateLimit(30, 60_000)
+/** Mutations / checkout — keep tight. */
 const creditsLimit = rateLimit(30, 60_000)
+/** Cheap SQLite balance reads — header + panel may both load. */
+const creditsBalanceLimit = rateLimit(120, 60_000)
 const publicReadLimit = rateLimit(60, 60_000)
 // Hash verify is read-only and easy to double-fire from UI retries; allow a higher burst.
 const verifyHashLimit = rateLimit(60, 60_000)
@@ -214,7 +217,7 @@ app.get('/api/credits/config', creditsLimit, (_req, res) => {
   })
 })
 
-app.get('/api/credits/balance', authMiddleware, requireVerifiedWallet, creditsLimit, async (_req, res) => {
+app.get('/api/credits/balance', authMiddleware, requireVerifiedWallet, creditsBalanceLimit, async (_req, res) => {
   try {
     const { getBalanceForWallet, getCreditsPublicConfig } = await import('./credits.js')
     const address = res.locals.address as string
