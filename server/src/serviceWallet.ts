@@ -12,6 +12,7 @@ import {
   buildAttestationPayloadBytes,
   getBlockNumber,
   getBroadcastClientForService,
+  getExpectedAttestationRecipient,
   getWalletBalanceLuna,
   waitForTransactionVisible,
 } from './nimiq-rpc.js'
@@ -65,15 +66,17 @@ function normalizeTxHashFromCore(hash: string): string {
 }
 
 /**
- * Broadcast a minimal self-send attestation from the service wallet.
+ * Broadcast a minimal attestation proof from the service wallet.
  * Value is capped; only called after a credit reservation exists.
  *
- * Strategy (aligned with @nimiq/core + public RPC):
- * 1. Build/sign with service key
+ * Important: Nimiq rejects self-sends ("Sender same as recipient") — same rule as
+ * Hub checkout. Credit proofs must go to the attestation sink (like direct NIM seals),
+ * with a minimal value (1 luna) and the seal payload in recipient data.
+ *
+ * Strategy:
+ * 1. Build/sign with service key → sink + payload
  * 2. Broadcast via light client + public sendRawTransaction
- * 3. Poll both for visibility, rebroadcasting while waiting
- * 4. If at least one path accepted the tx, return the hash even if public RPC
- *    is slow — the attestation poller will confirm when it appears.
+ * 3. Poll for on-chain visibility (require real visibility before success)
  */
 export async function broadcastCreditSealProof(input: {
   documentId: string
@@ -84,6 +87,16 @@ export async function broadcastCreditSealProof(input: {
   const valueLuna = CREDIT_PROOF_VALUE_LUNA
   if (valueLuna < 0 || valueLuna > MAX_PROOF_LUNA) {
     throw new Error('Invalid credit proof value configuration')
+  }
+
+  const sink = getExpectedAttestationRecipient()
+  if (!sink) {
+    throw new Error('Attestation sink address is not configured (ATTESTATION_RECIPIENT)')
+  }
+  if (sink === senderAddress) {
+    throw new Error(
+      'Service wallet must not equal the attestation sink — Nimiq rejects self-send transactions',
+    )
   }
 
   // Fail fast if the service wallet cannot pay the dust proof.
@@ -107,7 +120,7 @@ export async function broadcastCreditSealProof(input: {
   const validityStartHeight = Math.max(0, headHeight - 1)
 
   const sender = Address.fromString(senderAddress)
-  const recipient = sender // self-send proof
+  const recipient = Address.fromString(sink)
   const tx = TransactionBuilder.newBasicWithData(
     sender,
     recipient,
@@ -124,6 +137,7 @@ export async function broadcastCreditSealProof(input: {
   console.log('[credits] service wallet broadcasting proof', {
     documentId: input.documentId,
     sender: senderAddress,
+    recipient: sink,
     valueLuna,
     networkId,
     headHeight,
@@ -166,9 +180,8 @@ export async function broadcastCreditSealProof(input: {
     clientState: broadcast.clientState,
   })
 
-  // Poll for visibility while rebroadcasting. Soft-fail: if either path accepted
-  // the tx, return the hash so the attestation poller can confirm (public RPC can lag).
-  const visible = await waitForTransactionVisible(txHash, 45_000, 2_000, {
+  // Require real network visibility — RPC may return a hash without inclusion.
+  const visible = await waitForTransactionVisible(txHash, 90_000, 2_000, {
     rebroadcastHex: hex,
   })
 
@@ -177,20 +190,15 @@ export async function broadcastCreditSealProof(input: {
       txHash: txHash.slice(0, 16),
       confirmations: visible.confirmations,
       blockNumber: visible.blockNumber,
+      from: visible.from,
+      to: visible.to,
+      value: visible.value,
     })
     return { txHash, senderAddress }
   }
 
-  if (broadcast.clientAccepted || broadcast.rpcAccepted) {
-    console.warn(
-      '[credits] proof not yet visible on public RPC; proceeding with pending attestation',
-      { txHash: txHash.slice(0, 16) },
-    )
-    return { txHash, senderAddress }
-  }
-
   throw new Error(
-    `Credit seal proof was not accepted by the Nimiq network (tx ${txHash.slice(0, 12)}…). Retry seal shortly.`,
+    `Credit seal proof was submitted (tx ${txHash.slice(0, 12)}…) but not yet on the Nimiq network. Retry seal in a moment.`,
   )
 }
 

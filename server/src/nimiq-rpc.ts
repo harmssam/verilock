@@ -539,9 +539,13 @@ export async function verifyAttestation(
 
   const modeHint = expectation.paymentMode ?? 'auto'
   const hasCreditHold = hasActiveCreditReservation(expectation.docId)
+  // Credit proofs: minimal value from service wallet → attestation sink.
+  // Self-send is rejected by Nimiq ("Sender same as recipient") and must not be used.
   const looksLikeCreditProof =
     isCreditProofValueLuna(tx.value) &&
-    (recipient === sender || (expectedRecipient != null && recipient === expectedRecipient))
+    expectedRecipient != null &&
+    recipient === expectedRecipient &&
+    (!serviceWallet || sender === serviceWallet)
 
   let paymentMode: 'direct' | 'credit'
 
@@ -555,8 +559,10 @@ export async function verifyAttestation(
     if (serviceWallet && sender !== serviceWallet) {
       throw new Error('Credit seal proof must be sent from the VeriLock service wallet')
     }
-    if (recipient !== sender && expectedRecipient && recipient !== expectedRecipient) {
-      throw new Error('Credit seal proof recipient is invalid')
+    if (!expectedRecipient || recipient !== expectedRecipient) {
+      throw new Error(
+        'Credit seal proof must send the minimal value to the attestation sink (self-send is not allowed on Nimiq)',
+      )
     }
     paymentMode = 'credit'
   } else {
