@@ -83,6 +83,7 @@ This keeps SQLite (`verilock.db`) across deploys. PDF files are not stored — o
 | `SERVICE_WALLET_PRIVATE_KEY` | Hex key for credit-seal proofs (fund with dust NIM) |
 | `STRIPE_SECRET_KEY` | Stripe secret (set when ready; rotate after) |
 | `STRIPE_WEBHOOK_SECRET` | Webhook signing secret for `/api/stripe/webhook` |
+| `STRIPE_STATEMENT_DESCRIPTOR_SUFFIX` | Optional card-statement suffix (default `VERILOCK`; empty disables) |
 
 **Stripe card credits:** mint happens on webhook `checkout.session.completed` **and** on return via `POST /api/credits/checkout/confirm` (success_url `?credits=success&session_id=…`). Also, `GET /api/credits/balance?syncStripe=1` re-checks pending sessions for the signed-in wallet (recovers missed webhooks).
 
