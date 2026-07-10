@@ -242,14 +242,42 @@ function hashFromSerializedTx(cleanHex: string): string {
   return normalizeTxHash(tx.hash())
 }
 
+export type BroadcastResult = {
+  hash: string
+  clientState?: string
+  rpcAccepted: boolean
+  clientAccepted: boolean
+}
+
+/** Push hex to the public JSON-RPC node used for verification. */
+export async function sendRawTransactionViaRpc(rawTx: string): Promise<string> {
+  const clean = normalizeRawTransactionHex(rawTx)
+  const hash = await rpcCall<string>('sendRawTransaction', [clean])
+  if (typeof hash === 'string' && hash.length > 0) {
+    return normalizeTxHash(hash)
+  }
+  throw new Error('Empty sendRawTransaction response')
+}
+
 /**
  * Broadcast a signed transaction hex to the Nimiq network.
- * Prefer the web client; fall back to JSON-RPC. Always return a real tx hash.
+ * Prefer the web client; also push to public JSON-RPC. Always return a real tx hash.
  */
 export async function broadcastRawTransaction(rawTx: string): Promise<string> {
+  const result = await broadcastRawTransactionDetailed(rawTx)
+  return result.hash
+}
+
+/**
+ * Broadcast with diagnostics. Tries light client + public RPC, logs failures.
+ */
+export async function broadcastRawTransactionDetailed(rawTx: string): Promise<BroadcastResult> {
   const clean = normalizeRawTransactionHex(rawTx)
   let lastError: Error | null = null
   let knownHash: string | null = null
+  let clientState: string | undefined
+  let clientAccepted = false
+  let rpcAccepted = false
 
   try {
     knownHash = hashFromSerializedTx(clean)
@@ -259,41 +287,62 @@ export async function broadcastRawTransaction(rawTx: string): Promise<string> {
 
   try {
     const client = await getBroadcastClient()
-    const details = await client.sendTransaction(clean)
+    // Prefer Transaction object so the client signs/validates consistently.
+    const details = await client.sendTransaction(Transaction.fromAny(clean))
     const hash = normalizeTxHash(details.transactionHash)
+    clientState = details.state
     if (hash) {
-      // Also push to the public JSON-RPC node we use for verification so the
-      // tx is not only in the light client's peer set.
-      try {
-        await rpcCall<string>('sendRawTransaction', [clean])
-      } catch {
-        /* already known / race — ignore */
+      knownHash = hash
+      clientAccepted = details.state !== 'invalidated' && details.state !== 'expired'
+      if (details.state === 'invalidated' || details.state === 'expired') {
+        throw new Error(`Light client rejected transaction (state: ${details.state})`)
       }
-      return hash
     }
   } catch (err) {
     lastError = err instanceof Error ? err : new Error(String(err))
+    console.warn('[nimiq] client.sendTransaction failed', lastError.message)
   }
 
   try {
-    const hash = await rpcCall<string>('sendRawTransaction', [clean])
-    if (typeof hash === 'string' && hash.length > 0) {
-      return normalizeTxHash(hash)
-    }
+    const rpcHash = await sendRawTransactionViaRpc(clean)
+    knownHash = rpcHash || knownHash
+    rpcAccepted = true
   } catch (err) {
-    lastError = err instanceof Error ? err : new Error(String(err))
+    const message = err instanceof Error ? err.message : String(err)
+    // "already known" / duplicate is success for our purposes
+    if (/already|known|duplicate|in mempool/i.test(message)) {
+      rpcAccepted = true
+    } else {
+      lastError = err instanceof Error ? err : new Error(message)
+      console.warn('[nimiq] sendRawTransaction failed', message)
+    }
+  }
+
+  if (knownHash && (clientAccepted || rpcAccepted)) {
+    return {
+      hash: knownHash,
+      clientState,
+      rpcAccepted,
+      clientAccepted,
+    }
   }
 
   // If the network already has the tx (duplicate broadcast), return its real hash.
   if (knownHash) {
     const existing = await fetchTransaction(knownHash)
-    if (existing) return normalizeTxHash(existing.hash || knownHash)
+    if (existing) {
+      return {
+        hash: normalizeTxHash(existing.hash || knownHash),
+        clientState,
+        rpcAccepted: true,
+        clientAccepted,
+      }
+    }
   }
 
   if (knownHash && lastError) {
-    // Client may have accepted the tx even if the promise rejected late.
     throw new Error(
-      `Broadcast may have failed (${lastError.message}). Hash ${knownHash.slice(0, 12)}… not visible on RPC yet.`,
+      `Broadcast may have failed (${lastError.message}). Hash ${knownHash.slice(0, 12)}… not visible yet.`,
     )
   }
 
@@ -302,23 +351,92 @@ export async function broadcastRawTransaction(rawTx: string): Promise<string> {
   )
 }
 
-/** Wait until a tx is visible via getTransactionByHash or mempool, or timeout. */
+/**
+ * Wait until a tx is visible via public RPC and/or the light client.
+ * Optionally rebroadcast the serialized hex on each poll.
+ */
 export async function waitForTransactionVisible(
   txHash: string,
   timeoutMs = 45_000,
   pollMs = 2_000,
+  options?: { rebroadcastHex?: string },
 ): Promise<NimiqTransaction | null> {
   const started = Date.now()
+  let attempt = 0
   while (Date.now() - started < timeoutMs) {
     const tx = await fetchTransaction(txHash)
     if (tx) return tx
+
+    // Light client may know about a tx before public RPC indexes it.
+    try {
+      const client = await getBroadcastClient()
+      const details = await client.getTransaction(txHash)
+      if (details && details.state !== 'invalidated' && details.state !== 'expired') {
+        return plainDetailsToNimiqTx(details)
+      }
+    } catch {
+      /* not known to light client yet */
+    }
+
+    if (options?.rebroadcastHex && attempt > 0 && attempt % 2 === 0) {
+      try {
+        await sendRawTransactionViaRpc(options.rebroadcastHex)
+      } catch {
+        /* ignore rebroadcast errors */
+      }
+      try {
+        const client = await getBroadcastClient()
+        await client.sendTransaction(Transaction.fromAny(options.rebroadcastHex))
+      } catch {
+        /* ignore */
+      }
+    }
+
+    attempt += 1
     await new Promise(resolve => setTimeout(resolve, pollMs))
   }
   return null
 }
 
+function plainDetailsToNimiqTx(details: {
+  transactionHash: string
+  sender: string
+  recipient: string
+  value: number | bigint
+  data?: { raw?: string } | string
+  recipientData?: string
+  executionResult?: boolean
+  confirmations?: number
+  blockHeight?: number
+}): NimiqTransaction {
+  let recipientData = ''
+  if (typeof details.recipientData === 'string') {
+    recipientData = details.recipientData
+  } else if (details.data && typeof details.data === 'object' && details.data !== null && 'raw' in details.data) {
+    recipientData = String((details.data as { raw?: string }).raw ?? '')
+  } else if (typeof details.data === 'string') {
+    recipientData = details.data
+  }
+  const confirmations =
+    details.confirmations ??
+    (details.blockHeight != null && details.blockHeight > 0 ? 1 : 0)
+  return {
+    hash: details.transactionHash,
+    from: details.sender,
+    to: details.recipient,
+    value: typeof details.value === 'bigint' ? Number(details.value) : details.value,
+    recipientData,
+    // Light-client pending/included txs without an explicit result are treated as success.
+    executionResult: details.executionResult ?? true,
+    confirmations,
+    blockNumber: details.blockHeight,
+  }
+}
+
 export async function fetchTransaction(hash: string): Promise<NimiqTransaction | null> {
   const cleanHash = normalizeTxHash(hash)
+
+  // 1) Public RPC (authoritative for our attestation checks)
   try {
     const tx = await rpcCall<Record<string, unknown>>('getTransactionByHash', [cleanHash])
     return {
@@ -348,8 +466,23 @@ export async function fetchTransaction(hash: string): Promise<NimiqTransaction |
       confirmations: 0,
     }
   } catch {
-    return null
+    /* fall through to light client */
   }
+
+  // 2) Light client fallback (may see txs public RPC has not indexed yet)
+  try {
+    if (broadcastClient || broadcastClientInit) {
+      const client = await getBroadcastClient()
+      const details = await client.getTransaction(cleanHash)
+      if (details && details.state !== 'invalidated' && details.state !== 'expired') {
+        return plainDetailsToNimiqTx(details)
+      }
+    }
+  } catch {
+    /* not found */
+  }
+
+  return null
 }
 
 export interface AttestationExpectation {
