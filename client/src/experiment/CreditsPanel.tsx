@@ -28,7 +28,12 @@ interface CreditsPanelProps {
   compact?: boolean
   /** Prefer showing card price on pack chips (pricing page). */
   preferCardPrice?: boolean
-  /** Called when balance changes after a purchase — not on every poll. */
+  /**
+   * Balance only — hide pack selection and NIM/card purchase actions.
+   * Use on the seal step when the user already has enough credits.
+   */
+  balanceOnly?: boolean
+  /** Called when the known balance changes (load, top-up, purchase). */
   onBalanceChange?: (balance: number) => void
 }
 
@@ -40,6 +45,7 @@ export function CreditsPanel({
   refreshKey = 0,
   compact = false,
   preferCardPrice = false,
+  balanceOnly = false,
   onBalanceChange,
 }: CreditsPanelProps) {
   const [enabled, setEnabled] = useState(false)
@@ -71,6 +77,7 @@ export function CreditsPanel({
       if (!token) {
         setBalance(0)
         setEnabled(false)
+        notifyBalance(0)
         return
       }
       try {
@@ -82,6 +89,7 @@ export function CreditsPanel({
         setEnabled(data.enabled)
         setStripeEnabled(data.stripeEnabled)
         setBalance(data.balance)
+        notifyBalance(data.balance)
         if (Array.isArray(data.packs) && data.packs.length > 0) {
           setPacks(data.packs)
           setSelectedPack(prev => (data.packs!.includes(prev) ? prev : data.packs![0]!))
@@ -90,7 +98,7 @@ export function CreditsPanel({
         /* keep last known UI on 429 */
       }
     },
-    [token],
+    [token, notifyBalance],
   )
 
   useEffect(() => {
@@ -122,7 +130,7 @@ export function CreditsPanel({
   }, [notifyBalance, token])
 
   useEffect(() => {
-    if (!token || !enabled) return
+    if (!token || !enabled || balanceOnly) return
     let cancelled = false
     void (async () => {
       try {
@@ -144,7 +152,7 @@ export function CreditsPanel({
     return () => {
       cancelled = true
     }
-  }, [enabled, token])
+  }, [enabled, token, balanceOnly])
 
   const packPriceLabel = (pack: number): string => {
     const q = packQuotes.find(p => p.pack === pack)
@@ -233,7 +241,15 @@ export function CreditsPanel({
   const busyAny = busy != null
 
   return (
-    <div className={['journey-credits', compact ? 'journey-credits--compact' : ''].filter(Boolean).join(' ')}>
+    <div
+      className={[
+        'journey-credits',
+        compact ? 'journey-credits--compact' : '',
+        balanceOnly ? 'journey-credits--balance-only' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div className="journey-credits-top">
         <div className="journey-credits-top-label">
           <Coins size={15} strokeWidth={2.25} aria-hidden />
@@ -247,67 +263,71 @@ export function CreditsPanel({
         </div>
       </div>
 
-      <div className="journey-credits-packs" role="radiogroup" aria-label="Pack size">
-        {packs.map(pack => {
-          const active = selectedPack === pack
-          return (
-            <button
-              key={pack}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              className={`journey-credits-pack${active ? ' journey-credits-pack--active' : ''}`}
-              disabled={busyAny}
-              onClick={() => setSelectedPack(pack)}
-            >
-              <span className="journey-credits-pack-n">{pack}</span>
-              <span className="journey-credits-pack-price">{packPriceLabel(pack)}</span>
-            </button>
-          )
-        })}
-      </div>
+      {!balanceOnly && (
+        <>
+          <div className="journey-credits-packs" role="radiogroup" aria-label="Pack size">
+            {packs.map(pack => {
+              const active = selectedPack === pack
+              return (
+                <button
+                  key={pack}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  className={`journey-credits-pack${active ? ' journey-credits-pack--active' : ''}`}
+                  disabled={busyAny}
+                  onClick={() => setSelectedPack(pack)}
+                >
+                  <span className="journey-credits-pack-n">{pack}</span>
+                  <span className="journey-credits-pack-price">{packPriceLabel(pack)}</span>
+                </button>
+              )
+            })}
+          </div>
 
-      <div
-        className={[
-          'journey-credits-actions',
-          !stripeEnabled ? 'journey-credits-actions--single' : '',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        <button
-          type="button"
-          className={`btn btn-primary${busy === 'nim' ? ' btn--busy' : ''}`}
-          disabled={busyAny || !address}
-          onClick={() => void buyWithNim()}
-        >
-          {busy === 'nim' ? (
-            <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
-          ) : (
-            <Wallet size={16} strokeWidth={2.25} />
-          )}
-          {selectedQuote
-            ? `NIM · ${formatSealFeeNim(selectedQuote.creditNimCostTotal)}`
-            : 'Pay with NIM'}
-        </button>
-        {stripeEnabled && (
-          <button
-            type="button"
-            className={`btn btn-secondary${busy === 'card' ? ' btn--busy' : ''}`}
-            disabled={busyAny}
-            onClick={() => void buyWithCard()}
+          <div
+            className={[
+              'journey-credits-actions',
+              !stripeEnabled ? 'journey-credits-actions--single' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
           >
-            {busy === 'card' ? (
-              <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
-            ) : (
-              <CreditCard size={16} strokeWidth={2.25} />
+            <button
+              type="button"
+              className={`btn btn-primary${busy === 'nim' ? ' btn--busy' : ''}`}
+              disabled={busyAny || !address}
+              onClick={() => void buyWithNim()}
+            >
+              {busy === 'nim' ? (
+                <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
+              ) : (
+                <Wallet size={16} strokeWidth={2.25} />
+              )}
+              {selectedQuote
+                ? `NIM · ${formatSealFeeNim(selectedQuote.creditNimCostTotal)}`
+                : 'Pay with NIM'}
+            </button>
+            {stripeEnabled && (
+              <button
+                type="button"
+                className={`btn btn-secondary${busy === 'card' ? ' btn--busy' : ''}`}
+                disabled={busyAny}
+                onClick={() => void buyWithCard()}
+              >
+                {busy === 'card' ? (
+                  <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
+                ) : (
+                  <CreditCard size={16} strokeWidth={2.25} />
+                )}
+                {selectedQuote
+                  ? `Card · $${selectedQuote.creditStripeUsdTotal.toFixed(2)}`
+                  : 'Pay with card'}
+              </button>
             )}
-            {selectedQuote
-              ? `Card · $${selectedQuote.creditStripeUsdTotal.toFixed(2)}`
-              : 'Pay with card'}
-          </button>
-        )}
-      </div>
+          </div>
+        </>
+      )}
 
       {status && (
         <p className="muted journey-credits-msg" aria-live="polite">
