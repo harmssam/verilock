@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Copy, Files, LogOut, Wallet } from 'lucide-react'
+import { Check, ChevronDown, Coins, Copy, Files, LogOut, Wallet } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { formatDisplayAddress } from '../addresses'
 import { journeyConnectLabels, type JourneyConnectMode } from './journeyConnectUi'
@@ -10,9 +10,13 @@ interface AccountMenuProps {
   walletStatus?: string | null
   /** Resolved single-button connect mode (desktop Hub / mobile Pay / fallback). */
   connectMode?: JourneyConnectMode
+  /** Seal credit balance when credits are enabled (header chip). */
+  creditBalance?: number | null
   onConnect: () => void
   onDisconnect: () => void
   onAgreements?: () => void
+  /** Open pricing / buy credits. */
+  onCredits?: () => void
 }
 
 export function AccountMenu({
@@ -20,9 +24,11 @@ export function AccountMenu({
   connecting,
   walletStatus,
   connectMode = 'hub',
+  creditBalance = null,
   onConnect,
   onDisconnect,
   onAgreements,
+  onCredits,
 }: AccountMenuProps) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -61,71 +67,102 @@ export function AccountMenu({
     )
   }
 
-  return (
-    <div className={`exp-account${open ? ' exp-account--open' : ''}`} ref={rootRef}>
-      <button
-        type="button"
-        className="exp-account-trigger"
-        aria-expanded={open}
-        aria-hasPopup="menu"
-        onClick={() => setOpen(v => !v)}
-      >
-        <span className="exp-account-dot" aria-hidden />
-        <span className="exp-account-addr">{account.shortAddress}</span>
-        <ChevronDown size={14} strokeWidth={2.5} className="exp-account-chevron" aria-hidden />
-      </button>
+  const showCredits = creditBalance != null && Number.isFinite(creditBalance)
 
-      {open && (
-        <div className="exp-account-menu" role="menu">
-          <div className="exp-account-menu-head">
-            <span className="exp-account-menu-label">Connected</span>
-            <code className="exp-account-menu-full">{formatDisplayAddress(account.address)}</code>
-          </div>
-          {onAgreements && (
+  return (
+    <div className="exp-account-cluster">
+      {showCredits && (
+        <button
+          type="button"
+          className="exp-credits-chip"
+          onClick={onCredits}
+          title="Seal credits — buy more on Pricing"
+          aria-label={`${creditBalance} seal credit${creditBalance === 1 ? '' : 's'}`}
+        >
+          <Coins size={14} strokeWidth={2.25} aria-hidden />
+          <span className="exp-credits-chip-n">{creditBalance}</span>
+          <span className="exp-credits-chip-label">credits</span>
+        </button>
+      )}
+      <div className={`exp-account${open ? ' exp-account--open' : ''}`} ref={rootRef}>
+        <button
+          type="button"
+          className="exp-account-trigger"
+          aria-expanded={open}
+          aria-hasPopup="menu"
+          onClick={() => setOpen(v => !v)}
+        >
+          <span className="exp-account-dot" aria-hidden />
+          <span className="exp-account-addr">{account.shortAddress}</span>
+          <ChevronDown size={14} strokeWidth={2.5} className="exp-account-chevron" aria-hidden />
+        </button>
+
+        {open && (
+          <div className="exp-account-menu" role="menu">
+            <div className="exp-account-menu-head">
+              <span className="exp-account-menu-label">Connected</span>
+              <code className="exp-account-menu-full">{formatDisplayAddress(account.address)}</code>
+            </div>
+            {showCredits && (
+              <button
+                type="button"
+                className="exp-account-item"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false)
+                  onCredits?.()
+                }}
+              >
+                <Coins size={15} strokeWidth={2.25} />
+                {creditBalance} credit{creditBalance === 1 ? '' : 's'} — buy more
+              </button>
+            )}
+            {onAgreements && (
+              <button
+                type="button"
+                className="exp-account-item"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false)
+                  onAgreements()
+                }}
+              >
+                <Files size={15} strokeWidth={2.25} />
+                My agreements
+              </button>
+            )}
             <button
               type="button"
               className="exp-account-item"
               role="menuitem"
-              onClick={() => {
-                setOpen(false)
-                onAgreements()
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(account.address)
+                  setCopied(true)
+                  window.setTimeout(() => setCopied(false), 1600)
+                } catch {
+                  /* ignore */
+                }
               }}
             >
-              <Files size={15} strokeWidth={2.25} />
-              My agreements
+              {copied ? <Check size={15} strokeWidth={2.5} /> : <Copy size={15} strokeWidth={2.25} />}
+              {copied ? 'Copied' : 'Copy address'}
             </button>
-          )}
-          <button
-            type="button"
-            className="exp-account-item"
-            role="menuitem"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(account.address)
-                setCopied(true)
-                window.setTimeout(() => setCopied(false), 1600)
-              } catch {
-                /* ignore */
-              }
-            }}
-          >
-            {copied ? <Check size={15} strokeWidth={2.5} /> : <Copy size={15} strokeWidth={2.25} />}
-            {copied ? 'Copied' : 'Copy address'}
-          </button>
-          <button
-            type="button"
-            className="exp-account-item exp-account-item--danger"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false)
-              onDisconnect()
-            }}
-          >
-            <LogOut size={15} strokeWidth={2.25} />
-            Disconnect
-          </button>
-        </div>
-      )}
+            <button
+              type="button"
+              className="exp-account-item exp-account-item--danger"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false)
+                onDisconnect()
+              }}
+            >
+              <LogOut size={15} strokeWidth={2.25} />
+              Disconnect
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

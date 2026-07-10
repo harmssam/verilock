@@ -1,8 +1,14 @@
-import { Coins, CreditCard, ExternalLink, Wallet } from 'lucide-react'
+import type { NimiqProvider } from '@nimiq/mini-app-sdk'
+import { Coins, CreditCard, ExternalLink, ShoppingCart, Wallet } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from './api'
 import { SealPricingDisplay } from './SealPricingDisplay'
 import { formatSealFeeNim, getSealPricing } from './sealPricing'
+import { CreditsPanel } from './experiment/CreditsPanel'
+import {
+  journeyConnectLabels,
+  type JourneyConnectMode,
+} from './experiment/journeyConnectUi'
 import './PricePage.css'
 
 const NIMIQ_URL = 'https://www.nimiq.com'
@@ -25,9 +31,30 @@ interface CreditsPublicInfo {
   packs: PackRow[]
 }
 
-export function PricePage() {
+export interface PricePageProps {
+  token?: string | null
+  address?: string | null
+  nimiq?: NimiqProvider | null
+  setNimiq?: (p: NimiqProvider | null) => void
+  connecting?: boolean
+  connectMode?: JourneyConnectMode
+  onConnect?: () => void
+  onCreditsPurchased?: () => void
+}
+
+export function PricePage({
+  token = null,
+  address = null,
+  nimiq = null,
+  setNimiq,
+  connecting = false,
+  connectMode = 'hub',
+  onConnect,
+  onCreditsPurchased,
+}: PricePageProps = {}) {
   const basePricing = getSealPricing()
   const [creditsInfo, setCreditsInfo] = useState<CreditsPublicInfo | null>(null)
+  const [creditsRefresh, setCreditsRefresh] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -85,6 +112,8 @@ export function PricePage() {
       cancelled = true
     }
   }, [basePricing.feeNim, basePricing.promoActive])
+
+  const signedIn = Boolean(token && address)
 
   return (
     <div className="card price-page">
@@ -163,10 +192,48 @@ export function PricePage() {
               </p>
             </div>
           )}
-          <p className="muted price-page-credits-how">
-            <strong>Where to buy:</strong> connect your wallet → agreement → <em>Seal</em> step → pick a
-            pack → Buy with NIM or card.
-          </p>
+
+          <div className="price-page-credits-cta" id="buy-credits">
+            <div className="price-page-credits-cta-head">
+              <ShoppingCart size={18} strokeWidth={2.25} aria-hidden />
+              <div>
+                <strong>Buy credits now</strong>
+                <p className="muted" style={{ margin: '0.15rem 0 0', fontSize: '0.84rem' }}>
+                  {signedIn
+                    ? 'Pick a pack below — pay with NIM or card. Your balance updates in the header.'
+                    : 'Connect your Nimiq wallet to purchase a credit pack.'}
+                </p>
+              </div>
+            </div>
+
+            {!signedIn && onConnect && (
+              <button
+                type="button"
+                className={`btn btn-primary btn-lg${connecting ? ' btn--busy' : ''}`}
+                disabled={connecting}
+                onClick={onConnect}
+              >
+                <Wallet size={18} strokeWidth={2.25} />
+                {connecting
+                  ? journeyConnectLabels(connectMode).busy
+                  : journeyConnectLabels(connectMode).idle}
+              </button>
+            )}
+
+            {signedIn && (
+              <CreditsPanel
+                token={token}
+                address={address}
+                nimiq={nimiq}
+                setNimiq={setNimiq}
+                refreshKey={creditsRefresh}
+                onBalanceChange={() => {
+                  setCreditsRefresh(k => k + 1)
+                  onCreditsPurchased?.()
+                }}
+              />
+            )}
+          </div>
         </section>
       )}
 
