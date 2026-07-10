@@ -16,7 +16,9 @@ export function FilePicker({
   file,
   onChange,
 }: FilePickerProps) {
-  const id = useId()
+  // Avoid bare React useId (":r0:") in htmlFor — some browsers flag those labels.
+  const reactId = useId().replace(/:/g, '')
+  const id = `file-picker-${reactId}`
   const inputRef = useRef<HTMLInputElement>(null)
 
   return (
