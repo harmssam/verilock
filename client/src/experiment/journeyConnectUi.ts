@@ -49,8 +49,7 @@ export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
   about: string
   steps: string[]
 } {
-  const about =
-    'VeriLock uses Nimiq — a simple crypto wallet — so you can sign and seal agreements without uploading your PDF. Only a SHA-256 fingerprint is recorded; your file stays on this device.'
+  const about = 'Connect a Nimiq wallet to sign and seal. VeriLock never holds your keys.'
 
   switch (mode) {
     case 'pay-native':
@@ -58,9 +57,8 @@ export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
         title: 'Login with Nimiq Pay',
         about,
         steps: [
-          'Approve the connection in Nimiq Pay when prompted.',
+          'Approve the connection when Nimiq Pay prompts you.',
           'Your wallet address becomes your VeriLock identity.',
-          'You can disconnect anytime from the account menu.',
         ],
       }
     case 'pay-open':
@@ -68,9 +66,8 @@ export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
         title: 'Login with Nimiq Pay',
         about,
         steps: [
-          'Open VeriLock inside the Nimiq Pay app for the best mobile experience.',
-          'If you don’t have the app yet, install it from the store links below.',
-          'Then connect your wallet and return here to continue.',
+          'Open VeriLock in the Nimiq Pay app, or install it from the store links below.',
+          'Connect your wallet there, then return here to continue.',
         ],
       }
     case 'hub-fallback':
@@ -78,9 +75,8 @@ export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
         title: 'Login with Nimiq',
         about,
         steps: [
-          'Nimiq Pay did not open — you can still login in this browser via Nimiq Hub.',
-          'You’ll leave VeriLock briefly, approve the connection, then return automatically.',
-          'Or install Nimiq Pay and open VeriLock from the app for a smoother flow.',
+          'Nimiq Pay did not open — continue with Nimiq Hub in this browser instead.',
+          'Approve the connection, then you’ll return signed in.',
         ],
       }
     case 'hub':
@@ -88,9 +84,8 @@ export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
         title: 'Login with Nimiq',
         about,
         steps: [
-          'Continue opens Nimiq Hub in this browser — no app install required.',
-          'Choose or create a wallet, then approve the connection.',
-          'You’ll return to VeriLock signed in as that address.',
+          'Continue opens Nimiq Hub in this browser — no app install needed.',
+          'Choose or create a wallet, approve, and return signed in.',
         ],
       }
   }
