@@ -59,6 +59,13 @@
   color: var(--text-muted);
 }
 
+.price-page-model-explain {
+  margin: 0.15rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  max-width: 36rem;
+}
+
 .price-page-model-value {
   display: flex;
   flex-wrap: wrap;

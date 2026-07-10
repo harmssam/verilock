@@ -41,27 +41,124 @@
  * Glow only on the mark — never combine filter + background-clip:text on the
  * wordmark (Safari/mobile GPU layers flash when animated blobs repaint behind).
  */
-.exp-brand-mark {
+.exp-brand-mark-wrap {
+  position: relative;
   flex-shrink: 0;
+  display: grid;
+  place-items: center;
   width: 3.875rem;
   height: 3.875rem;
+}
+
+.exp-brand-mark-halo {
+  position: absolute;
+  inset: -18%;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 50% 45%,
+      rgba(94, 234, 212, 0.28) 0%,
+      rgba(59, 130, 246, 0.14) 42%,
+      transparent 70%
+    );
+  opacity: 0.55;
+  transform: scale(0.92);
+  pointer-events: none;
+  z-index: 0;
+  animation: exp-brand-halo 3.6s ease-in-out infinite;
+}
+
+.exp-brand-mark {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  /* Fixed −2° tilt — scale only on hover */
   transform: rotate(-2deg) scale(1);
   filter:
-    drop-shadow(0 0 4px rgba(94, 234, 212, 0.2))
-    drop-shadow(0 2px 10px rgba(59, 130, 246, 0.28));
+    drop-shadow(0 0 4px rgba(94, 234, 212, 0.22))
+    drop-shadow(0 2px 10px rgba(59, 130, 246, 0.3));
+  /* Pivot near the shackle so the lock feels suspended */
+  transform-origin: 50% 18%;
+  animation:
+    exp-brand-mark-idle 7.5s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite,
+    exp-brand-mark-glow 3.6s ease-in-out infinite;
   transition:
     transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     filter 0.28s ease;
 }
 
+/*
+ * Hang, breathe, then a quick “click shut” settle — one transform timeline
+ * so float and click never fight each other.
+ */
+@keyframes exp-brand-mark-idle {
+  0%,
+  100% {
+    transform: rotate(-3deg) translateY(0) scale(1);
+  }
+  22% {
+    transform: rotate(1.8deg) translateY(-2px) scale(1.02);
+  }
+  44% {
+    transform: rotate(-1.2deg) translateY(-0.5px) scale(1.01);
+  }
+  66% {
+    transform: rotate(0.6deg) translateY(-1.5px) scale(1.015);
+  }
+  /* lock click */
+  78% {
+    transform: rotate(-3.5deg) translateY(1px) scale(0.96);
+  }
+  84% {
+    transform: rotate(0.5deg) translateY(-2.5px) scale(1.06);
+  }
+  90% {
+    transform: rotate(-2deg) translateY(0) scale(1);
+  }
+}
+
+/* Breathing teal / sky glow (filter only — safe separate timeline) */
+@keyframes exp-brand-mark-glow {
+  0%,
+  100% {
+    filter:
+      drop-shadow(0 0 4px rgba(94, 234, 212, 0.2))
+      drop-shadow(0 2px 10px rgba(59, 130, 246, 0.28));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 11px rgba(94, 234, 212, 0.48))
+      drop-shadow(0 4px 18px rgba(59, 130, 246, 0.5));
+  }
+}
+
+@keyframes exp-brand-halo {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.08);
+  }
+}
+
 .exp-brand:hover .exp-brand-mark,
 .exp-brand:focus-visible .exp-brand-mark {
-  transform: rotate(-2deg) scale(1.04);
+  animation-play-state: paused;
+  transform: rotate(-2deg) scale(1.08);
   filter:
-    drop-shadow(0 0 6px rgba(94, 234, 212, 0.32))
-    drop-shadow(0 3px 14px rgba(59, 130, 246, 0.38));
+    drop-shadow(0 0 12px rgba(94, 234, 212, 0.55))
+    drop-shadow(0 4px 18px rgba(59, 130, 246, 0.55));
+}
+
+.exp-brand:hover .exp-brand-mark-halo,
+.exp-brand:focus-visible .exp-brand-mark-halo {
+  animation-play-state: paused;
+  opacity: 1;
+  transform: scale(1.12);
 }
 
 .exp-brand-text {
@@ -903,16 +1000,30 @@
     transform: none;
   }
 
-  .exp-brand-mark {
+  .exp-brand-mark,
+  .exp-brand-mark-halo {
+    animation: none;
     transition: none;
   }
 
-  .exp-brand:hover .exp-brand-mark,
-  .exp-brand:focus-visible .exp-brand-mark {
+  .exp-brand-mark {
     transform: rotate(-2deg) scale(1);
     filter:
       drop-shadow(0 0 4px rgba(94, 234, 212, 0.2))
       drop-shadow(0 2px 10px rgba(59, 130, 246, 0.28));
+  }
+
+  .exp-brand-mark-halo {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+
+  .exp-brand:hover .exp-brand-mark,
+  .exp-brand:focus-visible .exp-brand-mark {
+    transform: rotate(-2deg) scale(1.04);
+    filter:
+      drop-shadow(0 0 6px rgba(94, 234, 212, 0.32))
+      drop-shadow(0 3px 14px rgba(59, 130, 246, 0.38));
   }
 }
 
@@ -2794,7 +2905,7 @@ a.hash-chip.text-link:focus-visible {
     flex: 0 1 auto;
   }
 
-  .exp-brand-mark {
+  .exp-brand-mark-wrap {
     width: 2.65rem;
     height: 2.65rem;
   }
@@ -2899,7 +3010,8 @@ a.hash-chip.text-link:focus-visible {
   .doc-stage-orbit,
   .doc-stage--sealing .doc-card,
   .btn-spinner,
-  .exp-brand-mark {
+  .exp-brand-mark,
+  .exp-brand-mark-halo {
     animation: none;
   }
 

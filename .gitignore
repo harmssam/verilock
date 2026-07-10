@@ -26,6 +26,7 @@ client/public/nimiq-seal-logo.png
 
 # Competition / promo assets (local only)
 submission-assets/
+scoring-review.md
 
 # Google Search Console HTML file verification (meta tag method used instead)
 client/public/google*.html
