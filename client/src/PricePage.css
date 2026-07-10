@@ -4,6 +4,72 @@
   line-height: 1.55;
 }
 
+.price-page-credits {
+  margin-top: 1.35rem;
+  padding: 1rem 1.05rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--mint, #5eead4) 28%, var(--border, #cbd5e1));
+  background: color-mix(in srgb, var(--mint, #5eead4) 8%, transparent);
+}
+
+.price-page-credits-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.45rem;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.price-page-credits-lead {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.price-page-credits-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.price-page-credits-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.price-page-credits-list li svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--mint, #0d9488);
+}
+
+.price-page-credits-list li div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.price-page-credits-list strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.price-page-credits-how {
+  margin: 0.85rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
 .price-page-why {
   margin-top: 1.5rem;
   padding-top: 1.25rem;

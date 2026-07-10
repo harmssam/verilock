@@ -1816,17 +1816,15 @@ export function DocumentJourney({
                     </p>
                   </div>
                   <SealPricingDisplay className="journey-pricing journey-pricing--seal" />
-                  {token && (
-                    <CreditsPanel
-                      token={token}
-                      address={address}
-                      nimiq={nimiq}
-                      setNimiq={setNimiq}
-                      refreshKey={creditsRefresh}
-                      compact
-                      onBalanceChange={setCreditBalance}
-                    />
-                  )}
+                  <CreditsPanel
+                    token={token}
+                    address={address}
+                    nimiq={nimiq}
+                    setNimiq={setNimiq}
+                    refreshKey={creditsRefresh}
+                    compact
+                    onBalanceChange={setCreditBalance}
+                  />
                   {creditBalance >= 1 && (
                     <button
                       type="button"

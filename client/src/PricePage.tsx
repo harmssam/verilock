@@ -1,18 +1,116 @@
-import { ExternalLink } from 'lucide-react'
+import { Coins, CreditCard, ExternalLink, Wallet } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { api } from './api'
 import { SealPricingDisplay } from './SealPricingDisplay'
+import { formatSealFeeNim, getSealPricing } from './sealPricing'
 import './PricePage.css'
 
 const NIMIQ_URL = 'https://www.nimiq.com'
 
+interface CreditsPublicInfo {
+  enabled: boolean
+  stripeEnabled: boolean
+  stripeMarkup: number
+  feeNim: number
+  creditNimCost: number
+  creditStripeUsd: number | null
+  promoActive: boolean
+}
+
 export function PricePage() {
+  const basePricing = getSealPricing()
+  const [creditsInfo, setCreditsInfo] = useState<CreditsPublicInfo | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const [cfg, quote] = await Promise.all([
+          api.creditsConfig(),
+          api.creditsQuote(1).catch(() => null),
+        ])
+        if (cancelled) return
+        setCreditsInfo({
+          enabled: cfg.enabled,
+          stripeEnabled: cfg.stripeEnabled && Boolean(quote?.stripeEnabled),
+          stripeMarkup: cfg.stripeMarkup,
+          feeNim: quote?.feeNim ?? basePricing.feeNim,
+          creditNimCost: quote?.creditNimCost ?? basePricing.feeNim,
+          creditStripeUsd: quote?.creditStripeUsd ?? null,
+          promoActive: quote?.promoActive ?? basePricing.promoActive,
+        })
+      } catch {
+        if (!cancelled) {
+          setCreditsInfo({
+            enabled: true,
+            stripeEnabled: false,
+            stripeMarkup: 2,
+            feeNim: basePricing.feeNim,
+            creditNimCost: basePricing.feeNim,
+            creditStripeUsd: null,
+            promoActive: basePricing.promoActive,
+          })
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [basePricing.feeNim, basePricing.promoActive])
+
   return (
     <div className="card price-page">
       <h2>Pricing</h2>
       <p className="muted price-page-lead">
         One flat fee seals your document on the Nimiq blockchain. Your PDF stays on your device - only
-        its fingerprint is written on-chain.
+        its fingerprint is written on-chain. You can pay with NIM at seal time, or buy prepaid{' '}
+        <strong>seal credits</strong> (including with a card).
       </p>
       <SealPricingDisplay showAllCurrencies />
+
+      {creditsInfo?.enabled !== false && (
+        <section className="price-page-credits" aria-labelledby="price-credits-heading">
+          <h3 id="price-credits-heading" className="price-page-credits-title">
+            <Coins size={18} strokeWidth={2.25} aria-hidden />
+            Seal credits
+          </h3>
+          <p className="muted price-page-credits-lead">
+            <strong>1 credit = 1 seal</strong>, anytime — including after the July promo ends. Credits
+            never convert back to NIM or cash.
+          </p>
+          <ul className="price-page-credits-list">
+            <li>
+              <Wallet size={16} strokeWidth={2.25} aria-hidden />
+              <div>
+                <strong>Buy with NIM</strong>
+                <span className="muted">
+                  {formatSealFeeNim(creditsInfo?.creditNimCost ?? basePricing.feeNim)} NIM per credit
+                  (same as the current seal fee
+                  {creditsInfo?.promoActive ? ' — promo rate' : ''}). Best rate.
+                </span>
+              </div>
+            </li>
+            <li>
+              <CreditCard size={16} strokeWidth={2.25} aria-hidden />
+              <div>
+                <strong>Buy with card</strong>
+                <span className="muted">
+                  {creditsInfo?.stripeEnabled && creditsInfo.creditStripeUsd != null
+                    ? `About $${creditsInfo.creditStripeUsd.toFixed(2)} USD per credit (${creditsInfo.stripeMarkup}× live NIM market).`
+                    : `${creditsInfo?.stripeMarkup ?? 2}× live NIM market in USD — convenience premium so NIM stays cheaper.`}{' '}
+                  No NIM required to purchase; sealing with a credit uses VeriLock’s on-chain proof
+                  wallet.
+                </span>
+              </div>
+            </li>
+          </ul>
+          <p className="muted price-page-credits-how">
+            <strong>Where to buy:</strong> connect your Nimiq wallet, open an agreement, and go to the{' '}
+            <em>Seal</em> step. The credits panel appears there after you sign in — balance, Buy with
+            NIM, and Buy with card.
+          </p>
+        </section>
+      )}
 
       <section className="price-page-why" aria-labelledby="price-why-nimiq">
         <h3 id="price-why-nimiq" className="price-page-why-title">
