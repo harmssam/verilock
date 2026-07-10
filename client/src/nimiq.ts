@@ -262,6 +262,19 @@ function getRecentBlockHeightSync(): number | null {
   return lastKnownBlock
 }
 
+/** Hub checkout payload for seal — checkout() signs and broadcasts. */
+export type HubLockCheckoutRequest = {
+  appName: string
+  sender: string
+  forceSender: true
+  recipient: string
+  value: number
+  flags: number
+  extraData: Uint8Array
+  /** Hub sets validityStartHeight; 120 is the documented max/default duration. */
+  validityDuration: number
+}
+
 /**
  * Hub checkout request for seal (sync — safe on user-gesture path).
  *
@@ -273,7 +286,7 @@ export function buildLockRequestSync(
   address: string,
   docId: string,
   finalSha256: string,
-): Awaited<ReturnType<typeof buildHubLockCheckoutRequest>> {
+): HubLockCheckoutRequest {
   const recipient = getHubAttestationRecipient()
   return {
     appName: APP_NAME,
@@ -283,7 +296,6 @@ export function buildLockRequestSync(
     value: getSealFeeLuna(),
     flags: 0,
     extraData: buildAttestationPayloadBytes(docId, finalSha256.toLowerCase()),
-    // Hub picks validityStartHeight; 120 blocks is the documented default max.
     validityDuration: 120,
   }
 }
@@ -418,7 +430,11 @@ export function getHubAttestationRecipient(): string {
   return DEFAULT_ATTESTATION_RECIPIENT
 }
 
-async function buildHubLockCheckoutRequest(address: string, docId: string, finalSha256: string) {
+async function buildHubLockCheckoutRequest(
+  address: string,
+  docId: string,
+  finalSha256: string,
+): Promise<HubLockCheckoutRequest> {
   // Checkout does not require validityStartHeight (Hub sets it). Keep this async
   // so call sites can warm block height for other Hub paths without blocking.
   void getRecentBlockHeightSync()
@@ -1039,7 +1055,7 @@ export async function sendLockAttestationViaHub(
     token?: string
     broadcastFallback?: TransactionBroadcastFallback
     /** Prebuilt checkout request to avoid await inside the gesture path. */
-    prebuiltRequest?: Awaited<ReturnType<typeof buildHubLockCheckoutRequest>>
+    prebuiltRequest?: HubLockCheckoutRequest
     finalSha256?: string
   },
 ): Promise<string> {
