@@ -6,6 +6,7 @@ import {
   isPrivacyPath,
   saveHubReturnPath,
 } from '../hubReturnPath'
+import { applyPageMeta, journeyPathMeta, PAGE_META, type PageMeta } from '../seo'
 import type { SealDocument } from '../types'
 import { PricePage } from '../PricePage'
 import { PrivacyPolicyPage } from '../PrivacyPolicyPage'
@@ -46,6 +47,7 @@ export function ExperimentApp() {
   const [journeyEpoch, setJourneyEpoch] = useState(0)
   /** Bumps on shell pushState so DocumentJourney re-reads /d/:slug deep links. */
   const [navEpoch, setNavEpoch] = useState(0)
+  const [journeyMeta, setJourneyMeta] = useState<PageMeta | null>(null)
 
   const rememberJourneyPath = useCallback(() => {
     if (typeof window === 'undefined') return
@@ -114,6 +116,36 @@ export function ExperimentApp() {
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
+
+  const handleJourneyPageMeta = useCallback((meta: PageMeta) => {
+    setJourneyMeta(meta)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const path = window.location.pathname
+    const search = window.location.search
+
+    if (screen === 'pricing') {
+      applyPageMeta({ ...PAGE_META.pricing })
+      return
+    }
+    if (screen === 'privacy') {
+      applyPageMeta({ ...PAGE_META.privacy })
+      return
+    }
+    if (screen === 'agreements') {
+      applyPageMeta({ ...PAGE_META.agreements })
+      return
+    }
+    if (screen === 'not-found') {
+      applyPageMeta({ ...PAGE_META.notFound, path })
+      return
+    }
+
+    const meta = journeyMeta ?? journeyPathMeta(path, search)
+    applyPageMeta({ ...meta, path: meta.path ?? path })
+  }, [screen, journeyMeta, navEpoch])
 
   const connectMode = resolveJourneyConnectMode({
     inNimiqPay: wallet.inNimiqPay,
@@ -220,6 +252,7 @@ export function ExperimentApp() {
           key={journeyEpoch}
           wallet={wallet}
           navEpoch={navEpoch}
+          onPageMeta={handleJourneyPageMeta}
           onOpenAgreements={goAgreements}
           onHome={goJourney}
         />

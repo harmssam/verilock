@@ -224,4 +224,102 @@ export const api = {
     ),
 
   certificate: (idOrSlug: string) => request<Record<string, unknown>>(`/api/documents/${idOrSlug}/certificate`),
+
+  creditsConfig: () =>
+    request<{
+      enabled: boolean
+      stripeEnabled: boolean
+      stripeMarkup: number
+      maxPerCheckout: number
+      maxPerNimTopup: number
+      creditsPerSeal: number
+    }>('/api/credits/config'),
+
+  creditsBalance: (token: string) =>
+    request<{
+      walletAddress: string
+      balance: number
+      flagged: boolean
+      enabled: boolean
+      stripeEnabled: boolean
+      stripeMarkup: number
+      maxPerCheckout: number
+      maxPerNimTopup: number
+      creditsPerSeal: number
+    }>('/api/credits/balance', { headers: withAuth(token) }),
+
+  creditsQuote: (credits = 1) =>
+    request<{
+      credits: number
+      feeNim: number
+      feeLuna: number
+      promoActive: boolean
+      creditNimCost: number
+      creditNimCostTotal: number
+      nimUsd: number
+      stripeMarkup: number
+      creditStripeUsd: number
+      creditStripeUsdTotal: number
+      unitUsdCents: number
+      totalUsdCents: number
+      stripeEnabled: boolean
+      pricesStale: boolean
+    }>(`/api/credits/quote?credits=${encodeURIComponent(String(credits))}`),
+
+  creditsLedger: (token: string, limit = 50) =>
+    request<{
+      entries: Array<{
+        id: string
+        delta: number
+        balanceAfter: number
+        kind: string
+        createdAt: number
+      }>
+    }>(`/api/credits/ledger?limit=${limit}`, { headers: withAuth(token) }),
+
+  creditsTopupInfo: () =>
+    request<{
+      payloadHex: string
+      recipient: string | null
+      feeNim: number
+      feeLuna: number
+    }>('/api/credits/topup-payload'),
+
+  claimNimTopup: (token: string, txHash: string) =>
+    request<{
+      balance: number
+      creditsMinted: number
+      alreadyClaimed: boolean
+      feeNim: number
+    }>('/api/credits/topups/nim', {
+      method: 'POST',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ txHash }),
+    }),
+
+  creditsCheckout: (token: string, credits: number) =>
+    request<{
+      url: string
+      sessionId: string
+      quote: {
+        creditStripeUsdTotal: number
+        totalUsdCents: number
+        stripeMarkup: number
+      }
+    }>('/api/credits/checkout', {
+      method: 'POST',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credits }),
+    }),
+
+  payWithCredit: (token: string, docId: string, finalSha256?: string) =>
+    request<
+      AttestationStatus & {
+        balance: number
+      }
+    >(`/api/documents/${docId}/pay-with-credit`, {
+      method: 'POST',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(finalSha256 ? { finalSha256 } : {}),
+    }),
 }

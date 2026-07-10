@@ -72,6 +72,29 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 const app = express()
 applySecurityHeaders(app)
 app.use(cors({ origin: CORS_ORIGIN }))
+
+// Stripe webhooks need the raw body for signature verification — register before json parser.
+const stripeWebhookLimit = rateLimit(60, 60_000)
+app.post(
+  '/api/stripe/webhook',
+  stripeWebhookLimit,
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    try {
+      const { handleStripeWebhook } = await import('./stripeCredits.js')
+      const signature = req.headers['stripe-signature']
+      const sig = Array.isArray(signature) ? signature[0] : signature
+      const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body ?? '')
+      const result = await handleStripeWebhook(rawBody, sig)
+      res.json(result)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Webhook error'
+      console.error('[stripe] webhook', message)
+      res.status(400).json({ error: message })
+    }
+  },
+)
+
 app.use(express.json({ limit: '2mb' }))
 
 const authChallengeLimit = rateLimit(12, 60_000)
@@ -79,6 +102,7 @@ const authVerifyLimit = rateLimit(24, 60_000)
 const docLimit = rateLimit(30, 60_000)
 const attestLimit = rateLimit(24, 60_000)
 const walletBalanceLimit = rateLimit(30, 60_000)
+const creditsLimit = rateLimit(30, 60_000)
 const publicReadLimit = rateLimit(60, 60_000)
 // Hash verify is read-only and easy to double-fire from UI retries; allow a higher burst.
 const verifyHashLimit = rateLimit(60, 60_000)
@@ -181,6 +205,127 @@ app.get('/api/wallet-balance', authMiddleware, requireVerifiedWallet, walletBala
     })
   }
 })
+
+// ── Credits ────────────────────────────────────────────────────────────────
+
+app.get('/api/credits/config', creditsLimit, (_req, res) => {
+  void import('./credits.js').then(({ getCreditsPublicConfig }) => {
+    res.json(getCreditsPublicConfig())
+  })
+})
+
+app.get('/api/credits/balance', authMiddleware, requireVerifiedWallet, creditsLimit, async (_req, res) => {
+  try {
+    const { getBalanceForWallet, getCreditsPublicConfig } = await import('./credits.js')
+    const address = res.locals.address as string
+    res.json({ ...getBalanceForWallet(address), ...getCreditsPublicConfig() })
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : 'Could not load credits' })
+  }
+})
+
+app.get('/api/credits/quote', creditsLimit, async (req, res) => {
+  try {
+    const { quoteCredits } = await import('./credits.js')
+    const credits = Number(req.query.credits ?? 1)
+    const quote = await quoteCredits(credits)
+    res.json(quote)
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : 'Quote failed' })
+  }
+})
+
+app.get('/api/credits/ledger', authMiddleware, requireVerifiedWallet, creditsLimit, async (req, res) => {
+  try {
+    const { getLedgerForWallet } = await import('./credits.js')
+    const address = res.locals.address as string
+    const limit = Number(req.query.limit ?? 50)
+    res.json({ entries: getLedgerForWallet(address, limit) })
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : 'Ledger failed' })
+  }
+})
+
+app.post(
+  '/api/credits/topups/nim',
+  authMiddleware,
+  requireVerifiedWallet,
+  creditsLimit,
+  async (req, res) => {
+    try {
+      const { claimNimCreditTopup } = await import('./creditTopup.js')
+      const { txHash } = req.body as { txHash?: string }
+      if (!txHash?.trim()) {
+        res.status(400).json({ error: 'txHash required' })
+        return
+      }
+      const address = res.locals.address as string
+      const result = await claimNimCreditTopup(txHash, address)
+      res.json(result)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Top-up claim failed'
+      res.status(lockErrorStatus(message)).json({ error: message })
+    }
+  },
+)
+
+app.get('/api/credits/topup-payload', creditsLimit, async (_req, res) => {
+  try {
+    const { buildTopupPayloadHex } = await import('./creditTopup.js')
+    const { getSealFeeLuna, getSealFeeNim, getSealPricing } = await import('./sealPricing.js')
+    const { getExpectedAttestationRecipient } = await import('./nimiq-rpc.js')
+    res.json({
+      payloadHex: buildTopupPayloadHex(),
+      recipient: getExpectedAttestationRecipient(),
+      feeNim: getSealFeeNim(),
+      feeLuna: getSealFeeLuna(),
+      pricing: getSealPricing(),
+    })
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Top-up info failed' })
+  }
+})
+
+app.post(
+  '/api/credits/checkout',
+  authMiddleware,
+  requireVerifiedWallet,
+  creditsLimit,
+  async (req, res) => {
+    try {
+      const { createCreditsCheckoutSession } = await import('./stripeCredits.js')
+      const { credits } = req.body as { credits?: number }
+      const address = res.locals.address as string
+      const result = await createCreditsCheckoutSession({
+        walletAddress: address,
+        credits: credits ?? 1,
+      })
+      res.json(result)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Checkout failed'
+      res.status(400).json({ error: message })
+    }
+  },
+)
+
+app.post(
+  '/api/documents/:id/pay-with-credit',
+  attestLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  async (req, res) => {
+    try {
+      const { payWithCreditAndSeal } = await import('./payWithCredit.js')
+      const { finalSha256 } = req.body as { finalSha256?: string }
+      const address = res.locals.address as string
+      const result = await payWithCreditAndSeal(routeParam(req.params.id), address, finalSha256)
+      res.json(result)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Pay with credit failed'
+      res.status(lockErrorStatus(message)).json({ error: message })
+    }
+  },
+)
 
 app.post('/api/auth/challenge', authChallengeLimit, (req, res) => {
   const { address } = req.body as { address?: string }

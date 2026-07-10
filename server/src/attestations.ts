@@ -1,8 +1,13 @@
 import { v4 as uuid } from 'uuid'
 import {
+  captureCreditReservation,
+  releaseCreditReservation,
+} from './credits.js'
+import {
   createAttestation,
   getAttestationByTxHash,
   getAttestationForDocument,
+  getCreditReservation,
   getDocumentById,
   getPendingAttestations,
   lockDocument,
@@ -18,6 +23,7 @@ import {
   normalizeTxHash,
   verifyAttestation,
 } from './nimiq-rpc.js'
+import { getServiceWalletAddress } from './serviceWallet.js'
 
 const SKIP_CHAIN_VERIFY = process.env.SKIP_CHAIN_VERIFY === 'true'
 const POLL_INTERVAL_MS = 5_000
@@ -43,6 +49,11 @@ function markAttestationFailed(txHash: string, error: string): AttestationResult
     const doc = getDocumentById(att.documentId)
     if (doc?.status === 'locking') {
       updateDocumentStatus(att.documentId, 'ready_to_lock')
+    }
+    // Return prepaid credit if this was a credit-paid seal attempt.
+    const reservation = getCreditReservation(att.documentId)
+    if (reservation && reservation.status === 'held') {
+      releaseCreditReservation(att.documentId, error)
     }
   }
   return { status: 'failed', txHash, error }
@@ -171,13 +182,22 @@ export async function resolveAttestation(txHash: string): Promise<AttestationRes
         error: null,
       })
       lockDocument(att.documentId, Date.now())
+      captureCreditReservation(att.documentId, txHash)
       return { status: 'confirmed', txHash, blockNumber: 1, payload: att.payload }
     }
 
-    const { tx } = await verifyAttestation(txHash, {
+    const creditRes = getCreditReservation(att.documentId)
+    const paymentMode =
+      creditRes && (creditRes.status === 'held' || creditRes.status === 'captured')
+        ? 'credit'
+        : 'auto'
+
+    const { tx, paymentMode: resolvedMode } = await verifyAttestation(txHash, {
       senderAddress: att.senderAddress,
       docId: att.documentId,
       finalSha256: att.finalSha256,
+      paymentMode,
+      serviceWalletAddress: getServiceWalletAddress(),
     })
 
     updateAttestation(txHash, {
@@ -187,6 +207,9 @@ export async function resolveAttestation(txHash: string): Promise<AttestationRes
       error: null,
     })
     lockDocument(att.documentId, Date.now())
+    if (resolvedMode === 'credit') {
+      captureCreditReservation(att.documentId, txHash)
+    }
 
     return {
       status: 'confirmed',

@@ -65,6 +65,53 @@ export type SealJourneyResult =
   | { ok: false; redirecting: false; message: string }
 
 /**
+ * Seal using 1 prepaid credit — server posts the on-chain proof (no NIM required).
+ */
+export async function sealJourneyDocumentWithCredit(args: {
+  token: string
+  doc: SealDocument
+  onProgress: (message: string | null) => void
+}): Promise<SealJourneyResult> {
+  const { token, doc, onProgress } = args
+  const finalHash = doc.finalSha256 ?? doc.originalSha256
+
+  try {
+    onProgress('Reserving credit and posting on-chain proof…')
+    const result = await api.payWithCredit(token, doc.id, finalHash)
+
+    if (result.status === 'failed') {
+      return {
+        ok: false,
+        redirecting: false,
+        message: result.error ?? 'Credit seal failed',
+      }
+    }
+
+    if (result.status === 'pending') {
+      onProgress('Waiting for block confirmation…')
+      await pollAttestation({
+        token,
+        txHash: result.txHash,
+        onStatus: s => {
+          onProgress?.(s.status === 'pending' ? 'Confirming on-chain…' : 'Confirmed!')
+        },
+      })
+    }
+
+    const { document } = await api.getDocument(doc.id)
+    clearSealInFlight()
+    onProgress('Agreement locked on the Nimiq blockchain (1 credit).')
+    return { ok: true, document }
+  } catch (err) {
+    return {
+      ok: false,
+      redirecting: false,
+      message: err instanceof Error ? err.message : 'Credit seal failed',
+    }
+  }
+}
+
+/**
  * Seal a ready document using the same Pay / Hub paths as production App.
  */
 export async function sealJourneyDocument(args: {

@@ -582,14 +582,71 @@ function registerHubEventHandlers(
     }
   }
 
+  const handleCreditTopupSigned = (
+    signed: SignedTransaction,
+    state: Record<string, unknown> | null | undefined,
+    hubBroadcast: boolean,
+    registerWork?: (work: Promise<void>) => void,
+  ) => {
+    try {
+      const token = state?.token as string | undefined
+      if (!token) throw new Error('Credit top-up session expired — try again.')
+      sealLog('hub:creditTopupTxSigned', { hash: signed.hash, hubBroadcast })
+      const work = finalizeHubLockTransaction(signed, {
+        hubBroadcast,
+      })
+        .then(async txHash => {
+          const { claimNimTopupWithRetry } = await import('./creditTopupClaim')
+          sealLog('hub:creditTopupClaiming', { txHash })
+          const result = await claimNimTopupWithRetry(token, txHash)
+          try {
+            sessionStorage.removeItem('verilock-credit-topup')
+          } catch {
+            /* ignore */
+          }
+          window.dispatchEvent(
+            new CustomEvent('verilock:credits-topup', {
+              detail: { ok: true, ...result, txHash },
+            }),
+          )
+        })
+        .catch(err => {
+          const error = err instanceof Error ? err : new Error(String(err))
+          sealError('hub:creditTopupClaimFailed', error)
+          window.dispatchEvent(
+            new CustomEvent('verilock:credits-topup', {
+              detail: { ok: false, message: error.message },
+            }),
+          )
+        })
+      registerWork?.(work)
+    } catch (err) {
+      sealError('hub:creditTopupHandlerFailed', err)
+      const error = err instanceof Error ? err : new Error(String(err))
+      window.dispatchEvent(
+        new CustomEvent('verilock:credits-topup', {
+          detail: { ok: false, message: error.message },
+        }),
+      )
+    }
+  }
+
   hub.on(RequestType.CHECKOUT, (signed, state) => {
     sealLog('hub:CHECKOUT', { flow: state?.flow, hasToken: Boolean(state?.token), docId: state?.docId })
+    if (state?.flow === 'credit_topup') {
+      handleCreditTopupSigned(signed as SignedTransaction, state, true, registerLockWork)
+      return
+    }
     if (state?.flow !== 'lock') return
     handleLockSigned(signed as SignedTransaction, state, true, registerLockWork)
   })
 
   hub.on(RequestType.SIGN_TRANSACTION, (signed, state) => {
     sealLog('hub:SIGN_TRANSACTION', { flow: state?.flow, hasToken: Boolean(state?.token), docId: state?.docId })
+    if (state?.flow === 'credit_topup') {
+      handleCreditTopupSigned(signed as SignedTransaction, state, false, registerLockWork)
+      return
+    }
     if (state?.flow !== 'lock') {
       sealWarn('hub:SIGN_TRANSACTION ignored (not a lock flow)', { flow: state?.flow })
       return
@@ -859,6 +916,117 @@ export async function sendLockAttestation(
   const txError = getProviderErrorMessage(txHash)
   if (txError) throw new Error(txError)
   return txHash as string
+}
+
+/** Credit top-up payload: version=2, kind=1 — must match server creditTopup.ts */
+export const TOPUP_PAYLOAD_VERSION = 2
+export const TOPUP_PAYLOAD_KIND = 1
+
+export function buildTopupPayloadBytes(): Uint8Array {
+  const payload = new Uint8Array(2)
+  payload[0] = TOPUP_PAYLOAD_VERSION
+  payload[1] = TOPUP_PAYLOAD_KIND
+  return payload
+}
+
+export function buildTopupPayloadHex(): string {
+  return bytesToHex(buildTopupPayloadBytes())
+}
+
+async function buildHubCreditTopupRequest(address: string, valueLuna: number) {
+  let blockNumber = getRecentBlockHeightSync()
+  if (blockNumber == null) {
+    blockNumber = await refreshBlockHeight()
+  }
+  return {
+    appName: APP_NAME,
+    sender: address,
+    recipient: getHubAttestationRecipient(),
+    value: valueLuna,
+    flags: 0,
+    extraData: buildTopupPayloadBytes(),
+    validityStartHeight: blockNumber,
+  }
+}
+
+/** One-click NIM credit purchase via Nimiq Pay. */
+export async function sendCreditTopupViaPay(
+  nimiq: Awaited<ReturnType<typeof init>>,
+  valueLuna: number,
+): Promise<string> {
+  if (!Number.isFinite(valueLuna) || valueLuna <= 0) {
+    throw new Error('Invalid credit top-up amount')
+  }
+  const txHash = await nimiq.sendBasicTransactionWithData({
+    recipient: getHubAttestationRecipient(),
+    value: valueLuna,
+    data: buildTopupPayloadHex(),
+  })
+  const txError = getProviderErrorMessage(txHash)
+  if (txError) throw new Error(txError)
+  return txHash as string
+}
+
+/**
+ * One-click NIM credit purchase via Nimiq Hub.
+ * Prefer popup on desktop; redirect when preferRedirect is true (mobile).
+ */
+export async function sendCreditTopupViaHub(
+  address: string,
+  valueLuna: number,
+  options?: {
+    preferRedirect?: boolean
+    token?: string
+    credits?: number
+    broadcastFallback?: TransactionBroadcastFallback
+  },
+): Promise<string> {
+  if (!Number.isFinite(valueLuna) || valueLuna <= 0) {
+    throw new Error('Invalid credit top-up amount')
+  }
+  const hub = getHubApi()
+  const request = await buildHubCreditTopupRequest(address, valueLuna)
+
+  sealLog('hub:creditTopupRequest', {
+    recipient: request.recipient,
+    value: request.value,
+    preferRedirect: options?.preferRedirect ?? false,
+  })
+
+  const topupState = {
+    flow: 'credit_topup' as const,
+    token: options?.token,
+    credits: options?.credits,
+  }
+
+  const preferRedirect = options?.preferRedirect ?? false
+  if (preferRedirect) {
+    clearStaleHubRpcStateIfIdle()
+    saveHubReturnPath()
+    const behavior = hubRedirectBehavior(topupState)
+    await hub.signTransaction(
+      request,
+      behavior as Parameters<typeof hub.signTransaction>[1],
+    )
+    throw new Error(HUB_REDIRECT_MESSAGE)
+  }
+
+  try {
+    clearStaleHubRpcStateIfIdle()
+    const signed = await hub.signTransaction(request)
+    const txHash = await finalizeHubLockTransaction(signed as SignedTransaction, {
+      hubBroadcast: false,
+      broadcastFallback: options?.broadcastFallback,
+    })
+    sealLog('hub:creditTopupSuccess', { txHash })
+    return txHash
+  } catch (err) {
+    sealError('hub:creditTopupFailed', err)
+    if (isPopupBlockedError(err)) {
+      throw new Error(popupBlockedHelp())
+    }
+    throw err
+  }
 }
 
 export async function sendLockAttestationViaHub(
