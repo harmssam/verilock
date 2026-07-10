@@ -121,9 +121,13 @@ export async function quoteCredits(credits: number): Promise<CreditQuote> {
   const markup = getStripeMarkup()
   const creditStripeUsd = roundUsd(feeNim * prices.usd * markup)
   const unitUsdCents = usdToCents(creditStripeUsd)
-  const totalUsdCents = unitUsdCents * n
+  const rawTotalUsdCents = unitUsdCents * n
   const stripeMin = getStripeMinChargeCents()
+  // Card packs always meet Stripe’s $0.50 floor (e.g. 10-pack during promo).
+  const pack = isCreditPack(n)
+  const totalUsdCents = pack ? Math.max(rawTotalUsdCents, stripeMin) : rawTotalUsdCents
   const meetsStripeMinimum = totalUsdCents >= stripeMin
+  const creditStripeUsdTotal = roundUsd(totalUsdCents / 100)
 
   return {
     credits: n,
@@ -135,12 +139,12 @@ export async function quoteCredits(credits: number): Promise<CreditQuote> {
     nimUsd: prices.usd,
     stripeMarkup: markup,
     creditStripeUsd,
-    creditStripeUsdTotal: roundUsd(creditStripeUsd * n),
+    creditStripeUsdTotal,
     unitUsdCents,
     totalUsdCents,
     meetsStripeMinimum,
     stripeMinChargeCents: stripeMin,
-    isPack: isCreditPack(n),
+    isPack: pack,
     stripeEnabled: isStripeCreditsEnabled() && !pricesStale,
     pricesAgeMs: ageMs,
     pricesStale,
@@ -171,7 +175,7 @@ export async function quoteCreditPacks(): Promise<{
   }
 }
 
-/** Assert pack size + Stripe minimum before creating Checkout. */
+/** Assert pack size before creating Checkout (totals already floored to Stripe min). */
 export async function assertStripePackQuote(credits: number): Promise<CreditQuote> {
   const n = Math.floor(Number(credits))
   if (!isCreditPack(n)) {
@@ -180,14 +184,11 @@ export async function assertStripePackQuote(credits: number): Promise<CreditQuot
     )
   }
   const quote = await quoteCredits(n)
-  if (!quote.meetsStripeMinimum) {
-    throw new Error(
-      `This pack totals $${(quote.totalUsdCents / 100).toFixed(2)}, below Stripe’s ` +
-        `$${(quote.stripeMinChargeCents / 100).toFixed(2)} minimum. Choose a larger pack.`,
-    )
-  }
   if (!quote.stripeEnabled) {
     throw new Error('Card checkout is temporarily unavailable')
+  }
+  if (quote.totalUsdCents < quote.stripeMinChargeCents) {
+    throw new Error('Card pack total is below the payment minimum')
   }
   return quote
 }
