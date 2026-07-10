@@ -14,6 +14,7 @@ import { AccountMenu } from './AccountMenu'
 import { AgreementsPage } from './AgreementsPage'
 import { DocumentJourney } from './DocumentJourney'
 import { NotFoundPage } from './NotFoundPage'
+import { useCreditBalance } from './useCreditBalance'
 import {
   clearJourneyIntent,
   resolveIntentForConnect,
@@ -39,6 +40,7 @@ function screenFromPath(pathname: string): ShellScreen {
 
 export function ExperimentApp() {
   const wallet = useJourneyWallet()
+  const { balance: creditBalance, refresh: refreshCredits } = useCreditBalance(wallet.token)
   const [screen, setScreen] = useState<ShellScreen>(() =>
     typeof window !== 'undefined' ? screenFromPath(window.location.pathname) : 'journey',
   )
@@ -203,9 +205,11 @@ export function ExperimentApp() {
             connecting={wallet.connecting}
             walletStatus={wallet.walletStatus}
             connectMode={connectMode}
+            creditBalance={wallet.account ? creditBalance : null}
             onConnect={connectPreservingPath}
             onDisconnect={wallet.disconnect}
             onAgreements={wallet.account ? goAgreements : undefined}
+            onCredits={goPricing}
           />
         </div>
       </header>
@@ -227,7 +231,20 @@ export function ExperimentApp() {
           ← Back to home
         </button>
       )}
-      {screen === 'pricing' && <PricePage />}
+      {screen === 'pricing' && (
+        <PricePage
+          token={wallet.token}
+          address={wallet.address}
+          nimiq={wallet.nimiq}
+          setNimiq={wallet.setNimiq}
+          connecting={wallet.connecting}
+          connectMode={connectMode}
+          onConnect={connectPreservingPath}
+          onCreditsPurchased={() => {
+            void refreshCredits()
+          }}
+        />
+      )}
       {screen === 'privacy' && <PrivacyPolicyPage />}
       {screen === 'agreements' && (
         <AgreementsPage

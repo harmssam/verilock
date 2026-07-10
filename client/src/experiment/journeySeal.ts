@@ -98,6 +98,18 @@ export async function sealJourneyDocumentWithCredit(args: {
       })
     }
 
+    if (typeof result.balance === 'number') {
+      try {
+        window.dispatchEvent(
+          new CustomEvent('verilock:credits-topup', {
+            detail: { ok: true, balance: result.balance, creditsMinted: 0 },
+          }),
+        )
+      } catch {
+        /* ignore */
+      }
+    }
+
     const { document } = await api.getDocument(doc.id)
     clearSealInFlight()
     onProgress('Agreement locked on the Nimiq blockchain (1 credit).')
