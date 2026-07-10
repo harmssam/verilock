@@ -62,6 +62,7 @@ import {
 } from './journeyConnectUi'
 import { LoginSheet } from './LoginSheet'
 import { CreditsPanel } from './CreditsPanel'
+import { CreditSealProgress } from './CreditSealProgress'
 import {
   finishJourneyLock,
   sealJourneyDocument,
@@ -922,7 +923,7 @@ export function DocumentJourney({
     if (!token || !doc) return
     setBusy(true)
     setLocalError(null)
-    setLockMessage('Using 1 credit…')
+    setLockMessage('Reserving 1 credit — you can leave this page anytime…')
     const result = await sealJourneyDocumentWithCredit({
       token,
       doc: doc.source,
@@ -930,7 +931,7 @@ export function DocumentJourney({
     })
     if (result.ok) {
       setActiveFromSeal(result.document, doc.fileSize)
-      setLockMessage('Agreement locked on the Nimiq blockchain (1 credit).')
+      setLockMessage('Sealed forever on Nimiq (1 credit).')
       bumpAgreements()
       setCreditsRefresh(k => k + 1)
     } else {
@@ -1244,7 +1245,7 @@ export function DocumentJourney({
                 {displayError}
               </div>
             )}
-            {lockMessage && !displayError && (
+            {lockMessage && !displayError && !(step === 'seal' && busy && creditBalance >= 1) && (
               <div className="result-banner result-banner--ok" role="status">
                 {lockMessage}
               </div>
@@ -1742,96 +1743,99 @@ export function DocumentJourney({
 
               {step === 'seal' && doc && (
                 <div className="action-stack">
-                  <DocumentStage
-                    step={step}
-                    doc={doc}
-                    file={pdfFile}
-                    accepting={false}
-                    sealing={busy}
-                  />
-                  {!doc.directSeal && (
-                    <PartyList doc={doc} revealNames={revealParticipantPrivate} />
-                  )}
-                  {doc.source.signatures.length > 0 && (
-                    <SignaturesPanel
-                      signatures={doc.source.signatures}
-                      parties={doc.source.parties}
-                      compact
-                      revealPrivate={revealParticipantPrivate}
-                      authToken={token}
+                  {busy && creditBalance >= 1 ? (
+                    <CreditSealProgress
+                      message={lockMessage}
+                      title={doc.title}
+                      fingerprintPreview={doc.fingerprintPreview}
                     />
-                  )}
-                  <div className="seal-summary">
-                    <p>
-                      <strong>{doc.title}</strong>
-                    </p>
-                    <p className="muted">
-                      Fingerprint <code className="mono">{doc.fingerprintPreview}</code>
-                    </p>
-                    <p className="muted">
-                      {doc.directSeal
-                        ? 'Direct seal - no signatures required.'
-                        : `All ${requiredCount(doc)} signatures collected.`}
-                    </p>
-                  </div>
-                  {creditBalance < 1 && (
-                    <SealPricingDisplay className="journey-pricing journey-pricing--seal" />
-                  )}
-                  <CreditsPanel
-                    token={token}
-                    address={address}
-                    nimiq={nimiq}
-                    setNimiq={setNimiq}
-                    refreshKey={creditsRefresh}
-                    compact
-                    balanceOnly={creditBalance >= 1}
-                    onBalanceChange={setCreditBalance}
-                  />
-                  {creditBalance >= 1 ? (
-                    <button
-                      type="button"
-                      className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
-                      disabled={busy || !account}
-                      onClick={() => void sealWithCredit()}
-                    >
-                      {busy ? (
-                        <>
-                          <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                          Sealing on-chain…
-                        </>
-                      ) : (
-                        <>
-                          <Lock size={18} strokeWidth={2.25} />
-                          Seal on Chain - 1 credit
-                        </>
-                      )}
-                    </button>
                   ) : (
                     <>
-                      <button
-                        type="button"
-                        className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
-                        disabled={busy || !account}
-                        onClick={() => void seal()}
-                      >
-                        {busy ? (
-                          <>
-                            <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                            Sealing on Nimiq…
-                          </>
-                        ) : (
-                          <>
-                            <Lock size={18} strokeWidth={2.25} />
-                            {inNimiqPay || nimiq ? 'Pay NIM & seal on-chain' : 'Pay NIM via Hub'}
-                          </>
-                        )}
-                      </button>
-                      {!inNimiqPay && !nimiq && (
-                        <p className="muted journey-seal-hint" style={{ margin: 0 }}>
-                          {isMobileDevice()
-                            ? 'Sealing works best inside Nimiq Pay. In the browser, this seal uses Nimiq Hub — keep VeriLock open until you return and the on-chain proof is confirmed.'
-                            : 'Sealing redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the on-chain proof is confirmed. Or buy credits with NIM / card above to seal without another wallet payment.'}
+                      <DocumentStage
+                        step={step}
+                        doc={doc}
+                        file={pdfFile}
+                        accepting={false}
+                        sealing={busy}
+                      />
+                      {!doc.directSeal && (
+                        <PartyList doc={doc} revealNames={revealParticipantPrivate} />
+                      )}
+                      {doc.source.signatures.length > 0 && (
+                        <SignaturesPanel
+                          signatures={doc.source.signatures}
+                          parties={doc.source.parties}
+                          compact
+                          revealPrivate={revealParticipantPrivate}
+                          authToken={token}
+                        />
+                      )}
+                      <div className="seal-summary">
+                        <p>
+                          <strong>{doc.title}</strong>
                         </p>
+                        <p className="muted">
+                          Fingerprint <code className="mono">{doc.fingerprintPreview}</code>
+                        </p>
+                        <p className="muted">
+                          {doc.directSeal
+                            ? 'Direct seal - no signatures required.'
+                            : `All ${requiredCount(doc)} signatures collected.`}
+                        </p>
+                      </div>
+                      {creditBalance < 1 && (
+                        <SealPricingDisplay className="journey-pricing journey-pricing--seal" />
+                      )}
+                      <CreditsPanel
+                        token={token}
+                        address={address}
+                        nimiq={nimiq}
+                        setNimiq={setNimiq}
+                        refreshKey={creditsRefresh}
+                        compact
+                        balanceOnly={creditBalance >= 1}
+                        onBalanceChange={setCreditBalance}
+                      />
+                      {creditBalance >= 1 ? (
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-lg"
+                          disabled={!account}
+                          onClick={() => void sealWithCredit()}
+                        >
+                          <Lock size={18} strokeWidth={2.25} />
+                          Seal on Chain - 1 credit
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
+                            disabled={busy || !account}
+                            onClick={() => void seal()}
+                          >
+                            {busy ? (
+                              <>
+                                <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
+                                Sealing on Nimiq…
+                              </>
+                            ) : (
+                              <>
+                                <Lock size={18} strokeWidth={2.25} />
+                                {inNimiqPay || nimiq
+                                  ? 'Pay NIM & seal on-chain'
+                                  : 'Pay NIM via Hub'}
+                              </>
+                            )}
+                          </button>
+                          {!inNimiqPay && !nimiq && (
+                            <p className="muted journey-seal-hint" style={{ margin: 0 }}>
+                              {isMobileDevice()
+                                ? 'Sealing works best inside Nimiq Pay. In the browser, this seal uses Nimiq Hub — keep VeriLock open until you return and the on-chain proof is confirmed.'
+                                : 'Sealing redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the on-chain proof is confirmed. Or buy credits with NIM / card above to seal without another wallet payment.'}
+                            </p>
+                          )}
+                        </>
                       )}
                     </>
                   )}

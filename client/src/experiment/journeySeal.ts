@@ -76,7 +76,7 @@ export async function sealJourneyDocumentWithCredit(args: {
   const finalHash = doc.finalSha256 ?? doc.originalSha256
 
   try {
-    onProgress('Reserving credit and posting on-chain proof…')
+    onProgress('Reserving 1 credit — you can leave this page anytime…')
     const result = await api.payWithCredit(token, doc.id, finalHash)
 
     if (result.status === 'failed') {
@@ -88,12 +88,16 @@ export async function sealJourneyDocumentWithCredit(args: {
     }
 
     if (result.status === 'pending') {
-      onProgress('Waiting for block confirmation…')
+      onProgress('Proof submitted — waiting for Nimiq to confirm…')
       await pollAttestation({
         token,
         txHash: result.txHash,
         onStatus: s => {
-          onProgress?.(s.status === 'pending' ? 'Confirming on-chain…' : 'Confirmed!')
+          onProgress?.(
+            s.status === 'pending'
+              ? 'Confirming on Nimiq — safe to close this tab…'
+              : 'Confirmed on Nimiq!',
+          )
         },
       })
     }
@@ -114,7 +118,7 @@ export async function sealJourneyDocumentWithCredit(args: {
 
     const { document } = await api.getDocument(doc.id)
     clearSealInFlight()
-    onProgress('Agreement locked on the Nimiq blockchain (1 credit).')
+    onProgress('Sealed forever on Nimiq (1 credit).')
     return { ok: true, document }
   } catch (err) {
     return {

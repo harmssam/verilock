@@ -3855,3 +3855,249 @@ a.hash-chip.text-link:focus-visible {
   gap: 0;
   padding: 0.85rem 1.05rem;
 }
+
+/* ── Credit seal wait panel ── */
+.credit-seal-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.15rem;
+  padding: 1.25rem 1.15rem 1.2rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--mint, #5eead4) 32%, var(--border, #334155));
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--mint, #5eead4) 12%, transparent),
+      color-mix(in srgb, var(--surface-raised, #1e293b) 94%, transparent) 55%,
+      color-mix(in srgb, var(--amber, #fbbf24) 6%, transparent)
+    );
+  box-shadow: 0 0 40px color-mix(in srgb, var(--mint, #5eead4) 10%, transparent);
+}
+
+.credit-seal-progress-visual {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 7.5rem;
+  margin: 0.15rem 0 0.25rem;
+}
+
+.credit-seal-progress-glow {
+  position: absolute;
+  width: 7rem;
+  height: 7rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--mint, #5eead4) 28%, transparent), transparent 70%);
+  filter: blur(6px);
+  animation: exp-breathe 4.5s ease-in-out infinite;
+}
+
+.credit-seal-progress-orbit {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px dashed color-mix(in srgb, var(--text-dim, #94a3b8) 35%, transparent);
+  pointer-events: none;
+}
+
+.credit-seal-progress-orbit--a {
+  width: 6.75rem;
+  height: 6.75rem;
+  animation: exp-spin 28s linear infinite;
+}
+
+.credit-seal-progress-orbit--b {
+  width: 5.1rem;
+  height: 5.1rem;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--mint, #5eead4) 18%, transparent);
+  animation: exp-spin 18s linear infinite reverse;
+}
+
+.credit-seal-progress-core {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  color: var(--mint, #5eead4);
+  background: color-mix(in srgb, var(--surface, #0f172a) 80%, var(--mint, #5eead4) 12%);
+  border: 1px solid color-mix(in srgb, var(--mint, #5eead4) 45%, transparent);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--mint, #5eead4) 22%, transparent);
+}
+
+.credit-seal-progress-core--done {
+  color: var(--surface, #0f172a);
+  background: var(--mint, #5eead4);
+  border-color: transparent;
+  animation: exp-pop 0.45s ease;
+}
+
+.credit-seal-progress-spinner {
+  animation: exp-spin 0.9s linear infinite;
+}
+
+.credit-seal-progress-copy {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.credit-seal-progress-kicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--amber, #fbbf24);
+}
+
+.credit-seal-progress-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--text, #f1f5f9);
+}
+
+.credit-seal-progress-doc,
+.credit-seal-progress-fp,
+.credit-seal-progress-elapsed {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.credit-seal-progress-status {
+  margin: 0.35rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--mint, #5eead4) 85%, var(--text, #f1f5f9));
+}
+
+.credit-seal-progress-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.credit-seal-progress-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border, #475569) 70%, transparent);
+  background: color-mix(in srgb, var(--surface, #0f172a) 55%, transparent);
+  opacity: 0.72;
+  transition:
+    opacity 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.credit-seal-progress-step--current {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--mint, #5eead4) 45%, transparent);
+  background: color-mix(in srgb, var(--mint, #5eead4) 12%, transparent);
+}
+
+.credit-seal-progress-step--done {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--mint, #5eead4) 28%, transparent);
+}
+
+.credit-seal-progress-step-icon {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: var(--text-dim, #94a3b8);
+  background: color-mix(in srgb, var(--surface, #0f172a) 70%, transparent);
+}
+
+.credit-seal-progress-step--current .credit-seal-progress-step-icon {
+  color: var(--mint, #5eead4);
+}
+
+.credit-seal-progress-step--done .credit-seal-progress-step-icon {
+  color: var(--surface, #0f172a);
+  background: var(--mint, #5eead4);
+}
+
+.credit-seal-progress-step-spin {
+  animation: exp-spin 0.85s linear infinite;
+}
+
+.credit-seal-progress-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.credit-seal-progress-step-text strong {
+  font-weight: 700;
+  color: var(--text, #f1f5f9);
+}
+
+.credit-seal-progress-leave {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--amber, #fbbf24) 35%, var(--border, #334155));
+  background: color-mix(in srgb, var(--amber, #fbbf24) 10%, transparent);
+  color: var(--amber, #fbbf24);
+}
+
+.credit-seal-progress-leave strong {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 750;
+  color: var(--text, #f1f5f9);
+  margin-bottom: 0.2rem;
+}
+
+.credit-seal-progress-leave p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.credit-seal-progress-tip {
+  margin: 0;
+  text-align: center;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-muted, #94a3b8);
+  min-height: 2.4em;
+  animation: exp-fade 0.35s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .credit-seal-progress-glow,
+  .credit-seal-progress-orbit,
+  .credit-seal-progress-spinner,
+  .credit-seal-progress-step-spin,
+  .credit-seal-progress-tip {
+    animation: none;
+  }
+}
