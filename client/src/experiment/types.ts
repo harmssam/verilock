@@ -171,12 +171,14 @@ export function toJourneyDoc(doc: SealDocument, fileSize = 0): JourneyDoc {
 
   const parties: JourneyParty[] = doc.parties.map(p => {
     const sig = doc.signatures.find(s => s.partyId === p.id)
+    // Only a real signature record counts as signed — never party status alone.
+    const signed = Boolean(sig)
     return {
       id: p.id,
       roleLabel: partyLabel(p),
       // Server nulls displayName for non-participants
       displayName: p.displayName || null,
-      signed: p.status === 'signed' || Boolean(sig),
+      signed,
       walletShort: p.walletAddress
         ? shortAddress(p.walletAddress)
         : sig
@@ -187,6 +189,20 @@ export function toJourneyDoc(doc: SealDocument, fileSize = 0): JourneyDoc {
       required: p.required,
     }
   })
+
+  const required = doc.signingProgress.required
+  const requiredPartyCount = parties.filter(p => p.required).length
+  const signedFromSigs =
+    requiredPartyCount > 0
+      ? parties.filter(p => p.signed && p.required).length
+      : doc.signatures.length
+  // Never trust readyToLock when signature records are short of the requirement.
+  const recordsComplete =
+    directSeal || required === 0 || doc.signatures.length >= required
+  const partiesComplete = directSeal || required === 0 || signedFromSigs >= required
+  const readyToLock =
+    directSeal ||
+    (recordsComplete && partiesComplete && (doc.signingProgress.readyToLock || signedFromSigs >= required))
 
   return {
     id: doc.id,
@@ -200,25 +216,44 @@ export function toJourneyDoc(doc: SealDocument, fileSize = 0): JourneyDoc {
     parties,
     sealed,
     directSeal,
-    readyToLock: doc.signingProgress.readyToLock || directSeal,
-    requiredSignatures: doc.signingProgress.required,
-    signedSignatures: doc.signingProgress.signed,
+    readyToLock,
+    requiredSignatures: required,
+    signedSignatures: signedFromSigs,
     status: doc.status,
     source: doc,
   }
 }
 
 export function signedCount(doc: JourneyDoc): number {
-  return doc.signedSignatures || doc.parties.filter(p => p.signed).length
+  // Count parties that have a real signature (toJourneyDoc sets signed from signature rows only).
+  const requiredParties = doc.parties.filter(p => p.required)
+  if (requiredParties.length > 0) {
+    return requiredParties.filter(p => p.signed).length
+  }
+  const anySigned = doc.parties.filter(p => p.signed).length
+  if (anySigned > 0) return anySigned
+  return doc.source.signatures.length
 }
 
 export function requiredCount(doc: JourneyDoc): number {
-  return doc.requiredSignatures || doc.parties.length
+  if (doc.directSeal) return 0
+  if (typeof doc.requiredSignatures === 'number' && doc.requiredSignatures > 0) {
+    return doc.requiredSignatures
+  }
+  const requiredParties = doc.parties.filter(p => p.required).length
+  return requiredParties > 0 ? requiredParties : doc.parties.length
 }
 
+/**
+ * True only when every required signature has a real signature record.
+ * Does not treat server readyToLock alone as sufficient (guards status drift).
+ */
 export function allSigned(doc: JourneyDoc): boolean {
   if (doc.directSeal) return true
-  return doc.readyToLock || signedCount(doc) >= requiredCount(doc)
+  const need = requiredCount(doc)
+  if (need === 0) return true
+  if (doc.source.signatures.length < need) return false
+  return signedCount(doc) >= need
 }
 
 export function nextUnsignedParty(doc: JourneyDoc): JourneyParty | null {

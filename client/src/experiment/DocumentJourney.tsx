@@ -890,6 +890,12 @@ export function DocumentJourney({
 
   const seal = async () => {
     if (!token || !address || !doc) return
+    if (!doc.directSeal && !allSigned(doc)) {
+      setLocalError(
+        `${signedCount(doc)} of ${requiredCount(doc)} signatures collected — remaining signers must sign before sealing.`,
+      )
+      return
+    }
     setBusy(true)
     setLocalError(null)
     setLockMessage('Preparing lock…')
@@ -921,6 +927,12 @@ export function DocumentJourney({
 
   const sealWithCredit = async () => {
     if (!token || !doc) return
+    if (!doc.directSeal && !allSigned(doc)) {
+      setLocalError(
+        `${signedCount(doc)} of ${requiredCount(doc)} signatures collected — remaining signers must sign before sealing.`,
+      )
+      return
+    }
     setBusy(true)
     setLocalError(null)
     setLockMessage('Reserving 1 credit — you can leave this page anytime…')
@@ -1780,7 +1792,9 @@ export function DocumentJourney({
                         <p className="muted">
                           {doc.directSeal
                             ? 'Direct seal - no signatures required.'
-                            : `All ${requiredCount(doc)} signatures collected.`}
+                            : allSigned(doc)
+                              ? `All ${requiredCount(doc)} signatures collected.`
+                              : `${signedCount(doc)} of ${requiredCount(doc)} signatures collected — waiting on remaining signers.`}
                         </p>
                       </div>
                       {creditBalance < 1 && (
@@ -1800,7 +1814,7 @@ export function DocumentJourney({
                         <button
                           type="button"
                           className="btn btn-primary btn-lg"
-                          disabled={!account}
+                          disabled={!account || !allSigned(doc)}
                           onClick={() => void sealWithCredit()}
                         >
                           <Lock size={18} strokeWidth={2.25} />
@@ -1811,7 +1825,7 @@ export function DocumentJourney({
                           <button
                             type="button"
                             className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
-                            disabled={busy || !account}
+                            disabled={busy || !account || !allSigned(doc)}
                             onClick={() => void seal()}
                           >
                             {busy ? (
@@ -2113,24 +2127,37 @@ function PartyList({
   if (doc.directSeal || doc.parties.length === 0) return null
   return (
     <ul className="party-list">
-      {doc.parties.map(p => (
-        <li key={p.id} className={p.signed ? 'party-list-item party-list-item--done' : 'party-list-item'}>
-          <span className="party-list-check" aria-hidden>
-            {p.signed ? <Check size={14} strokeWidth={2.5} /> : null}
-          </span>
-          <div>
-            <strong>{p.roleLabel}</strong>
-            {revealNames && p.displayName ? (
-              <span className="muted"> · {p.displayName}</span>
-            ) : null}
-            {p.walletShort ? (
-              <span className="muted"> · {p.walletShort}</span>
-            ) : (
-              <span className="muted"> · waiting</span>
-            )}
-          </div>
-        </li>
-      ))}
+      {doc.parties.map(p => {
+        // Avoid "Creator · NQ… · NQ…" when display name is just the short address.
+        const showName =
+          revealNames &&
+          Boolean(p.displayName) &&
+          p.displayName !== p.walletShort &&
+          !/^NQ[1-9A-HJ-NP-Z]{2,}…[1-9A-HJ-NP-Z]{4}$/i.test(p.displayName ?? '')
+        let statusNote: string | null = null
+        if (p.signed) {
+          statusNote = p.walletShort
+        } else if (p.walletShort) {
+          statusNote = `${p.walletShort} · awaiting signature`
+        } else {
+          statusNote = 'awaiting signature'
+        }
+        return (
+          <li
+            key={p.id}
+            className={p.signed ? 'party-list-item party-list-item--done' : 'party-list-item'}
+          >
+            <span className="party-list-check" aria-hidden>
+              {p.signed ? <Check size={14} strokeWidth={2.5} /> : null}
+            </span>
+            <div>
+              <strong>{p.roleLabel}</strong>
+              {showName ? <span className="muted"> · {p.displayName}</span> : null}
+              {statusNote ? <span className="muted"> · {statusNote}</span> : null}
+            </div>
+          </li>
+        )
+      })}
     </ul>
   )
 }

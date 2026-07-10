@@ -56,6 +56,9 @@ export function shouldAutoStartSeal(input: {
   const { doc, address, busy, sealInFlight, alreadyAttempted, hasSufficientFunds } = input
   if (!isDocumentCreator(doc, address)) return false
   if (!doc.signingProgress.readyToLock) return false
+  // Require real signature records — never auto-seal on party status alone.
+  const need = doc.signingProgress.required
+  if (need > 0 && doc.signatures.length < need) return false
   if (doc.status === 'locked' || doc.status === 'locking') return false
   if (doc.attestation?.status === 'failed') return false
   if (!hasSufficientFunds) return false

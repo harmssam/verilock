@@ -453,6 +453,13 @@ export function markPartySigned(partyId: string): void {
   )
 }
 
+/** Clear signed status when no signature row exists (repair inconsistent state). */
+export function markPartyUnsigned(partyId: string): void {
+  db.prepare(
+    `UPDATE document_parties SET status = ?, signed_at = NULL WHERE id = ? AND status = ?`,
+  ).run('pending', partyId, 'signed')
+}
+
 export function assignPartyWallet(partyId: string, walletAddress: string): void {
   db.prepare('UPDATE document_parties SET wallet_address = ? WHERE id = ?').run(
     normalizeAddress(walletAddress),

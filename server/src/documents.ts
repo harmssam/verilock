@@ -19,6 +19,7 @@ import {
   runInTransaction,
   updatePartyDisplayName,
   markPartySigned,
+  markPartyUnsigned,
   setDocumentFinalSha256,
   setDocumentNotifyEmail,
   updateDocumentStatus,
@@ -129,14 +130,28 @@ function resolveRequiredSignatureCount(doc: DocumentRecord, parties: PartyRecord
   return parties.filter(p => p.required).length
 }
 
-function countSignedRequiredParties(parties: PartyRecord[]): number {
-  return parties.filter(p => p.required && p.status === 'signed').length
+/**
+ * Count required parties that have a real signature row.
+ * Party status alone is not enough — status can drift without a signature record.
+ */
+function countSignedRequiredParties(
+  parties: PartyRecord[],
+  signatures: Array<{ partyId: string }>,
+): number {
+  const signedPartyIds = new Set(signatures.map(sig => sig.partyId))
+  return parties.filter(p => p.required && signedPartyIds.has(p.id)).length
 }
 
-function signaturesComplete(doc: DocumentRecord, parties: PartyRecord[]): boolean {
+function signaturesComplete(
+  doc: DocumentRecord,
+  parties: PartyRecord[],
+  signatures: Array<{ partyId: string }>,
+): boolean {
   const requiredCount = resolveRequiredSignatureCount(doc, parties)
   if (requiredCount === 0) return true
-  return countSignedRequiredParties(parties) >= requiredCount
+  // Need enough signature records overall and enough required parties covered.
+  if (signatures.length < requiredCount) return false
+  return countSignedRequiredParties(parties, signatures) >= requiredCount
 }
 
 function signatureImageUrl(documentId: string, signatureId: string): string {
@@ -171,41 +186,46 @@ export function canRevealParticipantDetails(
 
 export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOptions) {
   reconcileDocumentParties(doc.id)
+  // Re-read after reconcile may repair party status / document status.
+  const freshDoc = getDocumentById(doc.id) ?? doc
   const parties = getPartiesForDocument(doc.id)
   const signatures = getSignaturesForDocument(doc.id)
   const signatureImageIds = getSignatureImageIdsForDocument(doc.id)
   const attestation = getAttestationForDocument(doc.id)
-  const requiredParties = parties.filter(p => p.required)
-  const signedRequired = countSignedRequiredParties(parties)
-  const requiredCount = resolveRequiredSignatureCount(doc, parties)
+  const signedRequired = countSignedRequiredParties(parties, signatures)
+  const requiredCount = resolveRequiredSignatureCount(freshDoc, parties)
   const revealPrivate = canRevealParticipantDetails(
-    doc,
+    freshDoc,
     parties,
     signatures,
     options?.viewerAddress,
   )
 
   return {
-    id: doc.id,
-    slug: doc.slug,
-    title: doc.title,
-    originalFilename: doc.originalFilename,
-    type: doc.type,
-    status: doc.status,
-    creatorAddress: doc.creatorAddress,
-    originalSha256: doc.originalSha256,
-    finalSha256: doc.finalSha256,
-    pageCount: doc.pageCount,
-    metadata: doc.metadata,
-    createdAt: doc.createdAt,
-    lockedAt: doc.lockedAt,
+    id: freshDoc.id,
+    slug: freshDoc.slug,
+    title: freshDoc.title,
+    originalFilename: freshDoc.originalFilename,
+    type: freshDoc.type,
+    status: freshDoc.status,
+    creatorAddress: freshDoc.creatorAddress,
+    originalSha256: freshDoc.originalSha256,
+    finalSha256: freshDoc.finalSha256,
+    pageCount: freshDoc.pageCount,
+    metadata: freshDoc.metadata,
+    createdAt: freshDoc.createdAt,
+    lockedAt: freshDoc.lockedAt,
     requiredSignatures: requiredCount,
     /** Whether names + signature images are included for this viewer. */
     participantDetailsRevealed: revealPrivate,
     parties: parties.map(party => {
       const base = publicParty(party)
+      const hasSignature = signatures.some(sig => sig.partyId === party.id)
       return {
         ...base,
+        // Never report signed without a signature row (defense in depth after reconcile).
+        status: hasSignature ? ('signed' as const) : party.status === 'declined' ? party.status : ('pending' as const),
+        signedAt: hasSignature ? party.signedAt : null,
         // Always redact human names for non-participants (even placeholders that look real).
         displayName: revealPrivate ? base.displayName : null,
       }
@@ -226,7 +246,8 @@ export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOpti
     signingProgress: {
       signed: signedRequired,
       required: requiredCount,
-      readyToLock: signaturesComplete(doc, parties) && doc.status !== 'locked',
+      readyToLock:
+        signaturesComplete(freshDoc, parties, signatures) && freshDoc.status !== 'locked',
     },
     attestation: attestation
       ? {
@@ -245,23 +266,31 @@ export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOpti
 function reconcileDocumentParties(documentId: string): void {
   const doc = getDocumentById(documentId)
   if (!doc) return
+  // Never rewrite party/signature state after the seal is final.
+  if (doc.status === 'locked') return
 
   const parties = getPartiesForDocument(documentId)
   const signatures = getSignaturesForDocument(documentId)
+  const signedPartyIds = new Set(signatures.map(sig => sig.partyId))
 
   for (const party of parties) {
-    if (party.status === 'pending' && signatures.some(sig => sig.partyId === party.id)) {
+    const hasSig = signedPartyIds.has(party.id)
+    if (party.status === 'pending' && hasSig) {
       markPartySigned(party.id)
+    } else if (party.status === 'signed' && !hasSig) {
+      // Orphan "signed" status without a signature row — treat as still pending.
+      markPartyUnsigned(party.id)
     }
   }
 
   const refreshed = getPartiesForDocument(documentId)
   const refreshedDoc = getDocumentById(documentId)!
-  if (signaturesComplete(refreshedDoc, refreshed)) {
-    if (doc.status === 'collecting_signatures' || doc.status === 'draft') {
+  if (signaturesComplete(refreshedDoc, refreshed, signatures)) {
+    if (refreshedDoc.status === 'collecting_signatures' || refreshedDoc.status === 'draft') {
       updateDocumentStatus(documentId, 'ready_to_lock')
     }
-  } else if (doc.status === 'ready_to_lock') {
+  } else if (refreshedDoc.status === 'ready_to_lock') {
+    // Incomplete collection must not stay sealable (e.g. status drift / bad data).
     updateDocumentStatus(documentId, 'collecting_signatures')
   }
 }
@@ -548,8 +577,9 @@ export function addSignature(input: {
       markPartySigned(party.id)
 
       const updatedParties = getPartiesForDocument(input.documentId)
+      const updatedSignatures = getSignaturesForDocument(input.documentId)
       const updatedDoc = getDocumentById(input.documentId)!
-      if (signaturesComplete(updatedDoc, updatedParties)) {
+      if (signaturesComplete(updatedDoc, updatedParties, updatedSignatures)) {
         // Already filtered out locked/locking above — only notify on first transition.
         becameReadyToLock = doc.status !== 'ready_to_lock'
         updateDocumentStatus(input.documentId, 'ready_to_lock')
@@ -598,9 +628,10 @@ export function prepareLock(documentId: string, finalSha256: string, requesterAd
   }
 
   const parties = getPartiesForDocument(documentId)
-  if (!signaturesComplete(doc, parties)) {
+  const signatures = getSignaturesForDocument(documentId)
+  if (!signaturesComplete(doc, parties, signatures)) {
     const requiredCount = resolveRequiredSignatureCount(doc, parties)
-    const remaining = requiredCount - countSignedRequiredParties(parties)
+    const remaining = Math.max(0, requiredCount - countSignedRequiredParties(parties, signatures))
     throw new Error(`${remaining} required signature(s) still pending`)
   }
 
