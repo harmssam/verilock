@@ -1,16 +1,25 @@
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 import { Coins, CreditCard, LoaderCircle, Wallet } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { formatSealFeeNim } from '../sealPricing'
 import { buyCreditsWithNim } from './journeyCreditTopup'
+
+const DEFAULT_PACKS = [10, 25, 50, 100]
+
+interface PackQuote {
+  pack: number
+  creditNimCostTotal: number
+  creditStripeUsdTotal: number
+  totalUsdCents: number
+  meetsStripeMinimum: boolean
+}
 
 interface CreditsPanelProps {
   token: string | null
   address?: string | null
   nimiq?: NimiqProvider | null
   setNimiq?: (p: NimiqProvider | null) => void
-  /** Bump to force a refresh (e.g. after seal). */
   refreshKey?: number
   compact?: boolean
   onBalanceChange?: (balance: number) => void
@@ -28,15 +37,24 @@ export function CreditsPanel({
   const [enabled, setEnabled] = useState(false)
   const [stripeEnabled, setStripeEnabled] = useState(false)
   const [balance, setBalance] = useState(0)
-  const [qty, setQty] = useState(1)
-  const [quoteLabel, setQuoteLabel] = useState<string | null>(null)
-  const [nimCostLabel, setNimCostLabel] = useState<string | null>(null)
+  const [packs, setPacks] = useState<number[]>(DEFAULT_PACKS)
+  const [selectedPack, setSelectedPack] = useState(10)
+  const [packQuotes, setPackQuotes] = useState<PackQuote[]>([])
   const [markup, setMarkup] = useState(2)
+  const [stripeMinCents, setStripeMinCents] = useState(50)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [maxCheckout, setMaxCheckout] = useState(20)
-  const [maxNimTopup, setMaxNimTopup] = useState(50)
+
+  const selectedQuote = useMemo(
+    () => packQuotes.find(p => p.pack === selectedPack) ?? null,
+    [packQuotes, selectedPack],
+  )
+
+  const stripePacks = useMemo(
+    () => packQuotes.filter(p => p.meetsStripeMinimum),
+    [packQuotes],
+  )
 
   const refresh = useCallback(async () => {
     if (!token) {
@@ -50,9 +68,12 @@ export function CreditsPanel({
       setStripeEnabled(data.stripeEnabled)
       setBalance(data.balance)
       setMarkup(data.stripeMarkup)
-      setMaxCheckout(data.maxPerCheckout)
-      if (typeof (data as { maxPerNimTopup?: number }).maxPerNimTopup === 'number') {
-        setMaxNimTopup((data as { maxPerNimTopup: number }).maxPerNimTopup)
+      if (Array.isArray(data.packs) && data.packs.length > 0) {
+        setPacks(data.packs)
+        setSelectedPack(prev => (data.packs.includes(prev) ? prev : data.packs[0]!))
+      }
+      if (typeof data.stripeMinChargeCents === 'number') {
+        setStripeMinCents(data.stripeMinChargeCents)
       }
       onBalanceChange?.(data.balance)
     } catch {
@@ -64,7 +85,6 @@ export function CreditsPanel({
     void refresh()
   }, [refresh, refreshKey])
 
-  // Hub redirect return for credit top-up
   useEffect(() => {
     const onTopup = (ev: Event) => {
       const detail = (ev as CustomEvent).detail as
@@ -86,32 +106,38 @@ export function CreditsPanel({
   }, [onBalanceChange, refresh])
 
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled && token) return
     let cancelled = false
     void (async () => {
       try {
-        const q = await api.creditsQuote(qty)
+        const catalog = await api.creditsPackQuotes()
         if (cancelled) return
-        setNimCostLabel(
-          `${formatSealFeeNim(q.creditNimCostTotal)} NIM (${formatSealFeeNim(q.creditNimCost)} each)`,
+        setPackQuotes(
+          catalog.packs.map(p => ({
+            pack: p.pack,
+            creditNimCostTotal: p.creditNimCostTotal,
+            creditStripeUsdTotal: p.creditStripeUsdTotal,
+            totalUsdCents: p.totalUsdCents,
+            meetsStripeMinimum: p.meetsStripeMinimum,
+          })),
         )
-        setQuoteLabel(
-          `≈ $${q.creditStripeUsdTotal.toFixed(2)} USD (${q.stripeMarkup}× NIM market)`,
-        )
-        setStripeEnabled(q.stripeEnabled)
-      } catch {
-        if (!cancelled) {
-          setQuoteLabel(null)
-          setNimCostLabel(null)
+        setStripeMinCents(catalog.stripeMinChargeCents)
+        setMarkup(catalog.stripeMarkup)
+        if (catalog.packs.some(p => p.stripeEnabled === false)) {
+          // keep stripeEnabled from balance unless catalog says rates stale
         }
+        const firstOk = catalog.packs.find(p => p.meetsStripeMinimum)
+        if (firstOk && !catalog.packs.find(p => p.pack === selectedPack)?.meetsStripeMinimum) {
+          // prefer selectable stripe pack when current selection is under min
+        }
+      } catch {
+        if (!cancelled) setPackQuotes([])
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [enabled, qty])
-
-  const maxQty = Math.max(1, Math.min(maxCheckout, maxNimTopup))
+  }, [enabled, token, selectedPack])
 
   const buyWithNim = async () => {
     if (!token || !address) {
@@ -124,7 +150,7 @@ export function CreditsPanel({
     const result = await buyCreditsWithNim({
       token,
       address,
-      credits: qty,
+      credits: selectedPack,
       nimiq,
       setNimiq: setNimiq ?? (() => {}),
       onProgress: setStatus,
@@ -143,7 +169,6 @@ export function CreditsPanel({
     }
     if (result.redirecting) {
       setStatus(result.message)
-      // Leave busy — page navigates to Hub
       return
     }
     setError(result.message)
@@ -153,11 +178,17 @@ export function CreditsPanel({
 
   const buyWithCard = async () => {
     if (!token) return
+    if (selectedQuote && !selectedQuote.meetsStripeMinimum) {
+      setError(
+        `Card packs must total at least $${(stripeMinCents / 100).toFixed(2)}. Choose a larger pack.`,
+      )
+      return
+    }
     setBusy(true)
     setError(null)
     setStatus(null)
     try {
-      const { url } = await api.creditsCheckout(token, qty)
+      const { url } = await api.creditsCheckout(token, selectedPack)
       window.location.href = url
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Checkout failed')
@@ -165,7 +196,6 @@ export function CreditsPanel({
     }
   }
 
-  // Public teaser when logged out (still on seal step)
   if (!token) {
     return (
       <div className={`journey-credits${compact ? ' journey-credits--compact' : ''}`}>
@@ -174,18 +204,20 @@ export function CreditsPanel({
           <span>Seal credits</span>
         </div>
         <p className="muted journey-credits-note" style={{ margin: 0, fontSize: '0.8rem' }}>
-          Connect your wallet to buy credits with NIM (1× seal price) or card (2× market), then seal
-          without another payment. See{' '}
+          Connect your wallet to buy credit packs (10 / 25 / 50 / 100) with NIM or card. See{' '}
           <a href="/pricing" className="inline-link">
             Pricing
-          </a>{' '}
-          for details.
+          </a>
+          .
         </p>
       </div>
     )
   }
 
   if (!enabled) return null
+
+  const cardDisabled =
+    busy || !stripeEnabled || (selectedQuote != null && !selectedQuote.meetsStripeMinimum)
 
   return (
     <div className={`journey-credits${compact ? ' journey-credits--compact' : ''}`}>
@@ -196,42 +228,54 @@ export function CreditsPanel({
         </span>
       </div>
       <p className="muted journey-credits-note" style={{ margin: 0, fontSize: '0.8rem' }}>
-        1 credit = 1 seal. Buy with NIM at the seal price (best rate), or card at {markup}× live
-        NIM market. Credits never convert back to NIM.
+        1 credit = 1 seal. Packs priced live at checkout (NIM at seal fee; card at {markup}× market).
+        Credits never convert back to NIM.
       </p>
 
+      <div className="journey-credits-packs" role="group" aria-label="Credit pack size">
+        {packs.map(pack => {
+          const q = packQuotes.find(p => p.pack === pack)
+          const underMin = q != null && !q.meetsStripeMinimum
+          return (
+            <button
+              key={pack}
+              type="button"
+              className={`journey-credits-pack${selectedPack === pack ? ' journey-credits-pack--active' : ''}`}
+              disabled={busy}
+              onClick={() => setSelectedPack(pack)}
+              title={
+                underMin
+                  ? `Below Stripe $${(stripeMinCents / 100).toFixed(2)} minimum for card — NIM still OK`
+                  : undefined
+              }
+            >
+              <span className="journey-credits-pack-n">{pack}</span>
+              <span className="muted journey-credits-pack-label">credits</span>
+            </button>
+          )
+        })}
+      </div>
+
       <div className="journey-credits-buy row" style={{ gap: '0.5rem', flexWrap: 'wrap' }}>
-        <label className="muted" style={{ fontSize: '0.85rem' }}>
-          Qty{' '}
-          <input
-            type="number"
-            min={1}
-            max={maxQty}
-            value={qty}
-            disabled={busy}
-            onChange={e => setQty(Math.max(1, Math.min(maxQty, Number(e.target.value) || 1)))}
-            style={{ width: '4rem' }}
-          />
-        </label>
         <button
           type="button"
           className={`btn btn-primary${busy ? ' btn--busy' : ''}`}
           disabled={busy || !address}
           onClick={() => void buyWithNim()}
-          title={!address ? 'Connect wallet first' : nimCostLabel ?? undefined}
+          title={!address ? 'Connect wallet first' : undefined}
         >
           {busy ? (
             <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
           ) : (
             <Wallet size={16} strokeWidth={2.25} />
           )}
-          Buy with NIM
+          Buy {selectedPack} with NIM
         </button>
         {stripeEnabled && (
           <button
             type="button"
             className={`btn btn-secondary${busy ? ' btn--busy' : ''}`}
-            disabled={busy}
+            disabled={cardDisabled}
             onClick={() => void buyWithCard()}
           >
             {busy ? (
@@ -239,19 +283,17 @@ export function CreditsPanel({
             ) : (
               <CreditCard size={16} strokeWidth={2.25} />
             )}
-            Buy with card
+            Buy {selectedPack} with card
           </button>
         )}
       </div>
 
-      {nimCostLabel && (
+      {selectedQuote && (
         <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>
-          NIM: {nimCostLabel} → {qty} credit{qty === 1 ? '' : 's'} (1× seal price)
-        </p>
-      )}
-      {quoteLabel && stripeEnabled && (
-        <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>
-          Card: {quoteLabel}
+          NIM: {formatSealFeeNim(selectedQuote.creditNimCostTotal)} · Card:{' '}
+          {selectedQuote.meetsStripeMinimum
+            ? `≈ $${selectedQuote.creditStripeUsdTotal.toFixed(2)}`
+            : `under $${(stripeMinCents / 100).toFixed(2)} min — pick ${stripePacks[0]?.pack ?? 'a larger pack'}+ for card`}
         </p>
       )}
       {status && (

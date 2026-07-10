@@ -70,6 +70,32 @@
   line-height: 1.55;
 }
 
+.price-page-packs {
+  margin-top: 0.85rem;
+  overflow-x: auto;
+}
+
+.price-page-packs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.price-page-packs-table th,
+.price-page-packs-table td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 80%, transparent);
+}
+
+.price-page-packs-table th {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .price-page-why {
   margin-top: 1.5rem;
   padding-top: 1.25rem;

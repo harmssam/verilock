@@ -16,9 +16,12 @@ import {
 } from './db.js'
 import {
   CREDIT_RESERVATION_TTL_MS,
+  getCreditPacks,
   getMaxCreditsPerCheckout,
   getMaxCreditsPerNimTopup,
+  getStripeMinChargeCents,
   getStripeMarkup,
+  isCreditPack,
   isCreditsEnabled,
   isStripeCreditsEnabled,
   NIM_PRICE_MAX_AGE_MS,
@@ -39,6 +42,8 @@ export function getCreditsPublicConfig() {
     stripeMarkup: getStripeMarkup(),
     maxPerCheckout: getMaxCreditsPerCheckout(),
     maxPerNimTopup: getMaxCreditsPerNimTopup(),
+    packs: getCreditPacks(),
+    stripeMinChargeCents: getStripeMinChargeCents(),
     creditsPerSeal: 1 as const,
   }
 }
@@ -81,9 +86,17 @@ export interface CreditQuote {
   creditStripeUsdTotal: number
   unitUsdCents: number
   totalUsdCents: number
+  /** Meets Stripe's minimum charge for this pack total. */
+  meetsStripeMinimum: boolean
+  stripeMinChargeCents: number
+  isPack: boolean
   stripeEnabled: boolean
   pricesAgeMs: number | null
   pricesStale: boolean
+}
+
+export interface CreditPackQuote extends CreditQuote {
+  pack: number
 }
 
 export async function quoteCredits(credits: number): Promise<CreditQuote> {
@@ -109,6 +122,8 @@ export async function quoteCredits(credits: number): Promise<CreditQuote> {
   const creditStripeUsd = roundUsd(feeNim * prices.usd * markup)
   const unitUsdCents = usdToCents(creditStripeUsd)
   const totalUsdCents = unitUsdCents * n
+  const stripeMin = getStripeMinChargeCents()
+  const meetsStripeMinimum = totalUsdCents >= stripeMin
 
   return {
     credits: n,
@@ -123,10 +138,58 @@ export async function quoteCredits(credits: number): Promise<CreditQuote> {
     creditStripeUsdTotal: roundUsd(creditStripeUsd * n),
     unitUsdCents,
     totalUsdCents,
+    meetsStripeMinimum,
+    stripeMinChargeCents: stripeMin,
+    isPack: isCreditPack(n),
     stripeEnabled: isStripeCreditsEnabled() && !pricesStale,
     pricesAgeMs: ageMs,
     pricesStale,
   }
+}
+
+/** Quote all fixed packs (for UI / pricing page). */
+export async function quoteCreditPacks(): Promise<{
+  packs: CreditPackQuote[]
+  stripeMinChargeCents: number
+  stripeMarkup: number
+  feeNim: number
+  promoActive: boolean
+}> {
+  const packSizes = getCreditPacks()
+  const packs: CreditPackQuote[] = []
+  for (const pack of packSizes) {
+    const q = await quoteCredits(pack)
+    packs.push({ ...q, pack })
+  }
+  const first = packs[0]
+  return {
+    packs,
+    stripeMinChargeCents: getStripeMinChargeCents(),
+    stripeMarkup: getStripeMarkup(),
+    feeNim: first?.feeNim ?? getSealPricing().feeNim,
+    promoActive: first?.promoActive ?? getSealPricing().promoActive,
+  }
+}
+
+/** Assert pack size + Stripe minimum before creating Checkout. */
+export async function assertStripePackQuote(credits: number): Promise<CreditQuote> {
+  const n = Math.floor(Number(credits))
+  if (!isCreditPack(n)) {
+    throw new Error(
+      `Card purchases are sold as packs only (${getCreditPacks().join(', ')} credits)`,
+    )
+  }
+  const quote = await quoteCredits(n)
+  if (!quote.meetsStripeMinimum) {
+    throw new Error(
+      `This pack totals $${(quote.totalUsdCents / 100).toFixed(2)}, below Stripe’s ` +
+        `$${(quote.stripeMinChargeCents / 100).toFixed(2)} minimum. Choose a larger pack.`,
+    )
+  }
+  if (!quote.stripeEnabled) {
+    throw new Error('Card checkout is temporarily unavailable')
+  }
+  return quote
 }
 
 function nextHoldIdempotencyKey(documentId: string): string {
