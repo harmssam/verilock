@@ -36,6 +36,32 @@ function publicAppUrl(): string {
   return url.replace(/\/$/, '')
 }
 
+/**
+ * Card-statement suffix (appears after account prefix, e.g. YOURCO*VERILOCK).
+ * Stripe allows up to 22 chars; strip characters banks reject.
+ * Override with STRIPE_STATEMENT_DESCRIPTOR_SUFFIX (empty disables).
+ */
+export function stripeStatementDescriptorSuffix(): string | null {
+  if (process.env.STRIPE_STATEMENT_DESCRIPTOR_SUFFIX !== undefined) {
+    const raw = process.env.STRIPE_STATEMENT_DESCRIPTOR_SUFFIX.trim()
+    if (!raw) return null
+    return sanitizeStatementDescriptorSuffix(raw)
+  }
+  return sanitizeStatementDescriptorSuffix('VERILOCK')
+}
+
+function sanitizeStatementDescriptorSuffix(value: string): string {
+  // Stripe: letters, numbers, spaces; no < > \ ' " *. Max 22.
+  const cleaned = value
+    .toUpperCase()
+    .replace(/[<>\\'\"*]/g, '')
+    .replace(/[^A-Z0-9 ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 22)
+  return cleaned || 'VERILOCK'
+}
+
 export async function createCreditsCheckoutSession(input: {
   walletAddress: string
   credits: number
@@ -58,6 +84,7 @@ export async function createCreditsCheckoutSession(input: {
   const stripe = getStripe()
   const appUrl = publicAppUrl()
   const now = Date.now()
+  const statementSuffix = stripeStatementDescriptorSuffix()
 
   const session = await stripe.checkout.sessions.create(
     {
@@ -89,6 +116,13 @@ export async function createCreditsCheckoutSession(input: {
           },
         },
       ],
+      // Card/Apple Pay bank line: {account_prefix}*VERILOCK (account prefix set in Dashboard).
+      payment_intent_data: {
+        description: `VeriLock ${credits}-credit pack`,
+        ...(statementSuffix
+          ? { statement_descriptor_suffix: statementSuffix }
+          : {}),
+      },
     },
     {
       idempotencyKey: `credits-pack:${wallet}:${credits}:${quote.totalUsdCents}:${Math.floor(now / 60_000)}`,
