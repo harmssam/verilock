@@ -1,7 +1,6 @@
 import {
   Check,
   Fingerprint,
-  HelpCircle,
   LoaderCircle,
   Lock,
   RotateCcw,
@@ -47,6 +46,7 @@ import {
 import { VerifyMatchesPanel } from '../VerifyMatchesPanel'
 import { DocumentStage } from './DocumentStage'
 import { FeatureRotator } from './FeatureRotator'
+import { HowVeriLockWorks } from './HowVeriLockWorks'
 import { JourneyAgreements } from './JourneyAgreements'
 import { NotFoundPage } from './NotFoundPage'
 import {
@@ -74,7 +74,6 @@ import { saveHubReturnPath } from '../hubReturnPath'
 import { journeyPathMeta, type PageMeta } from '../seo'
 import {
   allSigned,
-  CREATOR_STAGES,
   nextUnsignedParty,
   requiredCount,
   signedCount,
@@ -2083,40 +2082,11 @@ export function DocumentJourney({
         </>
       )}
 
-      <section className="how-block">
-        <button
-          type="button"
-          className="how-toggle"
-          onClick={() => setHowOpen(v => !v)}
-          aria-expanded={howOpen}
-        >
-          <HelpCircle size={18} strokeWidth={2.25} aria-hidden />
-          <span>
-            <strong>How VeriLock works</strong>
-            <span className="muted">
-              {role === 'signer'
-                ? ' Invited path: connect → sign'
-                : role === 'verifier'
-                  ? ' Verify path: drop a PDF anytime'
-                  : ' Creator path: connect → seal → verify'}
-            </span>
-          </span>
-          <span className={`trust-chevron${howOpen ? ' trust-chevron--open' : ''}`} />
-        </button>
-        {howOpen && (
-          <ol className="how-list">
-            {(role ? pathStages : CREATOR_STAGES).map((s, i) => (
-              <li key={s.id}>
-                <span className="how-num">{i + 1}</span>
-                <div>
-                  <strong>{s.label}</strong> - {s.blurb}
-                  <p className="how-privacy muted">{s.privacyNote}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+      <HowVeriLockWorks
+        role={role}
+        open={howOpen}
+        onToggle={() => setHowOpen(v => !v)}
+      />
 
     </div>
   )
