@@ -122,6 +122,53 @@
 }
 
 .seal-pricing-fiat-source {
-  margin: 0.55rem 0 0;
+  margin: 0.45rem 0 0;
   font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+/* Fastspot: plain muted text by default; link chrome only on hover / keyboard focus.
+   On touch devices (no hover), keep a normal tappable link. */
+.seal-pricing-fastspot-link {
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .seal-pricing-fastspot-link {
+    cursor: text;
+    pointer-events: none;
+  }
+
+  .seal-pricing-fiat-source:hover .seal-pricing-fastspot-link,
+  .seal-pricing-fiat-source:focus-within .seal-pricing-fastspot-link {
+    color: var(--mint, #0d9488);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  .seal-pricing-fastspot-link:focus-visible {
+    color: var(--mint, #0d9488);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    outline: 2px solid color-mix(in srgb, var(--mint, #0d9488) 55%, transparent);
+    outline-offset: 2px;
+    border-radius: 2px;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+}
+
+@media (hover: none) {
+  .seal-pricing-fastspot-link {
+    color: var(--mint, #0d9488);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
 }

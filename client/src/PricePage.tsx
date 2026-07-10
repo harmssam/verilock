@@ -94,7 +94,7 @@ export function PricePage() {
         its fingerprint is written on-chain. You can pay with NIM at seal time, or buy prepaid{' '}
         <strong>seal credits</strong> (including with a card).
       </p>
-      <SealPricingDisplay showAllCurrencies />
+      <SealPricingDisplay />
 
       {creditsInfo?.enabled !== false && (
         <section className="price-page-credits" aria-labelledby="price-credits-heading">
