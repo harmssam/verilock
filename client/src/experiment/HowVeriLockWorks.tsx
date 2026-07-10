@@ -32,9 +32,9 @@ const STEP_ICONS: Record<JourneyStepId, LucideIcon> = {
 }
 
 function roleSubtitle(role: PathRole | null): string {
-  if (role === 'signer') return 'Invited path: connect → sign'
-  if (role === 'verifier') return 'Verify path: drop a PDF anytime'
-  return 'Creator path: connect → seal → verify'
+  if (role === 'signer') return 'Match the shared PDF and sign with your wallet'
+  if (role === 'verifier') return 'Check a sealed fingerprint anytime — no wallet needed'
+  return 'Fingerprint locally, sign together, seal permanently on Nimiq'
 }
 
 function BeatVisual({ stageId, active }: { stageId: JourneyStepId; active: boolean }) {
@@ -215,7 +215,8 @@ export function HowVeriLockWorks({ role, open, onToggle }: HowVeriLockWorksProps
       {open && (
         <div className="how-story">
           <p className="how-story-lead muted">
-            Scroll the story — each beat is a real step in the product, with privacy built in.
+            Your PDF never leaves this device. Only its SHA-256 fingerprint is written to the Nimiq
+            blockchain when you seal.
           </p>
           <ol className="how-story-list">
             {stages.map((stage, i) => (
