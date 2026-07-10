@@ -925,7 +925,7 @@ export default function App() {
   }, [token, refreshSealFunds])
 
   // Aggressively pre-warm everything needed for bulletproof Hub gesture + return handling:
-  // - block height (sync buildLockRequestSync for validityStartHeight)
+  // - Hub checkout request (sync buildLockRequestSync — Hub sets validityStartHeight)
   // - prepareLock on server (so beginLock never fails with "Call prepare-lock first")
   // - funds status
   // This runs when readyToLock so explicit Seal tap has zero prep latency and reliable state.

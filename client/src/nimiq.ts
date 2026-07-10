@@ -262,29 +262,29 @@ function getRecentBlockHeightSync(): number | null {
   return lastKnownBlock
 }
 
-/** Build request synchronously using cached or last-known block.
- *  Never returns null — falls back so the gesture path can always proceed.
- *  (Slightly stale validityStartHeight is tolerated by the network/Hub.)
+/**
+ * Hub checkout request for seal (sync — safe on user-gesture path).
+ *
+ * Per Nimiq Hub docs, checkout() signs **and broadcasts**. Prefer this over
+ * signTransaction(), which only returns a signed payload and often fails to
+ * land when we rebroadcast ourselves (see docs/nimiq-network-integration.md).
  */
 export function buildLockRequestSync(
   address: string,
   docId: string,
   finalSha256: string,
-): Awaited<ReturnType<typeof buildHubLockSignRequest>> {
-  let h = getRecentBlockHeightSync()
-  if (h == null) {
-    // last resort: use 0 or a very old safe value; will be refreshed async
-    h = lastKnownBlock ?? 0
-  }
+): Awaited<ReturnType<typeof buildHubLockCheckoutRequest>> {
   const recipient = getHubAttestationRecipient()
   return {
     appName: APP_NAME,
     sender: address,
+    forceSender: true,
     recipient,
     value: getSealFeeLuna(),
     flags: 0,
     extraData: buildAttestationPayloadBytes(docId, finalSha256.toLowerCase()),
-    validityStartHeight: h,
+    // Hub picks validityStartHeight; 120 blocks is the documented default max.
+    validityDuration: 120,
   }
 }
 
@@ -418,23 +418,12 @@ export function getHubAttestationRecipient(): string {
   return DEFAULT_ATTESTATION_RECIPIENT
 }
 
-async function buildHubLockSignRequest(address: string, docId: string, finalSha256: string) {
-  // Always return a request without blocking the caller if possible.
-  // getRecent... will use cache or lastKnown; only await on cold start with no history.
-  let blockNumber = getRecentBlockHeightSync()
-  if (blockNumber == null) {
-    blockNumber = await refreshBlockHeight()
-  }
-  const recipient = getHubAttestationRecipient()
-  return {
-    appName: APP_NAME,
-    sender: address,
-    recipient,
-    value: getSealFeeLuna(),
-    flags: 0,
-    extraData: buildAttestationPayloadBytes(docId, finalSha256.toLowerCase()),
-    validityStartHeight: blockNumber,
-  }
+async function buildHubLockCheckoutRequest(address: string, docId: string, finalSha256: string) {
+  // Checkout does not require validityStartHeight (Hub sets it). Keep this async
+  // so call sites can warm block height for other Hub paths without blocking.
+  void getRecentBlockHeightSync()
+  void refreshBlockHeight().catch(() => {})
+  return buildLockRequestSync(address, docId, finalSha256)
 }
 
 export function isLockHubCommand(command: string, state: Record<string, unknown> | null | undefined): boolean {
@@ -499,9 +488,17 @@ export async function finalizeHubLockTransaction(
     if (await waitForTransactionOnNetwork(hash, HUB_CHECKOUT_NETWORK_WAIT_MS)) {
       return hash
     }
-    sealWarn('hub:checkoutProceedingBeforeVisible', { hash })
-    reportSealProgress('Transaction submitted — confirming on-chain…')
-    return hash
+    // Hub checkout should broadcast; if RPC still cannot see it, rebroadcast ourselves.
+    sealWarn('hub:checkoutNotVisibleYet', { hash })
+    reportSealProgress('Rebroadcasting signed transaction…')
+    try {
+      return await relaySignedTransaction(signed, options?.broadcastFallback)
+    } catch (err) {
+      sealWarn('hub:checkoutRelayFallbackFailed', err)
+      // Still return hash so the server poller can confirm if Hub broadcast was slow.
+      reportSealProgress('Transaction submitted — confirming on-chain…')
+      return hash
+    }
   }
 
   return relaySignedTransaction(signed, options?.broadcastFallback)
@@ -933,19 +930,18 @@ export function buildTopupPayloadHex(): string {
   return bytesToHex(buildTopupPayloadBytes())
 }
 
-async function buildHubCreditTopupRequest(address: string, valueLuna: number) {
-  let blockNumber = getRecentBlockHeightSync()
-  if (blockNumber == null) {
-    blockNumber = await refreshBlockHeight()
-  }
+async function buildHubCreditTopupCheckoutRequest(address: string, valueLuna: number) {
+  void getRecentBlockHeightSync()
+  void refreshBlockHeight().catch(() => {})
   return {
     appName: APP_NAME,
     sender: address,
+    forceSender: true,
     recipient: getHubAttestationRecipient(),
     value: valueLuna,
     flags: 0,
     extraData: buildTopupPayloadBytes(),
-    validityStartHeight: blockNumber,
+    validityDuration: 120,
   }
 }
 
@@ -969,7 +965,7 @@ export async function sendCreditTopupViaPay(
 
 /**
  * One-click NIM credit purchase via Nimiq Hub.
- * Prefer popup on desktop; redirect when preferRedirect is true (mobile).
+ * Uses checkout() so Hub broadcasts (signTransaction alone does not).
  */
 export async function sendCreditTopupViaHub(
   address: string,
@@ -985,9 +981,9 @@ export async function sendCreditTopupViaHub(
     throw new Error('Invalid credit top-up amount')
   }
   const hub = getHubApi()
-  const request = await buildHubCreditTopupRequest(address, valueLuna)
+  const request = await buildHubCreditTopupCheckoutRequest(address, valueLuna)
 
-  sealLog('hub:creditTopupRequest', {
+  sealLog('hub:creditTopupCheckoutRequest', {
     recipient: request.recipient,
     value: request.value,
     preferRedirect: options?.preferRedirect ?? false,
@@ -1004,18 +1000,19 @@ export async function sendCreditTopupViaHub(
     clearStaleHubRpcStateIfIdle()
     saveHubReturnPath()
     const behavior = hubRedirectBehavior(topupState)
-    await hub.signTransaction(
+    await hub.checkout(
       request,
-      behavior as Parameters<typeof hub.signTransaction>[1],
+      behavior as Parameters<typeof hub.checkout>[1],
     )
     throw new Error(HUB_REDIRECT_MESSAGE)
   }
 
   try {
     clearStaleHubRpcStateIfIdle()
-    const signed = await hub.signTransaction(request)
+    const signed = await hub.checkout(request)
     const txHash = await finalizeHubLockTransaction(signed as SignedTransaction, {
-      hubBroadcast: false,
+      // Hub checkout already broadcasts to the network.
+      hubBroadcast: true,
       broadcastFallback: options?.broadcastFallback,
     })
     sealLog('hub:creditTopupSuccess', { txHash })
@@ -1029,6 +1026,10 @@ export async function sendCreditTopupViaHub(
   }
 }
 
+/**
+ * Seal via Nimiq Hub using checkout() — signs and broadcasts (official path).
+ * signTransaction is only kept as a handler for in-flight legacy redirects.
+ */
 export async function sendLockAttestationViaHub(
   address: string,
   docId: string,
@@ -1037,22 +1038,21 @@ export async function sendLockAttestationViaHub(
     preferRedirect?: boolean
     token?: string
     broadcastFallback?: TransactionBroadcastFallback
-    /** Prebuilt request (from cache) to avoid await inside gesture path for redirect. */
-    prebuiltRequest?: Awaited<ReturnType<typeof buildHubLockSignRequest>>
+    /** Prebuilt checkout request to avoid await inside the gesture path. */
+    prebuiltRequest?: Awaited<ReturnType<typeof buildHubLockCheckoutRequest>>
     finalSha256?: string
   },
 ): Promise<string> {
   const hub = getHubApi()
   const request =
     options?.prebuiltRequest ??
-    (await buildHubLockSignRequest(address, docId, finalSha256))
+    (await buildHubLockCheckoutRequest(address, docId, finalSha256))
 
-  sealLog('hub:signTransactionRequest', {
+  sealLog('hub:checkoutRequest', {
     docId,
     recipient: request.recipient,
-    extraDataBytes: request.extraData.length,
+    extraDataBytes: request.extraData instanceof Uint8Array ? request.extraData.length : 0,
     value: request.value,
-    validityStartHeight: request.validityStartHeight,
     preferRedirect: options?.preferRedirect ?? false,
   })
 
@@ -1068,27 +1068,26 @@ export async function sendLockAttestationViaHub(
     clearStaleHubRpcStateIfIdle()
     saveHubReturnPath()
     const behavior = hubRedirectBehavior(lockState)
-    // The hub.signTransaction call (with redirect behavior) must be reached with no
-    // preceding await in the user gesture call stack for cross-browser reliability.
-    await hub.signTransaction(
+    // checkout with RedirectRequestBehavior must stay in the user-gesture stack.
+    await hub.checkout(
       request,
-      behavior as Parameters<typeof hub.signTransaction>[1],
+      behavior as Parameters<typeof hub.checkout>[1],
     )
     throw new Error(HUB_REDIRECT_MESSAGE)
   }
 
   try {
     clearStaleHubRpcStateIfIdle()
-    sealLog('hub:popupSignTransaction', { docId })
-    const signed = await hub.signTransaction(request)
+    sealLog('hub:popupCheckout', { docId })
+    const signed = await hub.checkout(request)
     const txHash = await finalizeHubLockTransaction(signed as SignedTransaction, {
-      hubBroadcast: false,
+      hubBroadcast: true,
       broadcastFallback: options?.broadcastFallback,
     })
-    sealLog('hub:signTransactionSuccess', { txHash })
+    sealLog('hub:checkoutSuccess', { txHash })
     return txHash
   } catch (err) {
-    sealError('hub:signTransactionFailed', err)
+    sealError('hub:checkoutFailed', err)
     if (isPopupBlockedError(err)) {
       throw new Error(popupBlockedHelp())
     }

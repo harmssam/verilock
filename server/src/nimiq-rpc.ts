@@ -1,4 +1,4 @@
-import { Client, ClientConfiguration } from '@nimiq/core'
+import { Client, ClientConfiguration, Transaction } from '@nimiq/core'
 import { normalizeAddress } from './addresses.js'
 import { hasActiveCreditReservation } from './db.js'
 import {
@@ -236,20 +236,85 @@ export function normalizeRawTransactionHex(rawTx: string): string {
   return clean.toLowerCase()
 }
 
-/** Broadcast a signed transaction hex to the Nimiq network. */
+/** Compute tx hash from serialized hex via @nimiq/core (never use raw slice as hash). */
+function hashFromSerializedTx(cleanHex: string): string {
+  const tx = Transaction.fromAny(cleanHex)
+  return normalizeTxHash(tx.hash())
+}
+
+/**
+ * Broadcast a signed transaction hex to the Nimiq network.
+ * Prefer the web client; fall back to JSON-RPC. Always return a real tx hash.
+ */
 export async function broadcastRawTransaction(rawTx: string): Promise<string> {
   const clean = normalizeRawTransactionHex(rawTx)
+  let lastError: Error | null = null
+  let knownHash: string | null = null
+
+  try {
+    knownHash = hashFromSerializedTx(clean)
+  } catch (err) {
+    lastError = err instanceof Error ? err : new Error(String(err))
+  }
+
   try {
     const client = await getBroadcastClient()
     const details = await client.sendTransaction(clean)
-    return normalizeTxHash(details.transactionHash)
-  } catch {
+    const hash = normalizeTxHash(details.transactionHash)
+    if (hash) {
+      // Also push to the public JSON-RPC node we use for verification so the
+      // tx is not only in the light client's peer set.
+      try {
+        await rpcCall<string>('sendRawTransaction', [clean])
+      } catch {
+        /* already known / race — ignore */
+      }
+      return hash
+    }
+  } catch (err) {
+    lastError = err instanceof Error ? err : new Error(String(err))
+  }
+
+  try {
     const hash = await rpcCall<string>('sendRawTransaction', [clean])
     if (typeof hash === 'string' && hash.length > 0) {
       return normalizeTxHash(hash)
     }
-    return normalizeTxHash(clean.slice(0, 64))
+  } catch (err) {
+    lastError = err instanceof Error ? err : new Error(String(err))
   }
+
+  // If the network already has the tx (duplicate broadcast), return its real hash.
+  if (knownHash) {
+    const existing = await fetchTransaction(knownHash)
+    if (existing) return normalizeTxHash(existing.hash || knownHash)
+  }
+
+  if (knownHash && lastError) {
+    // Client may have accepted the tx even if the promise rejected late.
+    throw new Error(
+      `Broadcast may have failed (${lastError.message}). Hash ${knownHash.slice(0, 12)}… not visible on RPC yet.`,
+    )
+  }
+
+  throw new Error(
+    lastError?.message ?? 'Could not broadcast transaction to the Nimiq network',
+  )
+}
+
+/** Wait until a tx is visible via getTransactionByHash or mempool, or timeout. */
+export async function waitForTransactionVisible(
+  txHash: string,
+  timeoutMs = 45_000,
+  pollMs = 2_000,
+): Promise<NimiqTransaction | null> {
+  const started = Date.now()
+  while (Date.now() - started < timeoutMs) {
+    const tx = await fetchTransaction(txHash)
+    if (tx) return tx
+    await new Promise(resolve => setTimeout(resolve, pollMs))
+  }
+  return null
 }
 
 export async function fetchTransaction(hash: string): Promise<NimiqTransaction | null> {
