@@ -8,8 +8,10 @@ import {
 } from './credits.js'
 import { isStripeCreditsEnabled } from './creditsConfig.js'
 import {
+  getCreditBalance,
   getStripeCheckoutSession,
   isCreditAccountFlagged,
+  listPendingStripeCheckoutsForWallet,
   updateStripeCheckoutStatus,
   upsertStripeCheckoutSession,
 } from './db.js'
@@ -124,22 +126,24 @@ export function mintFromCheckoutSession(session: Stripe.Checkout.Session): {
   minted: boolean
   balance?: number
   credits?: number
+  walletAddress?: string
+  paymentStatus?: string
 } {
   if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
     updateStripeCheckoutStatus(session.id, session.payment_status ?? 'unpaid')
-    return { minted: false }
+    return { minted: false, paymentStatus: session.payment_status ?? 'unpaid' }
   }
 
   const walletRaw = session.metadata?.walletAddress || session.client_reference_id
   if (!walletRaw) {
     console.error('[stripe] checkout session missing wallet metadata', session.id)
-    return { minted: false }
+    return { minted: false, paymentStatus: session.payment_status }
   }
   const wallet = normalizeAddress(walletRaw)
   const credits = Number.parseInt(session.metadata?.credits ?? '', 10)
   if (!Number.isFinite(credits) || credits < 1) {
     console.error('[stripe] checkout session missing credits metadata', session.id)
-    return { minted: false }
+    return { minted: false, walletAddress: wallet, paymentStatus: session.payment_status }
   }
 
   const feeNim = Number(session.metadata?.feeNim ?? 0)
@@ -160,7 +164,143 @@ export function mintFromCheckoutSession(session: Stripe.Checkout.Session): {
   })
 
   updateStripeCheckoutStatus(session.id, 'paid')
-  return { minted: created, balance, credits }
+  return {
+    minted: created,
+    balance,
+    credits,
+    walletAddress: wallet,
+    paymentStatus: session.payment_status,
+  }
+}
+
+/**
+ * Client return-path fulfillment (success_url). Mirrors NIM claim:
+ * re-fetch Checkout Session from Stripe and mint if paid.
+ * Idempotent via ledger key topup_stripe:{sessionId}.
+ */
+export async function confirmCreditsCheckoutSession(input: {
+  sessionId: string
+  walletAddress: string
+}): Promise<{
+  balance: number
+  creditsMinted: number
+  alreadyClaimed: boolean
+  paid: boolean
+  sessionId: string
+}> {
+  if (!isStripeCreditsEnabled()) {
+    throw new Error('Card purchases are not enabled')
+  }
+
+  const sessionId = input.sessionId.trim()
+  if (!sessionId.startsWith('cs_')) {
+    throw new Error('Invalid checkout session id')
+  }
+
+  const wallet = normalizeAddress(input.walletAddress)
+  const stripe = getStripe()
+  const session = await stripe.checkout.sessions.retrieve(sessionId)
+
+  const sessionWalletRaw = session.metadata?.walletAddress || session.client_reference_id
+  if (!sessionWalletRaw) {
+    throw new Error('Checkout session is missing wallet metadata')
+  }
+  if (normalizeAddress(sessionWalletRaw) !== wallet) {
+    throw new Error('Checkout session does not belong to this wallet')
+  }
+
+  const local = getStripeCheckoutSession(sessionId)
+  if (!local) {
+    // Session may predate a DB wipe or another instance; still mint from Stripe metadata.
+    const credits = Number.parseInt(session.metadata?.credits ?? '', 10) || 0
+    if (credits >= 1) {
+      upsertStripeCheckoutSession({
+        sessionId: session.id,
+        walletAddress: wallet,
+        credits,
+        usdCents: session.amount_total ?? 0,
+        unitUsdCents: Number(session.metadata?.unitUsdCents ?? 0) || 0,
+        feeNim: Number(session.metadata?.feeNim ?? 0) || 0,
+        nimUsd: Number(session.metadata?.nimUsd ?? 0) || 0,
+        markup: Number(session.metadata?.markup ?? 0) || 0,
+        status: 'pending',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    }
+  }
+
+  const result = mintFromCheckoutSession(session)
+  const balance = result.balance ?? getCreditBalance(wallet)
+  const creditsMinted = result.credits ?? 0
+  const paid =
+    session.payment_status === 'paid' || session.payment_status === 'no_payment_required'
+
+  if (!paid) {
+    return {
+      balance,
+      creditsMinted: 0,
+      alreadyClaimed: false,
+      paid: false,
+      sessionId,
+    }
+  }
+
+  return {
+    balance,
+    creditsMinted: result.minted ? creditsMinted : 0,
+    alreadyClaimed: !result.minted,
+    paid: true,
+    sessionId,
+  }
+}
+
+/**
+ * Recover paid-but-unminted packs when the user returns without session_id
+ * (or webhook never arrived). Checks local pending rows against Stripe.
+ */
+export async function syncPendingStripeCheckoutsForWallet(walletAddress: string): Promise<{
+  balance: number
+  mintedTotal: number
+  sessions: Array<{ sessionId: string; creditsMinted: number; alreadyClaimed: boolean; paid: boolean }>
+}> {
+  if (!isStripeCreditsEnabled()) {
+    const wallet = normalizeAddress(walletAddress)
+    return { balance: getCreditBalance(wallet), mintedTotal: 0, sessions: [] }
+  }
+
+  const wallet = normalizeAddress(walletAddress)
+  const pending = listPendingStripeCheckoutsForWallet(wallet, 10)
+  const sessions: Array<{
+    sessionId: string
+    creditsMinted: number
+    alreadyClaimed: boolean
+    paid: boolean
+  }> = []
+  let mintedTotal = 0
+
+  for (const row of pending) {
+    try {
+      const confirmed = await confirmCreditsCheckoutSession({
+        sessionId: row.sessionId,
+        walletAddress: wallet,
+      })
+      if (confirmed.creditsMinted > 0) mintedTotal += confirmed.creditsMinted
+      sessions.push({
+        sessionId: confirmed.sessionId,
+        creditsMinted: confirmed.creditsMinted,
+        alreadyClaimed: confirmed.alreadyClaimed,
+        paid: confirmed.paid,
+      })
+    } catch (err) {
+      console.warn('[stripe] pending sync failed', {
+        sessionId: row.sessionId,
+        message: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  return { balance: getCreditBalance(wallet), mintedTotal, sessions }
 }
 
 export async function handleStripeWebhook(

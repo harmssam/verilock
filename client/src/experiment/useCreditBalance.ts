@@ -17,7 +17,7 @@ export function useCreditBalance(token: string | null | undefined): {
   const [balance, setBalance] = useState<number | null>(null)
   const [enabled, setEnabled] = useState(false)
 
-  const refresh = useCallback(async (force = false) => {
+  const refresh = useCallback(async (force = false, options?: { syncStripe?: boolean }) => {
     if (!token) {
       setBalance(null)
       setEnabled(false)
@@ -26,18 +26,30 @@ export function useCreditBalance(token: string | null | undefined): {
     try {
       const data = await loadCreditsBalance(
         token,
-        () => api.creditsBalance(token),
-        { force },
+        () => api.creditsBalance(token, { syncStripe: options?.syncStripe }),
+        { force: force || options?.syncStripe },
       )
       setEnabled(data.enabled)
       setBalance(data.enabled ? data.balance : null)
+      // If pending Stripe sessions minted credits, push a top-up event so panels update.
+      const minted = data.stripeSynced?.mintedTotal
+      if (minted && minted > 0) {
+        writeCreditsBalanceCache(token, data.balance)
+        window.dispatchEvent(
+          new CustomEvent('verilock:credits-topup', {
+            detail: { ok: true, balance: data.balance, creditsMinted: minted },
+          }),
+        )
+      }
     } catch {
       // Keep last known balance on 429 / transient errors
     }
   }, [token])
 
   useEffect(() => {
-    void refresh(false)
+    // First load after connect: sync any paid-but-unminted Stripe checkouts
+    // (webhook may have missed). Later refreshes stay cheap.
+    void refresh(true, { syncStripe: true })
   }, [refresh])
 
   useEffect(() => {

@@ -1119,6 +1119,36 @@ export function getStripeCheckoutSession(sessionId: string): {
   }
 }
 
+/** Pending / unpaid checkout rows for a wallet (most recent first). */
+export function listPendingStripeCheckoutsForWallet(
+  walletAddress: string,
+  limit = 10,
+): Array<{
+  sessionId: string
+  walletAddress: string
+  credits: number
+  usdCents: number
+  status: string
+}> {
+  const wallet = normalizeAddress(walletAddress)
+  const rows = db
+    .prepare(
+      `SELECT * FROM stripe_checkout_sessions
+       WHERE wallet_address = ?
+         AND status NOT IN ('paid', 'failed', 'expired')
+       ORDER BY created_at DESC
+       LIMIT ?`,
+    )
+    .all(wallet, Math.max(1, Math.min(limit, 25))) as Record<string, unknown>[]
+  return rows.map(row => ({
+    sessionId: row.session_id as string,
+    walletAddress: row.wallet_address as string,
+    credits: row.credits as number,
+    usdCents: row.usd_cents as number,
+    status: row.status as string,
+  }))
+}
+
 export function updateStripeCheckoutStatus(sessionId: string, status: string, updatedAt = Date.now()): void {
   db.prepare('UPDATE stripe_checkout_sessions SET status = ?, updated_at = ? WHERE session_id = ?').run(
     status,

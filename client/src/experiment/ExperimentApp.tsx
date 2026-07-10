@@ -26,6 +26,11 @@ import {
   resolveJourneyConnectMode,
 } from './journeyConnectUi'
 import { useJourneyWallet } from './useJourneyWallet'
+import {
+  clearStripeCheckoutReturnFromUrl,
+  fulfillStripeCheckoutReturn,
+  peekStripeCheckoutReturn,
+} from './stripeCheckoutReturn'
 
 type ShellScreen = 'journey' | 'pricing' | 'privacy' | 'agreements' | 'not-found'
 
@@ -118,6 +123,49 @@ export function ExperimentApp() {
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
+
+  /** Stripe Checkout success/cancel return — mint credits client-side if webhook missed. */
+  const walletToken = wallet.token
+  const walletBootReady = wallet.bootReady
+  const setWalletError = wallet.setError
+  useEffect(() => {
+    const ret = peekStripeCheckoutReturn()
+    if (!ret.status) return
+
+    if (ret.status === 'cancel') {
+      clearStripeCheckoutReturnFromUrl()
+      setWalletError('Card checkout was cancelled.')
+      return
+    }
+
+    // Wait until wallet session is restored from localStorage after redirect.
+    if (!walletBootReady) return
+    if (!walletToken) {
+      clearStripeCheckoutReturnFromUrl()
+      setWalletError('Sign in with the same wallet to apply your card purchase.')
+      return
+    }
+    if (!ret.sessionId) {
+      clearStripeCheckoutReturnFromUrl()
+      void refreshCredits()
+      return
+    }
+
+    let cancelled = false
+    void (async () => {
+      const result = await fulfillStripeCheckoutReturn(walletToken, ret.sessionId!)
+      if (cancelled) return
+      clearStripeCheckoutReturnFromUrl()
+      if (!result.ok) {
+        setWalletError(result.message)
+      }
+      // Refresh (with pending sync) whether mint happened here or earlier via webhook.
+      void refreshCredits()
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [walletBootReady, walletToken, refreshCredits, setWalletError])
 
   const handleJourneyPageMeta = useCallback((meta: PageMeta) => {
     setJourneyMeta(meta)

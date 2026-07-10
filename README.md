@@ -84,6 +84,14 @@ This keeps SQLite (`verilock.db`) across deploys. PDF files are not stored — o
 | `STRIPE_SECRET_KEY` | Stripe secret (set when ready; rotate after) |
 | `STRIPE_WEBHOOK_SECRET` | Webhook signing secret for `/api/stripe/webhook` |
 
+**Stripe card credits:** mint happens on webhook `checkout.session.completed` **and** on return via `POST /api/credits/checkout/confirm` (success_url `?credits=success&session_id=…`). Also, `GET /api/credits/balance?syncStripe=1` re-checks pending sessions for the signed-in wallet (recovers missed webhooks).
+
+In Stripe Dashboard → Developers → Webhooks, point events at:
+
+`https://verilock.online/api/stripe/webhook`
+
+Subscribe at least to: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `charge.refunded`, `charge.dispute.created`. Put the signing secret in `STRIPE_WEBHOOK_SECRET`.
+
 Do **not** set `SKIP_CHAIN_VERIFY` in production.
 
 `PORT` is set automatically by Railway.
