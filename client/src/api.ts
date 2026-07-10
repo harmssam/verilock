@@ -237,7 +237,7 @@ export const api = {
       creditsPerSeal: number
     }>('/api/credits/config'),
 
-  creditsBalance: (token: string) =>
+  creditsBalance: (token: string, options?: { syncStripe?: boolean }) =>
     request<{
       walletAddress: string
       balance: number
@@ -250,7 +250,10 @@ export const api = {
       packs: number[]
       stripeMinChargeCents: number
       creditsPerSeal: number
-    }>('/api/credits/balance', { headers: withAuth(token) }),
+      stripeSynced?: { mintedTotal: number }
+    }>(`/api/credits/balance${options?.syncStripe ? '?syncStripe=1' : ''}`, {
+      headers: withAuth(token),
+    }),
 
   creditsQuote: (credits = 10) =>
     request<{
@@ -334,6 +337,20 @@ export const api = {
       method: 'POST',
       headers: { ...withAuth(token), 'Content-Type': 'application/json' },
       body: JSON.stringify({ credits }),
+    }),
+
+  /** Fulfill Stripe Checkout after redirect (or recover if webhook missed). */
+  confirmCreditsCheckout: (token: string, sessionId: string) =>
+    request<{
+      balance: number
+      creditsMinted: number
+      alreadyClaimed: boolean
+      paid: boolean
+      sessionId: string
+    }>('/api/credits/checkout/confirm', {
+      method: 'POST',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId }),
     }),
 
   payWithCredit: (token: string, docId: string, finalSha256?: string) =>

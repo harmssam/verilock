@@ -217,11 +217,41 @@ app.get('/api/credits/config', creditsLimit, (_req, res) => {
   })
 })
 
-app.get('/api/credits/balance', authMiddleware, requireVerifiedWallet, creditsBalanceLimit, async (_req, res) => {
+app.get('/api/credits/balance', authMiddleware, requireVerifiedWallet, creditsBalanceLimit, async (req, res) => {
   try {
     const { getBalanceForWallet, getCreditsPublicConfig } = await import('./credits.js')
     const address = res.locals.address as string
-    res.json({ ...getBalanceForWallet(address), ...getCreditsPublicConfig() })
+    // Optional recovery: ?syncStripe=1 re-checks pending Checkout Sessions with Stripe
+    // (covers missing webhooks / lost success_url). Cheap no-op when nothing pending.
+    const sync =
+      req.query.syncStripe === '1' ||
+      req.query.syncStripe === 'true' ||
+      req.query.sync === '1'
+    let stripeSynced: { mintedTotal: number } | undefined
+    if (sync) {
+      try {
+        const { syncPendingStripeCheckoutsForWallet } = await import('./stripeCredits.js')
+        const result = await syncPendingStripeCheckoutsForWallet(address)
+        if (result.mintedTotal > 0) {
+          console.log('[stripe] balance sync minted', {
+            wallet: address,
+            mintedTotal: result.mintedTotal,
+            sessions: result.sessions.length,
+          })
+        }
+        stripeSynced = { mintedTotal: result.mintedTotal }
+      } catch (err) {
+        console.warn(
+          '[stripe] balance sync skipped',
+          err instanceof Error ? err.message : String(err),
+        )
+      }
+    }
+    res.json({
+      ...getBalanceForWallet(address),
+      ...getCreditsPublicConfig(),
+      ...(stripeSynced ? { stripeSynced } : {}),
+    })
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : 'Could not load credits' })
   }
@@ -311,6 +341,43 @@ app.post(
       res.json(result)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Checkout failed'
+      res.status(400).json({ error: message })
+    }
+  },
+)
+
+/**
+ * Fulfill Stripe Checkout after success_url redirect (and recovery if webhook missed).
+ * Body: { sessionId: "cs_..." }. Idempotent.
+ */
+app.post(
+  '/api/credits/checkout/confirm',
+  authMiddleware,
+  requireVerifiedWallet,
+  creditsLimit,
+  async (req, res) => {
+    try {
+      const { confirmCreditsCheckoutSession } = await import('./stripeCredits.js')
+      const { sessionId } = req.body as { sessionId?: string }
+      if (!sessionId?.trim()) {
+        res.status(400).json({ error: 'sessionId required' })
+        return
+      }
+      const address = res.locals.address as string
+      const result = await confirmCreditsCheckoutSession({
+        sessionId: sessionId.trim(),
+        walletAddress: address,
+      })
+      if (!result.paid) {
+        res.status(402).json({
+          error: 'Payment not completed yet',
+          ...result,
+        })
+        return
+      }
+      res.json(result)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Checkout confirm failed'
       res.status(400).json({ error: message })
     }
   },

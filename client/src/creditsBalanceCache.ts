@@ -41,9 +41,10 @@ export async function loadCreditsBalance(
     maxPerCheckout?: number
     maxPerNimTopup?: number
     creditsPerSeal?: number
+    stripeSynced?: { mintedTotal: number }
   }>,
   options?: { force?: boolean },
-): Promise<CacheEntry> {
+): Promise<CacheEntry & { stripeSynced?: { mintedTotal: number } }> {
   if (!options?.force) {
     const hit = peekCreditsBalanceCache(token)
     if (hit) return hit
@@ -52,7 +53,7 @@ export async function loadCreditsBalance(
 
   const promise = (async () => {
     const data = await fetchFn()
-    const entry: CacheEntry = {
+    const entry: CacheEntry & { stripeSynced?: { mintedTotal: number } } = {
       balance: data.balance,
       enabled: data.enabled,
       stripeEnabled: data.stripeEnabled,
@@ -63,6 +64,7 @@ export async function loadCreditsBalance(
       maxPerNimTopup: data.maxPerNimTopup,
       creditsPerSeal: data.creditsPerSeal,
       fetchedAt: Date.now(),
+      stripeSynced: data.stripeSynced,
     }
     cache = { token, entry }
     return entry
