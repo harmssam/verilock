@@ -54,8 +54,6 @@ export function PricePage({
 }: PricePageProps = {}) {
   const basePricing = getSealPricing()
   const [creditsInfo, setCreditsInfo] = useState<CreditsPublicInfo | null>(null)
-  const [creditsRefresh, setCreditsRefresh] = useState(0)
-
   useEffect(() => {
     let cancelled = false
     void (async () => {
@@ -196,9 +194,7 @@ export function PricePage({
                 address={address}
                 nimiq={nimiq}
                 setNimiq={setNimiq}
-                refreshKey={creditsRefresh}
                 onBalanceChange={() => {
-                  setCreditsRefresh(k => k + 1)
                   onCreditsPurchased?.()
                 }}
               />
