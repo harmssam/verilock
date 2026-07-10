@@ -1774,7 +1774,9 @@ export function DocumentJourney({
                         : `All ${requiredCount(doc)} signatures collected.`}
                     </p>
                   </div>
-                  <SealPricingDisplay className="journey-pricing journey-pricing--seal" />
+                  {creditBalance < 1 && (
+                    <SealPricingDisplay className="journey-pricing journey-pricing--seal" />
+                  )}
                   <CreditsPanel
                     token={token}
                     address={address}
@@ -1782,9 +1784,10 @@ export function DocumentJourney({
                     setNimiq={setNimiq}
                     refreshKey={creditsRefresh}
                     compact
+                    balanceOnly={creditBalance >= 1}
                     onBalanceChange={setCreditBalance}
                   />
-                  {creditBalance >= 1 && (
+                  {creditBalance >= 1 ? (
                     <button
                       type="button"
                       className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
@@ -1794,40 +1797,43 @@ export function DocumentJourney({
                       {busy ? (
                         <>
                           <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                          Sealing with credit…
+                          Sealing on-chain…
                         </>
                       ) : (
                         <>
                           <Lock size={18} strokeWidth={2.25} />
-                          Seal with 1 credit (no NIM needed)
+                          Seal on Chain - 1 credit
                         </>
                       )}
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className={`btn ${creditBalance >= 1 ? 'btn-secondary' : 'btn-primary'} btn-lg${busy ? ' btn--busy' : ''}`}
-                    disabled={busy || !account}
-                    onClick={() => void seal()}
-                  >
-                    {busy ? (
-                      <>
-                        <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                        Sealing on Nimiq…
-                      </>
-                    ) : (
-                      <>
-                        <Lock size={18} strokeWidth={2.25} />
-                        {inNimiqPay || nimiq ? 'Pay NIM & seal on-chain' : 'Pay NIM via Hub'}
-                      </>
-                    )}
-                  </button>
-                  {!inNimiqPay && !nimiq && creditBalance < 1 && (
-                    <p className="muted journey-seal-hint" style={{ margin: 0 }}>
-                      {isMobileDevice()
-                        ? 'Sealing works best inside Nimiq Pay. In the browser, this seal uses Nimiq Hub — keep VeriLock open until you return and the on-chain proof is confirmed.'
-                        : 'Sealing redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the on-chain proof is confirmed. Or buy credits with NIM / card above to seal without another wallet payment.'}
-                    </p>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
+                        disabled={busy || !account}
+                        onClick={() => void seal()}
+                      >
+                        {busy ? (
+                          <>
+                            <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
+                            Sealing on Nimiq…
+                          </>
+                        ) : (
+                          <>
+                            <Lock size={18} strokeWidth={2.25} />
+                            {inNimiqPay || nimiq ? 'Pay NIM & seal on-chain' : 'Pay NIM via Hub'}
+                          </>
+                        )}
+                      </button>
+                      {!inNimiqPay && !nimiq && (
+                        <p className="muted journey-seal-hint" style={{ margin: 0 }}>
+                          {isMobileDevice()
+                            ? 'Sealing works best inside Nimiq Pay. In the browser, this seal uses Nimiq Hub — keep VeriLock open until you return and the on-chain proof is confirmed.'
+                            : 'Sealing redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the on-chain proof is confirmed. Or buy credits with NIM / card above to seal without another wallet payment.'}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               )}
