@@ -165,6 +165,196 @@
   padding: 0.55rem 0.9rem !important;
 }
 
+/* Official Nimiq hexagon (design kit) — keep aspect ratio in buttons */
+.nimiq-hexagon-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+  object-fit: contain;
+}
+
+.btn .nimiq-hexagon-icon {
+  /* Slight optical lift next to text */
+  margin-top: 0.05em;
+}
+
+/* ── Login sheet (Nimiq how-to + proceed) ── */
+
+.exp-login {
+  position: relative;
+}
+
+.login-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.95rem 1rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-bright);
+  background: rgba(18, 26, 56, 0.98);
+  box-shadow: var(--shadow-soft), 0 0 40px rgba(94, 234, 212, 0.08);
+  color: var(--text);
+  text-align: left;
+}
+
+.login-sheet--popover {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 50;
+  width: min(22.5rem, calc(100vw - 1.5rem));
+  animation: exp-pop 0.18s ease;
+}
+
+.login-sheet--inline {
+  width: 100%;
+  background:
+    linear-gradient(145deg, rgba(94, 234, 212, 0.08), rgba(59, 130, 246, 0.05)),
+    rgba(0, 0, 0, 0.22);
+  box-shadow: none;
+}
+
+.login-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.login-sheet-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.login-sheet-mark {
+  margin-top: 0.2rem;
+}
+
+.login-sheet-kicker {
+  margin: 0 0 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.login-sheet-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.login-sheet-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin: -0.25rem -0.35rem 0 0;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.login-sheet-close:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.login-sheet-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.login-sheet-about {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.login-sheet-steps {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.login-sheet-steps li + li {
+  margin-top: 0.35rem;
+}
+
+.login-sheet-proceed {
+  width: 100%;
+  justify-content: center;
+}
+
+.login-sheet-status {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--sky);
+}
+
+.login-sheet-stores {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-top: 0.15rem;
+  border-top: 1px solid var(--border);
+}
+
+.login-sheet-stores-label {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.login-sheet-store-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.login-sheet-store-row .btn {
+  flex: 1 1 auto;
+  min-width: min(100%, 7.5rem);
+  justify-content: center;
+  font-size: 0.78rem;
+  padding: 0.45rem 0.65rem;
+}
+
+.login-sheet-foot {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .login-sheet--popover {
+    position: fixed;
+    top: auto;
+    right: max(0.75rem, env(safe-area-inset-right));
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    left: max(0.75rem, env(safe-area-inset-left));
+    width: auto;
+    max-height: min(78dvh, 32rem);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    z-index: 60;
+  }
+}
+
 .exp-account-cluster {
   display: inline-flex;
   align-items: center;
@@ -593,6 +783,29 @@
 .trust-bar-sub {
   color: var(--text-muted);
   font-weight: 400;
+}
+
+/* Expanded-only copy of the fingerprint line (shown on mobile) */
+.trust-bar-sub--detail {
+  display: none;
+  margin: 0 0 0.55rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  /* Keep the collapsed trust bar to the headline only */
+  .trust-bar-sub--inline {
+    display: none;
+  }
+
+  .trust-bar-sub--detail {
+    display: block;
+  }
+
+  .trust-bar-main {
+    align-items: center;
+  }
 }
 
 .trust-chevron {
