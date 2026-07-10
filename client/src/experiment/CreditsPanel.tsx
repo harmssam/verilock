@@ -165,7 +165,27 @@ export function CreditsPanel({
     }
   }
 
-  if (!token || !enabled) return null
+  // Public teaser when logged out (still on seal step)
+  if (!token) {
+    return (
+      <div className={`journey-credits${compact ? ' journey-credits--compact' : ''}`}>
+        <div className="journey-credits-head">
+          <Coins size={16} strokeWidth={2.25} aria-hidden />
+          <span>Seal credits</span>
+        </div>
+        <p className="muted journey-credits-note" style={{ margin: 0, fontSize: '0.8rem' }}>
+          Connect your wallet to buy credits with NIM (1× seal price) or card (2× market), then seal
+          without another payment. See{' '}
+          <a href="/pricing" className="inline-link">
+            Pricing
+          </a>{' '}
+          for details.
+        </p>
+      </div>
+    )
+  }
+
+  if (!enabled) return null
 
   return (
     <div className={`journey-credits${compact ? ' journey-credits--compact' : ''}`}>
