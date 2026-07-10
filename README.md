@@ -69,13 +69,26 @@ This keeps SQLite (`verilock.db`) across deploys. PDF files are not stored — o
 |----------|-------|
 | `NODE_ENV` | `production` |
 | `DATA_DIR` | `/data` |
-| `CORS_ORIGIN` | `https://your-app.up.railway.app` |
+| `CORS_ORIGIN` | `https://verilock.online` (and any preview hosts) |
+| `PUBLIC_APP_URL` | `https://verilock.online` (Stripe + absolute links) |
+| `APP_PUBLIC_URL` | `https://verilock.online` (email deep links) |
 | `NIMIQ_RPC_URL` | `https://rpc.nimiqwatch.com` |
 | `NIM_MIN_CONFIRMATIONS` | `1` |
+| `ATTESTATION_RECIPIENT` | Seal/credit sink address |
+| `CREDITS_ENABLED` | `true` to enable prepaid credits |
+| `CREDITS_STRIPE_ENABLED` | `true` when Stripe keys are set |
+| `CREDITS_STRIPE_MARKUP` | `2` (card price = 2× live NIM market) |
+| `CREDITS_MAX_PER_CHECKOUT` | e.g. `20` |
+| `CREDITS_MAX_PER_NIM_TOPUP` | e.g. `50` |
+| `SERVICE_WALLET_PRIVATE_KEY` | Hex key for credit-seal proofs (fund with dust NIM) |
+| `STRIPE_SECRET_KEY` | Stripe secret (set when ready; rotate after) |
+| `STRIPE_WEBHOOK_SECRET` | Webhook signing secret for `/api/stripe/webhook` |
 
 Do **not** set `SKIP_CHAIN_VERIFY` in production.
 
 `PORT` is set automatically by Railway.
+
+See root `.env.example` and `server/.env.example` for the full template.
 
 ### 4. Build & deploy
 

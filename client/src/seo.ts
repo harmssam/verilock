@@ -1,7 +1,7 @@
 export const SITE_NAME = 'VeriLock'
 export const SITE_TAGLINE = 'Sign together. Prove forever.'
 export const DEFAULT_ORIGIN = 'https://verilock.online'
-export const DEFAULT_OG_IMAGE = '/verilock-logo.png'
+export const DEFAULT_OG_IMAGE = '/verilock-mark.png'
 
 export interface PageMeta {
   title: string
@@ -52,6 +52,12 @@ export const PAGE_META = {
   document: {
     title: `Agreement${TITLE_SUFFIX}`,
     description: 'Review, sign, or seal a VeriLock agreement.',
+    noindex: true,
+    path: '/',
+  },
+  notFound: {
+    title: `Page not found${TITLE_SUFFIX}`,
+    description: 'This page does not exist on VeriLock.',
     noindex: true,
     path: '/',
   },
@@ -113,6 +119,53 @@ export function applyPageMeta(meta: PageMeta): void {
   setMeta('name', 'twitter:image', image)
 
   setLink('canonical', url)
+}
+
+export function journeyPathMeta(
+  pathname: string,
+  search: string,
+  options?: {
+    document?: { title: string; slug: string } | null
+    verifyMatchTitle?: string | null
+    role?: 'creator' | 'signer' | 'verifier' | null
+  },
+): PageMeta {
+  const docSlug = pathname.match(/^\/d\/([^/]+)/)?.[1] ?? null
+  const vSlug = pathname.match(/^\/v\/([^/]+)/)?.[1] ?? null
+
+  if (docSlug) {
+    if (options?.document) {
+      return {
+        ...documentPageMeta(options.document.title, 'sign'),
+        path: `/d/${options.document.slug}`,
+      }
+    }
+    return { ...PAGE_META.document, path: `/d/${docSlug}` }
+  }
+
+  if (vSlug) {
+    if (options?.verifyMatchTitle) {
+      return {
+        ...documentPageMeta(options.verifyMatchTitle, 'verify'),
+        path: `/v/${vSlug}`,
+      }
+    }
+    return { ...PAGE_META.verify, path: `/v/${vSlug}` }
+  }
+
+  if (new URLSearchParams(search).get('intent')) {
+    return { ...PAGE_META.create }
+  }
+
+  if (options?.role === 'verifier') {
+    return { ...PAGE_META.verify }
+  }
+
+  if (options?.role === 'creator' || options?.role === 'signer') {
+    return { ...PAGE_META.create }
+  }
+
+  return { ...PAGE_META.home }
 }
 
 export function documentPageMeta(title: string, role: 'sign' | 'verify'): PageMeta {

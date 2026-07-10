@@ -62,11 +62,17 @@ import {
   journeyConnectOptions,
   resolveJourneyConnectMode,
 } from './journeyConnectUi'
-import { finishJourneyLock, sealJourneyDocument } from './journeySeal'
+import { CreditsPanel } from './CreditsPanel'
+import {
+  finishJourneyLock,
+  sealJourneyDocument,
+  sealJourneyDocumentWithCredit,
+} from './journeySeal'
 import { formatFileSize } from './PdfDropZone'
 import { SignaturePad } from './SignaturePad'
 import { StageRail } from './StageRail'
 import { saveHubReturnPath } from '../hubReturnPath'
+import { journeyPathMeta, type PageMeta } from '../seo'
 import {
   allSigned,
   CREATOR_STAGES,
@@ -85,6 +91,8 @@ interface DocumentJourneyProps {
   wallet: UseJourneyWalletResult
   /** Shell pushState navigation epoch — re-read /d/:slug deep links. */
   navEpoch?: number
+  /** Per-route document meta for SEO (title, canonical, noindex). */
+  onPageMeta?: (meta: PageMeta) => void
   /** Open full agreements page (header / welcome strip). */
   onOpenAgreements?: () => void
   /** Return to home (invalid deep link). */
@@ -129,6 +137,7 @@ async function loadVerifyDetails(
 export function DocumentJourney({
   wallet,
   navEpoch = 0,
+  onPageMeta,
   onOpenAgreements,
   onHome,
 }: DocumentJourneyProps) {
@@ -183,6 +192,8 @@ export function DocumentJourney({
   const [localError, setLocalError] = useState<string | null>(null)
   const [lockMessage, setLockMessage] = useState<string | null>(null)
   const [agreementsRefreshKey, setAgreementsRefreshKey] = useState(0)
+  const [creditBalance, setCreditBalance] = useState(0)
+  const [creditsRefresh, setCreditsRefresh] = useState(0)
   /** Deep-link /d/ or /v/ slug that does not resolve on the server. */
   const [missingDeepLink, setMissingDeepLink] = useState<string | null>(null)
   const fileSizeByDocIdRef = useRef<Record<string, number>>({})
@@ -190,6 +201,26 @@ export function DocumentJourney({
   const bumpAgreements = useCallback(() => {
     setAgreementsRefreshKey(k => k + 1)
   }, [])
+
+  useEffect(() => {
+    if (!onPageMeta) return
+    const path = window.location.pathname
+    const search = window.location.search
+    const verifyMatchTitle =
+      verifyOutcome.kind === 'match' && verifyOutcome.matches.length === 1
+        ? verifyOutcome.matches[0]!.title
+        : verifyOutcome.kind === 'match' && verifyOutcome.title
+          ? verifyOutcome.title
+          : null
+
+    onPageMeta(
+      journeyPathMeta(path, search, {
+        document: doc ? { title: doc.title, slug: doc.slug } : null,
+        verifyMatchTitle,
+        role: role ?? null,
+      }),
+    )
+  }, [onPageMeta, doc, role, verifyOutcome, navEpoch])
 
   const setActiveFromSeal = useCallback(
     (sealDoc: Parameters<typeof toJourneyDoc>[0], fileSize?: number) => {
@@ -874,6 +905,7 @@ export function DocumentJourney({
       setActiveFromSeal(result.document, doc.fileSize)
       setLockMessage('Agreement locked on the Nimiq blockchain.')
       bumpAgreements()
+      setCreditsRefresh(k => k + 1)
     } else if (result.redirecting) {
       setLockMessage(result.message)
     } else {
@@ -883,6 +915,28 @@ export function DocumentJourney({
     if (!result.ok && result.redirecting) {
       // leave busy - page navigates
       return
+    }
+    setBusy(false)
+  }
+
+  const sealWithCredit = async () => {
+    if (!token || !doc) return
+    setBusy(true)
+    setLocalError(null)
+    setLockMessage('Using 1 credit…')
+    const result = await sealJourneyDocumentWithCredit({
+      token,
+      doc: doc.source,
+      onProgress: setLockMessage,
+    })
+    if (result.ok) {
+      setActiveFromSeal(result.document, doc.fileSize)
+      setLockMessage('Agreement locked on the Nimiq blockchain (1 credit).')
+      bumpAgreements()
+      setCreditsRefresh(k => k + 1)
+    } else {
+      setLocalError(result.message)
+      setLockMessage(null)
     }
     setBusy(false)
   }
@@ -1762,9 +1816,40 @@ export function DocumentJourney({
                     </p>
                   </div>
                   <SealPricingDisplay className="journey-pricing journey-pricing--seal" />
+                  {token && (
+                    <CreditsPanel
+                      token={token}
+                      address={address}
+                      nimiq={nimiq}
+                      setNimiq={setNimiq}
+                      refreshKey={creditsRefresh}
+                      compact
+                      onBalanceChange={setCreditBalance}
+                    />
+                  )}
+                  {creditBalance >= 1 && (
+                    <button
+                      type="button"
+                      className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
+                      disabled={busy || !account}
+                      onClick={() => void sealWithCredit()}
+                    >
+                      {busy ? (
+                        <>
+                          <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
+                          Sealing with credit…
+                        </>
+                      ) : (
+                        <>
+                          <Lock size={18} strokeWidth={2.25} />
+                          Seal with 1 credit (no NIM needed)
+                        </>
+                      )}
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
+                    className={`btn ${creditBalance >= 1 ? 'btn-secondary' : 'btn-primary'} btn-lg${busy ? ' btn--busy' : ''}`}
                     disabled={busy || !account}
                     onClick={() => void seal()}
                   >
@@ -1776,15 +1861,15 @@ export function DocumentJourney({
                     ) : (
                       <>
                         <Lock size={18} strokeWidth={2.25} />
-                        {inNimiqPay || nimiq ? 'Seal fingerprint on-chain' : 'Seal via Hub'}
+                        {inNimiqPay || nimiq ? 'Pay NIM & seal on-chain' : 'Pay NIM via Hub'}
                       </>
                     )}
                   </button>
-                  {!inNimiqPay && !nimiq && (
+                  {!inNimiqPay && !nimiq && creditBalance < 1 && (
                     <p className="muted journey-seal-hint" style={{ margin: 0 }}>
                       {isMobileDevice()
                         ? 'Sealing works best inside Nimiq Pay. In the browser, this seal uses Nimiq Hub — keep VeriLock open until you return and the on-chain proof is confirmed.'
-                        : 'Sealing redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the on-chain proof is confirmed.'}
+                        : 'Sealing redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the on-chain proof is confirmed. Or buy credits with NIM / card above to seal without another wallet payment.'}
                     </p>
                   )}
                 </div>

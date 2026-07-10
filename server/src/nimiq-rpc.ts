@@ -1,6 +1,11 @@
 import { Client, ClientConfiguration } from '@nimiq/core'
 import { normalizeAddress } from './addresses.js'
-import { getSealFeeLuna, isValidSealFeeLuna, LEGACY_SEAL_FEE_LUNA } from './sealPricing.js'
+import { hasActiveCreditReservation } from './db.js'
+import {
+  getSealFeeLuna,
+  isCreditProofValueLuna,
+  isValidDirectSealFeeLuna,
+} from './sealPricing.js'
 
 let broadcastClient: Client | null = null
 let broadcastClientInit: Promise<Client> | null = null
@@ -23,17 +28,29 @@ async function getBroadcastClient(): Promise<Client> {
   return broadcastClientInit
 }
 
+/** Shared client for service-wallet signing/broadcast. */
+export async function getBroadcastClientForService(): Promise<Client> {
+  return getBroadcastClient()
+}
+
 const RPC_URL = process.env.NIMIQ_RPC_URL ?? 'https://rpc.nimiqwatch.com'
 const MIN_CONFIRMATIONS = Number(process.env.NIM_MIN_CONFIRMATIONS ?? 1)
 
 /** Must match client default in nimiq.ts. */
 const DEFAULT_ATTESTATION_RECIPIENT = 'NQ815N9JRGBJMLJQNBKEMQ1RD27TXS8PCVKA'
 
-function getExpectedAttestationRecipient(): string | null {
+export function getExpectedAttestationRecipient(): string | null {
   const configured = process.env.ATTESTATION_RECIPIENT?.trim()
   if (configured) return normalizeAddress(configured)
   if (process.env.NODE_ENV === 'production') return normalizeAddress(DEFAULT_ATTESTATION_RECIPIENT)
-  return null
+  // Dev default: same sink so local top-ups/seals have a recipient to validate against.
+  return normalizeAddress(DEFAULT_ATTESTATION_RECIPIENT)
+}
+
+function getServiceWalletAddressFromEnv(): string | null {
+  // Lazy import avoided — address is set when service wallet module loads; pass via expectation.
+  const raw = process.env.SERVICE_WALLET_ADDRESS?.trim()
+  return raw ? normalizeAddress(raw) : null
 }
 
 export interface NimiqTransaction {
@@ -274,12 +291,16 @@ export interface AttestationExpectation {
   senderAddress: string
   docId: string
   finalSha256: string
+  /** When true, require credit-reservation + service (or reserved) minimal proof. */
+  paymentMode?: 'direct' | 'credit' | 'auto'
+  /** Service wallet that may post credit seals (normalized). */
+  serviceWalletAddress?: string | null
 }
 
 export async function verifyAttestation(
   txHash: string,
   expectation: AttestationExpectation,
-): Promise<{ tx: NimiqTransaction }> {
+): Promise<{ tx: NimiqTransaction; paymentMode: 'direct' | 'credit' }> {
   const tx = await fetchTransaction(txHash)
   if (!tx) throw new Error('Transaction not found on-chain yet. Wait a few seconds and retry.')
 
@@ -296,48 +317,67 @@ export async function verifyAttestation(
     if (expectedSink && recipient === expectedSink && recipient !== sender) {
       throw new Error(
         'Transaction failed on-chain (executionResult: false). ' +
-          'Older Hub checkout seals sent 1 luna to the foundation sink, which cannot accept attestation data. ' +
-          'Hard refresh this page, then tap Retry seal to sign a self-send attestation instead.',
+          'Ensure the seal fee is sent correctly, or use pay-with-credit for a server-posted proof.',
       )
     }
     throw new Error(
       'Transaction failed on-chain (executionResult: false). ' +
-        'Ensure your Hub wallet has enough NIM for fees (~0.01 NIM), then tap Retry seal.',
+        'Ensure the signing wallet has enough NIM for fees, then retry seal.',
     )
   }
 
   if (normalizeAddress(tx.from) !== normalizeAddress(expectation.senderAddress)) {
-    throw new Error('Transaction sender does not match your wallet')
+    throw new Error('Transaction sender does not match the expected attestation sender')
   }
 
-  if (!isValidSealFeeLuna(tx.value)) {
-    const expectedLuna = getSealFeeLuna()
-    throw new Error(
-      `Attestation transaction must transfer the current seal fee (${expectedLuna} luna) or a legacy amount (${LEGACY_SEAL_FEE_LUNA.join(', ')} luna)`,
-    )
-  }
-
-  const expectedRecipient = getExpectedAttestationRecipient()
   const sender = normalizeAddress(tx.from)
   const recipient = normalizeAddress(tx.to)
   const expectedFeeLuna = getSealFeeLuna()
-  if (recipient === sender) {
-    if (!LEGACY_SEAL_FEE_LUNA.includes(tx.value as (typeof LEGACY_SEAL_FEE_LUNA)[number])) {
-      throw new Error('Self-send attestation transactions must use a legacy seal fee (0 or 1 luna)')
+  const expectedRecipient = getExpectedAttestationRecipient()
+  const serviceWallet =
+    expectation.serviceWalletAddress?.trim()
+      ? normalizeAddress(expectation.serviceWalletAddress)
+      : getServiceWalletAddressFromEnv()
+
+  const modeHint = expectation.paymentMode ?? 'auto'
+  const hasCreditHold = hasActiveCreditReservation(expectation.docId)
+  const looksLikeCreditProof =
+    isCreditProofValueLuna(tx.value) &&
+    (recipient === sender || (expectedRecipient != null && recipient === expectedRecipient))
+
+  let paymentMode: 'direct' | 'credit'
+
+  if (modeHint === 'credit' || (modeHint === 'auto' && looksLikeCreditProof && hasCreditHold)) {
+    if (!hasCreditHold) {
+      throw new Error('Credit reservation required for minimal-value seal proofs')
     }
-  } else if (expectedRecipient) {
+    if (!isCreditProofValueLuna(tx.value)) {
+      throw new Error('Credit seal proof must use a minimal on-chain value (0 or 1 luna)')
+    }
+    if (serviceWallet && sender !== serviceWallet) {
+      throw new Error('Credit seal proof must be sent from the VeriLock service wallet')
+    }
+    if (recipient !== sender && expectedRecipient && recipient !== expectedRecipient) {
+      throw new Error('Credit seal proof recipient is invalid')
+    }
+    paymentMode = 'credit'
+  } else {
+    // Direct pay: full current fee to sink only (legacy free amounts closed).
+    if (!isValidDirectSealFeeLuna(tx.value)) {
+      throw new Error(
+        `Attestation transaction must transfer the current seal fee (${expectedFeeLuna} luna)`,
+      )
+    }
+    if (!expectedRecipient) {
+      throw new Error('Attestation sink is not configured')
+    }
     if (recipient !== expectedRecipient) {
       throw new Error('Attestation transaction recipient does not match the expected sink address')
     }
-    if (
-      tx.value !== expectedFeeLuna &&
-      !LEGACY_SEAL_FEE_LUNA.includes(tx.value as (typeof LEGACY_SEAL_FEE_LUNA)[number])
-    ) {
-      throw new Error('Attestation transaction does not match the current seal fee')
-    }
+    paymentMode = 'direct'
   }
 
   verifyAttestationPayload(tx.recipientData, expectation.docId, expectation.finalSha256)
 
-  return { tx }
+  return { tx, paymentMode }
 }

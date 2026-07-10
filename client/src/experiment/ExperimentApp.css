@@ -2587,3 +2587,35 @@ a.hash-chip.text-link:focus-visible {
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
+/* ── Credits panel ── */
+.journey-credits {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 80
+/* ── Credits panel ── */
+.journey-credits {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 80%, transparent);
+  background: color-mix(in srgb, var(--surface-2, #f8fafc) 90%, transparent);
+}
+.journey-credits-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.95rem;
+}
+.journey-credits-buy {
+  display: flex;
+  align-items: center;
+}
+.journey-credits--compact {
+  margin-bottom: 0.25rem;
+}

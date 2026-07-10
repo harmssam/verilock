@@ -737,3 +737,400 @@ export function findDocumentsByHash(sha256: string): DocumentRecord[] {
     .all(sha256.toLowerCase(), sha256.toLowerCase()) as Record<string, unknown>[]
   return rows.map(rowToDocument)
 }
+
+// ── Credits (ledger-first prepaid seals) ───────────────────────────────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS credit_accounts (
+    wallet_address TEXT PRIMARY KEY,
+    balance INTEGER NOT NULL DEFAULT 0 CHECK (balance >= 0),
+    flagged INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS credit_ledger (
+    id TEXT PRIMARY KEY,
+    wallet_address TEXT NOT NULL,
+    delta INTEGER NOT NULL,
+    balance_after INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL UNIQUE,
+    ref_tx_hash TEXT,
+    ref_stripe_session_id TEXT,
+    ref_stripe_payment_intent TEXT,
+    ref_document_id TEXT,
+    nim_luna INTEGER,
+    usd_cents INTEGER,
+    fee_nim_at_event REAL,
+    nim_usd_at_event REAL,
+    created_at INTEGER NOT NULL,
+    meta TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_credit_ledger_wallet
+    ON credit_ledger(wallet_address, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_credit_ledger_stripe
+    ON credit_ledger(ref_stripe_session_id);
+
+  CREATE TABLE IF NOT EXISTS credit_reservations (
+    document_id TEXT PRIMARY KEY,
+    wallet_address TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'held',
+    service_tx_hash TEXT,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    resolved_at INTEGER,
+    FOREIGN KEY (document_id) REFERENCES documents(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS stripe_checkout_sessions (
+    session_id TEXT PRIMARY KEY,
+    wallet_address TEXT NOT NULL,
+    credits INTEGER NOT NULL,
+    usd_cents INTEGER NOT NULL,
+    unit_usd_cents INTEGER NOT NULL,
+    fee_nim REAL NOT NULL,
+    nim_usd REAL NOT NULL,
+    markup REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+`)
+
+export type CreditLedgerKind =
+  | 'topup_nim'
+  | 'topup_stripe'
+  | 'spend'
+  | 'refund_release'
+  | 'stripe_clawback'
+  | 'admin_adjust'
+
+export interface CreditLedgerEntry {
+  id: string
+  walletAddress: string
+  delta: number
+  balanceAfter: number
+  kind: CreditLedgerKind
+  idempotencyKey: string
+  refTxHash: string | null
+  refStripeSessionId: string | null
+  refStripePaymentIntent: string | null
+  refDocumentId: string | null
+  nimLuna: number | null
+  usdCents: number | null
+  feeNimAtEvent: number | null
+  nimUsdAtEvent: number | null
+  createdAt: number
+  meta: string | null
+}
+
+export type CreditReservationStatus = 'held' | 'captured' | 'released'
+
+export interface CreditReservation {
+  documentId: string
+  walletAddress: string
+  status: CreditReservationStatus
+  serviceTxHash: string | null
+  createdAt: number
+  expiresAt: number
+  resolvedAt: number | null
+}
+
+function rowToLedger(row: Record<string, unknown>): CreditLedgerEntry {
+  return {
+    id: row.id as string,
+    walletAddress: row.wallet_address as string,
+    delta: row.delta as number,
+    balanceAfter: row.balance_after as number,
+    kind: row.kind as CreditLedgerKind,
+    idempotencyKey: row.idempotency_key as string,
+    refTxHash: (row.ref_tx_hash as string | null) ?? null,
+    refStripeSessionId: (row.ref_stripe_session_id as string | null) ?? null,
+    refStripePaymentIntent: (row.ref_stripe_payment_intent as string | null) ?? null,
+    refDocumentId: (row.ref_document_id as string | null) ?? null,
+    nimLuna: (row.nim_luna as number | null) ?? null,
+    usdCents: (row.usd_cents as number | null) ?? null,
+    feeNimAtEvent: (row.fee_nim_at_event as number | null) ?? null,
+    nimUsdAtEvent: (row.nim_usd_at_event as number | null) ?? null,
+    createdAt: row.created_at as number,
+    meta: (row.meta as string | null) ?? null,
+  }
+}
+
+function ensureCreditAccount(walletAddress: string, now: number): void {
+  const wallet = normalizeAddress(walletAddress)
+  db.prepare(`
+    INSERT INTO credit_accounts (wallet_address, balance, flagged, updated_at)
+    VALUES (?, 0, 0, ?)
+    ON CONFLICT(wallet_address) DO NOTHING
+  `).run(wallet, now)
+}
+
+export function getCreditBalance(walletAddress: string): number {
+  const wallet = normalizeAddress(walletAddress)
+  const row = db
+    .prepare('SELECT balance FROM credit_accounts WHERE wallet_address = ?')
+    .get(wallet) as { balance: number } | undefined
+  return row?.balance ?? 0
+}
+
+export function isCreditAccountFlagged(walletAddress: string): boolean {
+  const wallet = normalizeAddress(walletAddress)
+  const row = db
+    .prepare('SELECT flagged FROM credit_accounts WHERE wallet_address = ?')
+    .get(wallet) as { flagged: number } | undefined
+  return Boolean(row?.flagged)
+}
+
+export function setCreditAccountFlagged(walletAddress: string, flagged: boolean): void {
+  const wallet = normalizeAddress(walletAddress)
+  const now = Date.now()
+  ensureCreditAccount(wallet, now)
+  db.prepare('UPDATE credit_accounts SET flagged = ?, updated_at = ? WHERE wallet_address = ?').run(
+    flagged ? 1 : 0,
+    now,
+    wallet,
+  )
+}
+
+export function getLedgerByIdempotencyKey(key: string): CreditLedgerEntry | null {
+  const row = db
+    .prepare('SELECT * FROM credit_ledger WHERE idempotency_key = ?')
+    .get(key) as Record<string, unknown> | undefined
+  return row ? rowToLedger(row) : null
+}
+
+export function listCreditLedger(walletAddress: string, limit = 50): CreditLedgerEntry[] {
+  const wallet = normalizeAddress(walletAddress)
+  const rows = db
+    .prepare(
+      `SELECT * FROM credit_ledger WHERE wallet_address = ? ORDER BY created_at DESC LIMIT ?`,
+    )
+    .all(wallet, Math.min(Math.max(limit, 1), 200)) as Record<string, unknown>[]
+  return rows.map(rowToLedger)
+}
+
+export interface ApplyCreditDeltaInput {
+  id: string
+  walletAddress: string
+  delta: number
+  kind: CreditLedgerKind
+  idempotencyKey: string
+  refTxHash?: string | null
+  refStripeSessionId?: string | null
+  refStripePaymentIntent?: string | null
+  refDocumentId?: string | null
+  nimLuna?: number | null
+  usdCents?: number | null
+  feeNimAtEvent?: number | null
+  nimUsdAtEvent?: number | null
+  meta?: string | null
+  createdAt?: number
+}
+
+/**
+ * Append-only ledger + balance update. Idempotent on idempotencyKey.
+ * Returns the resulting balance (existing or new).
+ */
+export function applyCreditDelta(input: ApplyCreditDeltaInput): {
+  balance: number
+  entry: CreditLedgerEntry
+  created: boolean
+} {
+  const wallet = normalizeAddress(input.walletAddress)
+  const now = input.createdAt ?? Date.now()
+
+  const existing = getLedgerByIdempotencyKey(input.idempotencyKey)
+  if (existing) {
+    return { balance: getCreditBalance(wallet), entry: existing, created: false }
+  }
+
+  if (!Number.isInteger(input.delta) || input.delta === 0) {
+    throw new Error('Credit delta must be a non-zero integer')
+  }
+
+  return runInTransaction(() => {
+    const again = getLedgerByIdempotencyKey(input.idempotencyKey)
+    if (again) {
+      return { balance: getCreditBalance(wallet), entry: again, created: false }
+    }
+
+    ensureCreditAccount(wallet, now)
+
+    if (input.delta > 0) {
+      db.prepare(
+        `UPDATE credit_accounts SET balance = balance + ?, updated_at = ? WHERE wallet_address = ?`,
+      ).run(input.delta, now, wallet)
+    } else {
+      const result = db
+        .prepare(
+          `UPDATE credit_accounts
+           SET balance = balance + ?, updated_at = ?
+           WHERE wallet_address = ? AND balance + ? >= 0`,
+        )
+        .run(input.delta, now, wallet, input.delta)
+      if (result.changes === 0) {
+        throw new Error('Insufficient credits')
+      }
+    }
+
+    const balance = getCreditBalance(wallet)
+    db.prepare(`
+      INSERT INTO credit_ledger (
+        id, wallet_address, delta, balance_after, kind, idempotency_key,
+        ref_tx_hash, ref_stripe_session_id, ref_stripe_payment_intent, ref_document_id,
+        nim_luna, usd_cents, fee_nim_at_event, nim_usd_at_event, created_at, meta
+      ) VALUES (
+        @id, @walletAddress, @delta, @balanceAfter, @kind, @idempotencyKey,
+        @refTxHash, @refStripeSessionId, @refStripePaymentIntent, @refDocumentId,
+        @nimLuna, @usdCents, @feeNimAtEvent, @nimUsdAtEvent, @createdAt, @meta
+      )
+    `).run({
+      id: input.id,
+      walletAddress: wallet,
+      delta: input.delta,
+      balanceAfter: balance,
+      kind: input.kind,
+      idempotencyKey: input.idempotencyKey,
+      refTxHash: input.refTxHash ?? null,
+      refStripeSessionId: input.refStripeSessionId ?? null,
+      refStripePaymentIntent: input.refStripePaymentIntent ?? null,
+      refDocumentId: input.refDocumentId ?? null,
+      nimLuna: input.nimLuna ?? null,
+      usdCents: input.usdCents ?? null,
+      feeNimAtEvent: input.feeNimAtEvent ?? null,
+      nimUsdAtEvent: input.nimUsdAtEvent ?? null,
+      createdAt: now,
+      meta: input.meta ?? null,
+    })
+
+    const entry = getLedgerByIdempotencyKey(input.idempotencyKey)!
+    return { balance, entry, created: true }
+  })
+}
+
+export function getCreditReservation(documentId: string): CreditReservation | null {
+  const row = db
+    .prepare('SELECT * FROM credit_reservations WHERE document_id = ?')
+    .get(documentId) as Record<string, unknown> | undefined
+  if (!row) return null
+  return {
+    documentId: row.document_id as string,
+    walletAddress: row.wallet_address as string,
+    status: row.status as CreditReservationStatus,
+    serviceTxHash: (row.service_tx_hash as string | null) ?? null,
+    createdAt: row.created_at as number,
+    expiresAt: row.expires_at as number,
+    resolvedAt: (row.resolved_at as number | null) ?? null,
+  }
+}
+
+export function insertCreditReservation(res: CreditReservation): void {
+  db.prepare(`
+    INSERT INTO credit_reservations (
+      document_id, wallet_address, status, service_tx_hash, created_at, expires_at, resolved_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    res.documentId,
+    normalizeAddress(res.walletAddress),
+    res.status,
+    res.serviceTxHash,
+    res.createdAt,
+    res.expiresAt,
+    res.resolvedAt,
+  )
+}
+
+export function updateCreditReservation(
+  documentId: string,
+  patch: Partial<Pick<CreditReservation, 'status' | 'serviceTxHash' | 'resolvedAt' | 'expiresAt'>>,
+): void {
+  const current = getCreditReservation(documentId)
+  if (!current) return
+  db.prepare(`
+    UPDATE credit_reservations
+    SET status = ?, service_tx_hash = ?, resolved_at = ?, expires_at = ?
+    WHERE document_id = ?
+  `).run(
+    patch.status ?? current.status,
+    patch.serviceTxHash !== undefined ? patch.serviceTxHash : current.serviceTxHash,
+    patch.resolvedAt !== undefined ? patch.resolvedAt : current.resolvedAt,
+    patch.expiresAt ?? current.expiresAt,
+    documentId,
+  )
+}
+
+export function hasActiveCreditReservation(documentId: string, now = Date.now()): boolean {
+  const res = getCreditReservation(documentId)
+  if (!res) return false
+  if (res.status === 'captured') return true
+  if (res.status === 'held' && res.expiresAt >= now) return true
+  return false
+}
+
+export function upsertStripeCheckoutSession(row: {
+  sessionId: string
+  walletAddress: string
+  credits: number
+  usdCents: number
+  unitUsdCents: number
+  feeNim: number
+  nimUsd: number
+  markup: number
+  status: string
+  createdAt: number
+  updatedAt: number
+}): void {
+  db.prepare(`
+    INSERT INTO stripe_checkout_sessions (
+      session_id, wallet_address, credits, usd_cents, unit_usd_cents,
+      fee_nim, nim_usd, markup, status, created_at, updated_at
+    ) VALUES (
+      @sessionId, @walletAddress, @credits, @usdCents, @unitUsdCents,
+      @feeNim, @nimUsd, @markup, @status, @createdAt, @updatedAt
+    )
+    ON CONFLICT(session_id) DO UPDATE SET
+      status = excluded.status,
+      updated_at = excluded.updated_at
+  `).run({
+    ...row,
+    walletAddress: normalizeAddress(row.walletAddress),
+  })
+}
+
+export function getStripeCheckoutSession(sessionId: string): {
+  sessionId: string
+  walletAddress: string
+  credits: number
+  usdCents: number
+  status: string
+} | null {
+  const row = db
+    .prepare('SELECT * FROM stripe_checkout_sessions WHERE session_id = ?')
+    .get(sessionId) as Record<string, unknown> | undefined
+  if (!row) return null
+  return {
+    sessionId: row.session_id as string,
+    walletAddress: row.wallet_address as string,
+    credits: row.credits as number,
+    usdCents: row.usd_cents as number,
+    status: row.status as string,
+  }
+}
+
+export function updateStripeCheckoutStatus(sessionId: string, status: string, updatedAt = Date.now()): void {
+  db.prepare('UPDATE stripe_checkout_sessions SET status = ?, updated_at = ? WHERE session_id = ?').run(
+    status,
+    updatedAt,
+    sessionId,
+  )
+}
+
+export function isTxHashUsedForCredits(txHash: string): boolean {
+  const clean = txHash.replace(/^0x/i, '').toLowerCase()
+  const row = db
+    .prepare(`SELECT 1 FROM credit_ledger WHERE lower(ref_tx_hash) = ? LIMIT 1`)
+    .get(clean) as unknown
+  return Boolean(row)
+}

@@ -14,12 +14,29 @@ function isKnownAppPath(path: string): boolean {
   return false
 }
 
+const SEO_STATIC_FILES = ['sitemap.xml', 'robots.txt'] as const
+
 export function attachClientStatic(app: Express): boolean {
   const distDir = getClientDistDir()
   if (!existsSync(join(distDir, 'index.html'))) {
     console.warn(`Client dist not found at ${distDir} — API-only mode`)
     return false
   }
+
+  // Express route patterns treat a trailing slash as optional — use exact path checks.
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      next()
+      return
+    }
+    for (const file of SEO_STATIC_FILES) {
+      if (req.path === `/${file}/`) {
+        res.redirect(301, `/${file}`)
+        return
+      }
+    }
+    next()
+  })
 
   app.use(
     express.static(distDir, {
