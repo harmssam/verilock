@@ -1,7 +1,9 @@
-import { Check, ChevronDown, Coins, Copy, Files, LogOut, Tag, Wallet } from 'lucide-react'
+import { Check, ChevronDown, Coins, Copy, Files, LogOut, Tag } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { formatDisplayAddress } from '../addresses'
-import { journeyConnectLabels, type JourneyConnectMode } from './journeyConnectUi'
+import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
+import { journeyLoginEntryLabels, type JourneyConnectMode } from './journeyConnectUi'
+import { LoginSheet } from './LoginSheet'
 import type { JourneyAccount } from './types'
 
 interface AccountMenuProps {
@@ -31,8 +33,10 @@ export function AccountMenu({
   onCredits,
 }: AccountMenuProps) {
   const [open, setOpen] = useState(false)
+  const [loginOpen, setLoginOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const loginRootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -50,20 +54,38 @@ export function AccountMenu({
     }
   }, [open])
 
+  // Close login sheet once a session exists
+  useEffect(() => {
+    if (account) setLoginOpen(false)
+  }, [account])
+
   if (!account) {
+    const entry = journeyLoginEntryLabels()
     return (
-      <button
-        type="button"
-        className={`btn btn-primary exp-connect-btn${connecting ? ' btn--busy' : ''}`}
-        onClick={onConnect}
-        disabled={connecting}
-        title={walletStatus ?? undefined}
-      >
-        <Wallet size={16} strokeWidth={2.25} aria-hidden />
-        {connecting
-          ? journeyConnectLabels(connectMode).busy
-          : journeyConnectLabels(connectMode).idle}
-      </button>
+      <div className="exp-login" ref={loginRootRef}>
+        <button
+          type="button"
+          data-login-trigger
+          className={`btn btn-primary exp-connect-btn${connecting ? ' btn--busy' : ''}`}
+          onClick={() => setLoginOpen(v => !v)}
+          disabled={connecting && !loginOpen}
+          title={walletStatus ?? 'Login with your Nimiq wallet'}
+          aria-expanded={loginOpen}
+          aria-haspopup="dialog"
+        >
+          <NimiqHexagonIcon size={16} />
+          {connecting && loginOpen ? entry.busy : entry.idle}
+        </button>
+        <LoginSheet
+          open={loginOpen}
+          connectMode={connectMode}
+          connecting={connecting}
+          walletStatus={walletStatus}
+          onClose={() => setLoginOpen(false)}
+          onProceed={onConnect}
+          placement="popover"
+        />
+      </div>
     )
   }
 

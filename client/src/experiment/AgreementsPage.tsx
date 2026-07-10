@@ -5,10 +5,10 @@ import {
   PenLine,
   Files,
   Trash2,
-  Wallet,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { shortAddress } from '../addresses'
+import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
 import {
   BUCKET_LABELS,
   BUCKET_ORDER,
@@ -22,7 +22,8 @@ import {
 import { api } from '../api'
 import { shortHash } from '../pdf/hashPdf'
 import { documentTypeLabel, type SealDocument } from '../types'
-import { journeyConnectLabels, type JourneyConnectMode } from './journeyConnectUi'
+import { journeyLoginEntryLabels, type JourneyConnectMode } from './journeyConnectUi'
+import { LoginSheet } from './LoginSheet'
 
 interface AgreementsPageProps {
   token: string | null
@@ -42,6 +43,53 @@ function sortBucket(docs: SealDocument[], bucket: AgreementBucket): SealDocument
     copy.sort((a, b) => b.createdAt - a.createdAt)
   }
   return copy
+}
+
+function AgreementsLoginGate({
+  connectMode,
+  connecting,
+  onConnect,
+  entry,
+}: {
+  connectMode: JourneyConnectMode
+  connecting: boolean
+  onConnect: () => void
+  entry: { idle: string; busy: string }
+}) {
+  const [loginOpen, setLoginOpen] = useState(false)
+
+  return (
+    <section className="agreements-page card" aria-label="Your agreements">
+      <header className="agreements-page-header">
+        <div>
+          <h2>Your agreements</h2>
+          <p className="muted agreements-page-subtitle">
+            Agreements are tied to your Nimiq wallet. Login to see everything you created or signed.
+          </p>
+        </div>
+      </header>
+      {!loginOpen ? (
+        <button
+          type="button"
+          data-login-trigger
+          className="btn btn-primary"
+          onClick={() => setLoginOpen(true)}
+        >
+          <NimiqHexagonIcon size={16} />
+          {entry.idle}
+        </button>
+      ) : (
+        <LoginSheet
+          open
+          connectMode={connectMode}
+          connecting={connecting}
+          onClose={() => setLoginOpen(false)}
+          onProceed={onConnect}
+          placement="inline"
+        />
+      )}
+    </section>
+  )
 }
 
 export function AgreementsPage({
@@ -105,37 +153,14 @@ export function AgreementsPage({
   const sealedCount = groups.locked.length
 
   if (!token || !address) {
-    const labels = journeyConnectLabels(connectMode)
+    const entry = journeyLoginEntryLabels()
     return (
-      <section className="agreements-page card" aria-label="Your agreements">
-        <header className="agreements-page-header">
-          <div>
-            <h2>Your agreements</h2>
-            <p className="muted agreements-page-subtitle">
-              Agreements are tied to your Nimiq wallet. Connect to see everything you created or
-              signed.
-            </p>
-          </div>
-        </header>
-        <button
-          type="button"
-          className={`btn btn-primary${connecting ? ' btn--busy' : ''}`}
-          onClick={onConnect}
-          disabled={connecting}
-        >
-          {connecting ? (
-            <>
-              <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
-              {labels.busy}
-            </>
-          ) : (
-            <>
-              <Wallet size={16} strokeWidth={2.25} aria-hidden />
-              {labels.idle}
-            </>
-          )}
-        </button>
-      </section>
+      <AgreementsLoginGate
+        connectMode={connectMode}
+        connecting={connecting}
+        onConnect={onConnect}
+        entry={entry}
+      />
     )
   }
 

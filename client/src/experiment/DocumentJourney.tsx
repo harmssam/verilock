@@ -1,6 +1,5 @@
 import {
   Check,
-  ExternalLink,
   Fingerprint,
   HelpCircle,
   LoaderCircle,
@@ -11,10 +10,10 @@ import {
   Trash2,
   Upload,
   Users,
-  Wallet,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { normalizeAddress } from '../addresses'
+import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
 import {
   canDeleteDocument,
   canRevealParticipantDetails,
@@ -31,7 +30,7 @@ import {
 } from '../fieldLimits'
 import { getPdfPageCount, sha256Hex, shortHash } from '../pdf/hashPdf'
 import { prepareSignatureImageUpload } from '../signatureImage'
-import { isMobileDevice, NIMIQ_PAY_ANDROID_URL, NIMIQ_PAY_IOS_URL } from '../nimiq'
+import { isMobileDevice } from '../nimiq'
 import { SealPricingDisplay } from '../SealPricingDisplay'
 import { ShareInviteCard } from '../ShareInviteCard'
 import {
@@ -57,11 +56,11 @@ import {
   syncIntentToUrl,
 } from './journeyIntent'
 import {
-  journeyConnectLabels,
-  journeyConnectLead,
   journeyConnectOptions,
+  journeyLoginEntryLabels,
   resolveJourneyConnectMode,
 } from './journeyConnectUi'
+import { LoginSheet } from './LoginSheet'
 import { CreditsPanel } from './CreditsPanel'
 import {
   finishJourneyLock,
@@ -157,6 +156,7 @@ export function DocumentJourney({
     inNimiqPay,
     mobilePayConnect,
     showOpenInPay,
+    walletStatus,
   } = wallet
 
   // Restore path after Hub login redirect (full page reload loses React state)
@@ -971,7 +971,6 @@ export function DocumentJourney({
     mobilePayConnect,
     showOpenInPay,
   })
-  const connectLabels = journeyConnectLabels(connectMode)
 
   const connectFromPath = () => {
     // Stamp intent into URL only when connecting (Hub return needs it).
@@ -1099,7 +1098,8 @@ export function DocumentJourney({
           <Shield className="trust-bar-icon" size={18} strokeWidth={2.25} aria-hidden />
           <span>
             <strong>Your PDF never leaves this device.</strong>
-            <span className="trust-bar-sub">
+            {/* Desktop: keep subtitle on the collapsed row. Mobile: only in expanded detail. */}
+            <span className="trust-bar-sub trust-bar-sub--inline">
               {' '}
               Only a SHA-256 fingerprint is stored / sealed on-chain.
             </span>
@@ -1108,6 +1108,9 @@ export function DocumentJourney({
         </button>
         {privacyOpen && (
           <div className="trust-bar-detail">
+            <p className="trust-bar-sub trust-bar-sub--detail">
+              Only a SHA-256 fingerprint is stored / sealed on-chain.
+            </p>
             <ul>
               <li>Fingerprinting runs in your browser - bytes stay local.</li>
               <li>Servers keep metadata + hash, not the file.</li>
@@ -1212,7 +1215,7 @@ export function DocumentJourney({
                     : step === 'done'
                       ? 'Agreement sealed'
                       : step === 'connect'
-                        ? 'Connect your wallet'
+                        ? 'Login'
                         : activeStage?.verb ?? 'Continue'}
                 </h3>
                 <p className="muted action-blurb">
@@ -1222,11 +1225,11 @@ export function DocumentJourney({
                     : step === 'done'
                       ? 'Keep your PDF. Drop a copy below anytime to verify the fingerprint.'
                       : step === 'connect' && role === 'signer'
-                        ? 'Connect first, then match the shared PDF and sign.'
+                        ? 'Login with Nimiq first, then match the shared PDF and sign.'
                         : step === 'connect' && role === 'verifier'
-                          ? 'Wallet is optional for verify — you can skip connect if you only need to check a PDF.'
+                          ? 'Wallet is optional for verify — you can skip login if you only need to check a PDF.'
                           : step === 'connect'
-                            ? 'Step 1 only — prove who you are. Your PDF comes next.'
+                            ? 'Step 1 only — prove who you are with Nimiq. Your PDF comes next.'
                             : activeStage?.blurb}
                 </p>
               </div>
@@ -1252,57 +1255,15 @@ export function DocumentJourney({
             <div className="action-dock-body">
               {step === 'connect' && (
                 <div className="action-stack">
-                  <p className="muted" style={{ margin: 0 }}>
-                    {journeyConnectLead(connectMode, role)}
-                  </p>
-                  {/* Single primary CTA — platform decides Pay vs Hub (see journeyConnectUi). */}
-                  <button
-                    type="button"
-                    className={`btn btn-primary btn-lg${connecting ? ' btn--busy' : ''}`}
-                    onClick={connectFromPath}
-                    disabled={connecting}
-                  >
-                    {connecting ? (
-                      <>
-                        <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                        {connectLabels.busy}
-                      </>
-                    ) : (
-                      <>
-                        <Wallet size={18} strokeWidth={2.25} />
-                        {connectLabels.idle}
-                      </>
-                    )}
-                  </button>
-                  {/* Mobile only: after Pay deeplink fails, show install help (not a second connect). */}
-                  {connectMode === 'hub-fallback' && role !== 'verifier' && (
-                    <div className="journey-pay-fallback" role="status">
-                      <p className="muted" style={{ margin: 0 }}>
-                        Don&apos;t have Nimiq Pay yet? Install it, then open VeriLock from the app —
-                        or use the button above to continue with Nimiq Hub.
-                      </p>
-                      <div className="journey-pay-store row">
-                        <a
-                          className="btn btn-secondary"
-                          href={NIMIQ_PAY_IOS_URL}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <ExternalLink size={15} strokeWidth={2.25} aria-hidden />
-                          App Store
-                        </a>
-                        <a
-                          className="btn btn-secondary"
-                          href={NIMIQ_PAY_ANDROID_URL}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <ExternalLink size={15} strokeWidth={2.25} aria-hidden />
-                          Google Play
-                        </a>
-                      </div>
-                    </div>
-                  )}
+                  <LoginSheet
+                    open
+                    connectMode={connectMode}
+                    connecting={connecting}
+                    walletStatus={walletStatus}
+                    onProceed={connectFromPath}
+                    placement="inline"
+                    showClose={false}
+                  />
                 </div>
               )}
 
@@ -1659,12 +1620,12 @@ export function DocumentJourney({
                               {connecting ? (
                                 <>
                                   <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
-                                  {connectLabels.busy}
+                                  {journeyLoginEntryLabels().busy}
                                 </>
                               ) : (
                                 <>
-                                  <Wallet size={16} strokeWidth={2.25} />
-                                  {connectLabels.idle}
+                                  <NimiqHexagonIcon size={16} />
+                                  {journeyLoginEntryLabels().idle}
                                 </>
                               )}
                             </button>

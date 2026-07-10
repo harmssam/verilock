@@ -1,14 +1,16 @@
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
-import { Coins, ExternalLink, Wallet } from 'lucide-react'
+import { Coins, ExternalLink } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from './api'
+import { NimiqHexagonIcon } from './NimiqHexagonIcon'
 import { SealPricingDisplay } from './SealPricingDisplay'
 import { formatSealFeeNim, getSealPricing } from './sealPricing'
 import { CreditsPanel } from './experiment/CreditsPanel'
 import {
-  journeyConnectLabels,
+  journeyLoginEntryLabels,
   type JourneyConnectMode,
 } from './experiment/journeyConnectUi'
+import { LoginSheet } from './experiment/LoginSheet'
 import './PricePage.css'
 
 const NIMIQ_URL = 'https://www.nimiq.com'
@@ -98,22 +100,11 @@ export function PricePage({
           </div>
 
           {!signedIn && onConnect && (
-            <div className="price-page-credits-connect">
-              <p className="muted" style={{ margin: 0, fontSize: '0.86rem' }}>
-                Connect your wallet to choose a pack.
-              </p>
-              <button
-                type="button"
-                className={`btn btn-primary${connecting ? ' btn--busy' : ''}`}
-                disabled={connecting}
-                onClick={onConnect}
-              >
-                <Wallet size={16} strokeWidth={2.25} />
-                {connecting
-                  ? journeyConnectLabels(connectMode).busy
-                  : journeyConnectLabels(connectMode).idle}
-              </button>
-            </div>
+            <PriceCreditsLogin
+              connectMode={connectMode}
+              connecting={connecting}
+              onConnect={onConnect}
+            />
           )}
 
           {signedIn && (
@@ -133,14 +124,7 @@ export function PricePage({
 
       <section className="price-page-why" aria-labelledby="price-why-nimiq">
         <h3 id="price-why-nimiq" className="price-page-why-title">
-          <img
-            className="price-page-nimiq-mark"
-            src="/nimiq-hexagon.svg"
-            alt=""
-            width={20}
-            height={18}
-            decoding="async"
-          />
+          <NimiqHexagonIcon size={20} className="price-page-nimiq-mark" />
           Why the Nimiq network?
         </h3>
         <p className="muted">
@@ -186,6 +170,49 @@ export function PricePage({
           .
         </p>
       </section>
+    </div>
+  )
+}
+
+function PriceCreditsLogin({
+  connectMode,
+  connecting,
+  onConnect,
+}: {
+  connectMode: JourneyConnectMode
+  connecting: boolean
+  onConnect: () => void
+}) {
+  const [loginOpen, setLoginOpen] = useState(false)
+  const entry = journeyLoginEntryLabels()
+
+  return (
+    <div className="price-page-credits-connect">
+      {!loginOpen ? (
+        <>
+          <p className="muted" style={{ margin: 0, fontSize: '0.86rem' }}>
+            Login with your Nimiq wallet to choose a pack.
+          </p>
+          <button
+            type="button"
+            data-login-trigger
+            className="btn btn-primary"
+            onClick={() => setLoginOpen(true)}
+          >
+            <NimiqHexagonIcon size={16} />
+            {entry.idle}
+          </button>
+        </>
+      ) : (
+        <LoginSheet
+          open
+          connectMode={connectMode}
+          connecting={connecting}
+          onClose={() => setLoginOpen(false)}
+          onProceed={onConnect}
+          placement="inline"
+        />
+      )}
     </div>
   )
 }
