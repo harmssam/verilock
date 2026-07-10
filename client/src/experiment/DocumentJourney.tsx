@@ -1600,15 +1600,18 @@ export function DocumentJourney({
 
                       <PartyList doc={doc} revealNames={revealParticipantPrivate} />
 
-                      {!allSigned(doc) && !doc.directSeal && (
-                        <ShareInviteCard
-                          document={doc.source}
-                          shareUrl={doc.shareUrl}
-                          linkCopied={linkCopied}
-                          onCopyLink={() => void copyLink()}
-                          embedded
-                        />
-                      )}
+                      {/* Invite / mailto is creator-only — co-signers (e.g. Tenant 2 of 2) only sign. */}
+                      {!allSigned(doc) &&
+                        !doc.directSeal &&
+                        (role === 'creator' || isDocumentCreator(doc.source, address)) && (
+                          <ShareInviteCard
+                            document={doc.source}
+                            shareUrl={doc.shareUrl}
+                            linkCopied={linkCopied}
+                            onCopyLink={() => void copyLink()}
+                            embedded
+                          />
+                        )}
 
                       {canCancelCurrent && role === 'creator' && (
                         <button
