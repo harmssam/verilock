@@ -226,8 +226,13 @@ app.get('/api/credits/balance', authMiddleware, requireVerifiedWallet, creditsLi
 
 app.get('/api/credits/quote', creditsLimit, async (req, res) => {
   try {
-    const { quoteCredits } = await import('./credits.js')
-    const credits = Number(req.query.credits ?? 1)
+    const { quoteCredits, quoteCreditPacks } = await import('./credits.js')
+    if (req.query.packs === '1' || req.query.packs === 'true') {
+      const catalog = await quoteCreditPacks()
+      res.json(catalog)
+      return
+    }
+    const credits = Number(req.query.credits ?? 10)
     const quote = await quoteCredits(credits)
     res.json(quote)
   } catch (err) {

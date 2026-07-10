@@ -1,14 +1,12 @@
 import Stripe from 'stripe'
 import { normalizeAddress } from './addresses.js'
 import {
+  assertStripePackQuote,
   clawbackStripeCredits,
   mintCreditsFromStripe,
   quoteCredits,
 } from './credits.js'
-import {
-  getMaxCreditsPerCheckout,
-  isStripeCreditsEnabled,
-} from './creditsConfig.js'
+import { isStripeCreditsEnabled } from './creditsConfig.js'
 import {
   getStripeCheckoutSession,
   isCreditAccountFlagged,
@@ -50,25 +48,17 @@ export async function createCreditsCheckoutSession(input: {
   }
 
   const credits = Math.floor(Number(input.credits))
-  if (!Number.isFinite(credits) || credits < 1) {
-    throw new Error('credits must be a positive integer')
-  }
-  if (credits > getMaxCreditsPerCheckout()) {
-    throw new Error(`Maximum ${getMaxCreditsPerCheckout()} credits per purchase`)
-  }
-
-  const quote = await quoteCredits(credits)
+  // Live pack quote + Stripe $0.50 floor (price set at session create — no daily Stripe Product sync)
+  const quote = await assertStripePackQuote(credits)
   if (quote.pricesStale) {
     throw new Error('NIM price quote is stale; try again in a moment')
-  }
-  if (!quote.stripeEnabled) {
-    throw new Error('Card checkout is temporarily unavailable')
   }
 
   const stripe = getStripe()
   const appUrl = publicAppUrl()
   const now = Date.now()
 
+  // One line item for the whole pack (clearer on the receipt than unit × qty at 4¢)
   const session = await stripe.checkout.sessions.create(
     {
       mode: 'payment',
@@ -78,29 +68,33 @@ export async function createCreditsCheckoutSession(input: {
       metadata: {
         walletAddress: wallet,
         credits: String(credits),
+        pack: String(credits),
         feeNim: String(quote.feeNim),
         nimUsd: String(quote.nimUsd),
         unitUsdCents: String(quote.unitUsdCents),
+        totalUsdCents: String(quote.totalUsdCents),
         markup: String(quote.stripeMarkup),
-        pricingVersion: '1',
+        pricingVersion: '2-packs',
       },
       line_items: [
         {
-          quantity: credits,
+          quantity: 1,
           price_data: {
             currency: 'usd',
-            unit_amount: quote.unitUsdCents,
+            unit_amount: quote.totalUsdCents,
             product_data: {
-              name: 'VeriLock seal credit',
+              name: `VeriLock ${credits}-credit pack`,
               description:
-                '1 credit = 1 document seal. Card price is 2× live NIM market to encourage paying with NIM.',
+                `${credits} seal credits (1 credit = 1 document seal). ` +
+                `Card price is ${quote.stripeMarkup}× live NIM market so paying with NIM stays cheaper. ` +
+                `Price locked at checkout from current rates.`,
             },
           },
         },
       ],
     },
     {
-      idempotencyKey: `credits-checkout:${wallet}:${credits}:${quote.unitUsdCents}:${Math.floor(now / 60_000)}`,
+      idempotencyKey: `credits-pack:${wallet}:${credits}:${quote.totalUsdCents}:${Math.floor(now / 60_000)}`,
     },
   )
 

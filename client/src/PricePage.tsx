@@ -7,14 +7,22 @@ import './PricePage.css'
 
 const NIMIQ_URL = 'https://www.nimiq.com'
 
+interface PackRow {
+  pack: number
+  nimTotal: number
+  usdTotal: number | null
+  cardOk: boolean
+}
+
 interface CreditsPublicInfo {
   enabled: boolean
   stripeEnabled: boolean
   stripeMarkup: number
   feeNim: number
   creditNimCost: number
-  creditStripeUsd: number | null
   promoActive: boolean
+  stripeMinChargeCents: number
+  packs: PackRow[]
 }
 
 export function PricePage() {
@@ -25,19 +33,33 @@ export function PricePage() {
     let cancelled = false
     void (async () => {
       try {
-        const [cfg, quote] = await Promise.all([
+        const [cfg, catalog] = await Promise.all([
           api.creditsConfig(),
-          api.creditsQuote(1).catch(() => null),
+          api.creditsPackQuotes().catch(() => null),
         ])
         if (cancelled) return
+        const packs: PackRow[] =
+          catalog?.packs.map(p => ({
+            pack: p.pack,
+            nimTotal: p.creditNimCostTotal,
+            usdTotal: p.creditStripeUsdTotal,
+            cardOk: p.meetsStripeMinimum,
+          })) ??
+          (cfg.packs ?? [10, 25, 50, 100]).map(pack => ({
+            pack,
+            nimTotal: basePricing.feeNim * pack,
+            usdTotal: null,
+            cardOk: true,
+          }))
         setCreditsInfo({
           enabled: cfg.enabled,
-          stripeEnabled: cfg.stripeEnabled && Boolean(quote?.stripeEnabled),
+          stripeEnabled: cfg.stripeEnabled,
           stripeMarkup: cfg.stripeMarkup,
-          feeNim: quote?.feeNim ?? basePricing.feeNim,
-          creditNimCost: quote?.creditNimCost ?? basePricing.feeNim,
-          creditStripeUsd: quote?.creditStripeUsd ?? null,
-          promoActive: quote?.promoActive ?? basePricing.promoActive,
+          feeNim: catalog?.feeNim ?? basePricing.feeNim,
+          creditNimCost: catalog?.feeNim ?? basePricing.feeNim,
+          promoActive: catalog?.promoActive ?? basePricing.promoActive,
+          stripeMinChargeCents: catalog?.stripeMinChargeCents ?? cfg.stripeMinChargeCents ?? 50,
+          packs,
         })
       } catch {
         if (!cancelled) {
@@ -47,8 +69,14 @@ export function PricePage() {
             stripeMarkup: 2,
             feeNim: basePricing.feeNim,
             creditNimCost: basePricing.feeNim,
-            creditStripeUsd: null,
             promoActive: basePricing.promoActive,
+            stripeMinChargeCents: 50,
+            packs: [10, 25, 50, 100].map(pack => ({
+              pack,
+              nimTotal: basePricing.feeNim * pack,
+              usdTotal: null,
+              cardOk: true,
+            })),
           })
         }
       }
@@ -75,8 +103,9 @@ export function PricePage() {
             Seal credits
           </h3>
           <p className="muted price-page-credits-lead">
-            <strong>1 credit = 1 seal</strong>, anytime — including after the July promo ends. Credits
-            never convert back to NIM or cash.
+            <strong>1 credit = 1 seal</strong>, anytime — including after the July promo ends. Buy fixed
+            packs; card price is computed live at checkout ({creditsInfo?.stripeMarkup ?? 2}× NIM market)
+            so we never need to maintain stale Stripe catalog prices. Credits never convert back to NIM.
           </p>
           <ul className="price-page-credits-list">
             <li>
@@ -85,8 +114,7 @@ export function PricePage() {
                 <strong>Buy with NIM</strong>
                 <span className="muted">
                   {formatSealFeeNim(creditsInfo?.creditNimCost ?? basePricing.feeNim)} NIM per credit
-                  (same as the current seal fee
-                  {creditsInfo?.promoActive ? ' — promo rate' : ''}). Best rate.
+                  (current seal fee{creditsInfo?.promoActive ? ' — promo rate' : ''}). Best rate.
                 </span>
               </div>
             </li>
@@ -95,19 +123,49 @@ export function PricePage() {
               <div>
                 <strong>Buy with card</strong>
                 <span className="muted">
-                  {creditsInfo?.stripeEnabled && creditsInfo.creditStripeUsd != null
-                    ? `About $${creditsInfo.creditStripeUsd.toFixed(2)} USD per credit (${creditsInfo.stripeMarkup}× live NIM market).`
-                    : `${creditsInfo?.stripeMarkup ?? 2}× live NIM market in USD — convenience premium so NIM stays cheaper.`}{' '}
-                  No NIM required to purchase; sealing with a credit uses VeriLock’s on-chain proof
-                  wallet.
+                  Same packs at {creditsInfo?.stripeMarkup ?? 2}× live NIM USD. Stripe requires at least $
+                  {((creditsInfo?.stripeMinChargeCents ?? 50) / 100).toFixed(2)} per charge — small packs
+                  may be NIM-only while promo pricing is low.
                 </span>
               </div>
             </li>
           </ul>
+          {creditsInfo?.packs && creditsInfo.packs.length > 0 && (
+            <div className="price-page-packs" aria-label="Credit pack prices">
+              <table className="price-page-packs-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Pack</th>
+                    <th scope="col">NIM</th>
+                    <th scope="col">Card (est.)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {creditsInfo.packs.map(row => (
+                    <tr key={row.pack}>
+                      <td>
+                        <strong>{row.pack}</strong> credits
+                      </td>
+                      <td>{formatSealFeeNim(row.nimTotal)}</td>
+                      <td>
+                        {row.usdTotal != null
+                          ? row.cardOk
+                            ? `≈ $${row.usdTotal.toFixed(2)}`
+                            : `Under $${((creditsInfo.stripeMinChargeCents ?? 50) / 100).toFixed(2)} min`
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.78rem' }}>
+                Estimates update with NIM markets; the amount you pay is locked when Checkout opens.
+              </p>
+            </div>
+          )}
           <p className="muted price-page-credits-how">
-            <strong>Where to buy:</strong> connect your Nimiq wallet, open an agreement, and go to the{' '}
-            <em>Seal</em> step. The credits panel appears there after you sign in — balance, Buy with
-            NIM, and Buy with card.
+            <strong>Where to buy:</strong> connect your wallet → agreement → <em>Seal</em> step → pick a
+            pack → Buy with NIM or card.
           </p>
         </section>
       )}

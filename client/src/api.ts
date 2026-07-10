@@ -232,6 +232,8 @@ export const api = {
       stripeMarkup: number
       maxPerCheckout: number
       maxPerNimTopup: number
+      packs: number[]
+      stripeMinChargeCents: number
       creditsPerSeal: number
     }>('/api/credits/config'),
 
@@ -245,10 +247,12 @@ export const api = {
       stripeMarkup: number
       maxPerCheckout: number
       maxPerNimTopup: number
+      packs: number[]
+      stripeMinChargeCents: number
       creditsPerSeal: number
     }>('/api/credits/balance', { headers: withAuth(token) }),
 
-  creditsQuote: (credits = 1) =>
+  creditsQuote: (credits = 10) =>
     request<{
       credits: number
       feeNim: number
@@ -262,9 +266,29 @@ export const api = {
       creditStripeUsdTotal: number
       unitUsdCents: number
       totalUsdCents: number
+      meetsStripeMinimum: boolean
+      stripeMinChargeCents: number
+      isPack: boolean
       stripeEnabled: boolean
       pricesStale: boolean
     }>(`/api/credits/quote?credits=${encodeURIComponent(String(credits))}`),
+
+  creditsPackQuotes: () =>
+    request<{
+      packs: Array<{
+        pack: number
+        credits: number
+        creditNimCostTotal: number
+        creditStripeUsdTotal: number
+        totalUsdCents: number
+        meetsStripeMinimum: boolean
+        stripeEnabled: boolean
+      }>
+      stripeMinChargeCents: number
+      stripeMarkup: number
+      feeNim: number
+      promoActive: boolean
+    }>('/api/credits/quote?packs=1'),
 
   creditsLedger: (token: string, limit = 50) =>
     request<{

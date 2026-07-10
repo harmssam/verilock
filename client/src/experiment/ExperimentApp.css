@@ -2616,6 +2616,39 @@ a.hash-chip.text-link:focus-visible {
   display: flex;
   align-items: center;
 }
+.journey-credits-packs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.journey-credits-pack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 3.5rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 90%, transparent);
+  background: color-mix(in srgb, var(--surface, #fff) 92%, transparent);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.journey-credits-pack--active {
+  border-color: color-mix(in srgb, var(--mint, #0d9488) 55%, var(--border));
+  background: color-mix(in srgb, var(--mint, #5eead4) 14%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--mint, #0d9488) 25%, transparent);
+}
+.journey-credits-pack-n {
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+.journey-credits-pack-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 .journey-credits--compact {
   margin-bottom: 0.25rem;
 }
