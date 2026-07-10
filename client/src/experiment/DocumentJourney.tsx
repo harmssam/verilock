@@ -1162,7 +1162,6 @@ export function DocumentJourney({
               <span className="muted">Drop a file - look up sealed fingerprints</span>
             </button>
           </div>
-          <SealPricingDisplay className="journey-pricing" />
         </section>
       )}
 

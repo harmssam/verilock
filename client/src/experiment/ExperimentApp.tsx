@@ -170,13 +170,16 @@ export function ExperimentApp() {
     <div className="exp-app">
       <header className={`exp-header${wallet.account ? ' exp-header--connected' : ''}`}>
         <button type="button" className="exp-brand" onClick={goJourney} aria-label="VeriLock home">
-          <img
-            className="exp-brand-mark"
-            src="/verilock-mark.png"
-            alt=""
-            width={70}
-            height={70}
-          />
+          <span className="exp-brand-mark-wrap" aria-hidden>
+            <span className="exp-brand-mark-halo" />
+            <img
+              className="exp-brand-mark"
+              src="/verilock-mark.png"
+              alt=""
+              width={70}
+              height={70}
+            />
+          </span>
           <div className="exp-brand-text">
             <h1>VeriLock</h1>
             <p>Sign together. Prove forever.</p>

@@ -73,8 +73,13 @@ export function PricePage({
     <div className="card price-page">
       <h2>Pricing</h2>
       <p className="muted price-page-lead">
-        Signing and verifying are free. Sealing costs <strong>1 credit</strong> — buy packs ahead of
-        time, or pay the current credit value in NIM when you seal.
+        Signing and verifying are free. Sealing costs <strong>1 credit</strong> and permanently records
+        your document&apos;s fingerprint on the{' '}
+        <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
+          Nimiq
+        </a>{' '}
+        network blockchain — buy packs ahead of time, or pay the current credit value in NIM when you
+        seal.
       </p>
 
       {creditsEnabled ? (
@@ -87,6 +92,10 @@ export function PricePage({
               <span className="price-page-model-credits">1 credit</span>
               <span className="price-page-model-per">per document</span>
             </div>
+            <p className="muted price-page-model-explain">
+              One credit pays for a permanent on-chain seal: the document fingerprint is written to the
+              Nimiq network blockchain and can be verified forever, independently of VeriLock.
+            </p>
           </div>
 
           <div className="price-page-model-row">
