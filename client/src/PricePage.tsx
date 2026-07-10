@@ -1,5 +1,5 @@
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
-import { Coins, CreditCard, ExternalLink, ShoppingCart, Wallet } from 'lucide-react'
+import { Coins, ExternalLink, ShoppingCart, Wallet } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from './api'
 import { SealPricingDisplay } from './SealPricingDisplay'
@@ -119,9 +119,8 @@ export function PricePage({
     <div className="card price-page">
       <h2>Pricing</h2>
       <p className="muted price-page-lead">
-        One flat fee seals your document on the Nimiq blockchain. Your PDF stays on your device - only
-        its fingerprint is written on-chain. You can pay with NIM at seal time, or buy prepaid{' '}
-        <strong>seal credits</strong> (including with a card).
+        One flat fee seals a document fingerprint on Nimiq. Pay with NIM when you seal, or buy prepaid
+        credits. Your PDF never leaves your device.
       </p>
       <SealPricingDisplay />
 
@@ -132,33 +131,13 @@ export function PricePage({
             Seal credits
           </h3>
           <p className="muted price-page-credits-lead">
-            <strong>1 credit = 1 seal</strong>, anytime — including after the July promo ends. Buy fixed
-            packs; card price is computed live at checkout ({creditsInfo?.stripeMarkup ?? 2}× NIM market)
-            so we never need to maintain stale Stripe catalog prices. Credits never convert back to NIM.
+            <strong>1 credit = 1 seal.</strong> NIM:{' '}
+            {formatSealFeeNim(creditsInfo?.creditNimCost ?? basePricing.feeNim)} each
+            {creditsInfo?.promoActive ? ' (promo)' : ''}. Card: about {creditsInfo?.stripeMarkup ?? 2}×
+            that in USD (at least $
+            {((creditsInfo?.stripeMinChargeCents ?? 50) / 100).toFixed(2)} per pack). Credits never
+            convert back to NIM.
           </p>
-          <ul className="price-page-credits-list">
-            <li>
-              <Wallet size={16} strokeWidth={2.25} aria-hidden />
-              <div>
-                <strong>Buy with NIM</strong>
-                <span className="muted">
-                  {formatSealFeeNim(creditsInfo?.creditNimCost ?? basePricing.feeNim)} NIM per credit
-                  (current seal fee{creditsInfo?.promoActive ? ' — promo rate' : ''}). Best rate.
-                </span>
-              </div>
-            </li>
-            <li>
-              <CreditCard size={16} strokeWidth={2.25} aria-hidden />
-              <div>
-                <strong>Buy with card</strong>
-                <span className="muted">
-                  Same packs at {creditsInfo?.stripeMarkup ?? 2}× live NIM USD. Stripe requires at least $
-                  {((creditsInfo?.stripeMinChargeCents ?? 50) / 100).toFixed(2)} per charge — small packs
-                  may be NIM-only while promo pricing is low.
-                </span>
-              </div>
-            </li>
-          </ul>
           {creditsInfo?.packs && creditsInfo.packs.length > 0 && (
             <div className="price-page-packs" aria-label="Credit pack prices">
               <table className="price-page-packs-table">
@@ -176,20 +155,11 @@ export function PricePage({
                         <strong>{row.pack}</strong> credits
                       </td>
                       <td>{formatSealFeeNim(row.nimTotal)}</td>
-                      <td>
-                        {row.usdTotal != null
-                          ? row.cardOk
-                            ? `≈ $${row.usdTotal.toFixed(2)}`
-                            : `Under $${((creditsInfo.stripeMinChargeCents ?? 50) / 100).toFixed(2)} min`
-                          : '—'}
-                      </td>
+                      <td>{row.usdTotal != null ? `≈ $${row.usdTotal.toFixed(2)}` : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.78rem' }}>
-                Estimates update with NIM markets; the amount you pay is locked when Checkout opens.
-              </p>
             </div>
           )}
 
@@ -197,11 +167,11 @@ export function PricePage({
             <div className="price-page-credits-cta-head">
               <ShoppingCart size={18} strokeWidth={2.25} aria-hidden />
               <div>
-                <strong>Buy credits now</strong>
+                <strong>Buy credits</strong>
                 <p className="muted" style={{ margin: '0.15rem 0 0', fontSize: '0.84rem' }}>
                   {signedIn
-                    ? 'Pick a pack below — pay with NIM or card. Your balance updates in the header.'
-                    : 'Connect your Nimiq wallet to purchase a credit pack.'}
+                    ? 'Choose a pack — NIM or card.'
+                    : 'Connect your wallet to buy a pack.'}
                 </p>
               </div>
             </div>

@@ -48,7 +48,6 @@ export async function createCreditsCheckoutSession(input: {
   }
 
   const credits = Math.floor(Number(input.credits))
-  // Live pack quote + Stripe $0.50 floor (price set at session create — no daily Stripe Product sync)
   const quote = await assertStripePackQuote(credits)
   if (quote.pricesStale) {
     throw new Error('NIM price quote is stale; try again in a moment')
@@ -58,7 +57,6 @@ export async function createCreditsCheckoutSession(input: {
   const appUrl = publicAppUrl()
   const now = Date.now()
 
-  // One line item for the whole pack (clearer on the receipt than unit × qty at 4¢)
   const session = await stripe.checkout.sessions.create(
     {
       mode: 'payment',
@@ -74,7 +72,7 @@ export async function createCreditsCheckoutSession(input: {
         unitUsdCents: String(quote.unitUsdCents),
         totalUsdCents: String(quote.totalUsdCents),
         markup: String(quote.stripeMarkup),
-        pricingVersion: '2-packs',
+        pricingVersion: '3-packs-min',
       },
       line_items: [
         {
@@ -84,10 +82,7 @@ export async function createCreditsCheckoutSession(input: {
             unit_amount: quote.totalUsdCents,
             product_data: {
               name: `VeriLock ${credits}-credit pack`,
-              description:
-                `${credits} seal credits (1 credit = 1 document seal). ` +
-                `Card price is ${quote.stripeMarkup}× live NIM market so paying with NIM stays cheaper. ` +
-                `Price locked at checkout from current rates.`,
+              description: `${credits} seal credits · 1 credit = 1 document seal`,
             },
           },
         },
