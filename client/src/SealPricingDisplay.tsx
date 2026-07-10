@@ -13,6 +13,11 @@ interface SealPricingDisplayProps {
    * Kept so older call sites still type-check.
    */
   showAllCurrencies?: boolean
+  /**
+   * Free-vs-paid note under the fee. Hide on pages that already explain
+   * pricing in surrounding copy (e.g. PricePage lead).
+   */
+  showNote?: boolean
 }
 
 function FastspotRateSource() {
@@ -32,7 +37,7 @@ function FastspotRateSource() {
   )
 }
 
-export function SealPricingDisplay({ className }: SealPricingDisplayProps) {
+export function SealPricingDisplay({ className, showNote = true }: SealPricingDisplayProps) {
   const pricing = getSealPricing()
   const { prices } = useNimPrices()
 
@@ -60,9 +65,12 @@ export function SealPricingDisplay({ className }: SealPricingDisplayProps) {
           <span className="muted seal-pricing-display-promo-note">{pricing.promoEndsLabel}</span>
         </div>
       )}
-      <p className="muted seal-pricing-display-note">
-        Signing and verifying are free. You only pay the seal fee when the agreement is locked on-chain.
-      </p>
+      {showNote && (
+        <p className="muted seal-pricing-display-note">
+          Signing and verifying are free. You only pay the seal fee when the agreement is locked
+          on-chain.
+        </p>
+      )}
     </div>
   )
 }

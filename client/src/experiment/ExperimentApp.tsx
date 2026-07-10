@@ -193,13 +193,16 @@ export function ExperimentApp() {
               Agreements
             </button>
           )}
-          <button
-            type="button"
-            className={`exp-pricing-link exp-nav-link${screen === 'pricing' ? ' exp-pricing-link--active' : ''}`}
-            onClick={screen === 'pricing' ? goJourney : goPricing}
-          >
-            Pricing
-          </button>
+          {/* Credits chip already opens Pricing; keep the nav link for guests / credits-off. */}
+          {!(wallet.account && creditBalance != null && Number.isFinite(creditBalance)) && (
+            <button
+              type="button"
+              className={`exp-pricing-link exp-nav-link${screen === 'pricing' ? ' exp-pricing-link--active' : ''}`}
+              onClick={screen === 'pricing' ? goJourney : goPricing}
+            >
+              Pricing
+            </button>
+          )}
           <AccountMenu
             account={wallet.account}
             connecting={wallet.connecting}
