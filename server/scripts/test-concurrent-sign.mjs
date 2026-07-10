@@ -74,7 +74,8 @@ assert(
     .join('; ')}`,
 )
 
-const finalDoc = getDocumentPublic(created.id)
+// Creator viewer so names are not redacted for assertions.
+const finalDoc = getDocumentPublic(created.id, CREATOR)
 assert(finalDoc, 'document missing')
 assert(finalDoc.signatures.length === 2, `expected 2 signatures, got ${finalDoc.signatures.length}`)
 
