@@ -1600,6 +1600,16 @@ export function DocumentJourney({
 
                       <PartyList doc={doc} revealNames={revealParticipantPrivate} />
 
+                      {!allSigned(doc) && !doc.directSeal && (
+                        <ShareInviteCard
+                          document={doc.source}
+                          shareUrl={doc.shareUrl}
+                          linkCopied={linkCopied}
+                          onCopyLink={() => void copyLink()}
+                          embedded
+                        />
+                      )}
+
                       {canCancelCurrent && role === 'creator' && (
                         <button
                           type="button"
