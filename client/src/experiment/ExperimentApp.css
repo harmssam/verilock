@@ -12,6 +12,21 @@
     max(1rem, env(safe-area-inset-right))
     max(3rem, env(safe-area-inset-bottom))
     max(1rem, env(safe-area-inset-left));
+  transition: max-width 0.2s ease;
+}
+
+/* Content pages (blog, pricing, privacy, agreements) use a wider desktop shell.
+   Journey create/sign/verify stays compact for focused mobile-first flows. */
+@media (min-width: 900px) {
+  .exp-app--wide {
+    max-width: min(1120px, calc(100vw - 3rem));
+  }
+}
+
+@media (min-width: 1280px) {
+  .exp-app--wide {
+    max-width: min(1200px, calc(100vw - 4rem));
+  }
 }
 
 /* ── Header / account ── */
@@ -584,6 +599,14 @@
   font-weight: 600;
   color: var(--text-muted);
   letter-spacing: -0.01em;
+}
+
+.exp-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 1rem;
 }
 
 .exp-footer-link {

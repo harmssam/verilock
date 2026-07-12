@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   isAgreementsPath,
+  isBlogPath,
   isKnownAppPath,
   isPricingPath,
   isPrivacyPath,
   saveHubReturnPath,
 } from '../hubReturnPath'
-import { applyPageMeta, journeyPathMeta, PAGE_META, type PageMeta } from '../seo'
+import { blogSlugFromPath, getPostBySlug } from '../blog'
+import { applyPageMeta, blogPostMeta, journeyPathMeta, PAGE_META, type PageMeta } from '../seo'
 import type { SealDocument } from '../types'
 import { PricePage } from '../PricePage'
 import { PrivacyPolicyPage } from '../PrivacyPolicyPage'
 import { AccountMenu } from './AccountMenu'
 import { AgreementsPage } from './AgreementsPage'
+import { BlogPage } from './BlogPage'
 import { DocumentJourney } from './DocumentJourney'
 import { NotFoundPage } from './NotFoundPage'
 import { useCreditBalance } from './useCreditBalance'
@@ -32,12 +35,13 @@ import {
   peekStripeCheckoutReturn,
 } from './stripeCheckoutReturn'
 
-type ShellScreen = 'journey' | 'pricing' | 'privacy' | 'agreements' | 'not-found'
+type ShellScreen = 'journey' | 'pricing' | 'privacy' | 'agreements' | 'blog' | 'not-found'
 
 function screenFromPath(pathname: string): ShellScreen {
   if (isPricingPath(pathname)) return 'pricing'
   if (isPrivacyPath(pathname)) return 'privacy'
   if (isAgreementsPath(pathname)) return 'agreements'
+  if (isBlogPath(pathname)) return 'blog'
   // Unknown paths (e.g. /foo) — do not fall through to the path picker as “home”.
   if (!isKnownAppPath(pathname)) return 'not-found'
   return 'journey'
@@ -62,7 +66,8 @@ export function ExperimentApp() {
     if (
       !isPricingPath(window.location.pathname) &&
       !isPrivacyPath(window.location.pathname) &&
-      !isAgreementsPath(window.location.pathname)
+      !isAgreementsPath(window.location.pathname) &&
+      !isBlogPath(window.location.pathname)
     ) {
       journeyReturnPathRef.current = path || '/'
     }
@@ -88,6 +93,14 @@ export function ExperimentApp() {
     rememberJourneyPath()
     setScreen('privacy')
     window.history.pushState({}, '', '/privacy')
+  }, [rememberJourneyPath])
+
+  const goBlog = useCallback((slug?: string) => {
+    rememberJourneyPath()
+    setScreen('blog')
+    const next = slug ? `/blog/${slug}` : '/blog'
+    window.history.pushState({}, '', next)
+    setNavEpoch(n => n + 1)
   }, [rememberJourneyPath])
 
   const goAgreements = useCallback(() => {
@@ -184,6 +197,20 @@ export function ExperimentApp() {
       applyPageMeta({ ...PAGE_META.privacy })
       return
     }
+    if (screen === 'blog') {
+      const slug = blogSlugFromPath(path)
+      if (slug) {
+        const post = getPostBySlug(slug)
+        if (post) {
+          applyPageMeta(blogPostMeta(post))
+          return
+        }
+        applyPageMeta({ ...PAGE_META.notFound, path })
+        return
+      }
+      applyPageMeta({ ...PAGE_META.blog })
+      return
+    }
     if (screen === 'agreements') {
       applyPageMeta({ ...PAGE_META.agreements })
       return
@@ -214,8 +241,11 @@ export function ExperimentApp() {
     void wallet.connect(journeyConnectOptions(connectMode))
   }
 
+  const wideShell =
+    screen === 'blog' || screen === 'pricing' || screen === 'privacy' || screen === 'agreements'
+
   return (
-    <div className="exp-app">
+    <div className={`exp-app${wideShell ? ' exp-app--wide' : ''}`}>
       <header className={`exp-header${wallet.account ? ' exp-header--connected' : ''}`}>
         <button type="button" className="exp-brand" onClick={goJourney} aria-label="VeriLock home">
           <img
@@ -251,6 +281,13 @@ export function ExperimentApp() {
               Pricing
             </button>
           )}
+          <button
+            type="button"
+            className={`exp-pricing-link exp-nav-link${screen === 'blog' ? ' exp-pricing-link--active' : ''}`}
+            onClick={screen === 'blog' ? goJourney : () => goBlog()}
+          >
+            Blog
+          </button>
           <AccountMenu
             account={wallet.account}
             connecting={wallet.connecting}
@@ -277,6 +314,7 @@ export function ExperimentApp() {
       {(screen === 'pricing' ||
         screen === 'privacy' ||
         screen === 'agreements' ||
+        screen === 'blog' ||
         screen === 'not-found') && (
         <button type="button" className="exp-back-home" onClick={goJourney}>
           ← Back to home
@@ -297,6 +335,15 @@ export function ExperimentApp() {
         />
       )}
       {screen === 'privacy' && <PrivacyPolicyPage />}
+      {screen === 'blog' && (
+        <BlogPage
+          key={typeof window !== 'undefined' ? window.location.pathname : '/blog'}
+          path={typeof window !== 'undefined' ? window.location.pathname : '/blog'}
+          onOpenIndex={() => goBlog()}
+          onOpenPost={slug => goBlog(slug)}
+          onHome={goJourney}
+        />
+      )}
       {screen === 'agreements' && (
         <AgreementsPage
           token={wallet.token}
@@ -314,7 +361,7 @@ export function ExperimentApp() {
           onHome={goJourney}
         />
       )}
-      {/* Keep journey mounted so in-progress state survives pricing/privacy/agreements visits */}
+      {/* Keep journey mounted so in-progress state survives pricing/privacy/agreements/blog visits */}
       <div hidden={screen !== 'journey'}>
         <DocumentJourney
           key={journeyEpoch}
@@ -330,13 +377,22 @@ export function ExperimentApp() {
         <p className="exp-footer-tagline">
           Your wallet is your identity; the chain is the proof.
         </p>
-        <button
-          type="button"
-          className={`exp-footer-link${screen === 'privacy' ? ' exp-footer-link--active' : ''}`}
-          onClick={goPrivacy}
-        >
-          Privacy Policy
-        </button>
+        <div className="exp-footer-links">
+          <button
+            type="button"
+            className={`exp-footer-link${screen === 'blog' ? ' exp-footer-link--active' : ''}`}
+            onClick={() => goBlog()}
+          >
+            Blog
+          </button>
+          <button
+            type="button"
+            className={`exp-footer-link${screen === 'privacy' ? ' exp-footer-link--active' : ''}`}
+            onClick={goPrivacy}
+          >
+            Privacy Policy
+          </button>
+        </div>
       </footer>
     </div>
   )

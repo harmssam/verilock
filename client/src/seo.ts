@@ -31,6 +31,12 @@ export const PAGE_META = {
       'How VeriLock handles your data: PDFs stay on your device, only document fingerprints and signing metadata are stored, and sealed hashes remain public on Nimiq.',
     path: '/privacy',
   },
+  blog: {
+    title: `Blog${TITLE_SUFFIX}`,
+    description:
+      'Guides on private PDF signing, permanent on-chain document fingerprints, wallet-optional verification, and VeriLock product updates.',
+    path: '/blog',
+  },
   verify: {
     title: `Verify a Document${TITLE_SUFFIX}`,
     description:
@@ -175,5 +181,13 @@ export function documentPageMeta(title: string, role: 'sign' | 'verify'): PageMe
     description: `${verb} "${title}" on VeriLock. Fingerprint your PDF locally, collect Nimiq wallet signatures, and seal the document hash on-chain.`,
     path: undefined,
     noindex: true,
+  }
+}
+
+export function blogPostMeta(post: { title: string; description: string; slug: string }): PageMeta {
+  return {
+    title: `${post.title}${TITLE_SUFFIX}`,
+    description: post.description,
+    path: `/blog/${post.slug}`,
   }
 }

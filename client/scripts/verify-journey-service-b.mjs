@@ -94,6 +94,19 @@ check('experiment React entry exports ExperimentApp mount', () => {
   assert.match(main, /createRoot/)
 })
 
+check('blog is wired as a known Journey shell path', () => {
+  const hub = readFileSync(join(clientDir, 'src/hubReturnPath.ts'), 'utf8')
+  assert.match(hub, /export function isBlogPath/)
+  assert.match(hub, /isBlogPath\(path\)/)
+  const app = readFileSync(join(clientDir, 'src/experiment/ExperimentApp.tsx'), 'utf8')
+  assert.match(app, /BlogPage/)
+  assert.match(app, /isBlogPath/)
+  const posts = readFileSync(join(clientDir, 'src/blog/posts.ts'), 'utf8')
+  assert.match(posts, /export const ALL_POSTS/)
+  const sitemap = readFileSync(join(clientDir, 'public/sitemap.xml'), 'utf8')
+  assert.match(sitemap, /verilock\.online\/blog/)
+})
+
 if (process.env.VERIFY_DIST === '1') {
   check('client/dist after production build is journey shell', () => {
     const index = join(clientDir, 'dist', 'index.html')
