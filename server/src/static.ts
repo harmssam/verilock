@@ -9,6 +9,8 @@ function isKnownAppPath(path: string): boolean {
   if (/^\/agreements\/?$/.test(path)) return true
   if (/^\/pricing\/?$/.test(path)) return true
   if (/^\/privacy\/?$/.test(path)) return true
+  // Blog index + post slugs (SPA deep links must get index.html, not 404.html)
+  if (/^\/blog(?:\/[a-zA-Z0-9_-]+)?\/?$/.test(path)) return true
   if (/^\/d\/[^/]+\/?$/.test(path)) return true
   if (/^\/v\/[^/]+\/?$/.test(path)) return true
   return false
