@@ -32,7 +32,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Share carefully, seal when ready, verify on verilock.online.',
+      text: 'Share carefully, seal when ready, verify anytime. Permanent seals are 50 NIM through July (promo ends August 1).',
     },
   ],
 }

@@ -7,11 +7,12 @@ export const post: BlogPost = {
   title: 'Secure Online PDF Signing for Agreements',
   description:
     'Sign PDF agreements online without uploading the file. Local fingerprints, multi-party wallets, permanent on-chain proof.',
-  date: '2026-07-05',
+  date: '2026-07-07',
   tags: ['guide', 'privacy'],
   coverImage: cover,
   coverAlt: 'Abstract illustration of a private document protected by a soft padlock glow',
   relatedSlugs: [
+    'is-this-the-same-file',
     'how-to-sign-pdf-with-blockchain',
     'private-signatures-public-proof',
   ],
@@ -60,7 +61,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Try it on verilock.online. Sign together. Prove forever.',
+      text: 'Sign together. Prove forever. Seals are 50 NIM through July (95% off list), then the standard fee returns August 1.',
     },
   ],
 }

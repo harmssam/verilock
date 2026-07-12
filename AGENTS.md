@@ -70,6 +70,11 @@ Legacy-only (do not invest product work here without an explicit request):
 - Optional ready-to-seal email is gated by client `FEATURES.emailNotifyUi` and server Resend flags.
 - Do not re-enable or redesign email in the legacy app by default.
 
+### Blog
+
+- Journey blog: `client/src/blog/` + `BlogPage` under `/blog`.
+- Author rules (no site-name CTAs, no em dashes, promo seal fee CTAs): **`client/src/blog/README.md`**.
+
 ### If the user says “the app” / “production” / “VeriLock UI”
 
 Interpret as **Journey Edition** (`client/src/experiment/`), never the pre-journey SPA.

@@ -341,7 +341,7 @@ export function ExperimentApp() {
           path={typeof window !== 'undefined' ? window.location.pathname : '/blog'}
           onOpenIndex={() => goBlog()}
           onOpenPost={slug => goBlog(slug)}
-          onHome={goJourney}
+          onPricing={goPricing}
         />
       )}
       {screen === 'agreements' && (

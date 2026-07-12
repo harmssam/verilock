@@ -48,7 +48,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Need a check now? Use the verifier path on verilock.online. No wallet required.',
+      text: 'Need a check now? Use the verifier path from home. No wallet required. When you are ready to lock a new fingerprint, seals are 50 NIM through July.',
     },
   ],
 }

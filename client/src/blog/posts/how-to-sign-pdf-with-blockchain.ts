@@ -7,11 +7,12 @@ export const post: BlogPost = {
   title: 'How to Sign a PDF with Blockchain',
   description:
     'Fingerprint a PDF, collect multi-party wallet signatures, and seal a permanent hash on Nimiq.',
-  date: '2026-07-06',
+  date: '2026-07-07',
   tags: ['guide'],
   coverImage: cover,
   coverAlt: 'Abstract illustration of a document fingerprint linked to a glowing chain',
   relatedSlugs: [
+    'is-this-the-same-file',
     'blockchain-pdf-signature-verification',
     'prepaid-credits-for-seals',
   ],
@@ -47,7 +48,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'That is the full loop. Try it at verilock.online.',
+      text: 'That is the full loop. Ready to seal? Through July the permanent fingerprint record is 50 NIM (95% off), ending August 1.',
     },
   ],
 }

@@ -3,6 +3,7 @@ import { post as blockchainPdfSignatureVerification } from './posts/blockchain-p
 import { post as clearerPricingForPermanentSeals } from './posts/clearer-pricing-for-permanent-seals'
 import { post as howToSignPdfWithBlockchain } from './posts/how-to-sign-pdf-with-blockchain'
 import { post as howToVerifySignedPdfWithoutWallet } from './posts/how-to-verify-signed-pdf-without-wallet'
+import { post as isThisTheSameFile } from './posts/is-this-the-same-file'
 import { post as journeyEditionIsLive } from './posts/journey-edition-is-live'
 import { post as prepaidCreditsForSeals } from './posts/prepaid-credits-for-seals'
 import { post as privateSignaturesPublicProof } from './posts/private-signatures-public-proof'
@@ -22,6 +23,7 @@ export const ALL_POSTS: BlogPost[] = [
   howToSignPdfWithBlockchain,
   blockchainPdfSignatureVerification,
   secureOnlinePdfSigningForAgreements,
+  isThisTheSameFile,
 ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.slug.localeCompare(b.slug)))
 
 const bySlug = new Map(ALL_POSTS.map(p => [p.slug, p]))

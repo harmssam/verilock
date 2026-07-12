@@ -32,7 +32,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Open verilock.online to use it. Live site serves Journey by default.',
+      text: 'Journey is the live default. Pick a path above, and when you seal, July pricing is 50 NIM for a permanent record (95% off; ends August 1).',
     },
   ],
 }
