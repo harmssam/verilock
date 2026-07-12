@@ -13,7 +13,8 @@ interface BlogPageProps {
   path: string
   onOpenIndex: () => void
   onOpenPost: (slug: string) => void
-  onHome: () => void
+  /** Prefer pricing so CTAs advertise seal fee / promo without leaving the site. */
+  onPricing: () => void
 }
 
 const TAG_LABEL: Record<BlogTag, string> = {
@@ -207,12 +208,12 @@ function BlogPostView({
   post,
   onOpenIndex,
   onOpenPost,
-  onHome,
+  onPricing,
 }: {
   post: BlogPost
   onOpenIndex: () => void
   onOpenPost: (slug: string) => void
-  onHome: () => void
+  onPricing: () => void
 }) {
   const bodyHasCoverFigure = post.body.some(
     b => b.type === 'figure' && b.src === post.coverImage,
@@ -244,8 +245,11 @@ function BlogPostView({
       <BlogPostBody body={post.body} />
       <RelatedPosts post={post} onOpenPost={onOpenPost} />
       <div className="blog-cta">
-        <button type="button" className="btn btn-primary" onClick={onHome}>
-          Try VeriLock
+        <p className="muted blog-cta-note">
+          Through July, permanent seals are 50 NIM (95% off list). Promo ends August 1.
+        </p>
+        <button type="button" className="btn btn-primary" onClick={onPricing}>
+          See seal pricing
         </button>
       </div>
     </article>
@@ -275,7 +279,7 @@ function BlogNotFound({
   )
 }
 
-export function BlogPage({ path, onOpenIndex, onOpenPost, onHome }: BlogPageProps) {
+export function BlogPage({ path, onOpenIndex, onOpenPost, onPricing }: BlogPageProps) {
   const slug = blogSlugFromPath(path)
   if (!slug) {
     return <BlogIndex onOpenPost={onOpenPost} />
@@ -289,7 +293,7 @@ export function BlogPage({ path, onOpenIndex, onOpenPost, onHome }: BlogPageProp
       post={post}
       onOpenIndex={onOpenIndex}
       onOpenPost={onOpenPost}
-      onHome={onHome}
+      onPricing={onPricing}
     />
   )
 }

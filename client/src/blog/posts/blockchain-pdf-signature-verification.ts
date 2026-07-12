@@ -7,11 +7,12 @@ export const post: BlogPost = {
   title: 'Blockchain PDF Signature Verification',
   description:
     'What verification actually checks: matching fingerprints, party signatures, and a permanent on-chain seal.',
-  date: '2026-07-06',
+  date: '2026-07-07',
   tags: ['guide', 'verify'],
   coverImage: cover,
   coverAlt: 'Abstract illustration of matching fingerprints linked by a verification arc',
   relatedSlugs: [
+    'is-this-the-same-file',
     'tamper-proof-pdf-verification',
     'how-to-verify-signed-pdf-without-a-wallet',
   ],
@@ -57,7 +58,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Private file. Public proof. Check anytime on verilock.online.',
+      text: 'Private file. Public proof. Check integrity anytime, and seal new agreements for 50 NIM through the end of July (promo ends August 1).',
     },
   ],
 }

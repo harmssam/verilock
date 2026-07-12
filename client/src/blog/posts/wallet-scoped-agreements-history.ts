@@ -32,7 +32,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Connect on verilock.online and use Agreements in the header.',
+      text: 'Connect and open Agreements in the header. Seal new work for 50 NIM through the end of July while the promo lasts.',
     },
   ],
 }

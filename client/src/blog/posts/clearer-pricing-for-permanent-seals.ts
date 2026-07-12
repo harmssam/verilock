@@ -32,7 +32,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Review live numbers on verilock.online/pricing.',
+      text: 'Open Pricing for live numbers. Through July a seal is 50 NIM (95% off the 1000 NIM list). Promo ends August 1.',
     },
   ],
 }

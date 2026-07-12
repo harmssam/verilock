@@ -48,7 +48,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Private signing for those who sign. Public proof for those who only check. Try verify on verilock.online.',
+      text: 'Private signing for those who sign. Public proof for those who only check. When you seal, the July rate is 50 NIM (95% off list) through August 1.',
     },
   ],
 }

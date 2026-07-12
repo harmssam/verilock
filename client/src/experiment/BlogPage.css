@@ -490,7 +490,18 @@
 }
 
 .blog-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
   margin-top: 1.25rem;
+}
+
+.blog-cta-note {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  max-width: 28rem;
 }
 
 .blog-missing-path {

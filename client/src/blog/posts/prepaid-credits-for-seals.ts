@@ -32,7 +32,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'See packs on verilock.online/pricing, then seal when ready.',
+      text: 'Open Pricing for pack options. Each seal still benefits from the July rate of 50 NIM while the promo runs through August 1.',
     },
   ],
 }
