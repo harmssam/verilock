@@ -1,0 +1,66 @@
+import type { BlogPost } from '../types'
+
+const cover = '/blog/secure-online-pdf-signing-for-agreements.jpg'
+
+export const post: BlogPost = {
+  slug: 'secure-online-pdf-signing-for-agreements',
+  title: 'Secure Online PDF Signing for Agreements',
+  description:
+    'Sign PDF agreements online without uploading the file. Local fingerprints, multi-party wallets, permanent on-chain proof.',
+  date: '2026-07-05',
+  tags: ['guide', 'privacy'],
+  coverImage: cover,
+  coverAlt: 'Abstract illustration of a private document protected by a soft padlock glow',
+  relatedSlugs: [
+    'how-to-sign-pdf-with-blockchain',
+    'private-signatures-public-proof',
+  ],
+  body: [
+    {
+      type: 'p',
+      text: 'Most signing tools ask you to upload the full PDF so a platform can host it. Convenient, but your agreement text lives on someone else\'s servers.',
+    },
+    {
+      type: 'p',
+      text: 'VeriLock fingerprints the PDF in the browser, collects wallet signatures, and seals a compact hash on Nimiq. The PDF stays on each device. The chain holds proof, not the contract wording.',
+    },
+    {
+      type: 'figure',
+      src: cover,
+      alt: 'Private document with a padlock of light',
+      caption: 'Private by design: the file stays with you. The proof can be public.',
+    },
+    {
+      type: 'h2',
+      text: 'What security means here',
+    },
+    {
+      type: 'ul',
+      items: [
+        'Did every party review the same file?',
+        'Can someone rewrite a page after signatures?',
+        'Can a third party check integrity without trusting one vendor database?',
+      ],
+    },
+    {
+      type: 'p',
+      text: 'Local SHA-256 fingerprinting, multi-party signing against that fingerprint, and an on-chain seal answer those questions. Change the file, and the hash will not match.',
+    },
+    {
+      type: 'h2',
+      text: 'Private file, public proof',
+    },
+    {
+      type: 'p',
+      text: 'VeriLock stores workflow metadata (title, fingerprints, parties, seal details). The full PDF is never uploaded. When you seal, a Nimiq transaction anchors the fingerprint permanently.',
+    },
+    {
+      type: 'note',
+      text: 'VeriLock helps you sign together and prove the sealed fingerprint later. It is not legal advice about enforceability in your jurisdiction.',
+    },
+    {
+      type: 'p',
+      text: 'Try it on verilock.online. Sign together. Prove forever.',
+    },
+  ],
+}
