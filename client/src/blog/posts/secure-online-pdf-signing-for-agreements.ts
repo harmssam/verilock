@@ -10,7 +10,7 @@ export const post: BlogPost = {
   date: '2026-07-07',
   tags: ['guide', 'privacy'],
   coverImage: cover,
-  coverAlt: 'Abstract illustration of a private document protected by a soft padlock glow',
+  coverAlt: 'Printed agreement beside phone showing verification mark on warm gray desk',
   relatedSlugs: [
     'is-this-the-same-file',
     'how-to-sign-pdf-with-blockchain',

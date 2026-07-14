@@ -10,11 +10,11 @@ export const post: BlogPost = {
   date: '2026-07-06',
   tags: ['guide', 'privacy'],
   coverImage: cover,
-  coverAlt: 'Abstract illustration of two document copies aligning into one trusted version',
+  coverAlt: 'Two off-white printed contracts side by side on a charcoal desk, with a red pen between them and a red hand-drawn circle marking a small difference',
   relatedSlugs: [
+    'what-is-verilock',
+    'how-verilock-works',
     'secure-online-pdf-signing-for-agreements',
-    'how-to-sign-pdf-with-blockchain',
-    'how-to-verify-signed-pdf-without-a-wallet',
   ],
   body: [
     {

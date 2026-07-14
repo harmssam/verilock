@@ -10,7 +10,7 @@ export const post: BlogPost = {
   date: '2026-07-09',
   tags: ['feature', 'privacy'],
   coverImage: cover,
-  coverAlt: 'Abstract illustration of a private document half hidden while a public seal glows',
+  coverAlt: 'Printed contract with redacted party details and visible matte navy verification stamp on warm gray paper',
   relatedSlugs: [
     'secure-online-pdf-signing-for-agreements',
     'how-to-verify-signed-pdf-without-a-wallet',
