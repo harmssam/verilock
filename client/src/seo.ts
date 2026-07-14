@@ -34,7 +34,7 @@ export const PAGE_META = {
   blog: {
     title: `Blog${TITLE_SUFFIX}`,
     description:
-      'Guides on private PDF signing, permanent on-chain document fingerprints, wallet-optional verification, and VeriLock product updates.',
+      'Medium guides on what VeriLock is, how fingerprinting and Nimiq seals work, private PDF signing, wallet-optional verification, and product updates.',
     path: '/blog',
   },
   verify: {

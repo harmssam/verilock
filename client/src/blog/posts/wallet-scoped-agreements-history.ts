@@ -10,10 +10,10 @@ export const post: BlogPost = {
   date: '2026-07-09',
   tags: ['feature'],
   coverImage: cover,
-  coverAlt: 'Abstract illustration of stacked agreement cards with a wallet glow',
+  coverAlt: 'Open manila folder stacked with signed paper agreements, soft blockchain network hexagons in the background',
   relatedSlugs: [
-    'journey-edition-is-live',
     'private-signatures-public-proof',
+    'how-to-sign-pdf-with-blockchain',
   ],
   body: [
     {

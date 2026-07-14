@@ -1,8 +1,10 @@
+import { useEffect } from 'react'
 import {
   blogSlugFromPath,
   formatBlogDate,
   getAllPosts,
   getPostBySlug,
+  resolveBlogSlug,
   type BlogBlock,
   type BlogPost,
   type BlogTag,
@@ -120,7 +122,7 @@ function BlogIndex({ onOpenPost }: { onOpenPost: (slug: string) => void }) {
       <header className="blog-index-header">
         <h2 id="blog-index-title">Blog</h2>
         <p className="muted blog-lead">
-          Product updates and short guides on private signing and permanent proof.
+          Guides on private signing and permanent proof, plus product updates.
         </p>
       </header>
 
@@ -279,14 +281,33 @@ function BlogNotFound({
   )
 }
 
+function BlogSlugRedirect({
+  fromSlug,
+  toSlug,
+  onOpenPost,
+}: {
+  fromSlug: string
+  toSlug: string
+  onOpenPost: (slug: string) => void
+}) {
+  useEffect(() => {
+    if (fromSlug !== toSlug) onOpenPost(toSlug)
+  }, [fromSlug, toSlug, onOpenPost])
+  return null
+}
+
 export function BlogPage({ path, onOpenIndex, onOpenPost, onPricing }: BlogPageProps) {
   const slug = blogSlugFromPath(path)
   if (!slug) {
     return <BlogIndex onOpenPost={onOpenPost} />
   }
-  const post = getPostBySlug(slug)
+  const canonical = resolveBlogSlug(slug)
+  const post = getPostBySlug(canonical)
   if (!post) {
     return <BlogNotFound path={path} onOpenIndex={onOpenIndex} />
+  }
+  if (slug !== post.slug) {
+    return <BlogSlugRedirect fromSlug={slug} toSlug={post.slug} onOpenPost={onOpenPost} />
   }
   return (
     <BlogPostView

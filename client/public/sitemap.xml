@@ -21,17 +21,17 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://verilock.online/blog/what-is-verilock</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://verilock.online/blog/how-verilock-works</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://verilock.online/blog/prepaid-credits-for-seals</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://verilock.online/blog/clearer-pricing-for-permanent-seals</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://verilock.online/blog/journey-edition-is-live</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>

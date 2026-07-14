@@ -10,7 +10,7 @@ export const post: BlogPost = {
   date: '2026-07-07',
   tags: ['guide', 'verify'],
   coverImage: cover,
-  coverAlt: 'Abstract illustration of matching fingerprints linked by a verification arc',
+  coverAlt: 'Two abstract digital fingerprints face a glowing blue checkmark between them, with subtle hash characters and blockchain nodes on a white background',
   relatedSlugs: [
     'is-this-the-same-file',
     'tamper-proof-pdf-verification',

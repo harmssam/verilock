@@ -5,5 +5,7 @@ export {
   formatBlogDate,
   getAllPosts,
   getPostBySlug,
+  resolveBlogSlug,
+  BLOG_SLUG_REDIRECTS,
   isBlogIndexPath,
 } from './posts'
