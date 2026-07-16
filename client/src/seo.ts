@@ -31,6 +31,12 @@ export const PAGE_META = {
       'How VeriLock handles your data: PDFs stay on your device, only document fingerprints and signing metadata are stored, and sealed hashes remain public on Nimiq.',
     path: '/privacy',
   },
+  security: {
+    title: `Security & Integrity${TITLE_SUFFIX}`,
+    description:
+      'How VeriLock protects PDFs: local SHA-256 fingerprinting, wallet identity, on-chain hash seals on Nimiq, and verification without uploading your file. No invented certifications.',
+    path: '/security',
+  },
   blog: {
     title: `Blog${TITLE_SUFFIX}`,
     description:

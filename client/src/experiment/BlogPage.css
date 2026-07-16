@@ -101,7 +101,6 @@
 
 .blog-featured-media img,
 .blog-spotlight-media img,
-.blog-figure img,
 .blog-related-card img {
   display: block;
   width: 100%;
@@ -320,15 +319,16 @@
   }
 }
 
-/* Post article — readable measure, centered in the wide shell */
+/* Post article — same shell width as blog index (no narrower column) */
 .blog-page--post {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
   background: var(--gradient-card, transparent);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   border-radius: var(--radius-lg, 16px);
   padding: 1.1rem 1.1rem 1.25rem;
-  max-width: 46rem;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 @media (min-width: 900px) {
@@ -363,57 +363,101 @@
   color: var(--text-muted);
 }
 
+/* Block flow (not flex) so floated side figures can wrap following copy */
 .blog-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
+  display: block;
+  max-width: 42rem;
+}
+
+.blog-body > * + * {
+  margin-top: 0.9rem;
 }
 
 .blog-body-h2 {
-  margin: 0.5rem 0 0;
+  margin: 1.15rem 0 0;
   font-family: var(--font-display);
-  font-size: 0.95rem;
+  font-size: 1.02rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   color: var(--text);
+  clear: both;
+}
+
+.blog-body-h2:first-child {
+  margin-top: 0.35rem;
 }
 
 .blog-body-p {
   margin: 0;
-  line-height: 1.6;
-  font-size: 0.92rem;
+  line-height: 1.65;
+  font-size: 0.94rem;
 }
 
 .blog-body-list {
   margin: 0;
   padding-left: 1.15rem;
-  line-height: 1.55;
-  font-size: 0.9rem;
+  line-height: 1.6;
+  font-size: 0.92rem;
 }
 
 .blog-body-list li + li {
-  margin-top: 0.35rem;
+  margin-top: 0.4rem;
 }
 
 .blog-body-note {
   margin: 0;
-  padding: 0.7rem 0.8rem;
-  border-left: 3px solid rgba(94, 234, 212, 0.45);
-  border-radius: 0 8px 8px 0;
+  padding: 0.75rem 0.9rem;
+  border-left: 3px solid color-mix(in srgb, var(--mint, #5eead4) 55%, transparent);
+  border-radius: 0 10px 10px 0;
   background: var(--surface-hover, rgba(255, 255, 255, 0.04));
-  font-size: 0.86rem;
-  line-height: 1.5;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  clear: both;
+}
+
+/* Pull quote — editorial break without full-width media */
+.blog-body-quote {
+  margin: 1.15rem 0 0;
+  padding: 0.15rem 0 0.15rem 1.1rem;
+  border: none;
+  border-left: 3px solid color-mix(in srgb, var(--mint, #5eead4) 70%, transparent);
+  clear: both;
+}
+
+.blog-body-quote-text {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.blog-body-quote-cite {
+  display: block;
+  margin-top: 0.55rem;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 500;
+  font-style: normal;
+  letter-spacing: 0.01em;
 }
 
 .blog-figure {
-  margin: 0.15rem 0;
+  margin: 0.35rem 0 0;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  background: #0a0e22;
+  /* Theme surface so caption text-muted stays readable on light + dark shells */
+  background: var(--surface-raised, var(--bg-mid, #0a0e22));
 }
 
 .blog-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
   aspect-ratio: 16 / 9;
 }
 
@@ -422,7 +466,71 @@
   padding: 0.55rem 0.75rem 0.65rem;
   font-size: 0.78rem;
   line-height: 1.4;
+  color: var(--text-muted);
+  background: var(--surface-raised, var(--bg-mid, transparent));
   border-top: 1px solid var(--border, rgba(255, 255, 255, 0.06));
+}
+
+/* Full-width figure in the reading column (default) */
+.blog-figure--full {
+  clear: both;
+  width: 100%;
+}
+
+/* Centered inset — shorter aspect, less banner-like */
+.blog-figure--narrow {
+  clear: both;
+  width: min(100%, 22rem);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.blog-figure--narrow img {
+  aspect-ratio: 4 / 3;
+}
+
+/* Side figures: copy wraps beside them on wider viewports */
+.blog-figure--left,
+.blog-figure--right {
+  width: min(100%, 15.5rem);
+  max-width: 46%;
+}
+
+.blog-figure--left img,
+.blog-figure--right img {
+  aspect-ratio: 4 / 3;
+}
+
+@media (min-width: 560px) {
+  .blog-figure--left {
+    float: left;
+    margin: 0.15rem 1.15rem 0.85rem 0;
+    max-width: 44%;
+  }
+
+  .blog-figure--right {
+    float: right;
+    margin: 0.15rem 0 0.85rem 1.15rem;
+    max-width: 44%;
+  }
+}
+
+@media (max-width: 559px) {
+  .blog-figure--left,
+  .blog-figure--right {
+    clear: both;
+    width: min(100%, 20rem);
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 100%;
+  }
+}
+
+/* End float context before related / CTA (outside .blog-body) */
+.blog-body::after {
+  content: '';
+  display: table;
+  clear: both;
 }
 
 .blog-related {

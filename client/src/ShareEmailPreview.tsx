@@ -27,10 +27,19 @@ export function ShareEmailPreview({ content, compact }: ShareEmailPreviewProps) 
       </section>
 
       <section className="share-email-preview-section share-email-preview-section--pdf">
-        <h4>Attach the PDF (required)</h4>
+        <h4>{content.pdfAttached ? 'Agreement PDF (attached)' : 'Attach the PDF (required)'}</h4>
         <p>
-          Send this exact file with your message:{' '}
-          <code className="share-email-preview-pdf">{content.pdfName}</code>
+          {content.pdfAttached ? (
+            <>
+              This invite includes the exact file to sign:{' '}
+              <code className="share-email-preview-pdf">{content.pdfName}</code>
+            </>
+          ) : (
+            <>
+              Send this exact file with your message:{' '}
+              <code className="share-email-preview-pdf">{content.pdfName}</code>
+            </>
+          )}
         </p>
         <p className="share-email-preview-note">
           VeriLock never hosts your PDF. The signer must receive the same file you fingerprinted so they

@@ -221,10 +221,21 @@ When the July promo ends, update this section and post closers so they do not pr
   tags: ['guide' | 'feature' | 'privacy' | 'verify' | 'pricing'],
   coverImage: '/blog/<slug>.jpg',
   coverAlt: string,
-  body: BlogBlock[], // p | h2 | ul | note | figure
+  body: BlogBlock[], // p | h2 | ul | note | quote | figure
   relatedSlugs?: string[],
 }
 ```
+
+### Body blocks (editorial layout)
+
+| Block | Use |
+|-------|-----|
+| `p` / `h2` / `ul` | Default prose |
+| `note` | Limits / non-claims (aside callout) |
+| `quote` | Pull quote. Optional `cite`. 0–2 per post. |
+| `figure` | Image. Optional `layout`: **`full`** (default, column width), **`left`** / **`right`** (float beside following paragraphs on desktop), **`narrow`** (centered inset, 4:3) |
+
+Do not stack every figure as full width. Prefer one full process image, then a side figure next to the claim it illustrates. Quotes should restate a product fact already in the post, not marketing slogans.
 
 ## Pillar posts (canonical)
 

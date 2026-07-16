@@ -1,4 +1,4 @@
-export type { BlogBlock, BlogPost, BlogTag } from './types'
+export type { BlogBlock, BlogFigureLayout, BlogPost, BlogTag } from './types'
 export {
   ALL_POSTS,
   blogSlugFromPath,

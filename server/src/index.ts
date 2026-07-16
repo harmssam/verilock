@@ -59,6 +59,7 @@ import { getNimPrices } from './nimPrices.js'
 import { getWalletBalanceLuna } from './nimiq-rpc.js'
 import { getMinimumSealBalanceLuna, getSealPricing, hasSufficientSealBalance } from './sealPricing.js'
 import { startSessionCleanup } from './session-cleanup.js'
+import { attachLocalStudios } from './localStudios.js'
 
 assertSafeBootConfig()
 
@@ -802,19 +803,27 @@ if (IS_PRODUCTION) {
   attachClientStatic(app)
 }
 
-const server = app.listen(PORT, HOST, () => {
-  console.log(`VeriLock listening on http://${HOST}:${PORT}`)
-  console.log(`  data: ${getDataDir()}`)
-  console.log(`  chain verify: ${!SKIP_CHAIN_VERIFY}`)
-  if (IS_PRODUCTION) {
-    console.log(`  mode: production (client + API)`)
+async function boot(): Promise<void> {
+  if (!IS_PRODUCTION) {
+    await attachLocalStudios(app)
   }
-})
 
-server.on('error', err => {
-  console.error('FATAL: server failed to start', err)
-  process.exit(1)
-})
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`VeriLock listening on http://${HOST}:${PORT}`)
+    console.log(`  data: ${getDataDir()}`)
+    console.log(`  chain verify: ${!SKIP_CHAIN_VERIFY}`)
+    if (IS_PRODUCTION) {
+      console.log(`  mode: production (client + API)`)
+    }
+  })
+
+  server.on('error', err => {
+    console.error('FATAL: server failed to start', err)
+    process.exit(1)
+  })
+}
+
+void boot()
 
 process.on('uncaughtException', err => {
   console.error('uncaughtException', err)

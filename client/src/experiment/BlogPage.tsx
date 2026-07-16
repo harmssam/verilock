@@ -58,12 +58,26 @@ function BlogPostBody({ body }: { body: BlogBlock[] }) {
             </p>
           )
         }
-        if (block.type === 'figure') {
+        if (block.type === 'quote') {
           return (
-            <figure key={i} className="blog-figure">
+            <blockquote key={i} className="blog-body-quote">
+              <p className="blog-body-quote-text">{block.text}</p>
+              {block.cite ? (
+                <cite className="blog-body-quote-cite muted">{block.cite}</cite>
+              ) : null}
+            </blockquote>
+          )
+        }
+        if (block.type === 'figure') {
+          const layout = block.layout ?? 'full'
+          return (
+            <figure
+              key={i}
+              className={`blog-figure blog-figure--${layout}`}
+            >
               <img src={block.src} alt={block.alt} loading="lazy" decoding="async" />
               {block.caption ? (
-                <figcaption className="blog-figure-caption muted">{block.caption}</figcaption>
+                <figcaption className="blog-figure-caption">{block.caption}</figcaption>
               ) : null}
             </figure>
           )
@@ -297,6 +311,12 @@ function BlogSlugRedirect({
 }
 
 export function BlogPage({ path, onOpenIndex, onOpenPost, onPricing }: BlogPageProps) {
+  // SPA navigation keeps scroll position; always open blog views at the top.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [path])
+
   const slug = blogSlugFromPath(path)
   if (!slug) {
     return <BlogIndex onOpenPost={onOpenPost} />

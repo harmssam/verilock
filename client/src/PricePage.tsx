@@ -78,7 +78,7 @@ export function PricePage({
         <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
           Nimiq
         </a>{' '}
-        network blockchain — buy packs ahead of time, or pay the current credit value in NIM when you
+        network blockchain. Buy packs ahead of time, or pay the current credit value in NIM when you
         seal.
       </p>
 

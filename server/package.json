@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --exclude './data/**' --exclude '../client/public/blog/**' src/index.ts",
     "start": "node --import tsx src/index.ts",
     "build": "tsc",
     "test:concurrent-sign": "node --import tsx scripts/test-concurrent-sign.mjs"

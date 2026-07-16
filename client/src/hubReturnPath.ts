@@ -50,6 +50,10 @@ export function isPrivacyPath(path: string): boolean {
   return /^\/privacy\/?$/.test(path)
 }
 
+export function isSecurityPath(path: string): boolean {
+  return /^\/security\/?$/.test(path)
+}
+
 export function isBlogPath(path: string): boolean {
   return /^\/blog(?:\/[^/]+)?\/?$/.test(path)
 }
@@ -59,6 +63,7 @@ export function isKnownAppPath(path: string): boolean {
   if (isAgreementsPath(path)) return true
   if (isPricingPath(path)) return true
   if (isPrivacyPath(path)) return true
+  if (isSecurityPath(path)) return true
   if (isBlogPath(path)) return true
   if (documentSlugFromPath(path)) return true
   if (verifySlugFromPath(path)) return true

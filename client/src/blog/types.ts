@@ -1,11 +1,23 @@
 export type BlogTag = 'guide' | 'feature' | 'privacy' | 'verify' | 'pricing'
 
+/** Body figure placement. Default is full width of the article column. */
+export type BlogFigureLayout = 'full' | 'left' | 'right' | 'narrow'
+
 export type BlogBlock =
   | { type: 'p'; text: string }
   | { type: 'h2'; text: string }
   | { type: 'ul'; items: string[] }
   | { type: 'note'; text: string }
-  | { type: 'figure'; src: string; alt: string; caption?: string }
+  /** Pull quote or highlighted claim. Use sparingly (0–2 per post). */
+  | { type: 'quote'; text: string; cite?: string }
+  | {
+      type: 'figure'
+      src: string
+      alt: string
+      caption?: string
+      /** full (default) | left/right float beside following copy | narrow centered */
+      layout?: BlogFigureLayout
+    }
 
 export interface BlogPost {
   slug: string
