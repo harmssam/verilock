@@ -17,7 +17,7 @@ When a redesign task is scoped only to blog/pricing marketing copy, that slice m
 | Primary | People who need a permanent integrity proof of a PDF agreement | Remote parties, rental/contract/NDA flows, no shared document store |
 | Secondary | Co-signers who received a PDF + invite link | Match file, sign with wallet, leave |
 | Secondary | Anyone verifying a sealed PDF later | No account required |
-| Tertiary | Blog / pricing visitors | Learn privacy model or buy seal credits |
+| Tertiary | Pricing visitors | Buy seal credits |
 
 ## Purpose
 
@@ -78,9 +78,9 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 - [ ] Signer stages still: Sign → Done (wallet login is a gate on submit, not a rail step)
 - [ ] Verifier stages still: Verify only (wallet optional)
 - [ ] Deep links `/d/:slug`, `/v/:slug`, `?intent=`, `?preferSeal=1` still work
-- [ ] Shell routes `/`, `/pricing`, `/privacy`, `/agreements`, `/blog`, `/blog/:slug`, 404 still exist
-- [ ] Header: brand home, Agreements (when logged in), Pricing (when no credits chip), Blog, AccountMenu
-- [ ] Footer: tagline, Blog, Security, Privacy Policy
+- [ ] Shell routes `/`, `/pricing`, `/privacy`, `/agreements`, `/security`, 404 still exist
+- [ ] Header: brand home, Agreements (when logged in), Pricing (when no credits chip), Security (desktop), AccountMenu
+- [ ] Footer: tagline, Security, Privacy Policy
 - [ ] How it works + privacy notes still present
 - [ ] Document stage metaphor still present (fingerprint / signatures / seal feedback)
 - [ ] Share invite (copy link, email package patterns) still present where creator can invite
@@ -104,7 +104,6 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 | Brand home control | Logo + wordmark + tagline → reset to `/` journey home |
 | Nav: Agreements | Shown when wallet connected |
 | Nav: Pricing | Shown when credits chip not already covering pricing |
-| Nav: Blog | Index + posts |
 | Nav: Security | Header on desktop; footer on narrow (with Blog on very small screens) |
 | Account menu | Login sheet, address, copy, agreements, credits → pricing, disconnect |
 | Credits balance chip | When credits enabled and logged in |
@@ -128,7 +127,6 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 | `/privacy` | Privacy policy |
 | `/security` | Security & integrity (product-true claims only) |
 | `/agreements` | Full agreements list |
-| `/blog`, `/blog/:slug` | Blog index / post |
 | unknown | 404 page with home |
 
 ### Home / welcome

@@ -37,12 +37,6 @@ export const PAGE_META = {
       'How VeriLock protects PDFs: local SHA-256 fingerprinting, wallet identity, on-chain hash seals on Nimiq, and verification without uploading your file. No invented certifications.',
     path: '/security',
   },
-  blog: {
-    title: `Blog${TITLE_SUFFIX}`,
-    description:
-      'Medium guides on what VeriLock is, how fingerprinting and Nimiq seals work, private PDF signing, wallet-optional verification, and product updates.',
-    path: '/blog',
-  },
   verify: {
     title: `Verify a Document${TITLE_SUFFIX}`,
     description:
@@ -190,10 +184,3 @@ export function documentPageMeta(title: string, role: 'sign' | 'verify'): PageMe
   }
 }
 
-export function blogPostMeta(post: { title: string; description: string; slug: string }): PageMeta {
-  return {
-    title: `${post.title}${TITLE_SUFFIX}`,
-    description: post.description,
-    path: `/blog/${post.slug}`,
-  }
-}

@@ -6,22 +6,19 @@ import { Fingerprint, ScanSearch, Users, type LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   isAgreementsPath,
-  isBlogPath,
   isKnownAppPath,
   isPricingPath,
   isPrivacyPath,
   isSecurityPath,
   saveHubReturnPath,
 } from './hubReturnPath'
-import { applyPageMeta, blogPostMeta, journeyPathMeta, PAGE_META, type PageMeta } from './seo'
-import { blogSlugFromPath, getPostBySlug } from './blog'
+import { applyPageMeta, journeyPathMeta, PAGE_META, type PageMeta } from './seo'
 import type { SealDocument } from './types'
 import { PricePage } from './PricePage'
 import { PrivacyPolicyPage } from './PrivacyPolicyPage'
 import { SecurityPage } from './SecurityPage'
 import { AccountMenu } from './journey/AccountMenu'
 import { AgreementsPage } from './journey/AgreementsPage'
-import { BlogPage } from './journey/BlogPage'
 import { DocumentJourney } from './journey/DocumentJourney'
 import { NotFoundPage } from './journey/NotFoundPage'
 import { useCreditBalance } from './journey/useCreditBalance'
@@ -88,7 +85,6 @@ type ShellScreen =
   | 'privacy'
   | 'security'
   | 'agreements'
-  | 'blog'
   | 'not-found'
 
 function screenFromPath(pathname: string): ShellScreen {
@@ -96,7 +92,6 @@ function screenFromPath(pathname: string): ShellScreen {
   if (isPrivacyPath(pathname)) return 'privacy'
   if (isSecurityPath(pathname)) return 'security'
   if (isAgreementsPath(pathname)) return 'agreements'
-  if (isBlogPath(pathname)) return 'blog'
   if (!isKnownAppPath(pathname)) return 'not-found'
   return 'journey'
 }
@@ -225,8 +220,7 @@ export function App() {
       !isPricingPath(window.location.pathname) &&
       !isPrivacyPath(window.location.pathname) &&
       !isSecurityPath(window.location.pathname) &&
-      !isAgreementsPath(window.location.pathname) &&
-      !isBlogPath(window.location.pathname)
+      !isAgreementsPath(window.location.pathname)
     ) {
       journeyReturnPathRef.current = path || '/'
     }
@@ -265,14 +259,6 @@ export function App() {
     scrollShellTop()
   }, [rememberJourneyPath])
 
-  const goBlog = useCallback((slug?: string) => {
-    rememberJourneyPath()
-    setScreen('blog')
-    const next = slug ? `/blog/${slug}` : '/blog'
-    pushShellUrl(next)
-    setNavEpoch(n => n + 1)
-    scrollShellTop()
-  }, [rememberJourneyPath])
 
   const goAgreements = useCallback(() => {
     rememberJourneyPath()
@@ -430,20 +416,6 @@ export function App() {
       applyPageMeta({ ...PAGE_META.security })
       return
     }
-    if (screen === 'blog') {
-      const slug = blogSlugFromPath(path)
-      if (slug) {
-        const post = getPostBySlug(slug)
-        if (post) {
-          applyPageMeta(blogPostMeta(post))
-          return
-        }
-        applyPageMeta({ ...PAGE_META.notFound, path })
-        return
-      }
-      applyPageMeta({ ...PAGE_META.blog })
-      return
-    }
     if (screen === 'agreements') {
       applyPageMeta({ ...PAGE_META.agreements })
       return
@@ -458,19 +430,18 @@ export function App() {
 
   /**
    * Home can remount; track + DocumentJourney stay mounted (hidden when not active)
-   * so mid-flow state survives pricing / blog / privacy / security visits.
+   * so mid-flow state survives pricing / privacy / security visits.
    */
   const showHome = screen === 'journey' && viewSurface === 'home'
   const showTrack = viewSurface === 'track'
   const trackMeta = trackRole ? TRACK_META[trackRole] : null
   const TrackIcon = trackMeta?.icon
 
-  // Wider content shell (blog, privacy, etc.). Agreements matches landing (960px), not this.
+  // Wider content shell (privacy, security, etc.). Agreements matches landing (960px), not this.
   const wideShell =
     screen === 'pricing' ||
     screen === 'privacy' ||
     screen === 'security' ||
-    screen === 'blog' ||
     screen === 'not-found'
 
   return (
@@ -527,13 +498,6 @@ export function App() {
                 Pricing
               </button>
             )}
-            <button
-              type="button"
-              className={`lr-nav lr-nav--blog${screen === 'blog' ? ' lr-nav--active' : ''}`}
-              onClick={screen === 'blog' ? goJourney : () => goBlog()}
-            >
-              Blog
-            </button>
             {/* Desktop only: on narrow viewports Security lives in the footer (prod parity, less crowding). */}
             <button
               type="button"
@@ -570,7 +534,6 @@ export function App() {
         screen === 'privacy' ||
         screen === 'security' ||
         screen === 'agreements' ||
-        screen === 'blog' ||
         screen === 'not-found') && (
         <button type="button" className="lr-back" onClick={goJourney}>
           ← Back to home
@@ -599,15 +562,6 @@ export function App() {
           onPrivacy={goPrivacy}
         />
       )}
-      {screen === 'blog' && (
-        <BlogPage
-          key={typeof window !== 'undefined' ? window.location.pathname : '/blog'}
-          path={typeof window !== 'undefined' ? window.location.pathname : '/blog'}
-          onOpenIndex={() => goBlog()}
-          onOpenPost={slug => goBlog(slug)}
-          onPricing={goPricing}
-        />
-      )}
       {screen === 'agreements' && (
         <AgreementsPage
           token={wallet.token}
@@ -626,7 +580,7 @@ export function App() {
         />
       )}
 
-      {/* Keep journey mounted so in-progress state survives pricing/privacy/blog/security. */}
+      {/* Keep journey mounted so in-progress state survives pricing/privacy/security. */}
       <div hidden={screen !== 'journey'}>
         <div
           className={[
@@ -639,11 +593,7 @@ export function App() {
             .join(' ')}
         >
           {showHome && (
-            <LandingHome
-              onPickRole={pickRole}
-              onOpenBlogPost={slug => goBlog(slug)}
-              onOpenBlogIndex={() => goBlog()}
-            />
+            <LandingHome onPickRole={pickRole} />
           )}
           {/* hidden (not unmounted) when home so DocumentJourney keep-alive works */}
           <div className="lr-track" hidden={!showTrack}>
@@ -695,13 +645,6 @@ export function App() {
           Your wallet is your identity; the chain is the proof.
         </p>
         <div className="lr-footer-links">
-          <button
-            type="button"
-            className={`lr-footer-link${screen === 'blog' ? ' lr-footer-link--active' : ''}`}
-            onClick={() => goBlog()}
-          >
-            Blog
-          </button>
           <button
             type="button"
             className={`lr-footer-link${screen === 'security' ? ' lr-footer-link--active' : ''}`}
