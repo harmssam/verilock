@@ -2,9 +2,10 @@
 /**
  * Production packaging: SPA → client/dist for Express static serve.
  *
- * Usage (from client/): node scripts/package-service-b.mjs
+ * Usage (from client/): node scripts/package.mjs
  * Or: npm run build --prefix client
- * Alias: npm run package:service-b --prefix client
+ *
+ * Legacy alias (Railway / old scripts): npm run package:service-b
  */
 import { cpSync, existsSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -12,7 +13,8 @@ import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 
 const clientDir = join(dirname(fileURLToPath(import.meta.url)), '..')
-const distJourney = join(clientDir, 'dist-journey')
+/** Vite intermediate outDir (copied to dist below). */
+const distBuild = join(clientDir, 'dist-build')
 const dist = join(clientDir, 'dist')
 
 function run(cmd, args) {
@@ -26,9 +28,9 @@ console.log('[production] Building SPA (base: /)…')
 run('npx', ['tsc', '-b'])
 run('npx', ['vite', 'build'])
 
-const indexHtml = join(distJourney, 'index.html')
+const indexHtml = join(distBuild, 'index.html')
 if (!existsSync(indexHtml)) {
-  console.error('[production] Missing dist-journey/index.html after build')
+  console.error('[production] Missing dist-build/index.html after build')
   process.exit(1)
 }
 
@@ -47,7 +49,7 @@ if (html.includes('lr-preview-banner') || html.includes('Landing redesign previe
 }
 
 // Blog is local-only / gitignored; strip if a dirty local public/blog was copied.
-for (const dir of [distJourney, dist]) {
+for (const dir of [distBuild, dist]) {
   const blogDir = join(dir, 'blog')
   if (existsSync(blogDir)) {
     console.log(`[production] Stripping leftover ${blogDir.replace(clientDir + '/', '')}/ …`)
@@ -58,7 +60,7 @@ for (const dir of [distJourney, dist]) {
 console.log('[production] Installing build into client/dist …')
 rmSync(dist, { recursive: true, force: true })
 mkdirSync(dist, { recursive: true })
-cpSync(distJourney, dist, { recursive: true })
+cpSync(distBuild, dist, { recursive: true })
 
 // Re-strip after copy in case anything reappeared
 const distBlog = join(dist, 'blog')

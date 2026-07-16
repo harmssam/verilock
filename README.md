@@ -114,7 +114,7 @@ docker build -t verilock .
 docker run -p 3002:3002 -v verilock-data:/data -e DATA_DIR=/data -e NODE_ENV=production verilock
 ```
 
-Production packaging details: [docs/service-b-journey.md](docs/service-b-journey.md).
+Production packaging details: [docs/production-packaging.md](docs/production-packaging.md).
 
 ### 5. Test production locally
 

@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/package-service-b.mjs",
+    "build": "node scripts/package.mjs",
     "build:app": "tsc -b && vite build",
-    "package:service-b": "node scripts/package-service-b.mjs",
-    "test:service-b": "node scripts/verify-journey-service-b.mjs",
+    "test:production": "node scripts/verify-production.mjs",
+    "package:service-b": "node scripts/package.mjs",
+    "test:service-b": "node scripts/verify-production.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

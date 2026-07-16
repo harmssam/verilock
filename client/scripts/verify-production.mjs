@@ -2,7 +2,7 @@
 /**
  * Structural tests for production packaging.
  * Drives real shipped files (configs, HTML entry, package scripts).
- * Run: node scripts/verify-journey-service-b.mjs
+ * Run: npm run test:production --prefix client
  * Optional: VERIFY_DIST=1 after npm run build to assert client/dist content.
  */
 import { existsSync, readFileSync } from 'node:fs'
@@ -29,12 +29,12 @@ console.log('verify-production')
 
 check('client/package.json default build packages SPA into client/dist', () => {
   const pkg = JSON.parse(readFileSync(join(clientDir, 'package.json'), 'utf8'))
-  assert.ok(pkg.scripts['package:service-b'], 'missing package:service-b alias')
-  assert.ok(
-    pkg.scripts.build.includes('package-service-b') || pkg.scripts.build.includes('package:service-b'),
-    'default build must package SPA into client/dist',
-  )
+  assert.ok(pkg.scripts.build.includes('package.mjs') || pkg.scripts.build.includes('scripts/package'), 'default build must run package.mjs')
+  assert.ok(pkg.scripts['test:production'], 'missing test:production')
   assert.equal(pkg.scripts.dev, 'vite', 'default dev should use vite.config.ts')
+  // Legacy aliases still work for old docs / muscle memory
+  assert.ok(pkg.scripts['package:service-b'], 'missing package:service-b alias')
+  assert.ok(pkg.scripts['test:service-b'], 'missing test:service-b alias')
   assert.ok(!pkg.scripts['dev:landing-redesign'], 'parallel landing-redesign dev must be removed')
   assert.ok(!pkg.scripts['dev:legacy'], 'legacy dev must be removed')
   assert.ok(!pkg.scripts['build:legacy'], 'legacy build must be removed')
@@ -43,7 +43,9 @@ check('client/package.json default build packages SPA into client/dist', () => {
 check('root package.json default build is production SPA', () => {
   const pkg = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8'))
   assert.ok(pkg.scripts.build, 'missing root build')
+  assert.ok(pkg.scripts['test:production'], 'missing root test:production')
   assert.ok(pkg.scripts['build:service-b'], 'missing root build:service-b alias')
+  assert.ok(pkg.scripts['test:service-b'], 'missing root test:service-b alias')
   assert.ok(!pkg.scripts['dev:legacy'], 'root legacy dev must be removed')
   assert.ok(!pkg.scripts['build:legacy'], 'root legacy build must be removed')
 })
@@ -55,17 +57,24 @@ check('Dockerfile builds default client', () => {
 
 check('Dockerfile.service-b remains production-compatible alias', () => {
   const docker = readFileSync(join(rootDir, 'Dockerfile.service-b'), 'utf8')
-  assert.match(docker, /npm run build --prefix client|package:service-b/)
+  assert.match(docker, /npm run build --prefix client/)
 })
 
 check('vite.config.ts is sole root-hosted production config', () => {
   const src = readFileSync(join(clientDir, 'vite.config.ts'), 'utf8')
   assert.match(src, /base:\s*['"]\/['"]/)
-  assert.match(src, /outDir:\s*['"]dist-journey['"]/)
+  assert.match(src, /outDir:\s*['"]dist-build['"]/)
   assert.match(src, /index\.html/)
   assert.ok(!existsSync(join(clientDir, 'vite.journey.config.ts')), 'vite.journey.config.ts should be removed')
   assert.ok(!existsSync(join(clientDir, 'vite.landing-redesign.config.ts')), 'vite.landing-redesign.config.ts should be removed')
   assert.ok(!existsSync(join(clientDir, 'vite.experiment.config.ts')), 'vite.experiment.config.ts should be removed')
+})
+
+check('package scripts use production names (not service-b paths)', () => {
+  assert.ok(existsSync(join(clientDir, 'scripts/package.mjs')))
+  assert.ok(existsSync(join(clientDir, 'scripts/verify-production.mjs')))
+  assert.ok(!existsSync(join(clientDir, 'scripts/package-service-b.mjs')), 'package-service-b.mjs should be renamed')
+  assert.ok(!existsSync(join(clientDir, 'scripts/verify-journey-service-b.mjs')), 'verify-journey-service-b.mjs should be renamed')
 })
 
 check('index.html boots production App + surface markers + indexable SEO', () => {
@@ -115,6 +124,11 @@ check('archives and blog are excluded from GitHub / production wiring', () => {
   const css = readFileSync(join(clientDir, 'src/App.css'), 'utf8')
   assert.ok(!css.includes('lr-preview-banner'), 'preview banner CSS must be removed')
   assert.ok(!css.includes('lr-blog-latest'), 'blog-latest CSS must be removed')
+})
+
+check('production packaging docs use plain names', () => {
+  assert.ok(existsSync(join(rootDir, 'docs/production-packaging.md')))
+  assert.ok(!existsSync(join(rootDir, 'docs/service-b-journey.md')), 'service-b-journey.md should be renamed')
 })
 
 if (process.env.VERIFY_DIST === '1') {

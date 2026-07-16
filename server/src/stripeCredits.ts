@@ -89,6 +89,9 @@ export async function createCreditsCheckoutSession(input: {
   const session = await stripe.checkout.sessions.create(
     {
       mode: 'payment',
+      // Show “Add promotion code” on Checkout (promo codes / coupons).
+      // Mutually exclusive with session-level `discounts`.
+      allow_promotion_codes: true,
       // Return to pricing so pack UI + balance are visible after Checkout.
       success_url: `${appUrl}/pricing?credits=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/pricing?credits=cancel`,
@@ -183,8 +186,9 @@ export function mintFromCheckoutSession(session: Stripe.Checkout.Session): {
 
   const feeNim = Number(session.metadata?.feeNim ?? 0)
   const nimUsd = Number(session.metadata?.nimUsd ?? 0)
+  // Prefer amount_total (includes 0 after 100% promo). Only fall back if Stripe omitted it.
   const usdCents =
-    typeof session.amount_total === 'number' && session.amount_total > 0
+    typeof session.amount_total === 'number'
       ? session.amount_total
       : Number(session.metadata?.unitUsdCents ?? 0) * credits
 

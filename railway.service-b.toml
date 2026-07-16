@@ -1,4 +1,4 @@
-# Alias of railway.toml (journey UI at SPA root).
+# Alias of railway.toml (production SPA packaging).
 # Existing services may still point config-as-code path here.
 # Prefer /railway.toml for new setup.
 

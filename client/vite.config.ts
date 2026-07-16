@@ -11,9 +11,9 @@ import { defineConfig } from 'vite'
  *   npm run build --prefix client
  *   → client/dist/index.html
  *
- * Intermediate:
+ * Intermediate (Vite outDir, then package.mjs copies → dist):
  *   npm run build:app --prefix client
- *   → client/dist-journey/index.html (base: '/')
+ *   → client/dist-build/index.html (base: '/')
  *
  * Dev:
  *   npm run dev --prefix client
@@ -23,7 +23,7 @@ function renameHtmlToIndex(): Plugin {
   return {
     name: 'html-to-index',
     closeBundle() {
-      const outDir = resolve(__dirname, 'dist-journey')
+      const outDir = resolve(__dirname, 'dist-build')
       const from = resolve(outDir, 'index.html')
       // Single SPA input already emits index.html when input is index.html
       if (!existsSync(from)) {
@@ -99,7 +99,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist-journey',
+    outDir: 'dist-build',
     emptyOutDir: true,
     rollupOptions: {
       input: {
