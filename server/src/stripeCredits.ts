@@ -89,8 +89,9 @@ export async function createCreditsCheckoutSession(input: {
   const session = await stripe.checkout.sessions.create(
     {
       mode: 'payment',
-      success_url: `${appUrl}/?credits=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/?credits=cancel`,
+      // Return to pricing so pack UI + balance are visible after Checkout.
+      success_url: `${appUrl}/pricing?credits=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/pricing?credits=cancel`,
       client_reference_id: wallet,
       metadata: {
         walletAddress: wallet,

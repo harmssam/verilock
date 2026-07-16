@@ -2,7 +2,8 @@ import { api } from '../api'
 import { writeCreditsBalanceCache } from '../creditsBalanceCache'
 
 /**
- * Stripe Checkout success_url is `/?credits=success&session_id=cs_...`.
+ * Stripe Checkout success_url is `/pricing?credits=success&session_id=cs_...`
+ * (cancel: `/pricing?credits=cancel`). Query params work on any path.
  * Credits used to mint only via webhook — if the webhook missed, balance stayed 0.
  * This claims the session on return (same idea as NIM top-up claim).
  */

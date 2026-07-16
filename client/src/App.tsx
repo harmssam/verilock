@@ -2342,6 +2342,7 @@ export default function App() {
               shareUrl={documentShareUrl}
               linkCopied={shareLinkCopied}
               onCopyLink={() => void copyDocumentShareLink()}
+              pdfFile={pdfFile ?? signPdfFile}
             />
           )}
 
@@ -2474,6 +2475,7 @@ export default function App() {
                       shareUrl={documentShareUrl}
                       linkCopied={shareLinkCopied}
                       onCopyLink={() => void copyDocumentShareLink()}
+                      pdfFile={pdfFile ?? signPdfFile}
                       embedded
                     />
                   )}

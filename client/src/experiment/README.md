@@ -4,6 +4,8 @@
 
 Served at `/` via default `npm run build` / `npm run dev` (journey packaging). See repo root **`AGENTS.md`**.
 
+Before restyling: load **`docs/journey-anti-slop.md`** (tokens, ban list, pre-ship checklist) and **`PRODUCT.md`** (feature parity).
+
 ## Concept (v2)
 
 Not a thinner clone of the production step list.

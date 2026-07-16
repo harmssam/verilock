@@ -78,3 +78,14 @@ Legacy-only (do not invest product work here without an explicit request):
 ### If the user says “the app” / “production” / “VeriLock UI”
 
 Interpret as **Journey Edition** (`client/src/experiment/`), never the pre-journey SPA.
+
+### Redesign / Impeccable / visual overhaul
+
+**Feature parity is mandatory.** Any redesign is a restyle of Journey Edition only: same routes, paths, stages, docks, shell screens, and capabilities. Do not add or remove product features unless the user explicitly asks.
+
+- Full inventory + acceptance checklist: **`PRODUCT.md`** (section *Feature parity law*)
+- **Anti-slop design checklist (load before any UI restyle):** **`docs/journey-anti-slop.md`**
+  - Positive system: navy + mint tokens, Bricolage/Figtree, path → rail → dock → stage
+  - Negative bans: purple SaaS gradients, glass-everywhere, generic feature cards, fake testimonials, crypto-neon gimmick
+  - Pre-ship self-check + ugly-state tests + copy-paste agent prompt block
+- Impeccable skills (if installed): `.github/skills/impeccable/` — always load `PRODUCT.md` first, then `docs/journey-anti-slop.md`

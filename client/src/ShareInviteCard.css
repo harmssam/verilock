@@ -18,13 +18,64 @@
   margin-bottom: 0.85rem;
 }
 
+.share-actions--with-eml {
+  grid-template-columns: 1fr;
+}
+
+.share-actions:not(.share-actions--with-eml) {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 421px) {
+  .share-actions--with-eml {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .share-actions--with-eml .share-eml-btn {
+    grid-column: 1 / -1;
+  }
+
+  .share-actions:not(.share-actions--with-eml) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .share-actions:not(.share-actions--with-eml) .share-eml-btn {
+    grid-column: 1 / -1;
+  }
+}
+
+.share-eml-pick {
+  cursor: pointer;
+  position: relative;
+}
+
+.share-eml-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .share-email-btn,
-.share-copy-btn {
+.share-copy-btn,
+.share-eml-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
   width: 100%;
+}
+
+.share-eml-error {
+  margin: 0 0 0.75rem;
+  font-size: 0.84rem;
+  color: var(--danger, #f87171);
+  line-height: 1.4;
 }
 
 .share-link-block {

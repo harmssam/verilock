@@ -58,8 +58,8 @@
  */
 .exp-brand-mark {
   flex-shrink: 0;
-  width: 3.875rem;
-  height: 3.875rem;
+  width: 4.5rem;
+  height: 4.5rem;
   object-fit: contain;
   /* Fixed −2° tilt — scale only on hover */
   transform: rotate(-2deg) scale(1);
@@ -535,10 +535,21 @@
 
 .exp-account-menu-full {
   display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.68rem;
   color: var(--sky);
   word-break: break-all;
   line-height: 1.35;
+  text-decoration: none;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+a.exp-account-menu-full:hover,
+a.exp-account-menu-full:focus-visible {
+  color: var(--mint);
+  text-decoration: underline;
+  text-decoration-color: rgba(94, 234, 212, 0.5);
+  text-underline-offset: 0.15em;
 }
 
 .exp-account-item {
@@ -1049,7 +1060,7 @@
   color: var(--lime);
 }
 
-/* Toolbar */
+/* Toolbar — sits at top of .action-dock-head */
 
 .journey-toolbar {
   display: flex;
@@ -1057,6 +1068,13 @@
   justify-content: space-between;
   gap: 0.5rem;
   flex-wrap: wrap;
+  width: 100%;
+}
+
+.action-dock-head > .journey-toolbar {
+  margin: -0.15rem 0 0.15rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--border, rgba(15, 23, 42, 0.08));
 }
 
 .journey-role-pill {
@@ -1710,8 +1728,10 @@ a.hash-chip.text-link:focus-visible {
 
 /* In-app agreements notification (ready to seal / needs signature) */
 .journey-agreements {
+  box-sizing: border-box;
   margin: 0 0 1rem;
-  padding: 0.95rem 1rem;
+  /* Extra inline padding so right-aligned CTAs (View agreements →) clear the edge */
+  padding: 0.95rem 1.2rem;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(94, 234, 212, 0.32);
   background: linear-gradient(145deg, rgba(94, 234, 212, 0.1), rgba(0, 0, 0, 0.2));
@@ -1723,7 +1743,7 @@ a.hash-chip.text-link:focus-visible {
 .journey-agreements--quiet {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.55rem 1rem;
   border-color: var(--border);
   background: rgba(0, 0, 0, 0.16);
   box-shadow: none;
@@ -1811,15 +1831,28 @@ a.hash-chip.text-link:focus-visible {
 }
 
 .journey-agreements-all {
+  /* Override .text-btn (margin-left + padding: 0) — this is a card CTA, not inline text */
   margin: 0;
+  padding: 0.2rem 0.15rem;
+  flex-shrink: 0;
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--sky);
+  white-space: nowrap;
 }
 
 .journey-agreements--quiet {
   flex-wrap: wrap;
   justify-content: space-between;
+  align-items: center;
+  row-gap: 0.45rem;
+}
+
+/* Let status copy shrink/wrap so the CTA stays inside the padded box
+   (flex default min-width: auto lets content paint over padding-right). */
+.journey-agreements--quiet > p {
+  flex: 1 1 12rem;
+  min-width: 0;
 }
 
 /* ── Full agreements page (/agreements) ── */
@@ -3571,8 +3604,8 @@ a.hash-chip.text-link:focus-visible {
   }
 
   .exp-brand-mark {
-    width: 2.65rem;
-    height: 2.65rem;
+    width: 3.1rem;
+    height: 3.1rem;
   }
 
   .exp-brand-text h1 {

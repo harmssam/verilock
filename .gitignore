@@ -19,6 +19,17 @@ data/
 branding/
 logo-ideas/
 
+# Local content studios (Blog Studio + X Post Studio — never ship)
+server/src/blogStudio.ts
+server/src/blogStudioCopy.ts
+server/src/blogStudioGrok.ts
+server/src/blogStudioRoutes.ts
+server/src/xPostStudio.ts
+server/src/xPostStudioRoutes.ts
+server/scripts/e2e-blog-studio.mjs
+server/data/blog-studio-drafts/
+server/data/x-post-studio/
+
 # Legacy interim logos (superseded by verilock-mark)
 client/public/verilock-logo.png
 client/public/verilock-logo-96.png

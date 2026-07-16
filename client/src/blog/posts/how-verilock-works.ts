@@ -1,7 +1,7 @@
 import type { BlogPost } from '../types'
 
 const cover = '/blog/how-verilock-works.jpg'
-const flow = '/blog/how-verilock-works-flow.svg'
+const flow = '/blog/how-verilock-works-flow.jpg'
 const match = '/blog/how-verilock-works-match.jpg'
 
 export const post: BlogPost = {
@@ -19,19 +19,24 @@ export const post: BlogPost = {
     'how-to-verify-signed-pdf-without-a-wallet',
     'blockchain-pdf-signature-verification',
   ],
-      body: [
+  body: [
     {
       type: 'p',
       text: 'VeriLock follows a simple four-step loop. First, create a fingerprint of your PDF on your own device. Next, collect signatures from everyone who must agree. Then, seal that fingerprint on the Nimiq blockchain. Finally, verify any file later to ensure it has not changed.',
     },
     {
+      type: 'quote',
+      text: 'The blockchain stores only a permanent record of the fingerprint. You keep the actual document safe on your device.',
+    },
+    {
       type: 'p',
-      text: 'This process never puts your full document on a public ledger. The blockchain stores only a permanent record of the fingerprint. You keep the actual document safe on your device.',
+      text: 'This process never puts your full document on a public ledger. Sealing freezes an integrity claim. Verification is the same math run again on any copy you still hold.',
     },
     {
       type: 'figure',
       src: flow,
-      alt: 'Diagram showing four steps: Fingerprint, Sign, Seal, and Verify',
+      layout: 'full',
+      alt: 'Four stations on a linen desk: fingerprinted PDF, pens for signing, stamp and archive folder, laptop with a green check',
       caption: 'One clear path: local fingerprint, multi-party sign, on-chain seal, and easy verify.',
     },
     {
@@ -75,22 +80,27 @@ export const post: BlogPost = {
       text: 'When the group is ready, you seal the record. Sealing publishes the document fingerprint to the Nimiq blockchain. You pay a small fee in NIM or use a prepaid credit. Once sealed, the record is permanent. It is not owned by any single private database. Anyone can check the anchored hash independently.',
     },
     {
+      type: 'quote',
+      text: 'Only seal when the group stops changing the file. Sealing freezes the integrity claim.',
+    },
+    {
       type: 'p',
-      text: 'Only seal when the group stops changing the file. Sealing freezes the integrity claim. If someone edits the PDF after this point, verification will fail.',
+      text: 'If someone edits the PDF after this point, verification will fail. That is the point: a silent change is no longer invisible.',
     },
     {
       type: 'h2',
       text: '4. Verify (Check Integrity)',
     },
     {
-      type: 'p',
-      text: 'Verification is simple math that you can run again. Take a PDF, create its fingerprint locally, and compare it to the sealed record. A match means your bytes are identical to the sealed document. A mismatch means something changed, even if the filename looks familiar.',
-    },
-    {
       type: 'figure',
       src: match,
-      alt: 'Comparison of two documents: one matching the seal with a checkmark, one altered with a broken fingerprint',
-      caption: 'Same bytes match the seal. A silent edit breaks the fingerprint.',
+      layout: 'right',
+      alt: 'Two near-identical contract pages on a linen desk; the right page has one number change circled in red pen',
+      caption: 'Same bytes match. A silent edit breaks the fingerprint.',
+    },
+    {
+      type: 'p',
+      text: 'Verification is simple math that you can run again. Take a PDF, create its fingerprint locally, and compare it to the sealed record. A match means your bytes are identical to the sealed document. A mismatch means something changed, even if the filename looks familiar.',
     },
     {
       type: 'p',

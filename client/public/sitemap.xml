@@ -16,6 +16,11 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://verilock.online/security</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://verilock.online/blog</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>

@@ -1,6 +1,7 @@
 import { Check, ChevronDown, Coins, Copy, Files, LogOut, Tag } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { formatDisplayAddress } from '../addresses'
+import { buildNimiqAddressExplorerUrl } from '../explorer'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
 import { journeyLoginEntryLabels, type JourneyConnectMode } from './journeyConnectUi'
 import { LoginSheet } from './LoginSheet'
@@ -123,7 +124,15 @@ export function AccountMenu({
           <div className="exp-account-menu" role="menu">
             <div className="exp-account-menu-head">
               <span className="exp-account-menu-label">Connected</span>
-              <code className="exp-account-menu-full">{formatDisplayAddress(account.address)}</code>
+              <a
+                className="exp-account-menu-full"
+                href={buildNimiqAddressExplorerUrl(account.address)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`View ${formatDisplayAddress(account.address)} on Nimiq Watch`}
+              >
+                {formatDisplayAddress(account.address)}
+              </a>
             </div>
             {onCredits && (
               <button

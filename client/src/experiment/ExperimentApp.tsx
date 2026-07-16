@@ -5,6 +5,7 @@ import {
   isKnownAppPath,
   isPricingPath,
   isPrivacyPath,
+  isSecurityPath,
   saveHubReturnPath,
 } from '../hubReturnPath'
 import { blogSlugFromPath, getPostBySlug } from '../blog'
@@ -12,6 +13,7 @@ import { applyPageMeta, blogPostMeta, journeyPathMeta, PAGE_META, type PageMeta 
 import type { SealDocument } from '../types'
 import { PricePage } from '../PricePage'
 import { PrivacyPolicyPage } from '../PrivacyPolicyPage'
+import { SecurityPage } from '../SecurityPage'
 import { AccountMenu } from './AccountMenu'
 import { AgreementsPage } from './AgreementsPage'
 import { BlogPage } from './BlogPage'
@@ -35,11 +37,19 @@ import {
   peekStripeCheckoutReturn,
 } from './stripeCheckoutReturn'
 
-type ShellScreen = 'journey' | 'pricing' | 'privacy' | 'agreements' | 'blog' | 'not-found'
+type ShellScreen =
+  | 'journey'
+  | 'pricing'
+  | 'privacy'
+  | 'security'
+  | 'agreements'
+  | 'blog'
+  | 'not-found'
 
 function screenFromPath(pathname: string): ShellScreen {
   if (isPricingPath(pathname)) return 'pricing'
   if (isPrivacyPath(pathname)) return 'privacy'
+  if (isSecurityPath(pathname)) return 'security'
   if (isAgreementsPath(pathname)) return 'agreements'
   if (isBlogPath(pathname)) return 'blog'
   // Unknown paths (e.g. /foo) — do not fall through to the path picker as “home”.
@@ -66,6 +76,7 @@ export function ExperimentApp() {
     if (
       !isPricingPath(window.location.pathname) &&
       !isPrivacyPath(window.location.pathname) &&
+      !isSecurityPath(window.location.pathname) &&
       !isAgreementsPath(window.location.pathname) &&
       !isBlogPath(window.location.pathname)
     ) {
@@ -93,6 +104,12 @@ export function ExperimentApp() {
     rememberJourneyPath()
     setScreen('privacy')
     window.history.pushState({}, '', '/privacy')
+  }, [rememberJourneyPath])
+
+  const goSecurity = useCallback(() => {
+    rememberJourneyPath()
+    setScreen('security')
+    window.history.pushState({}, '', '/security')
   }, [rememberJourneyPath])
 
   const goBlog = useCallback((slug?: string) => {
@@ -128,6 +145,15 @@ export function ExperimentApp() {
     setNavEpoch(n => n + 1)
   }, [])
 
+  const startVerify = useCallback(() => {
+    clearJourneyIntent()
+    saveJourneyIntent('verifier')
+    setScreen('journey')
+    setJourneyEpoch(n => n + 1)
+    window.history.pushState({}, '', '/?intent=verifier')
+    setNavEpoch(n => n + 1)
+  }, [])
+
   useEffect(() => {
     const onPopState = () => {
       setScreen(screenFromPath(window.location.pathname))
@@ -144,6 +170,9 @@ export function ExperimentApp() {
   useEffect(() => {
     const ret = peekStripeCheckoutReturn()
     if (!ret.status) return
+
+    // Checkout return URLs land on /pricing so the pack UI is visible.
+    setScreen('pricing')
 
     if (ret.status === 'cancel') {
       clearStripeCheckoutReturnFromUrl()
@@ -197,6 +226,10 @@ export function ExperimentApp() {
       applyPageMeta({ ...PAGE_META.privacy })
       return
     }
+    if (screen === 'security') {
+      applyPageMeta({ ...PAGE_META.security })
+      return
+    }
     if (screen === 'blog') {
       const slug = blogSlugFromPath(path)
       if (slug) {
@@ -242,7 +275,11 @@ export function ExperimentApp() {
   }
 
   const wideShell =
-    screen === 'blog' || screen === 'pricing' || screen === 'privacy' || screen === 'agreements'
+    screen === 'blog' ||
+    screen === 'pricing' ||
+    screen === 'privacy' ||
+    screen === 'security' ||
+    screen === 'agreements'
 
   return (
     <div className={`exp-app${wideShell ? ' exp-app--wide' : ''}`}>
@@ -252,8 +289,8 @@ export function ExperimentApp() {
             className="exp-brand-mark"
             src="/verilock-mark.png"
             alt=""
-            width={70}
-            height={70}
+            width={80}
+            height={80}
           />
           <div className="exp-brand-text">
             <h1>VeriLock</h1>
@@ -313,6 +350,7 @@ export function ExperimentApp() {
 
       {(screen === 'pricing' ||
         screen === 'privacy' ||
+        screen === 'security' ||
         screen === 'agreements' ||
         screen === 'blog' ||
         screen === 'not-found') && (
@@ -335,6 +373,13 @@ export function ExperimentApp() {
         />
       )}
       {screen === 'privacy' && <PrivacyPolicyPage />}
+      {screen === 'security' && (
+        <SecurityPage
+          onCreate={startCreate}
+          onVerify={startVerify}
+          onPrivacy={goPrivacy}
+        />
+      )}
       {screen === 'blog' && (
         <BlogPage
           key={typeof window !== 'undefined' ? window.location.pathname : '/blog'}
@@ -384,6 +429,13 @@ export function ExperimentApp() {
             onClick={() => goBlog()}
           >
             Blog
+          </button>
+          <button
+            type="button"
+            className={`exp-footer-link${screen === 'security' ? ' exp-footer-link--active' : ''}`}
+            onClick={goSecurity}
+          >
+            Security
           </button>
           <button
             type="button"

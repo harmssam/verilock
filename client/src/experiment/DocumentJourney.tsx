@@ -96,6 +96,12 @@ interface DocumentJourneyProps {
   onOpenAgreements?: () => void
   /** Return to home (invalid deep link). */
   onHome?: () => void
+  /**
+   * Landing redesign (and any shell that owns the path picker) — skip the
+   * in-journey “What are you here to do?” welcome so it does not double with
+   * the shell home. Production ExperimentApp leaves this unset.
+   */
+  suppressWelcome?: boolean
 }
 
 type VerifyOutcome =
@@ -139,6 +145,7 @@ export function DocumentJourney({
   onPageMeta,
   onOpenAgreements,
   onHome,
+  suppressWelcome = false,
 }: DocumentJourneyProps) {
   const {
     account,
@@ -662,6 +669,25 @@ export function DocumentJourney({
   }, [verifyFile, setActiveFromSeal])
 
   const resetAll = () => {
+    // Prefer shell home (path picker / redesign landing) so we don't flash an
+    // in-component welcome under a track title. Keep local UI for the fade-out.
+    if (onHome) {
+      clearJourneyIntent()
+      syncIntentToUrl(null)
+      setLocalError(null)
+      setLockMessage(null)
+      setError(null)
+      if (
+        window.location.pathname.startsWith('/d/') ||
+        window.location.pathname.startsWith('/v/') ||
+        window.location.search.includes('intent=')
+      ) {
+        window.history.pushState({}, '', '/')
+      }
+      onHome()
+      return
+    }
+
     setRole(null)
     clearJourneyIntent()
     syncIntentToUrl(null)
@@ -1144,7 +1170,7 @@ export function DocumentJourney({
         />
       )}
 
-      {step === 'welcome' && (
+      {step === 'welcome' && !suppressWelcome && (
         <section className="hero-pick">
           <div className="hero-pick-copy">
             <FeatureRotator />
@@ -1179,27 +1205,6 @@ export function DocumentJourney({
 
       {step !== 'welcome' && (
         <>
-          <div className="journey-toolbar">
-            <button
-              type="button"
-              className="btn btn-ghost journey-reset"
-              onClick={resetAll}
-              title="Return to Create / Invited / Verify"
-            >
-              <RotateCcw size={14} strokeWidth={2.25} aria-hidden />
-              Start over
-            </button>
-            {account && role === 'creator' && (
-              <span className="journey-role-pill">Creating as {account.shortAddress}</span>
-            )}
-            {role === 'signer' && (
-              <span className="journey-role-pill">
-                {account ? `Signing as ${account.shortAddress}` : 'Signing'}
-              </span>
-            )}
-            {role === 'verifier' && <span className="journey-role-pill">Verifier mode</span>}
-          </div>
-
           {role && (
             <StageRail
               role={role}
@@ -1212,6 +1217,26 @@ export function DocumentJourney({
 
           <section className="action-dock" aria-live="polite">
             <header className="action-dock-head">
+              <div className="journey-toolbar">
+                <button
+                  type="button"
+                  className="btn btn-ghost journey-reset"
+                  onClick={resetAll}
+                  title="Return to Create / Invited / Verify"
+                >
+                  <RotateCcw size={14} strokeWidth={2.25} aria-hidden />
+                  Start over
+                </button>
+                {account && role === 'creator' && (
+                  <span className="journey-role-pill">Creating as {account.shortAddress}</span>
+                )}
+                {role === 'signer' && (
+                  <span className="journey-role-pill">
+                    {account ? `Signing as ${account.shortAddress}` : 'Signing'}
+                  </span>
+                )}
+                {role === 'verifier' && <span className="journey-role-pill">Verifier mode</span>}
+              </div>
               <div>
                 <p className="action-kicker">
                   {step === 'done' && role !== 'signer'
@@ -1518,6 +1543,7 @@ export function DocumentJourney({
                     shareUrl={doc.shareUrl}
                     linkCopied={linkCopied}
                     onCopyLink={() => void copyLink()}
+                    pdfFile={pdfFile ?? signFile}
                     embedded
                   />
                   <button
@@ -1548,8 +1574,9 @@ export function DocumentJourney({
                     </button>
                   )}
                   <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                    Copying the link keeps you here so you can share the PDF next. Continue when
-                    you are ready to sign as the creator. You can cancel until someone signs.
+                    Prefer a ready-made message? Download the email package (link + PDF) or copy
+                    the link and send the file yourself. Continue when you are ready to sign as
+                    the creator. You can cancel until someone signs.
                   </p>
                 </div>
               )}
@@ -1609,6 +1636,7 @@ export function DocumentJourney({
                             shareUrl={doc.shareUrl}
                             linkCopied={linkCopied}
                             onCopyLink={() => void copyLink()}
+                            pdfFile={pdfFile ?? signFile}
                             embedded
                           />
                         )}

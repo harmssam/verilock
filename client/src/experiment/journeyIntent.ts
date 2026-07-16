@@ -89,6 +89,7 @@ export function resolveJourneyIntent(): PathRole | null {
     isHomePath(pathname) ||
     pathname === '/pricing' ||
     pathname === '/privacy' ||
+    pathname === '/security' ||
     pathname === '/agreements' ||
     pathname.startsWith('/agreements/') ||
     pathname === '/blog' ||
