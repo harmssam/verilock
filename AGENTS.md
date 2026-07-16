@@ -8,7 +8,7 @@
 |------|----------------|-------|
 | **PRIMARY shell** | `client/src/App.tsx` + `App.css` | Light landing, header, shell routes |
 | **PRIMARY home** | `client/src/landing/` | Path cards, how-it-works, path stills |
-| **PRIMARY product flow** | `client/src/journey/` | DocumentJourney, dock, seal, account, blog UI |
+| **PRIMARY product flow** | `client/src/journey/` | DocumentJourney, dock, seal, account UI |
 | **PRIMARY entry** | `client/src/main.tsx` → `App` | Mounted via `client/index.html` |
 | **PRIMARY Vite config** | `client/vite.config.ts` | Default `npm run dev` / `npm run build` |
 | **PRIMARY production URL** | `https://verilock.online` | Packaged into `client/dist` as root SPA |
@@ -56,7 +56,7 @@ Safe shared edits (production may depend on these):
 
 - `client/src/nimiq.ts`, `api.ts`, `session.ts`, hub redirect helpers
 - `NimiqPayOpenPanel.tsx`, seal pricing, PDF hash, ShareInviteCard
-- `PricePage`, `SecurityPage`, blog posts
+- `PricePage`, `SecurityPage`
 
 Archive-only (do not invest product work without an explicit request):
 

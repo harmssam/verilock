@@ -114,37 +114,6 @@ body[data-verilock-surface='journey'] #root::after {
   }
 }
 
-.lr-preview-banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
-  margin: 0 0 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 10px;
-  border: 1px dashed rgba(13, 148, 136, 0.35);
-  background: rgba(13, 148, 136, 0.06);
-  color: var(--lr-muted);
-  font-size: 0.74rem;
-  line-height: 1.4;
-}
-
-.lr-preview-banner strong {
-  color: var(--lr-accent);
-  font-weight: 650;
-}
-
-.lr-preview-link {
-  color: var(--lr-accent);
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.lr-preview-link:hover {
-  text-decoration: underline;
-}
 
 /* ── Sticky top menu: full viewport width; content aligned to shell ── */
 
@@ -1179,188 +1148,6 @@ html {
   margin-top: 0.25rem;
 }
 
-/* Latest blog post on home */
-
-.lr-blog-latest {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
-
-.lr-blog-latest-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 0.75rem 1rem;
-  flex-wrap: wrap;
-}
-
-.lr-blog-latest-eyebrow {
-  margin: 0 0 0.2rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--lr-accent);
-}
-
-.lr-blog-latest-heading {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(1.25rem, 2.8vw, 1.5rem);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  color: var(--lr-text);
-}
-
-.lr-blog-latest-all {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.35rem 0.15rem;
-  border: none;
-  background: none;
-  color: var(--lr-accent);
-  font-size: 0.84rem;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.lr-blog-latest-all:hover {
-  color: var(--mint-deep, #0f766e);
-}
-
-.lr-blog-latest-card {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0;
-  width: 100%;
-  padding: 0;
-  border-radius: 14px;
-  border: 1px solid var(--lr-line);
-  background: var(--lr-surface);
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  overflow: hidden;
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
-  transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    transform 0.18s ease;
-}
-
-@media (min-width: 720px) {
-  .lr-blog-latest-card {
-    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  }
-}
-
-.lr-blog-latest-card:hover {
-  border-color: rgba(13, 148, 136, 0.35);
-  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.1);
-  transform: translateY(-2px);
-}
-
-.lr-blog-latest-card:focus-visible {
-  outline: 2px solid rgba(13, 148, 136, 0.55);
-  outline-offset: 2px;
-}
-
-.lr-blog-latest-thumb {
-  display: block;
-  min-height: 10rem;
-  aspect-ratio: 16 / 10;
-  background: var(--lr-surface-2);
-  overflow: hidden;
-}
-
-@media (min-width: 720px) {
-  .lr-blog-latest-thumb {
-    min-height: 100%;
-    aspect-ratio: auto;
-  }
-}
-
-.lr-blog-latest-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 0.35s ease;
-}
-
-.lr-blog-latest-card:hover .lr-blog-latest-thumb img {
-  transform: scale(1.03);
-}
-
-.lr-blog-latest-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  padding: 1.1rem 1.15rem 1.2rem;
-  min-width: 0;
-}
-
-.lr-blog-latest-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.65rem;
-  font-size: 0.75rem;
-  color: var(--lr-dim);
-}
-
-.lr-blog-latest-tag {
-  padding: 0.12rem 0.45rem;
-  border-radius: 999px;
-  border: 1px solid var(--lr-line);
-  background: var(--lr-surface-2);
-  color: var(--lr-muted);
-  font-weight: 650;
-  text-transform: capitalize;
-}
-
-.lr-blog-latest-title {
-  font-family: var(--font-display);
-  font-size: clamp(1.05rem, 2.4vw, 1.25rem);
-  font-weight: 750;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
-  color: var(--lr-text);
-}
-
-.lr-blog-latest-desc {
-  font-size: 0.88rem;
-  line-height: 1.5;
-  color: var(--lr-muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.lr-blog-latest-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.35rem;
-  font-size: 0.86rem;
-  font-weight: 700;
-  color: var(--lr-accent);
-}
-
-.lr-blog-latest-card:hover .lr-blog-latest-cta {
-  color: var(--mint-deep, #0f766e);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lr-blog-latest-card,
-  .lr-blog-latest-thumb img {
-    transition: none;
-    transform: none;
-  }
-}
 
 /* ── Footer ── */
 
@@ -2022,7 +1809,7 @@ body[data-verilock-surface='journey'] .lr-track .trust-bar-sub {
   background: rgba(185, 28, 28, 0.08);
 }
 
-/* Narrow: no wrap under brand; Security (and Blog on very small) → footer only */
+/* Narrow: no wrap under brand; Security → footer only */
 @media (max-width: 720px) {
   .lr-nav--security {
     display: none;
@@ -2071,22 +1858,12 @@ body[data-verilock-surface='journey'] .lr-track .trust-bar-sub {
     padding: 0.85rem 0.9rem 0.95rem;
   }
 
-  .lr-preview-banner {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 }
 
-@media (max-width: 400px) {
-  /* Footer still has Blog; keep Pricing + Account as the only header actions */
-  .lr-nav--blog {
-    display: none;
-  }
-}
 
 /* ═══════════════════════════════════════════════════════════
-   Pricing restyle (preview only — same PricePage DOM & promo data)
-   Scoped under .lr-app so production Journey is untouched.
+   Pricing restyle (same PricePage DOM & promo data)
+   Scoped under .lr-app.
    ═══════════════════════════════════════════════════════════ */
 
 .lr-app .price-page.card {

@@ -1126,7 +1126,6 @@ export function DocumentJourney({
               step={step}
               account={Boolean(account)}
               doc={doc}
-              sharedAck={sharedAck}
             />
           )}
 

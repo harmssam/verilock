@@ -14,7 +14,6 @@ interface StageRailProps {
   step: JourneyStepId
   account: boolean
   doc: JourneyDoc | null
-  sharedAck: boolean
 }
 
 function isStepDone(
@@ -48,7 +47,7 @@ function isStepDone(
   return false
 }
 
-export function StageRail({ role, step, account, doc, sharedAck: _sharedAck }: StageRailProps) {
+export function StageRail({ role, step, account, doc }: StageRailProps) {
   const stages = stagesForRole(role)
   const railRef = useRef<HTMLElement>(null)
   const itemRefs = useRef<(HTMLDivElement | null)[]>([])
