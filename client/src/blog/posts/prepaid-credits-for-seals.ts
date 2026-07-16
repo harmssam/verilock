@@ -6,19 +6,21 @@ export const post: BlogPost = {
   slug: 'prepaid-credits-for-seals',
   title: 'Clearer Pricing and Prepaid Seal Credits',
   description:
-    'Credit-first seal pricing, a cleaner pack picker, and prepaid credits so you can seal without juggling NIM at the last step.',
+    'One credit seals one document fingerprint on Nimiq. Buy packs with NIM or card, watch balance in the header, and seal without a last-minute wallet scramble.',
   date: '2026-07-10',
   tags: ['feature', 'pricing'],
   coverImage: cover,
-  coverAlt: 'Charcoal credit card and amber hexagonal payment icon on a signed contract, soft studio lighting',
+  coverAlt:
+    'Charcoal credit card and amber hexagonal payment icon on a signed contract, soft studio lighting',
   relatedSlugs: [
     'how-to-sign-pdf-with-blockchain',
     'wallet-scoped-agreements-history',
+    'what-is-verilock',
   ],
   body: [
     {
       type: 'p',
-      text: 'Sealing still means publishing a permanent fingerprint of your PDF hash on Nimiq. We simplified how that step is priced and paid: credits come first when you are signed in, the pack picker is quieter, and prepaid balance can cover a seal without a last-minute NIM dance.',
+      text: 'Sealing still means publishing a permanent fingerprint of your PDF hash on Nimiq. Signing and verifying stay free. What we cleaned up is how you pay for that lock: a simple credit model, prepaid packs, and a quieter path at seal time so the last step is not a scramble for spare NIM.',
     },
     {
       type: 'figure',
@@ -27,12 +29,50 @@ export const post: BlogPost = {
       caption: 'Top up with NIM or buy fixed packs by card. One credit, one seal.',
     },
     {
-      type: 'p',
-      text: 'When a balance is available, the header can surface it so focus stays on documents. Card checkout can mint credits on return even if a webhook is delayed. Statements include a VeriLock suffix so the charge is easy to spot.',
+      type: 'h2',
+      text: 'What a credit is',
     },
     {
       type: 'p',
-      text: 'Open Pricing for live pack options and fee numbers. Through July a seal is 50 NIM (95% off the 1000 NIM list). Promo ends August 1.',
+      text: 'One credit pays for one permanent on-chain seal of one document fingerprint. The same amount applies whether you spend a prepaid credit or pay the current credit value in NIM when you seal. Fiat estimates on Pricing come from market data; the product truth is the NIM / credit figure shown there.',
+    },
+    {
+      type: 'h2',
+      text: 'How to buy and use credits',
+    },
+    {
+      type: 'ul',
+      items: [
+        'Open Pricing while signed in with your Nimiq wallet.',
+        'Choose a prepaid pack (typical sizes span small multi-seal packs up through larger ones).',
+        'Pay with NIM from the wallet, or with card when card checkout is available.',
+        'After purchase, the header can show your balance so focus stays on documents.',
+        'At seal time, spend a credit or pay NIM for the current fee, depending on balance and flow.',
+      ],
+    },
+    {
+      type: 'p',
+      text: 'Card checkout can mint credits when you return to the app even if a webhook is delayed. Statements include a VeriLock suffix so the charge is easy to spot later.',
+    },
+    {
+      type: 'h2',
+      text: 'Why prepaid helps',
+    },
+    {
+      type: 'p',
+      text: 'Multi-party agreements often stall at the last step when the creator still needs to pay the network fee. Credits let you fund seals ahead of time. Co-signers still only need a wallet to sign; they do not buy the seal unless they are the party locking the hash.',
+    },
+    {
+      type: 'note',
+      text: 'Credits are for seal fees, not a subscription that changes who can verify. Anyone with the sealed PDF can still re-hash and check the on-chain record without a credit balance.',
+    },
+    {
+      type: 'h2',
+      text: 'Promo and list price',
+    },
+    {
+      type: 'p',
+      text: 'Open Pricing for live pack options and fee numbers. Through the end of July, a permanent seal is 50 NIM, which is 95% off the 1000 NIM list price. The promo ends August 1. After that, use the current figures on Pricing, not this post\'s snapshot.',
     },
   ],
 }

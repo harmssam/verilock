@@ -22,21 +22,24 @@ export interface JourneyStage {
   privacyNote: string
 }
 
-/** Creator path: full lifecycle from wallet → sealed proof. */
+/**
+ * Creator path stages (rail + how-it-works).
+ * Wallet login is a gate on create/sign/seal — not a numbered stage.
+ */
 export const CREATOR_STAGES: JourneyStage[] = [
-  {
-    id: 'connect',
-    label: 'Connect',
-    verb: 'Prove who you are',
-    blurb: 'Link your Nimiq wallet. Required to create, sign, or seal.',
-    privacyNote: 'Wallet only proves identity - it never sees your PDF bytes.',
-  },
   {
     id: 'fingerprint',
     label: 'Fingerprint',
-    verb: 'Hash the PDF locally',
-    blurb: 'Drop your agreement. We compute SHA-256 on this device only.',
+    verb: 'Create a fingerprint from your file',
+    blurb: 'Drop your agreement. We create its fingerprint on your device directly.',
     privacyNote: 'The file never uploads. Only the fingerprint is registered.',
+  },
+  {
+    id: 'sign',
+    label: 'Sign',
+    verb: 'Sign as creator',
+    blurb: 'Confirm the fingerprint with your wallet first, then invite co-signers.',
+    privacyNote: 'You prove you hold these bytes - still no upload.',
   },
   {
     id: 'share',
@@ -44,13 +47,6 @@ export const CREATOR_STAGES: JourneyStage[] = [
     verb: 'Invite co-signers',
     blurb: 'Send a link plus the same PDF out-of-band (email, AirDrop…).',
     privacyNote: 'You control the file. We only host the agreement record + link.',
-  },
-  {
-    id: 'sign',
-    label: 'Sign',
-    verb: 'Everyone confirms',
-    blurb: 'Each party re-fingerprints their copy, then signs with their wallet.',
-    privacyNote: 'Signers prove they hold the same bytes - still no upload.',
   },
   {
     id: 'seal',
@@ -68,15 +64,10 @@ export const CREATOR_STAGES: JourneyStage[] = [
   },
 ]
 
-/** Invited signer path: open invite / match PDF, then sign. No create/share/seal. */
+/**
+ * Invited signer path. Login is required to submit a signature, not a rail step.
+ */
 export const SIGNER_STAGES: JourneyStage[] = [
-  {
-    id: 'connect',
-    label: 'Connect',
-    verb: 'Prove who you are',
-    blurb: 'Connect the Nimiq wallet you will use to sign this agreement.',
-    privacyNote: 'Wallet only proves identity - it never sees your PDF bytes.',
-  },
   {
     id: 'sign',
     label: 'Sign',

@@ -142,7 +142,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'In Journey, pick create to start, join to co-sign, or verify to check a sealed file. For a shorter walkthrough of signing only, see How to Sign a PDF with Blockchain. For the product definition and limits, see What is VeriLock.',
+      text: 'On the home screen, pick Create & seal to start, I was invited to co-sign, or Verify a PDF to check a sealed file. For a shorter walkthrough of signing only, see How to Sign a PDF with Blockchain. For the product definition and limits, see What is VeriLock.',
     },
     {
       type: 'p',

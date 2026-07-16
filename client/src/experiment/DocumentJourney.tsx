@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Check,
   Fingerprint,
   LoaderCircle,
@@ -58,7 +59,9 @@ import {
 import {
   journeyConnectOptions,
   journeyLoginEntryLabels,
+  journeyLoginNeedsSheet,
   resolveJourneyConnectMode,
+  type JourneyConnectRequest,
 } from './journeyConnectUi'
 import { LoginSheet } from './LoginSheet'
 import { CreditsPanel } from './CreditsPanel'
@@ -152,6 +155,7 @@ export function DocumentJourney({
     token,
     address,
     connecting,
+    walletStatus,
     connect,
     setError,
     nimiq,
@@ -163,7 +167,6 @@ export function DocumentJourney({
     inNimiqPay,
     mobilePayConnect,
     showOpenInPay,
-    walletStatus,
   } = wallet
 
   // Restore path after Hub login redirect (full page reload loses React state)
@@ -255,7 +258,7 @@ export function DocumentJourney({
         setRole('creator')
         saveJourneyIntent('creator')
         syncIntentToUrl('creator')
-        // Skip share if signatures already progressing or ready to seal
+        // Shared-ack only for invite-sent UI; step uses sign-before-share resolution
         const { signed, required, readyToLock } = document.signingProgress
         setSharedAck(
           preferSeal ||
@@ -457,7 +460,7 @@ export function DocumentJourney({
   const step = useMemo<JourneyStepId>(() => {
     if (!role) return 'welcome'
     if (role === 'verifier') return 'verify'
-    if (!account) return 'connect'
+    // Wallet login is a gate on actions — not a numbered rail step.
     if (role === 'signer') {
       if (!doc) return 'sign'
       // After this wallet has signed (or everyone has), show the short "done" step
@@ -470,14 +473,42 @@ export function DocumentJourney({
       if (doc.sealed || meSigned || allSigned(doc)) return 'done'
       return 'sign'
     }
+    // Creator path: fingerprint → sign (you first) → share (invite) → seal → done
     if (!doc) return 'fingerprint'
     if (doc.sealed) return 'done'
     if (doc.directSeal || allSigned(doc)) return 'seal'
-    if (signedCount(doc) > 0 || sharedAck) return 'sign'
+    // Sign before share: stay on sign while this wallet can still take a party slot
+    if (address) {
+      const resolution = resolveSigningParty(doc.source, address)
+      if (resolution.ok) return 'sign'
+    } else if (signedCount(doc) === 0) {
+      return 'sign'
+    }
+    // Creator already signed (or no open slot) — invite remaining co-signers
     return 'share'
-  }, [role, account, doc, sharedAck, address])
+  }, [role, doc, address])
 
   const pathStages = useMemo(() => stagesForRole(role), [role])
+
+  // Quiet refresh while creator waits for co-signers after signing (share step).
+  useEffect(() => {
+    if (role !== 'creator' || !doc || doc.sealed || allSigned(doc)) return
+    if (step !== 'share') return
+    const slug = doc.slug
+    const size = fileSizeByDocIdRef.current[doc.id] ?? doc.fileSize
+    const tick = () => {
+      void (async () => {
+        try {
+          const { document } = await api.getDocument(slug, token)
+          setActiveFromSeal(document, size)
+        } catch {
+          /* ignore transient network */
+        }
+      })()
+    }
+    const id = window.setInterval(tick, 12_000)
+    return () => window.clearInterval(id)
+  }, [role, doc, step, token, setActiveFromSeal])
 
   const revealParticipantPrivate = Boolean(
     doc && canRevealParticipantDetails(doc.source, address),
@@ -799,19 +830,15 @@ export function DocumentJourney({
     try {
       await navigator.clipboard.writeText(doc.shareUrl)
       setLinkCopied(true)
-      // Do not advance off share — copy alone should not open the sign/PDF step.
+      // Copy alone stays on share — co-signers sign via the invite path.
       window.setTimeout(() => setLinkCopied(false), 1800)
     } catch {
       setLocalError('Could not copy link — select and copy it manually if needed.')
     }
   }
 
-  /** Leave share step; reuse create PDF so creator is not asked to re-drop it. */
-  const continueAfterShare = () => {
-    if (pdfFile && pdfHash) {
-      setSignFile(pdfFile)
-      setSignHash(pdfHash)
-    }
+  /** Mark invite as sent (share is already after creator sign). */
+  const acknowledgeShare = () => {
     setSharedAck(true)
   }
 
@@ -1009,16 +1036,31 @@ export function DocumentJourney({
     mobilePayConnect,
     showOpenInPay,
   })
+  const loginNeedsSheet = journeyLoginNeedsSheet(connectMode)
+  const [loginSheetOpen, setLoginSheetOpen] = useState(false)
 
-  const connectFromPath = () => {
+  useEffect(() => {
+    if (account) setLoginSheetOpen(false)
+  }, [account])
+
+  const connectFromPath = (options?: JourneyConnectRequest) => {
     // Stamp intent into URL only when connecting (Hub return needs it).
     if (role) {
       saveJourneyIntent(role)
       syncIntentToUrl(role)
     }
     saveHubReturnPath()
-    // Single button: Pay-first on mobile, Hub on desktop / after Pay fallback.
-    void connect(journeyConnectOptions(connectMode))
+    // Explicit options from mobile chooser; otherwise resolve from mode (desktop → Hub).
+    void connect(options !== undefined ? options : journeyConnectOptions(connectMode))
+  }
+
+  /** Header-style Login: sheet on mobile (Pay vs Hub), direct Hub/Pay-native on desktop. */
+  const requestLogin = () => {
+    if (loginNeedsSheet) {
+      setLoginSheetOpen(true)
+      return
+    }
+    connectFromPath()
   }
 
   /** Invited path: resolve agreement by PDF fingerprint when there is no /d/ link yet. */
@@ -1159,7 +1201,11 @@ export function DocumentJourney({
         )}
       </aside>
 
-      {token && (step === 'welcome' || !doc) && (
+      {/*
+        Quiet agreements strip on Journey welcome only.
+        Landing redesign (suppressWelcome) uses full /agreements instead.
+      */}
+      {token && !suppressWelcome && (step === 'welcome' || !doc) && (
         <JourneyAgreements
           token={token}
           address={address}
@@ -1222,10 +1268,10 @@ export function DocumentJourney({
                   type="button"
                   className="btn btn-ghost journey-reset"
                   onClick={resetAll}
-                  title="Return to Create / Invited / Verify"
+                  title="Back to home"
                 >
-                  <RotateCcw size={14} strokeWidth={2.25} aria-hidden />
-                  Start over
+                  <ArrowLeft size={14} strokeWidth={2.25} aria-hidden />
+                  Back home
                 </button>
                 {account && role === 'creator' && (
                   <span className="journey-role-pill">Creating as {account.shortAddress}</span>
@@ -1250,9 +1296,7 @@ export function DocumentJourney({
                     ? (activeStage?.verb ?? 'You are all set')
                     : step === 'done'
                       ? 'Agreement sealed'
-                      : step === 'connect'
-                        ? 'Login'
-                        : activeStage?.verb ?? 'Continue'}
+                      : activeStage?.verb ?? 'Continue'}
                 </h3>
                 <p className="muted action-blurb">
                   {step === 'done' && role === 'signer'
@@ -1260,13 +1304,7 @@ export function DocumentJourney({
                       'Your signature is recorded. When everyone has signed, the agreement is sealed on Nimiq.')
                     : step === 'done'
                       ? 'Keep your PDF. Drop a copy below anytime to verify the fingerprint.'
-                      : step === 'connect' && role === 'signer'
-                        ? 'Login with Nimiq first, then match the shared PDF and sign.'
-                        : step === 'connect' && role === 'verifier'
-                          ? 'Wallet is optional for verify — you can skip login if you only need to check a PDF.'
-                          : step === 'connect'
-                            ? 'Step 1 only — prove who you are with Nimiq. Your PDF comes next.'
-                            : activeStage?.blurb}
+                      : activeStage?.blurb}
                 </p>
               </div>
               {activeStage && !(step === 'done' && role === 'creator') && (
@@ -1289,20 +1327,6 @@ export function DocumentJourney({
             )}
 
             <div className="action-dock-body">
-              {step === 'connect' && (
-                <div className="action-stack">
-                  <LoginSheet
-                    open
-                    connectMode={connectMode}
-                    connecting={connecting}
-                    walletStatus={walletStatus}
-                    onProceed={connectFromPath}
-                    placement="inline"
-                    showClose={false}
-                  />
-                </div>
-              )}
-
               {step === 'fingerprint' && (
                 <div className="action-stack">
                   <DocumentStage
@@ -1327,7 +1351,8 @@ export function DocumentJourney({
                       </>
                     ) : (
                       <>
-                        Step 2: <strong>drop a PDF</strong> or <strong>Browse files</strong>.
+                        <strong>Drop a PDF</strong> or <strong>Browse files</strong>. Hashing
+                        stays on this device.
                       </>
                     )}
                   </p>
@@ -1515,15 +1540,39 @@ export function DocumentJourney({
                   )}
                   <button
                     type="button"
-                    className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
-                    disabled={!pdfFile || !pdfHash || !creatorName.trim() || busy}
-                    onClick={() => void createDoc()}
+                    className={`btn btn-primary btn-lg${busy || connecting ? ' btn--busy' : ''}`}
+                    disabled={
+                      !pdfFile ||
+                      !pdfHash ||
+                      !creatorName.trim() ||
+                      busy ||
+                      (!account && connecting)
+                    }
+                    onClick={() => {
+                      if (!account) {
+                        requestLogin()
+                        return
+                      }
+                      void createDoc()
+                    }}
                   >
                     {busy ? (
                       <>
                         <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
                         Creating…
                       </>
+                    ) : !account ? (
+                      connecting ? (
+                        <>
+                          <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
+                          {journeyLoginEntryLabels().busy}
+                        </>
+                      ) : (
+                        <>
+                          <NimiqHexagonIcon size={18} />
+                          {journeyLoginEntryLabels().idle} to continue
+                        </>
+                      )
                     ) : (
                       <>
                         <Fingerprint size={18} strokeWidth={2.25} />
@@ -1531,12 +1580,45 @@ export function DocumentJourney({
                       </>
                     )}
                   </button>
+                  {!account && loginNeedsSheet && loginSheetOpen && (
+                    <LoginSheet
+                      open
+                      connectMode={connectMode}
+                      connecting={connecting}
+                      walletStatus={walletStatus}
+                      onClose={() => setLoginSheetOpen(false)}
+                      onProceed={connectFromPath}
+                      placement="inline"
+                    />
+                  )}
+                  {!account && (
+                    <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                      Login with Nimiq when you are ready to register the fingerprint. Your PDF
+                      never leaves this device.
+                    </p>
+                  )}
                 </div>
               )}
 
               {step === 'share' && doc && (
                 <div className="action-stack">
                   <DocumentStage step={step} doc={doc} file={pdfFile} accepting={false} />
+                  <div className="progress-bar-wrap">
+                    <div className="progress-bar-meta">
+                      <span>
+                        Signatures {signedCount(doc)}/{requiredCount(doc)}
+                      </span>
+                      <span className="muted">{doc.title}</span>
+                    </div>
+                    <div className="progress-bar-track">
+                      <div
+                        className="progress-bar-fill"
+                        style={{
+                          width: `${requiredCount(doc) ? (signedCount(doc) / requiredCount(doc)) * 100 : 0}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
                   <PartyList doc={doc} revealNames={revealParticipantPrivate} />
                   <ShareInviteCard
                     document={doc.source}
@@ -1546,13 +1628,20 @@ export function DocumentJourney({
                     pdfFile={pdfFile ?? signFile}
                     embedded
                   />
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-lg"
-                    onClick={continueAfterShare}
-                  >
-                    I&apos;ve shared — continue to sign
-                  </button>
+                  {sharedAck ? (
+                    <div className="result-banner result-banner--ok">
+                      <Check size={18} strokeWidth={2.5} />
+                      Invite sent — waiting for co-signers. You can seal when everyone has signed.
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-lg"
+                      onClick={acknowledgeShare}
+                    >
+                      I&apos;ve shared the invite
+                    </button>
+                  )}
                   {canCancelCurrent && (
                     <button
                       type="button"
@@ -1574,9 +1663,9 @@ export function DocumentJourney({
                     </button>
                   )}
                   <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                    Prefer a ready-made message? Download the email package (link + PDF) or copy
-                    the link and send the file yourself. Continue when you are ready to sign as
-                    the creator. You can cancel until someone signs.
+                    You already signed as the creator. Send the link and the same PDF to
+                    co-signers. Prefer a ready-made message? Download the email package. This
+                    view updates when they sign.
                   </p>
                 </div>
               )}
@@ -1627,20 +1716,7 @@ export function DocumentJourney({
 
                       <PartyList doc={doc} revealNames={revealParticipantPrivate} />
 
-                      {/* Invite / mailto is creator-only — co-signers (e.g. Tenant 2 of 2) only sign. */}
-                      {!allSigned(doc) &&
-                        !doc.directSeal &&
-                        (role === 'creator' || isDocumentCreator(doc.source, address)) && (
-                          <ShareInviteCard
-                            document={doc.source}
-                            shareUrl={doc.shareUrl}
-                            linkCopied={linkCopied}
-                            onCopyLink={() => void copyLink()}
-                            pdfFile={pdfFile ?? signFile}
-                            embedded
-                          />
-                        )}
-
+                      {/* Creator invites on the share step (after they sign). Never on invited path. */}
                       {canCancelCurrent && role === 'creator' && (
                         <button
                           type="button"
@@ -1663,24 +1739,37 @@ export function DocumentJourney({
                       ) : (
                         <>
                           {!account && (
-                            <button
-                              type="button"
-                              className={`btn btn-primary${connecting ? ' btn--busy' : ''}`}
-                              onClick={connectFromPath}
-                              disabled={connecting}
-                            >
-                              {connecting ? (
-                                <>
-                                  <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
-                                  {journeyLoginEntryLabels().busy}
-                                </>
-                              ) : (
-                                <>
-                                  <NimiqHexagonIcon size={16} />
-                                  {journeyLoginEntryLabels().idle}
-                                </>
+                            <>
+                              <button
+                                type="button"
+                                className={`btn btn-primary${connecting ? ' btn--busy' : ''}`}
+                                onClick={requestLogin}
+                                disabled={connecting}
+                              >
+                                {connecting ? (
+                                  <>
+                                    <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
+                                    {journeyLoginEntryLabels().busy}
+                                  </>
+                                ) : (
+                                  <>
+                                    <NimiqHexagonIcon size={16} />
+                                    {journeyLoginEntryLabels().idle}
+                                  </>
+                                )}
+                              </button>
+                              {loginNeedsSheet && loginSheetOpen && (
+                                <LoginSheet
+                                  open
+                                  connectMode={connectMode}
+                                  connecting={connecting}
+                                  walletStatus={walletStatus}
+                                  onClose={() => setLoginSheetOpen(false)}
+                                  onProceed={connectFromPath}
+                                  placement="inline"
+                                />
                               )}
-                            </button>
+                            </>
                           )}
 
                           {account && signingResolution && !signingResolution.ok && (
@@ -1782,8 +1871,9 @@ export function DocumentJourney({
                                 )}
                               </button>
                               <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                                Each co-signer uses their own wallet. After you sign, the next
-                                party can open the same invite link or drop this PDF.
+                                {role === 'creator'
+                                  ? 'Sign first with your wallet. Next you will share the invite link and PDF with co-signers.'
+                                  : 'Each co-signer uses their own wallet. After you sign, the creator can seal when everyone is done.'}
                               </p>
                             </>
                           )}

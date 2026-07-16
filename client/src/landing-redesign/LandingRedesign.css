@@ -201,6 +201,7 @@ body[data-verilock-surface='landing-redesign'] #root::after {
   inset: 0;
   z-index: 0;
   pointer-events: none;
+  overflow: hidden;
 }
 
 .lr-header-track-bg {
@@ -210,8 +211,10 @@ body[data-verilock-surface='landing-redesign'] #root::after {
   object-fit: cover;
   /* Full color + slight contrast so the still isn't a grey slab */
   filter: saturate(1.05) brightness(1.01) contrast(1.06);
-  transform: scale(1.04);
+  /* Zoom via placementImageStyle --lr-path-zoom / transform */
+  --lr-path-zoom: 1;
   opacity: 0.88;
+  pointer-events: none;
 }
 
 /* Text-side veil only — right side keeps the still (was full-card grey fog) */
@@ -778,46 +781,8 @@ html {
   height: 100%;
   object-fit: cover;
   display: block;
-  filter: saturate(1.02) contrast(1.06) brightness(0.98);
-}
-
-.lr-hero-visual-card {
-  position: absolute;
-  left: 0.85rem;
-  bottom: 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  max-width: calc(100% - 1.7rem);
-  padding: 0.7rem 0.9rem;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  /* Solid fill for WCAG-ish contrast over parchment stills (no light-on-light). */
-  background: #ffffff;
-  box-shadow:
-    0 1px 0 rgba(15, 23, 42, 0.04),
-    0 12px 32px rgba(15, 23, 42, 0.16);
-  color: var(--lr-accent);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.lr-hero-visual-card--in {
-  opacity: 1;
-}
-
-.lr-hero-visual-card strong {
-  display: block;
-  font-size: 0.84rem;
-  font-weight: 700;
-  color: var(--lr-text);
-}
-
-.lr-hero-visual-card span {
-  display: block;
-  font-size: 0.74rem;
-  color: var(--lr-muted);
-  line-height: 1.35;
+  /* Brand hero still (lock + Nimiq hexes): keep color true, no parchment filters */
+  filter: none;
 }
 
 .lr-paths-section {
@@ -974,8 +939,7 @@ html {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lr-status,
-  .lr-hero-visual-card {
+  .lr-status {
     opacity: 1;
     transition: none;
   }
@@ -1001,100 +965,6 @@ html {
 }
 
 /* Path cards — still fills card; translucent white label strip overlays the image */
-
-.lr-place-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.55rem 0.75rem;
-  margin: 0 0 0.85rem;
-  padding: 0.65rem 0.8rem;
-  border-radius: 12px;
-  border: 1px dashed rgba(13, 148, 136, 0.28);
-  background: rgba(13, 148, 136, 0.05);
-}
-
-.lr-place-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.75rem;
-  border-radius: 999px;
-  border: 1px solid rgba(13, 148, 136, 0.28);
-  background: #fff;
-  color: var(--lr-accent);
-  font-size: 0.78rem;
-  font-weight: 650;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
-}
-
-.lr-place-toggle:hover {
-  border-color: rgba(13, 148, 136, 0.45);
-  background: rgba(13, 148, 136, 0.08);
-}
-
-.lr-place-toggle--on {
-  background: var(--lr-accent);
-  border-color: transparent;
-  color: #fff;
-}
-
-.lr-place-toggle--on:hover {
-  background: var(--mint-deep, #0f766e);
-  border-color: transparent;
-  color: #fff;
-}
-
-.lr-place-hint {
-  flex: 1 1 12rem;
-  margin: 0;
-  font-size: 0.74rem;
-  line-height: 1.4;
-  color: var(--lr-muted);
-}
-
-.lr-place-hint code {
-  font-size: 0.7rem;
-  padding: 0.05rem 0.3rem;
-  border-radius: 4px;
-  background: rgba(15, 23, 42, 0.06);
-  color: var(--lr-text);
-}
-
-.lr-place-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.lr-place-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.65rem;
-  border-radius: 8px;
-  border: 1px solid var(--lr-line-strong);
-  background: #fff;
-  color: var(--lr-text);
-  font-size: 0.74rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.lr-place-btn:hover {
-  border-color: rgba(13, 148, 136, 0.4);
-  color: var(--lr-accent);
-}
-
-.lr-place-btn--primary {
-  border-color: rgba(13, 148, 136, 0.35);
-  background: rgba(13, 148, 136, 0.1);
-  color: var(--lr-accent);
-}
 
 .lr-paths {
   display: grid;
@@ -1173,34 +1043,6 @@ html {
   overflow: hidden;
   background: var(--lr-surface-2);
   pointer-events: none;
-  touch-action: none;
-  user-select: none;
-}
-
-.lr-path-thumb--place {
-  /* Stay under .lr-path-main so the label strip stays visible; drag the still above it */
-  pointer-events: auto;
-  cursor: grab;
-}
-
-.lr-path-thumb--place:active {
-  cursor: grabbing;
-}
-
-.lr-path-place-badge {
-  position: absolute;
-  top: 0.55rem;
-  left: 0.55rem;
-  z-index: 3;
-  padding: 0.22rem 0.45rem;
-  border-radius: 6px;
-  background: rgba(15, 23, 42, 0.72);
-  color: #fff;
-  font-size: 0.68rem;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-  pointer-events: none;
 }
 
 .lr-path-img {
@@ -1210,7 +1052,6 @@ html {
   display: block;
   /* Keep role metaphors readable; label strip owns text contrast */
   filter: saturate(1.05) contrast(1.08) brightness(0.97);
-  /* Default scale; place mode sets --lr-path-zoom + inline transform */
   --lr-path-zoom: 1;
   transform: scale(var(--lr-path-zoom));
   transition:
@@ -1223,46 +1064,6 @@ html {
 .lr-path:hover .lr-path-img {
   filter: saturate(1.1) contrast(1.1) brightness(1);
   transform: scale(calc(var(--lr-path-zoom, 1) * 1.03));
-}
-
-.lr-path--place:hover .lr-path-img,
-.lr-paths--place .lr-path:hover .lr-path-img {
-  /* Keep still steady while dragging / placing */
-  transform: scale(var(--lr-path-zoom, 1));
-  transition: filter 0.2s ease;
-}
-
-.lr-path-sliders {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.55rem 0.65rem;
-  border-radius: 10px;
-  border: 1px solid var(--lr-line);
-  background: rgba(255, 255, 255, 0.88);
-}
-
-.lr-path-slider {
-  display: grid;
-  grid-template-columns: 1rem minmax(0, 1fr) 2.6rem;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.7rem;
-  font-weight: 650;
-  color: var(--lr-muted);
-}
-
-.lr-path-slider input[type='range'] {
-  width: 100%;
-  accent-color: var(--lr-accent);
-  cursor: pointer;
-}
-
-.lr-path-slider output {
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  color: var(--lr-text);
-  font-weight: 600;
 }
 
 /* Label strip: near-solid white so title/detail pass contrast over busy stills */
@@ -1641,6 +1442,19 @@ body[data-verilock-surface='landing-redesign'] .login-sheet-stores {
   border-top-color: var(--lr-line);
 }
 
+body[data-verilock-surface='landing-redesign'] .login-sheet-choice-hint {
+  color: var(--lr-muted);
+}
+
+body[data-verilock-surface='landing-redesign'] .login-sheet-choice-divider {
+  color: var(--lr-muted);
+}
+
+body[data-verilock-surface='landing-redesign'] .login-sheet-choice-divider::before,
+body[data-verilock-surface='landing-redesign'] .login-sheet-choice-divider::after {
+  background: var(--lr-line);
+}
+
 /*
  * Action stack + rental / fingerprint form chrome.
  * Production .field input|select|textarea use rgba(0,0,0,0.25–0.28) dark glass —
@@ -1861,7 +1675,7 @@ body[data-verilock-surface='landing-redesign'] .verify-result-card {
   border-color: rgba(13, 148, 136, 0.28);
 }
 
-/* Journey toolbar “Start over” etc. inside dock head */
+/* Journey toolbar “Back home” etc. inside dock head */
 body[data-verilock-surface='landing-redesign'] .journey-toolbar .btn-ghost,
 body[data-verilock-surface='landing-redesign'] .journey-toolbar .text-btn {
   color: var(--lr-accent);
@@ -2136,6 +1950,76 @@ body[data-verilock-surface='landing-redesign'] .lr-track .trust-bar-sub {
   border: 1px solid var(--lr-line);
   border-radius: 14px;
   box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+}
+
+/* Agreements list on light shell — beat dark-glass item fills from ExperimentApp */
+.lr-app .agreements-page-header h2 {
+  color: var(--lr-text);
+}
+
+.lr-app .agreements-page-wallet {
+  color: var(--lr-accent);
+}
+
+.lr-app .agreements-page-count {
+  background: rgba(13, 148, 136, 0.08);
+  border-color: var(--lr-line);
+  color: var(--lr-text);
+}
+
+.lr-app .agreements-page-item {
+  border-color: var(--lr-line);
+  background: var(--lr-surface-2, #f0fdfa);
+}
+
+.lr-app .agreements-page-item--seal {
+  border-color: rgba(13, 148, 136, 0.32);
+  background: rgba(13, 148, 136, 0.06);
+}
+
+.lr-app .agreements-page-title-row {
+  min-width: 0;
+}
+
+.lr-app .agreements-page-title {
+  color: var(--lr-text);
+}
+
+.lr-app .agreements-page-main:hover .agreements-page-title {
+  color: var(--lr-accent);
+}
+
+.lr-app .agreements-page-type {
+  border-color: var(--lr-line-strong, rgba(15, 23, 42, 0.13));
+  background: #ffffff;
+  color: var(--lr-muted);
+}
+
+.lr-app .agreements-page-headline {
+  color: var(--lr-accent);
+}
+
+.lr-app .agreements-page .btn-secondary {
+  border: 1px solid rgba(13, 148, 136, 0.35);
+  background: #ffffff;
+  color: var(--lr-accent);
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.lr-app .agreements-page .btn-secondary:hover:not(:disabled) {
+  border-color: var(--lr-accent);
+  background: var(--lr-accent-soft);
+  color: var(--mint-deep, #0f766e);
+}
+
+.lr-app .agreements-page-cancel {
+  color: #b91c1c;
+}
+
+.lr-app .agreements-page-cancel:hover:not(:disabled) {
+  color: #991b1b;
+  background: rgba(185, 28, 28, 0.08);
 }
 
 /* Narrow: no wrap under brand; Security (and Blog on very small) → footer only */
@@ -2495,35 +2379,79 @@ body[data-verilock-surface='landing-redesign'] .lr-track .trust-bar-sub {
   min-height: 2.75rem;
 }
 
-/* Why Nimiq */
+/* Why Nimiq — scannable card grid on the light shell */
 
 .lr-app .price-page-why {
-  margin-top: 1.65rem;
-  padding: 1.15rem 1.2rem 1.25rem;
-  border-radius: 14px;
+  margin-top: 1.75rem;
+  padding: 1.35rem 1.3rem 1.4rem;
+  border-radius: 16px;
   border: 1px solid var(--lr-line);
   background: #ffffff;
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.045);
+}
+
+.lr-app .price-page-why-badge {
+  border-color: rgba(233, 178, 19, 0.32);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 220, 120, 0.35), transparent 55%),
+    #fffaf0;
+  box-shadow: 0 4px 12px rgba(233, 178, 19, 0.14);
 }
 
 .lr-app .price-page-why-title {
-  font-size: 1.02rem;
-  font-weight: 750;
-  letter-spacing: -0.02em;
+  font-size: 1.12rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
   color: var(--lr-text, #0f172a);
 }
 
-.lr-app .price-page-why > p,
-.lr-app .price-page-why-list,
+.lr-app .price-page-why-lead {
+  color: var(--lr-muted, #4b5c6b);
+  font-size: 0.92rem;
+  line-height: 1.58;
+}
+
+.lr-app .price-page-why-item {
+  border-color: var(--lr-line);
+  background: #fafdfc;
+  box-shadow: none;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.lr-app .price-page-why-item:hover {
+  border-color: rgba(13, 148, 136, 0.22);
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+}
+
+.lr-app .price-page-why-item-title {
+  color: var(--lr-text, #0f172a);
+  font-size: 0.9rem;
+}
+
+.lr-app .price-page-why-item-body {
+  color: var(--lr-muted, #4b5c6b);
+  font-size: 0.84rem;
+  line-height: 1.52;
+}
+
 .lr-app .price-page-why-cta {
-  color: var(--lr-muted, #8fa3c4);
+  border-top-color: var(--lr-line);
+  color: var(--lr-muted, #4b5c6b);
 }
 
-.lr-app .price-page-why-list strong {
-  color: var(--lr-text, #0f172a);
-  font-weight: 650;
+.lr-app .price-page-nimiq-link {
+  color: var(--lr-accent, #0d9488);
+}
+
+.lr-app .price-page-nimiq-link:hover,
+.lr-app .price-page-nimiq-link:focus-visible {
+  text-decoration-color: rgba(13, 148, 136, 0.45);
 }
 
 .lr-app .price-page .muted {
-  color: var(--lr-muted, #8fa3c4);
+  color: var(--lr-muted, #4b5c6b);
 }

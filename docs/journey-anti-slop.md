@@ -57,8 +57,8 @@ Design **serves the workflow** (path → rail → dock → document stage).
 ### IA (do not invent a fourth path)
 
 - Path picker: **Create & seal** · **I was invited** · **Verify a PDF**
-- Creator rail: Connect → Fingerprint → Share → Sign → Seal → Verify
-- Signer rail: Connect → Sign → Done
+- Creator rail: Fingerprint → Sign → Share → Seal → Verify (login is a gate, not a step)
+- Signer rail: Sign → Done (login is a gate on submit)
 - Verifier: Verify only (wallet optional)
 - Shell: home, pricing, privacy, agreements, blog, 404
 

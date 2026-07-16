@@ -21,15 +21,13 @@ function isStepDone(
   role: PathRole,
   stageId: JourneyStepId,
   step: JourneyStepId,
-  account: boolean,
+  _account: boolean,
   doc: JourneyDoc | null,
-  sharedAck: boolean,
 ): boolean {
   if (step === 'done') return true
 
   if (role === 'signer') {
-    if (stageId === 'connect') return account && step !== 'connect'
-    // step === 'done' already returned true above; here mark sign complete when past it
+    // When step is 'done', early return above marks all stages complete
     if (stageId === 'sign') return Boolean(doc && (allSigned(doc) || doc.sealed))
     if (stageId === 'done') return Boolean(doc?.sealed)
     return false
@@ -39,18 +37,18 @@ function isStepDone(
     return false
   }
 
-  // Creator path
-  if (!account && stageId === 'connect') return false
-  if (account && stageId === 'connect') return step !== 'connect'
-  if (doc && (stageId === 'connect' || stageId === 'fingerprint')) return true
-  if (doc && stageId === 'share' && (sharedAck || signedCount(doc) > 0 || doc.directSeal))
+  // Creator path: Fingerprint → Sign → Share → Seal → Verify (login is not a stage)
+  if (doc && stageId === 'fingerprint') return true
+  // Sign is done once the creator has signed (or direct seal / everyone done)
+  if (doc && stageId === 'sign' && (signedCount(doc) > 0 || doc.directSeal || allSigned(doc)))
     return true
-  if (doc && stageId === 'sign' && allSigned(doc)) return true
+  // Share is done once everyone signed (moved on to seal) or direct seal
+  if (doc && stageId === 'share' && (allSigned(doc) || doc.directSeal)) return true
   if (doc?.sealed && stageId === 'seal') return true
   return false
 }
 
-export function StageRail({ role, step, account, doc, sharedAck }: StageRailProps) {
+export function StageRail({ role, step, account, doc, sharedAck: _sharedAck }: StageRailProps) {
   const stages = stagesForRole(role)
   const railRef = useRef<HTMLElement>(null)
   const itemRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -102,7 +100,7 @@ export function StageRail({ role, step, account, doc, sharedAck }: StageRailProp
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [measure, step, account, doc, sharedAck, role, stages.length])
+  }, [measure, step, account, doc, role, stages.length])
 
   const ariaLabel =
     role === 'signer'
@@ -123,7 +121,7 @@ export function StageRail({ role, step, account, doc, sharedAck }: StageRailProp
       />
       {stages.map((s, i) => {
         const current = i === currentIndex
-        const done = isStepDone(role, s.id, step, account, doc, sharedAck) && !current
+        const done = isStepDone(role, s.id, step, account, doc) && !current
         return (
           <div
             key={s.id}

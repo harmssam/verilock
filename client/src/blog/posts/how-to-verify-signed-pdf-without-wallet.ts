@@ -65,7 +65,7 @@ export const post: BlogPost = {
     {
       type: 'ul',
       items: [
-        'From Journey home, choose the verify path (or open the verify link you were given).',
+        'On the home screen, choose Verify a PDF (or open the verify link you were given).',
         'Load the agreement reference if it is not already in the URL.',
         'Select the PDF from your device. Fingerprinting runs locally in the browser.',
         'Read the result: match means integrity holds against the sealed fingerprint; no match means the bytes differ.',

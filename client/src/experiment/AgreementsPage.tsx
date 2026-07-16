@@ -22,7 +22,12 @@ import {
 import { api } from '../api'
 import { shortHash } from '../pdf/hashPdf'
 import { documentTypeLabel, type SealDocument } from '../types'
-import { journeyLoginEntryLabels, type JourneyConnectMode } from './journeyConnectUi'
+import {
+  journeyLoginEntryLabels,
+  journeyLoginNeedsSheet,
+  type JourneyConnectMode,
+  type JourneyConnectRequest,
+} from './journeyConnectUi'
 import { LoginSheet } from './LoginSheet'
 
 interface AgreementsPageProps {
@@ -30,7 +35,7 @@ interface AgreementsPageProps {
   address: string | null
   connecting: boolean
   connectMode: JourneyConnectMode
-  onConnect: () => void
+  onConnect: (options?: JourneyConnectRequest) => void
   onOpen: (doc: SealDocument, preferSeal?: boolean) => void
   onCreate: () => void
 }
@@ -53,10 +58,11 @@ function AgreementsLoginGate({
 }: {
   connectMode: JourneyConnectMode
   connecting: boolean
-  onConnect: () => void
+  onConnect: (options?: JourneyConnectRequest) => void
   entry: { idle: string; busy: string }
 }) {
   const [loginOpen, setLoginOpen] = useState(false)
+  const needsSheet = journeyLoginNeedsSheet(connectMode)
 
   return (
     <section className="agreements-page card" aria-label="Your agreements">
@@ -68,15 +74,31 @@ function AgreementsLoginGate({
           </p>
         </div>
       </header>
-      {!loginOpen ? (
+      {!needsSheet || !loginOpen ? (
         <button
           type="button"
           data-login-trigger
-          className="btn btn-primary"
-          onClick={() => setLoginOpen(true)}
+          className={`btn btn-primary${connecting ? ' btn--busy' : ''}`}
+          disabled={connecting}
+          onClick={() => {
+            if (!needsSheet) {
+              onConnect()
+              return
+            }
+            setLoginOpen(true)
+          }}
         >
-          <NimiqHexagonIcon size={16} />
-          {entry.idle}
+          {connecting ? (
+            <>
+              <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+              {entry.busy}
+            </>
+          ) : (
+            <>
+              <NimiqHexagonIcon size={16} />
+              {entry.idle}
+            </>
+          )}
         </button>
       ) : (
         <LoginSheet
