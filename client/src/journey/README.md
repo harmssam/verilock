@@ -43,5 +43,5 @@ client/src/journey/
 
 ```bash
 npm run build --prefix client               # → client/dist
-npm run test:service-b --prefix client
+npm run test:production --prefix client
 ```

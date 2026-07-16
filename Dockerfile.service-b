@@ -1,4 +1,4 @@
-# Alias of production Dockerfile (journey UI as SPA root).
+# Alias of Dockerfile (production SPA packaging).
 # Kept so existing Railway env RAILWAY_DOCKERFILE_PATH=Dockerfile.service-b keeps working.
 # Prefer Dockerfile for new setup.
 

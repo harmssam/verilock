@@ -21,7 +21,14 @@
 npm run dev                 # server + client (:5176)
 npm run dev --prefix client # client only
 npm run build --prefix client
-npm run test:service-b --prefix client
+npm run test:production --prefix client
+```
+
+**Legacy aliases** (same as above; do not invent new “service-b” workflows):
+
+```bash
+npm run test:service-b --prefix client   # → test:production
+npm run package:service-b --prefix client  # → package.mjs
 ```
 
 **Do not** look for parallel product UIs:
@@ -48,7 +55,7 @@ vite --config vite.experiment.config.ts  # removed
 - Product modules under `client/src/journey/`
 - Home under `client/src/landing/`
 - Dev URL: port **5176** (or next free), `index.html`
-- Build: `package-service-b.mjs` / `vite.config.ts` → `client/dist`
+- Build: `client/scripts/package.mjs` / `vite.config.ts` → `client/dist`
 
 ### Shared vs archive-only
 

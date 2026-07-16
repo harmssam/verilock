@@ -3,6 +3,7 @@ node_modules/
 .railway/
 dist/
 client/dist/
+client/dist-build/
 client/dist-journey/
 client/dist-experiment/
 client/dist-landing-redesign/

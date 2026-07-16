@@ -1,6 +1,6 @@
-# Production — journey UI at SPA root.
-# VeriLock-Journey may use config-as-code path /railway.service-b.toml or
-# RAILWAY_DOCKERFILE_PATH=Dockerfile.service-b (same journey packaging).
+# Production SPA (light shell + journey) at root.
+# VeriLock-Journey may still use railway.service-b.toml or
+# RAILWAY_DOCKERFILE_PATH=Dockerfile.service-b (identical packaging aliases).
 
 [build]
 builder = "nixpacks"

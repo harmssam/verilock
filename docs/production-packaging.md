@@ -1,8 +1,8 @@
-# Production UI — single SPA
+# Production packaging — single SPA
 
 **One production frontend.** Default `npm run build`, `Dockerfile`, and `railway.toml` package the light shell + journey product flow into `client/dist`.
 
-The old dual-service names (`service-b`, `package:service-b`, `Dockerfile.service-b`) remain as **aliases** so existing Railway settings keep working.
+Legacy dual-service names (`service-b`, `package:service-b`, `Dockerfile.service-b`, `railway.service-b.toml`) remain as **aliases** so existing Railway settings keep working. Prefer the plain names below for new work.
 
 ## Live (Railway project `Verilock`)
 
@@ -23,10 +23,11 @@ railway up --service VeriLock-Journey --ci -y
 |---------|--------|
 | Build (root) | `npm run build` |
 | Client only | `npm run build --prefix client` |
+| Package script | `client/scripts/package.mjs` |
 | Docker | `Dockerfile` (or alias `Dockerfile.service-b`) |
 | Config-as-code | `railway.toml` (or alias `railway.service-b.toml`) |
 | Output | `client/dist/index.html` = production shell (`data-verilock-surface="journey"`) |
-| Vite config | `client/vite.config.ts` (`base: '/'`, `outDir: dist-journey` then copy → `dist`) |
+| Vite config | `client/vite.config.ts` (`base: '/'`, `outDir: dist-build` then copy → `dist`) |
 | Entry | `client/index.html` → `src/main.tsx` → `App` |
 
 ### Layout
@@ -43,8 +44,8 @@ railway up --service VeriLock-Journey --ci -y
 npm run build --prefix client
 # → client/dist/index.html boots production shell
 
-npm run test:service-b --prefix client
-VERIFY_DIST=1 npm run test:service-b --prefix client
+npm run test:production --prefix client
+VERIFY_DIST=1 npm run test:production --prefix client
 
 npm run start:prod-local
 # → http://localhost:3003/
@@ -53,7 +54,7 @@ npm run start:prod-local
 ### Archive (recovery only)
 
 Snapshots under `client/src/archive/` (pre-journey SPA, navy shell, orphan components).  
-**Do not** ship archive trees as production.
+**Do not** ship archive trees as production. Not on GitHub (gitignored).
 
 ### Notes
 
