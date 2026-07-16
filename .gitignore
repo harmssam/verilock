@@ -45,6 +45,8 @@ server/src/blogStudioGrok.ts
 server/src/blogStudioRoutes.ts
 server/src/xPostStudio.ts
 server/src/xPostStudioRoutes.ts
+server/src/xPostSchedule.ts
+server/src/xPostTwitter.ts
 server/scripts/e2e-blog-studio.mjs
 server/data/blog-studio-drafts/
 server/data/x-post-studio/
