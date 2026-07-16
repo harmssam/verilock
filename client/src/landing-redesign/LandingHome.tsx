@@ -101,6 +101,33 @@ function buildHeroClaims(): HeroClaim[] {
   ]
 }
 
+/**
+ * Image placement tools are designer chrome only.
+ * Visible when `import.meta.env.DEV` and `?place=1` (never on default home).
+ */
+function usePlaceModeAllowed(): boolean {
+  const [allowed, setAllowed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    if (!import.meta.env.DEV) return false
+    return new URLSearchParams(window.location.search).get('place') === '1'
+  })
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      setAllowed(false)
+      return
+    }
+    const sync = () => {
+      setAllowed(new URLSearchParams(window.location.search).get('place') === '1')
+    }
+    sync()
+    window.addEventListener('popstate', sync)
+    return () => window.removeEventListener('popstate', sync)
+  }, [])
+
+  return allowed
+}
+
 const ROTATE_MS = 4800
 const FADE_MS = 220
 
@@ -176,10 +203,10 @@ export function LandingHome({
 }: LandingHomeProps) {
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [howOpen, setHowOpen] = useState(false)
+  const placeModeAllowed = usePlaceModeAllowed()
   const [placeMode, setPlaceMode] = useState(false)
-  const [placements, setPlacements] = useState<PathPlacements>(() =>
-    typeof window !== 'undefined' ? loadPathPlacementsFromStorage() : clonePathPlacements(),
-  )
+  /** Locked defaults unless place mode is allowed (dev + ?place=1). */
+  const [placements, setPlacements] = useState<PathPlacements>(() => clonePathPlacements())
   const [copyState, setCopyState] = useState<'idle' | 'ok' | 'err'>('idle')
   const dragRef = useRef<{
     role: PathRole
@@ -192,9 +219,20 @@ export function LandingHome({
   const { claim, visible: claimVisible } = useHeroClaims()
   const ClaimIcon = claim.icon
 
+  // Force place mode off when the gate closes (query removed / production build).
   useEffect(() => {
+    if (!placeModeAllowed) {
+      setPlaceMode(false)
+      setPlacements(clonePathPlacements())
+      return
+    }
+    setPlacements(loadPathPlacementsFromStorage())
+  }, [placeModeAllowed])
+
+  useEffect(() => {
+    if (!placeModeAllowed) return
     savePathPlacementsToStorage(placements)
-  }, [placements])
+  }, [placements, placeModeAllowed])
 
   const setCardPlacement = useCallback((role: PathRole, next: Partial<ImagePlacement>) => {
     setPlacements(prev => ({
@@ -285,21 +323,20 @@ export function LandingHome({
 
   return (
     <div className="lr-home">
-      {/* DocuSeal-style hero: headline + visual, then our three paths */}
+      {/* Task-first hero: local fingerprint + on-chain hash, then three paths */}
       <section className="lr-hero-band" aria-labelledby="lr-hero-headline">
         <div className="lr-hero-copy">
-          <p className="lr-hero-eyebrow">PDF seals · multi-party · Nimiq</p>
           <h1 id="lr-hero-headline" className="lr-hero-headline">
-            Document seals
-            <span className="lr-hero-headline-em"> for everyone</span>
+            Fingerprint a PDF.{' '}
+            <span className="lr-hero-headline-em">Lock the proof on Nimiq.</span>
           </h1>
           <p className="lr-hero-sub">
-            Fingerprint locally, co-sign with wallets, lock a permanent proof on Nimiq.
+            Hash stays in the browser. Co-sign with wallets. Seal only the fingerprint on-chain.
+            The file never uploads.
           </p>
           {/*
-            One primary CTA only — the three roles live in the path cards below.
-            Duplicating Create / Invited / Verify here made the page feel like two
-            identical sections stacked.
+            One primary CTA only. Paths below cover Create / Invited / Verify.
+            Secondary jumps to path picker for co-signers and verifiers.
           */}
           <div className="lr-hero-ctas">
             <button
@@ -311,7 +348,7 @@ export function LandingHome({
               <ArrowRight size={16} strokeWidth={2.25} aria-hidden />
             </button>
             <a className="lr-cta lr-cta--ghost" href="#lr-paths">
-              All paths
+              Sign or verify
             </a>
           </div>
           <p
@@ -401,45 +438,51 @@ export function LandingHome({
           </p>
         </div>
 
-        <div className="lr-place-bar" role="region" aria-label="Path image placement">
-          <button
-            type="button"
-            className={`lr-place-toggle${placeMode ? ' lr-place-toggle--on' : ''}`}
-            aria-pressed={placeMode}
-            onClick={() => setPlaceMode(v => !v)}
-          >
-            <Move size={15} strokeWidth={2} aria-hidden />
-            {placeMode ? 'Placing images' : 'Place images'}
-          </button>
-          {placeMode && (
-            <>
-              <p className="lr-place-hint">
-                Drag to pan, scroll to zoom, or use sliders. Values save in this browser; copy to
-                lock into <code>pathMedia.ts</code>.
-              </p>
-              <div className="lr-place-actions">
-                <button type="button" className="lr-place-btn" onClick={resetPlacements}>
-                  Reset defaults
-                </button>
-                <button type="button" className="lr-place-btn lr-place-btn--primary" onClick={() => void copyPlacements()}>
-                  {copyState === 'ok' ? (
-                    <>
-                      <Check size={14} strokeWidth={2.25} aria-hidden />
-                      Copied
-                    </>
-                  ) : copyState === 'err' ? (
-                    'Copy failed'
-                  ) : (
-                    <>
-                      <Copy size={14} strokeWidth={2} aria-hidden />
-                      Copy PATH_PLACEMENTS
-                    </>
-                  )}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+        {placeModeAllowed && (
+          <div className="lr-place-bar" role="region" aria-label="Path image placement (dev only)">
+            <button
+              type="button"
+              className={`lr-place-toggle${placeMode ? ' lr-place-toggle--on' : ''}`}
+              aria-pressed={placeMode}
+              onClick={() => setPlaceMode(v => !v)}
+            >
+              <Move size={15} strokeWidth={2} aria-hidden />
+              {placeMode ? 'Placing images' : 'Place images'}
+            </button>
+            {placeMode && (
+              <>
+                <p className="lr-place-hint">
+                  Dev only (<code>?place=1</code>). Drag to pan, scroll to zoom, or use sliders.
+                  Values save in this browser; copy to lock into <code>pathMedia.ts</code>.
+                </p>
+                <div className="lr-place-actions">
+                  <button type="button" className="lr-place-btn" onClick={resetPlacements}>
+                    Reset defaults
+                  </button>
+                  <button
+                    type="button"
+                    className="lr-place-btn lr-place-btn--primary"
+                    onClick={() => void copyPlacements()}
+                  >
+                    {copyState === 'ok' ? (
+                      <>
+                        <Check size={14} strokeWidth={2.25} aria-hidden />
+                        Copied
+                      </>
+                    ) : copyState === 'err' ? (
+                      'Copy failed'
+                    ) : (
+                      <>
+                        <Copy size={14} strokeWidth={2} aria-hidden />
+                        Copy PATH_PLACEMENTS
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className={`lr-paths${placeMode ? ' lr-paths--place' : ''}`} role="list">
           {PATHS.map(path => {
