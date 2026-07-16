@@ -1,6 +1,7 @@
 /**
  * How VeriLock works — shell home accordion (light production SPA).
  * Stages/copy match the product flow; quieter motion for the landing surface.
+ * Beat animations start when each step scrolls into view and play once (no loop).
  */
 import {
   FileText,
@@ -9,11 +10,12 @@ import {
   Link2,
   Lock,
   PenLine,
+  Search,
   ShieldCheck,
   Wallet,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
 import type { JourneyStage, JourneyStepId, PathRole } from '../journey/types'
 import { CREATOR_STAGES, stagesForRole } from '../journey/types'
@@ -31,7 +33,7 @@ const STEP_ICONS: Record<JourneyStepId, LucideIcon> = {
   share: Link2,
   sign: PenLine,
   seal: Lock,
-  verify: ShieldCheck,
+  verify: Search,
   done: ShieldCheck,
 }
 
@@ -88,54 +90,78 @@ function BeatVisual({ stageId, active }: { stageId: JourneyStepId; active: boole
         </div>
       )
     case 'fingerprint':
+      /* PDF → fingerprint: file icon, arrow, fingerprint (icons alone, no boxes) */
       return (
         <div className={`lr-how-visual lr-how-visual--fingerprint${play}`} aria-hidden>
-          <span className="lr-how-doc">
-            <FileText size={20} strokeWidth={2} />
-            <span className="lr-how-scan" />
-          </span>
-          <span className="lr-how-hash">
-            <span />
-            <span />
-            <span />
-            <span />
-          </span>
-          <Fingerprint className="lr-how-main-icon lr-how-main-icon--corner" size={18} strokeWidth={2.25} />
+          <div className="lr-fp">
+            <span className="lr-fp-file">
+              <FileText size={26} strokeWidth={1.9} />
+            </span>
+            <svg
+              className="lr-fp-arrow"
+              viewBox="0 0 28 16"
+              fill="none"
+              aria-hidden
+            >
+              <path
+                className="lr-fp-arrow-line"
+                pathLength={100}
+                d="M2 8 H20"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <path
+                className="lr-fp-arrow-head"
+                d="M17 3.5 L22.5 8 L17 12.5"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="lr-fp-print">
+              <Fingerprint size={26} strokeWidth={1.9} />
+            </span>
+          </div>
         </div>
       )
     case 'share':
-      /* One PDF fans out to three co-signers (three paths → three people) */
+      /*
+       * One PDF fans out to three co-signers.
+       * Paths + person dots share one SVG viewBox so endpoints stay aligned.
+       * Doc is the FileText icon itself (no surrounding box).
+       */
       return (
         <div className={`lr-how-visual lr-how-visual--share${play}`} aria-hidden>
           <div className="lr-share">
             <span className="lr-share-doc">
-              <FileText size={15} strokeWidth={2.25} />
+              <FileText size={24} strokeWidth={1.9} />
             </span>
 
-            <svg className="lr-share-paths" viewBox="0 0 48 56" fill="none" aria-hidden>
-              {/* pathLength=100 → stroke-dasharray/offset 100 for reliable draw */}
+            <svg
+              className="lr-share-diagram"
+              viewBox="0 0 48 56"
+              fill="none"
+              aria-hidden
+            >
               <path
                 className="lr-share-path lr-share-path--1"
                 pathLength={100}
-                d="M6 28 C18 28 22 10 40 10"
+                d="M8 28 C20 28 24 12 38 12"
               />
               <path
                 className="lr-share-path lr-share-path--2"
                 pathLength={100}
-                d="M6 28 H40"
+                d="M8 28 H38"
               />
               <path
                 className="lr-share-path lr-share-path--3"
                 pathLength={100}
-                d="M6 28 C18 28 22 46 40 46"
+                d="M8 28 C20 28 24 44 38 44"
               />
+              <circle className="lr-share-person lr-share-person--1" cx={42} cy={12} r={3.4} />
+              <circle className="lr-share-person lr-share-person--2" cx={42} cy={28} r={3.4} />
+              <circle className="lr-share-person lr-share-person--3" cx={42} cy={44} r={3.4} />
             </svg>
-
-            <div className="lr-share-people">
-              <span className="lr-share-person lr-share-person--1" />
-              <span className="lr-share-person lr-share-person--2" />
-              <span className="lr-share-person lr-share-person--3" />
-            </div>
           </div>
         </div>
       )
@@ -149,6 +175,11 @@ function BeatVisual({ stageId, active }: { stageId: JourneyStepId; active: boole
         </div>
       )
     case 'seal':
+      /*
+       * Regular flat-top hex + padlock. Shackle behind opaque body.
+       * Left leg is shorter so raised = open padlock; drop = locked.
+       * Plays once on scroll-in.
+       */
       return (
         <div className={`lr-how-visual lr-how-visual--seal${play}`} aria-hidden>
           <span className="lr-how-chain">
@@ -157,26 +188,95 @@ function BeatVisual({ stageId, active }: { stageId: JourneyStepId; active: boole
             <span />
           </span>
           <span className="lr-how-lock-wrap">
-            <img
-              className="lr-how-lock"
-              src="/verilock-mark.png"
-              alt=""
-              width={40}
-              height={40}
-            />
+            <svg
+              className="lr-how-seal-svg"
+              viewBox="0 0 48 48"
+              fill="none"
+              aria-hidden
+            >
+              {/*
+                Regular flat-top hexagon (center 24,24, R=18).
+                Vertices at 0°/60°/… so top & bottom edges are horizontal,
+                width:height = 2 : √3.
+              */}
+              <path
+                className="lr-how-seal-hex"
+                d="M42 24 L33 39.59 L15 39.59 L6 24 L15 8.41 L33 8.41 Z"
+              />
+              <g className="lr-how-padlock">
+                {/*
+                  Shackle first (under body). Right leg long (hinge in body);
+                  left leg short so when raised it clears the body = unlocked.
+                */}
+                <g className="lr-how-pad-shackle-g">
+                  <path
+                    className="lr-how-pad-shackle"
+                    d="M19.25 23.4 V16.4 A4.75 4.75 0 0 1 28.75 16.4 V28.2"
+                    strokeWidth="2.5"
+                    strokeLinecap="butt"
+                    strokeLinejoin="round"
+                  />
+                </g>
+                {/* Opaque body covers shackle feet when locked */}
+                <rect
+                  className="lr-how-pad-body"
+                  x="16.5"
+                  y="22"
+                  width="15"
+                  height="13"
+                  rx="2.4"
+                />
+                <circle className="lr-how-pad-keyhole" cx="24" cy="27.2" r="1.4" />
+                <path
+                  className="lr-how-pad-keyslot"
+                  d="M24 28.3 V31.4"
+                  strokeWidth="1.55"
+                  strokeLinecap="round"
+                />
+              </g>
+            </svg>
           </span>
         </div>
       )
     case 'verify':
     case 'done':
+      /* Real magnifying-glass shape (lens + handle) drifts over the document */
       return (
         <div className={`lr-how-visual lr-how-visual--verify${play}`} aria-hidden>
-          <span className="lr-how-doc lr-how-doc--sm">
-            <FileText size={16} strokeWidth={2} />
-          </span>
-          <span className="lr-how-match">
-            <ShieldCheck size={20} strokeWidth={2.25} />
-          </span>
+          <div className="lr-how-inspect">
+            <span className="lr-how-inspect-doc">
+              <span className="lr-how-inspect-lines" aria-hidden>
+                <i />
+                <i />
+                <i />
+                <i />
+              </span>
+            </span>
+            <svg
+              className="lr-how-inspect-glass"
+              viewBox="0 0 40 40"
+              fill="none"
+              aria-hidden
+            >
+              {/* Lens rim */}
+              <circle
+                className="lr-how-inspect-rim"
+                cx="16"
+                cy="16"
+                r="10.5"
+                strokeWidth="2.4"
+              />
+              {/* Slight glass fill */}
+              <circle className="lr-how-inspect-lens" cx="16" cy="16" r="8.2" />
+              {/* Handle */}
+              <path
+                className="lr-how-inspect-handle"
+                d="M24.2 24.2 L34 34"
+                strokeWidth="3.2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
         </div>
       )
     default:
@@ -192,17 +292,57 @@ function StoryBeat({
   stage,
   index,
   total,
-  revealed,
+  open,
 }: {
   stage: JourneyStage
   index: number
   total: number
-  revealed: boolean
+  open: boolean
 }) {
   const Icon = STEP_ICONS[stage.id] ?? HelpCircle
+  const beatRef = useRef<HTMLLIElement>(null)
+  const [revealed, setRevealed] = useState(false)
+
+  useEffect(() => {
+    if (!open) {
+      setRevealed(false)
+      return
+    }
+
+    if (prefersReducedMotion()) {
+      setRevealed(true)
+      return
+    }
+
+    const el = beatRef.current
+    if (!el) return
+
+    /**
+     * Play each beat’s visual only when it enters the viewport while scrolling.
+     * rootMargin bottom pulls the trigger slightly earlier so the draw finishes
+     * while the card is still comfortably on screen.
+     */
+    const io = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          setRevealed(true)
+          io.disconnect()
+          return
+        }
+      },
+      {
+        threshold: 0.45,
+        rootMargin: '0px 0px -12% 0px',
+      },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [open, stage.id])
 
   return (
     <li
+      ref={beatRef}
       className={`lr-how-beat${revealed ? ' lr-how-beat--in' : ''}`}
       style={{ ['--lr-how-i' as string]: index }}
     >
@@ -229,39 +369,6 @@ function StoryBeat({
 
 export function LandingHowItWorks({ role, open, onToggle }: LandingHowItWorksProps) {
   const stages = role ? stagesForRole(role) : CREATOR_STAGES
-  /** Bitmask / set of revealed indices — sequential when accordion opens */
-  const [revealed, setRevealed] = useState<Set<number>>(() => new Set())
-
-  const stageCount = stages.length
-
-  useEffect(() => {
-    if (!open) {
-      setRevealed(new Set())
-      return
-    }
-
-    if (prefersReducedMotion()) {
-      setRevealed(new Set(Array.from({ length: stageCount }, (_, i) => i)))
-      return
-    }
-
-    const timers: number[] = []
-    // Lead-in, then one beat every ~110ms (calm stagger)
-    for (let i = 0; i < stageCount; i++) {
-      const id = window.setTimeout(() => {
-        setRevealed(prev => {
-          const next = new Set(prev)
-          next.add(i)
-          return next
-        })
-      }, 80 + i * 110)
-      timers.push(id)
-    }
-
-    return () => {
-      for (const id of timers) window.clearTimeout(id)
-    }
-  }, [open, stageCount])
 
   return (
     <section className={`lr-how${open ? ' lr-how--open' : ''}`}>
@@ -292,7 +399,7 @@ export function LandingHowItWorks({ role, open, onToggle }: LandingHowItWorksPro
                 stage={stage}
                 index={i}
                 total={stages.length}
-                revealed={revealed.has(i)}
+                open={open}
               />
             ))}
           </ol>
