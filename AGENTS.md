@@ -13,7 +13,7 @@
 | **PRIMARY Vite config** | `client/vite.config.ts` | Default `npm run dev` / `npm run build` |
 | **PRIMARY production URL** | `https://verilock.online` | Packaged into `client/dist` as root SPA |
 | **Shared libraries** | `client/src/*.ts(x)` except archive | `nimiq.ts`, `api.ts`, seal helpers, pricing, etc. |
-| **ARCHIVE (read-only)** | `client/src/archive/` | Pre-journey SPA, navy shell snapshot, orphans — do not extend |
+| **LOCAL ONLY (gitignored)** | `client/src/archive/`, blog trees | Historical snapshots + blog content — never push |
 
 ### Commands (always prefer these)
 
@@ -68,8 +68,8 @@ Archive-only (do not invest product work without an explicit request):
 
 ### Blog
 
-- Journey blog: `client/src/blog/` + `BlogPage` under `/blog`.
-- Author rules (no site-name CTAs, no em dashes, promo seal fee CTAs): **`client/src/blog/README.md`**.
+- **Not in production / not on GitHub.** Blog content, art, and `BlogPage` are local-only (gitignored under `client/src/blog/`, `client/public/blog/`).
+- Do not re-add `/blog` routes, nav, or sitemap entries unless the user explicitly asks.
 
 ### If the user says “the app” / “production” / “VeriLock UI”
 

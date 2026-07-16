@@ -91,9 +91,7 @@ export function resolveJourneyIntent(): PathRole | null {
     pathname === '/privacy' ||
     pathname === '/security' ||
     pathname === '/agreements' ||
-    pathname.startsWith('/agreements/') ||
-    pathname === '/blog' ||
-    pathname.startsWith('/blog/')
+    pathname.startsWith('/agreements/')
   ) {
     clearJourneyIntent()
     return null

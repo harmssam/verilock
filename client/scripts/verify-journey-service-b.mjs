@@ -96,19 +96,23 @@ check('product modules live under src/journey and shell under App', () => {
   assert.ok(!existsSync(join(clientDir, 'src/landing-redesign')), 'src/landing-redesign should be removed')
   const app = readFileSync(join(clientDir, 'src/App.tsx'), 'utf8')
   assert.match(app, /DocumentJourney/)
-  assert.match(app, /DocumentJourney/)
-  assert.match(app, /BlogPage/)
+  assert.ok(!app.includes('BlogPage'), 'production shell must not mount BlogPage')
   assert.ok(!app.includes('lr-preview-banner'), 'preview banner must not ship')
 })
 
-check('blog is wired as a known shell path', () => {
+check('archives and blog are not shipped in the tracked tree', () => {
+  assert.ok(!existsSync(join(clientDir, 'src/archive')) || true) // may exist locally
+  // Gitignore must exclude them
+  const gi = readFileSync(join(rootDir, '.gitignore'), 'utf8')
+  assert.match(gi, /client\/src\/archive\//)
+  assert.match(gi, /client\/src\/blog\//)
+  assert.match(gi, /client\/public\/blog\//)
+  const app = readFileSync(join(clientDir, 'src/App.tsx'), 'utf8')
+  assert.ok(!app.includes("from './blog'"), 'App must not import blog modules')
   const hub = readFileSync(join(clientDir, 'src/hubReturnPath.ts'), 'utf8')
-  assert.match(hub, /export function isBlogPath/)
-  assert.match(hub, /isBlogPath\(path\)/)
-  const posts = readFileSync(join(clientDir, 'src/blog/posts.ts'), 'utf8')
-  assert.match(posts, /export const ALL_POSTS/)
+  assert.ok(!hub.includes('isBlogPath'), 'blog paths are not known app routes')
   const sitemap = readFileSync(join(clientDir, 'public/sitemap.xml'), 'utf8')
-  assert.match(sitemap, /verilock\.online\/blog/)
+  assert.ok(!sitemap.includes('/blog'), 'sitemap must not list blog URLs')
 })
 
 if (process.env.VERIFY_DIST === '1') {

@@ -5,6 +5,7 @@ dist/
 client/dist/
 client/dist-journey/
 client/dist-experiment/
+client/dist-landing-redesign/
 data/
 *.db
 *.db-wal
@@ -15,7 +16,25 @@ data/
 !**/.env.example
 .DS_Store
 
-# Local design assets (production logos live in client/public/verilock-mark*)
+# Local scratch / review captures (never ship)
+tmp/
+tmp-*.png
+tmp-*.jpg
+**/tmp-*.png
+**/tmp-*.jpg
+14.jpg
+client/tmp-home.png
+
+# Historical UI snapshots — keep locally, not in GitHub
+client/src/archive/
+
+# Product blog (content + art + BlogPage) — local only, not production SPA
+client/src/blog/
+client/public/blog/
+client/src/journey/BlogPage.tsx
+client/src/journey/BlogPage.css
+
+# Local design / promo assets (production logos live in client/public/verilock-mark*)
 branding/
 logo-ideas/
 
