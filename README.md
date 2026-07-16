@@ -6,8 +6,8 @@ Built for the [Mini Apps Competition](https://miniappscompetition.com/).
 
 **Live demo:** [https://verilock.online/](https://verilock.online/) (Railway)
 
-> **UI source of truth:** **Journey Edition** in `client/src/experiment/` (default `npm run dev` / `npm run build`).  
-> The pre-journey SPA (`client/src/App.tsx`) is legacy/recovery only. Contributors and agents: see **`AGENTS.md`**.
+> **UI source of truth:** production SPA — `client/src/App.tsx` (shell) + `client/src/landing/` + `client/src/journey/`  
+> (default `npm run dev` / `npm run build`). Historical UIs live only under `client/src/archive/`. See **`AGENTS.md`**.
 
 ## What it does
 
@@ -31,10 +31,8 @@ npm install --prefix client
 SKIP_CHAIN_VERIFY=true npm run dev
 ```
 
-- **UI:** http://localhost:5176 (journey SPA — production UI)
+- **UI:** http://localhost:5176 (production SPA)
 - **API:** http://localhost:3002/api/health
-
-Legacy (pre-journey) UI: `npm run dev:legacy` → http://localhost:5174
 
 ### Try in Nimiq Pay
 

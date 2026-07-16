@@ -58,7 +58,7 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 | Reordering layout **within** an existing surface | Removing a path, step, route, control, or gate |
 | Clearer copy that preserves meaning | Changing business rules (fees, sign counts, privacy model) |
 | Same components, better hierarchy | Merging Create/Invited/Verify into a different IA |
-| Shared-module restyles that Journey already uses | Rebuilding legacy `App.tsx` as the product shell |
+| Shared-module restyles that Journey already uses | Restoring archive shells as production |
 
 ### Hard rules
 
@@ -93,11 +93,11 @@ If a visual idea conflicts with a row above, **drop the visual idea**, not the f
 
 ---
 
-## Feature inventory (source of truth: Journey Edition)
+## Feature inventory (source of truth: production SPA)
 
-Production UI: `client/src/experiment/` · entry `ExperimentApp` · styles `ExperimentApp.css` + `index.css` tokens.
+Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home) · `client/src/journey/` (DocumentJourney + dock) · styles `App.css` + `journey/Journey.css` + `index.css` tokens.
 
-### Shell (`ExperimentApp`)
+### Shell (`App`)
 
 | Feature | Notes |
 |---------|--------|
@@ -105,14 +105,15 @@ Production UI: `client/src/experiment/` · entry `ExperimentApp` · styles `Expe
 | Nav: Agreements | Shown when wallet connected |
 | Nav: Pricing | Shown when credits chip not already covering pricing |
 | Nav: Blog | Index + posts |
-| Nav: Security | Production: footer only. Landing redesign: header on desktop, footer on narrow |
+| Nav: Security | Header on desktop; footer on narrow (with Blog on very small screens) |
 | Account menu | Login sheet, address, copy, agreements, credits → pricing, disconnect |
 | Credits balance chip | When credits enabled and logged in |
 | Wallet status / error banner | Connect and payment errors |
 | Back to home | On pricing / privacy / security / agreements / blog / 404 |
-| Journey keep-alive | Journey stays mounted (hidden) when visiting other shell screens |
+| Journey keep-alive | DocumentJourney stays mounted (hidden) when visiting other shell screens |
 | Stripe checkout return | Mint/refresh credits after card purchase |
 | Footer | Tagline + Blog + Security + Privacy Policy |
+| Home path picker | Light landing (`LandingHome`) — not the navy welcome strip |
 
 ### Routes
 
@@ -189,33 +190,22 @@ Wallet login (LoginSheet / Hub / Pay) is a **gate** when creating, signing, or s
 
 ### Explicitly out of redesign scope (do not reintroduce as primary)
 
-- Legacy step-list SPA (`client/src/App.tsx`) as production shell
-- Archive UI under `client/src/archive/`
+- Archive UI under `client/src/archive/` (pre-journey SPA, navy shell snapshot)
 - New email product redesign beyond existing `FEATURES.emailNotifyUi` gate
 
 ---
 
-## Landing redesign preview (non-production)
+## Brand decision (production)
 
-Parallel UI only. **Does not replace Journey.**
+**Light DocuSeal-style shell is production** (`App` + `landing/`).
 
-| | |
-|--|--|
-| Path | `client/src/landing-redesign/` |
-| Entry | `client/landing-redesign.html` |
-| Dev | `npm run dev:landing-redesign --prefix client` → **:5178** |
-| Rule | Original `experiment/*` files are **not** edited; redesign imports them |
-| Parity | Same shell routes + three paths + trust + how-it-works; agreements via `/agreements` (no home strip) |
-| After path pick | Hands off to existing `DocumentJourney` (original step UI) |
+| Surface | Status |
+|---------|--------|
+| Light shell + home | Production (`npm run dev` / `npm run build` / verilock.online) |
+| DocumentJourney dock / stage | Same product flow; may still use navy task CSS until a full dock restyle |
+| Navy `ExperimentApp` shell | Archived under `client/src/archive/navy-shell-2026-07-16/` |
 
-### Brand decision (locked until revisited)
-
-**Light DocuSeal-style shell stays preview forever** unless product owners explicitly adopt it as the production register.
-
-- Production remains **deep navy task UI** (Journey Edition + `docs/journey-anti-slop.md` tokens).
-- Landing redesign may keep cream/white surfaces **only** on `:5178` / this tree.
-- Do **not** merge the light shell into `client/src/experiment/` or default `npm run build` without an explicit ship decision.
-- Path image placement tools are **dev + `?place=1` only** (never default product chrome).
+Agreements open via header / AccountMenu → `/agreements` (no quiet home strip).
 
 ## Design principles (parity-safe)
 

@@ -2,12 +2,11 @@ import { Eraser } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 
 interface SignaturePadProps {
-  /** Called with PNG blob when ink changes; null when cleared. */
-  onChange: (blob: Blob | null) => void
+  onChange: (hasInk: boolean) => void
   disabled?: boolean
 }
 
-/** Draw-to-sign pad - image stays local until submit. */
+/** Lightweight draw-to-sign pad for the experiment (local only). */
 export function SignaturePad({ onChange, disabled }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawing = useRef(false)
@@ -69,16 +68,8 @@ export function SignaturePad({ onChange, disabled }: SignaturePadProps) {
     ctx?.stroke()
     if (!hasInk.current) {
       hasInk.current = true
+      onChange(true)
     }
-  }
-
-  const emitBlob = () => {
-    const canvas = canvasRef.current
-    if (!canvas || !hasInk.current) {
-      onChange(null)
-      return
-    }
-    canvas.toBlob(blob => onChange(blob), 'image/png')
   }
 
   const end = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -89,7 +80,6 @@ export function SignaturePad({ onChange, disabled }: SignaturePadProps) {
     } catch {
       /* ignore */
     }
-    emitBlob()
   }
 
   const clear = () => {
@@ -101,7 +91,7 @@ export function SignaturePad({ onChange, disabled }: SignaturePadProps) {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.restore()
     hasInk.current = false
-    onChange(null)
+    onChange(false)
   }
 
   return (
@@ -121,9 +111,7 @@ export function SignaturePad({ onChange, disabled }: SignaturePadProps) {
         onPointerUp={end}
         onPointerCancel={end}
       />
-      <p className="sig-pad-hint muted">
-        Draw with mouse or finger. Image stays on this device until you sign.
-      </p>
+      <p className="sig-pad-hint muted">Draw with mouse or finger - stays on this device (demo).</p>
     </div>
   )
 }

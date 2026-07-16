@@ -18,7 +18,6 @@
   },
   "include": ["src"],
   "exclude": [
-    "src/archive/**",
-    "src/journey/**"
+    "src/archive/**"
   ]
 }

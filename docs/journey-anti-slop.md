@@ -5,12 +5,12 @@ Load this **before any Journey UI / redesign work**, together with:
 | Doc | Why |
 |-----|-----|
 | **`PRODUCT.md`** | Feature parity law, inventory, brand personality |
-| **`AGENTS.md`** | Journey-only production UI rules |
+| **`AGENTS.md`** | Production SPA UI rules |
 | **`.github/skills/impeccable/`** | Craft / critique / audit commands (if used) |
 | **This file** | Positive design system, negative bans, pre-ship self-check |
 
-**Surface:** `client/src/experiment/` + tokens in `client/src/index.css` + shared panels Journey imports.  
-**Not the surface:** legacy `App.tsx`, `client/src/archive/`, greenfield “SaaS landing” templates.
+**Surface:** `client/src/App.tsx` + `landing/` + `journey/` + tokens in `client/src/index.css` + shared panels.  
+**Not the surface:** `client/src/archive/`, greenfield “SaaS landing” templates.
 
 ---
 
@@ -74,7 +74,7 @@ Design **serves the workflow** (path → rail → dock → document stage).
 
 Prefer real shipped product patterns over AI galleries:
 
-- Existing Journey screens and `ExperimentApp.css` (first)
+- Existing production screens and `App.css` / `journey/Journey.css` (first)
 - Shared panels Journey already uses (`ShareInviteCard`, seal pricing, signature pad)
 - Real app onboarding patterns (e.g. Mobbin) only as **structure** inspiration, not as a new brand
 
@@ -195,10 +195,10 @@ AI is good at the ideal screenshot. Product design is the rest:
 
 | Task | Load |
 |------|------|
-| Any visual restyle | `PRODUCT.md` feature parity → this file → edit `experiment/` only |
+| Any visual restyle | `PRODUCT.md` feature parity → this file → edit `App` / `landing/` / `journey/` only |
 | Impeccable craft/shape/polish | Impeccable setup + **product** register + this file |
 | Blog art / copy | `client/src/blog/README.md` (no em dashes; promo fee CTAs) |
-| Landing preview only | `client/src/landing-redesign/` — does **not** replace Journey |
+| Archive snapshots | `client/src/archive/` — read-only; never production |
 
 **Feature parity wins over aesthetics.** If a visual idea conflicts with inventory, drop the visual idea.
 
@@ -207,10 +207,11 @@ AI is good at the ideal screenshot. Product design is the rest:
 ## 8. Minimal agent prompt block (copy into UI tasks)
 
 ```
-You are editing VeriLock Journey Edition only (client/src/experiment/).
+You are editing VeriLock production SPA only (client/src/App.tsx, landing/, journey/).
 
 Positive system:
-- Tokens: client/src/index.css (navy deep bg, mint accent, Bricolage + Figtree)
+- Shell: light DocuSeal-style (App.css); dock may still use navy task tokens (journey/Journey.css)
+- Tokens: client/src/index.css + shell CSS; Bricolage + Figtree
 - IA: path picker → stage rail → action dock → document stage
 - Personality: calm, technical, trust-first; task UI not campaign landing
 - PRODUCT.md feature parity is mandatory
@@ -235,5 +236,5 @@ Done only when docs/journey-anti-slop.md section 5 + PRODUCT.md parity checklist
 
 - Product inventory & parity: [`PRODUCT.md`](../PRODUCT.md)
 - Journey contributor rules: [`AGENTS.md`](../AGENTS.md)
-- Experiment notes: [`client/src/experiment/README.md`](../client/src/experiment/README.md)
+- Journey modules: [`client/src/journey/README.md`](../client/src/journey/README.md)
 - Blog voice: [`client/src/blog/README.md`](../client/src/blog/README.md)

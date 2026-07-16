@@ -1,10 +1,13 @@
 # Archive (read-only reference)
 
-Snapshots of **pre-Journey** UI kept for historical comparison (e.g. Nimiq Pay mobile patterns).
+Historical UI snapshots. **Do not develop product features here.**
 
-**Do not develop product features here.** Active production UI:
+| Folder | What it is |
+|--------|------------|
+| `pre-journey-2026-07-09/` | Pre-Journey step-list SPA (before path → rail → dock) |
+| `navy-shell-2026-07-16/` | Deep-navy Journey shell + parallel landing-redesign preview before light shell became production |
+| `orphan-journey-2026-07-16/` | Dead component copies that blocked the `journey/` directory name |
 
-- `client/src/experiment/`
-- `client/vite.journey.config.ts`
+**Active production UI:** `client/src/App.tsx` (shell) + `client/src/journey/` + `client/src/landing/`.
 
 See repo root `AGENTS.md`.

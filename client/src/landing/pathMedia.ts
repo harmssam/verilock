@@ -2,7 +2,7 @@
  * Path stills + locked object-position crops for landing cards and track banners.
  */
 import type { CSSProperties } from 'react'
-import type { PathRole } from '../experiment/types'
+import type { PathRole } from '../journey/types'
 
 /** Focal crop (0–100%) + zoom scale (1 = cover, >1 = zoom in). */
 export type ImagePlacement = { x: number; y: number; zoom: number }
@@ -27,13 +27,13 @@ export const PATH_PLACEMENTS: PathPlacements = {
 }
 
 export const PATH_STILLS: Record<PathRole, string> = {
-  creator: '/landing-redesign/path-create.jpg',
-  signer: '/landing-redesign/path-invite.jpg',
-  verifier: '/landing-redesign/path-verify.jpg',
+  creator: '/landing/path-create.jpg',
+  signer: '/landing/path-invite.jpg',
+  verifier: '/landing/path-verify.jpg',
 }
 
 /** Home hero visual: VeriLock mark + Nimiq hex network (not a path still). */
-export const HERO_STILL = '/landing-redesign/hero.jpg'
+export const HERO_STILL = '/landing/hero.jpg'
 
 /** object-position for the hero still (lock sits slightly left of center). */
 export const HERO_PLACEMENT: ImagePlacement = { x: 42, y: 48, zoom: 1 }
