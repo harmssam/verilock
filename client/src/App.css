@@ -45,8 +45,8 @@ body[data-verilock-surface='journey'] {
   --lr-dim: #6b7c8d;
   --lr-accent: #0d9488;
   --lr-accent-soft: rgba(13, 148, 136, 0.1);
-  /* Invite path: cool teal (not sky blue) */
-  --lr-warn: #0e7490;
+  /* Invite path: light golden amber (less red/orange than #d97706) */
+  --lr-warn: #ca8a04;
   --lr-verify: #65a30d;
   --lr-scrim: 15, 23, 42;
 
@@ -968,19 +968,24 @@ html {
   aspect-ratio: 4 / 5;
   min-height: 15.5rem;
   padding: 0;
-  border-radius: 14px;
-  border: 1px solid var(--lr-line);
-  background: var(--lr-surface-2);
+  /* Slightly tighter radius so still + border fill corners (no page bg peek) */
+  border-radius: 10px;
+  /*
+   * Photo cards: white rim only — no slate drop-shadow / inset ring
+   * (those read as gray arcs at the bottom corners).
+   * Hover: colored border + soft outer ring only, no gray lift shadow.
+   */
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
   overflow: hidden;
   isolation: isolate;
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 0 0 0 transparent;
   transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    transform 0.18s ease;
+    border-color 0.1s ease-out,
+    box-shadow 0.1s ease-out;
 }
 
 @media (min-width: 720px) {
@@ -991,26 +996,28 @@ html {
 }
 
 .lr-path:hover {
-  border-color: rgba(13, 148, 136, 0.35);
-  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.1);
-  transform: translateY(-2px);
+  border-color: rgba(13, 148, 136, 0.6);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.28);
 }
 
 .lr-path:focus-visible {
-  outline: 2px solid rgba(13, 148, 136, 0.55);
-  outline-offset: 2px;
+  outline: none;
+  border-color: rgba(13, 148, 136, 0.65);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.35);
 }
 
-/* Full-bleed still under the label overlay */
+/* Full-bleed still — covers entire card including under the frosted label strip */
 .lr-path-thumb {
   position: absolute;
-  inset: 0;
+  /* Slight overscan so cover image seals rounded corners under the border */
+  inset: -1px;
   z-index: 0;
   display: block;
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: auto;
   overflow: hidden;
-  background: var(--lr-surface-2);
+  background: transparent;
+  border-radius: inherit;
   pointer-events: none;
 }
 
@@ -1018,24 +1025,22 @@ html {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   display: block;
-  /* Keep role metaphors readable; label strip owns text contrast */
-  filter: saturate(1.05) contrast(1.08) brightness(0.97);
+  /* Keep role metaphors readable; label strip frosts the bottom for text */
+  filter: saturate(1.06) contrast(1.08) brightness(0.98);
   --lr-path-zoom: 1;
-  transform: scale(var(--lr-path-zoom));
-  transition:
-    filter 0.25s ease,
-    transform 0.2s ease;
+  /* Tiny scale past 1 so object-fit cover never leaves anti-aliased gaps at the radius */
+  transform: scale(calc(var(--lr-path-zoom) * 1.02));
+  transform-origin: center center;
   pointer-events: none;
-  will-change: transform;
 }
 
-.lr-path:hover .lr-path-img {
-  filter: saturate(1.1) contrast(1.1) brightness(1);
-  transform: scale(calc(var(--lr-path-zoom, 1) * 1.03));
-}
-
-/* Label strip: near-solid white so title/detail pass contrast over busy stills */
+/*
+ * Label strip sits over the full-bleed still (thumb is absolute inset 0).
+ * Frosted glass: lower white opacity + stronger blur so color bleeds through
+ * while title/detail stay readable.
+ */
 .lr-path-main {
   position: relative;
   z-index: 1;
@@ -1045,11 +1050,28 @@ html {
   gap: 0.65rem;
   margin-top: auto;
   padding: 0.95rem 1rem 1.05rem;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 -10px 28px rgba(15, 23, 42, 0.1);
+  /* Inner bottom radius ≈ card 10px − 2px border */
+  border-radius: 0 0 8px 8px;
+  /* Soft top: more image bleed at the edge, slightly denser under text */
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.52) 0%,
+    rgba(255, 255, 255, 0.72) 38%,
+    rgba(255, 255, 255, 0.8) 100%
+  );
+  /* Lighter frost so more of the still shows through */
+  backdrop-filter: blur(8px) saturate(1.08);
+  -webkit-backdrop-filter: blur(8px) saturate(1.08);
+  /* No hairline, no slate upward shadow (read as gray at bottom corners) */
+  border: none;
+  box-shadow: none;
+}
+
+/* No backdrop-filter: keep strip denser so text contrast still holds */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .lr-path-main {
+    background: rgba(255, 255, 255, 0.92);
+  }
 }
 
 .lr-path-icon {
@@ -1107,18 +1129,15 @@ html {
 .lr-path-go {
   align-self: center;
   color: var(--lr-dim);
-  transition:
-    color 0.15s ease,
-    transform 0.15s ease;
 }
 
 .lr-path:hover .lr-path-go {
   color: var(--lr-accent);
-  transform: translateX(3px);
 }
 
 .lr-path--signer:hover {
-  border-color: rgba(14, 116, 144, 0.35);
+  border-color: rgba(202, 138, 4, 0.7);
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.35);
 }
 
 .lr-path--signer:hover .lr-path-go {
@@ -1126,22 +1145,12 @@ html {
 }
 
 .lr-path--verifier:hover {
-  border-color: rgba(101, 163, 13, 0.35);
+  border-color: rgba(101, 163, 13, 0.6);
+  box-shadow: 0 0 0 3px rgba(101, 163, 13, 0.28);
 }
 
 .lr-path--verifier:hover .lr-path-go {
   color: var(--lr-verify);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lr-path,
-  .lr-path-img,
-  .lr-path:hover,
-  .lr-path:hover .lr-path-img,
-  .lr-path:hover .lr-path-go {
-    transition: none;
-    transform: none;
-  }
 }
 
 .lr-how-wrap {

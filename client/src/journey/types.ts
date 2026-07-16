@@ -45,8 +45,9 @@ export const CREATOR_STAGES: JourneyStage[] = [
     id: 'share',
     label: 'Share',
     verb: 'Invite co-signers',
-    blurb: 'Send a link plus the same PDF out-of-band (email, AirDrop…).',
-    privacyNote: 'You control the file. We only host the agreement record + link.',
+    blurb:
+      'Send people the invite link and the PDF file together (email, chat, AirDrop). We never upload the document.',
+    privacyNote: 'You send the file yourself. We only host the agreement record and link.',
   },
   {
     id: 'seal',
