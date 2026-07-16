@@ -20,17 +20,24 @@ export const PATH_ZOOM_MIN = 1
 export const PATH_ZOOM_MAX = 2.5
 export const PATH_ZOOM_STEP = 0.05
 
-/** Locked focal crops (0–100%). Defaults until overridden via place mode / localStorage. */
+/**
+ * Locked focal crops (0–100%) + zoom.
+ * Tuned so seal / handoff / magnifier read clearly under light label scrims.
+ * Live-tune with dev `?place=1`, then paste back here.
+ */
 export const PATH_PLACEMENTS: PathPlacements = {
   card: {
-    creator: { x: 50, y: 48, zoom: 1 },
-    signer: { x: 80, y: 100, zoom: 1.15 },
-    verifier: { x: 46.5, y: 36, zoom: 1 },
+    // Wax seal centered, slightly higher so the strip does not cover the lock mark
+    creator: { x: 48, y: 38, zoom: 1.12 },
+    // Folder handoff: keep hands + document in the upper two-thirds
+    signer: { x: 62, y: 42, zoom: 1.2 },
+    // Magnifier + stamp: crop to the instrument cluster
+    verifier: { x: 44, y: 32, zoom: 1.18 },
   },
   track: {
-    creator: { x: 52, y: 40, zoom: 1 },
-    signer: { x: 52, y: 40, zoom: 1 },
-    verifier: { x: 48, y: 38, zoom: 1 },
+    creator: { x: 50, y: 36, zoom: 1.08 },
+    signer: { x: 58, y: 40, zoom: 1.1 },
+    verifier: { x: 46, y: 34, zoom: 1.1 },
   },
 }
 
@@ -40,8 +47,8 @@ export const PATH_STILLS: Record<PathRole, string> = {
   verifier: '/landing-redesign/path-verify.jpg',
 }
 
-/** localStorage key for redesign preview card placement overrides. */
-export const PATH_PLACEMENTS_STORAGE_KEY = 'verilock.landing-redesign.pathPlacements.v2'
+/** localStorage key for redesign preview card placement overrides. Bump when defaults change. */
+export const PATH_PLACEMENTS_STORAGE_KEY = 'verilock.landing-redesign.pathPlacements.v3'
 
 export function formatObjectPosition(p: Pick<ImagePlacement, 'x' | 'y'>): string {
   return `${p.x}% ${p.y}%`

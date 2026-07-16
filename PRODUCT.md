@@ -208,6 +208,15 @@ Parallel UI only. **Does not replace Journey.**
 | Parity | Same shell routes + three paths + trust + how-it-works + agreements strip |
 | After path pick | Hands off to existing `DocumentJourney` (original step UI) |
 
+### Brand decision (locked until revisited)
+
+**Light DocuSeal-style shell stays preview forever** unless product owners explicitly adopt it as the production register.
+
+- Production remains **deep navy task UI** (Journey Edition + `docs/journey-anti-slop.md` tokens).
+- Landing redesign may keep cream/white surfaces **only** on `:5178` / this tree.
+- Do **not** merge the light shell into `client/src/experiment/` or default `npm run build` without an explicit ship decision.
+- Path image placement tools are **dev + `?place=1` only** (never default product chrome).
+
 ## Design principles (parity-safe)
 
 1. **Task first** — Path → rail → dock → stage; never bury the three intents.

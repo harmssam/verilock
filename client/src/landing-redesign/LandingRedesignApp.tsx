@@ -471,6 +471,7 @@ export function LandingRedesignApp() {
           </button>
 
           <div className="lr-header-actions">
+            {/* Logged-in: Agreements nav (parity with production ExperimentApp). */}
             {wallet.account && (
               <button
                 type="button"
@@ -480,6 +481,10 @@ export function LandingRedesignApp() {
                 Agreements
               </button>
             )}
+            {/*
+              Credits chip (AccountMenu) already opens Pricing when balance is known.
+              Hide Pricing nav for logged-in users with a finite credit balance (prod parity).
+            */}
             {!(wallet.account && creditBalance != null && Number.isFinite(creditBalance)) && (
               <button
                 type="button"

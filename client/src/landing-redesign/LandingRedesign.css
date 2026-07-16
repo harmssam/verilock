@@ -678,15 +678,16 @@ body[data-verilock-surface='landing-redesign'] .btn-primary:hover:not(:disabled)
 .lr-hero-headline {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(2rem, 5vw, 2.85rem);
+  font-size: clamp(1.85rem, 4.6vw, 2.65rem);
   font-weight: 800;
   letter-spacing: -0.04em;
-  line-height: 1.08;
+  line-height: 1.1;
   color: var(--lr-text);
   text-wrap: balance;
 }
 
 .lr-hero-headline-em {
+  display: inline;
   color: var(--lr-accent);
 }
 
@@ -723,7 +724,7 @@ body[data-verilock-surface='landing-redesign'] .btn-primary:hover:not(:disabled)
     box-shadow 0.15s ease;
 }
 
-/* Anchor “All paths” uses same .lr-cta chrome as buttons */
+/* Anchor secondary CTA uses same .lr-cta chrome as buttons */
 a.lr-cta {
   box-sizing: border-box;
 }
@@ -777,7 +778,7 @@ html {
   height: 100%;
   object-fit: cover;
   display: block;
-  filter: saturate(0.92) contrast(1.02);
+  filter: saturate(1.02) contrast(1.06) brightness(0.98);
 }
 
 .lr-hero-visual-card {
@@ -788,13 +789,15 @@ html {
   align-items: center;
   gap: 0.55rem;
   max-width: calc(100% - 1.7rem);
-  padding: 0.65rem 0.8rem;
+  padding: 0.7rem 0.9rem;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  /* Solid fill for WCAG-ish contrast over parchment stills (no light-on-light). */
+  background: #ffffff;
+  box-shadow:
+    0 1px 0 rgba(15, 23, 42, 0.04),
+    0 12px 32px rgba(15, 23, 42, 0.16);
   color: var(--lr-accent);
-  backdrop-filter: blur(8px);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -805,16 +808,16 @@ html {
 
 .lr-hero-visual-card strong {
   display: block;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 700;
   color: var(--lr-text);
 }
 
 .lr-hero-visual-card span {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   color: var(--lr-muted);
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 .lr-paths-section {
@@ -950,18 +953,20 @@ html {
 .lr-status {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
   min-height: 1.35em;
   margin: 0.35rem 0 0;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--lr-accent);
+  padding: 0.35rem 0.65rem 0.35rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(13, 148, 136, 0.2);
+  background: rgba(13, 148, 136, 0.08);
+  color: #0f766e;
   font-size: 0.84rem;
-  font-weight: 600;
+  font-weight: 650;
   line-height: 1.35;
   opacity: 0;
   transition: opacity 0.2s ease;
+  max-width: 100%;
 }
 
 .lr-status--in {
@@ -1203,7 +1208,8 @@ html {
   height: 100%;
   object-fit: cover;
   display: block;
-  filter: saturate(0.9) contrast(1.02);
+  /* Keep role metaphors readable; label strip owns text contrast */
+  filter: saturate(1.05) contrast(1.08) brightness(0.97);
   /* Default scale; place mode sets --lr-path-zoom + inline transform */
   --lr-path-zoom: 1;
   transform: scale(var(--lr-path-zoom));
@@ -1215,7 +1221,7 @@ html {
 }
 
 .lr-path:hover .lr-path-img {
-  filter: saturate(1) contrast(1.04);
+  filter: saturate(1.1) contrast(1.1) brightness(1);
   transform: scale(calc(var(--lr-path-zoom, 1) * 1.03));
 }
 
@@ -1259,7 +1265,7 @@ html {
   font-weight: 600;
 }
 
-/* Label strip sits on top of the still so transparency reveals the image */
+/* Label strip: near-solid white so title/detail pass contrast over busy stills */
 .lr-path-main {
   position: relative;
   z-index: 1;
@@ -1269,11 +1275,11 @@ html {
   gap: 0.65rem;
   margin-top: auto;
   padding: 0.95rem 1rem 1.05rem;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255, 255, 255, 0.45);
-  box-shadow: 0 -8px 28px rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 -10px 28px rgba(15, 23, 42, 0.1);
 }
 
 .lr-path-icon {
@@ -1318,14 +1324,14 @@ html {
   font-size: 1.02rem;
   font-weight: 750;
   letter-spacing: -0.02em;
-  color: var(--lr-text);
+  color: #0f172a;
   line-height: 1.2;
 }
 
 .lr-path-detail {
   font-size: 0.8rem;
   line-height: 1.45;
-  color: var(--lr-muted);
+  color: #3d4f5f;
 }
 
 .lr-path-go {
@@ -2071,16 +2077,29 @@ body[data-verilock-surface='landing-redesign'] .lr-track .trust-bar-sub {
 }
 
 .lr-header .exp-credits-chip {
-  border-color: var(--lr-line);
+  border-color: rgba(13, 148, 136, 0.28);
   background: #ffffff;
   color: var(--lr-text);
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  font-weight: 650;
 }
 
 .lr-header .exp-credits-chip:hover {
-  border-color: rgba(13, 148, 136, 0.35);
+  border-color: rgba(13, 148, 136, 0.45);
   background: var(--lr-accent-soft);
   color: var(--lr-text);
+}
+
+.lr-header .exp-credits-chip-n {
+  color: var(--lr-accent);
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.lr-header .exp-account-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 /* Agreements page: Create & seal / New agreement — match light CTA style */
