@@ -37,6 +37,14 @@ import {
 import { emailFeaturesPublic } from './email/config.js'
 import { verifyHubSignedMessage } from './hub-signature.js'
 import { rateLimit } from './rate-limit.js'
+import {
+  clientIpFromRequest,
+  deliverSupportContact,
+  sanitizeSupportContact,
+  supportContactPublicFeatures,
+  verifyTurnstileToken,
+  type SupportContactBody,
+} from './supportContact.js'
 import { broadcastRawTransaction, normalizeRawTransactionHex, verifySignature } from './nimiq-rpc.js'
 import {
   assertSafeBootConfig,
@@ -110,6 +118,8 @@ const creditsBalanceLimit = rateLimit(120, 60_000)
 const publicReadLimit = rateLimit(60, 60_000)
 // Hash verify is read-only and easy to double-fire from UI retries; allow a higher burst.
 const verifyHashLimit = rateLimit(60, 60_000)
+/** Public contact form — tight limit against spam floods. */
+const supportContactLimit = rateLimit(5, 15 * 60_000)
 
 function lockErrorStatus(message: string): number {
   if (message === 'Only the creator can seal this agreement') return 403
@@ -476,7 +486,50 @@ app.get('/api/me', authMiddleware, (req, res) => {
 })
 
 app.get('/api/features', (_req, res) => {
-  res.json(emailFeaturesPublic())
+  res.json({
+    ...emailFeaturesPublic(),
+    ...supportContactPublicFeatures(),
+  })
+})
+
+app.post('/api/support/contact', supportContactLimit, async (req, res) => {
+  const body = (req.body ?? {}) as SupportContactBody
+  const sanitized = sanitizeSupportContact(body)
+
+  if (!sanitized.ok) {
+    if ('silent' in sanitized && sanitized.silent) {
+      // Honeypot / too-fast bots: fake success so scrapers don't learn the rules.
+      res.json({ ok: true })
+      return
+    }
+    if ('error' in sanitized) {
+      res.status(sanitized.status).json({ error: sanitized.error })
+      return
+    }
+    res.status(400).json({ error: 'Invalid request' })
+    return
+  }
+
+  const remoteIp = clientIpFromRequest(req)
+  const turnstile = await verifyTurnstileToken(sanitized.turnstileToken, remoteIp)
+  if (!turnstile.ok) {
+    res.status(400).json({ error: turnstile.error })
+    return
+  }
+
+  const delivered = await deliverSupportContact({
+    name: sanitized.name,
+    email: sanitized.email,
+    subject: sanitized.subject,
+    message: sanitized.message,
+  })
+
+  if (!delivered.ok) {
+    res.status(delivered.status).json({ error: delivered.error })
+    return
+  }
+
+  res.json({ ok: true })
 })
 
 app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req, res) => {

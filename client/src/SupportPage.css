@@ -1,0 +1,123 @@
+.support-page h2 {
+  margin: 0 0 0.5rem;
+}
+
+.support-lead {
+  margin: 0 0 1.25rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.support-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Honeypot: off-screen, not display:none (some bots skip display:none fields). */
+.support-hp {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.support-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.support-char-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.support-turnstile {
+  min-height: 2.5rem;
+}
+
+.support-turnstile-host {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.support-turnstile-loading {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.support-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.support-error {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm, 12px);
+  border: 1px solid rgba(220, 38, 38, 0.28);
+  background: rgba(220, 38, 38, 0.06);
+  color: #b91c1c;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.support-privacy-note {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.support-privacy-note a {
+  color: var(--lr-accent, var(--mint-deep, #0f766e));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.support-privacy-note a:hover {
+  color: var(--lr-text, var(--text));
+}
+
+.support-success {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.support-success-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.support-success .muted {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.support-again-btn {
+  align-self: flex-start;
+  margin-top: 0.35rem;
+}
+
+/* Light shell: match pricing / privacy card density */
+body[data-verilock-surface='journey'] .support-page.card {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  box-shadow: 0 10px 36px rgba(15, 23, 42, 0.05);
+}
+
+body[data-verilock-surface='journey'] .support-error {
+  border-color: rgba(185, 28, 28, 0.22);
+  background: rgba(254, 226, 226, 0.55);
+  color: #991b1b;
+}

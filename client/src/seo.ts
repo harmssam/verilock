@@ -37,6 +37,12 @@ export const PAGE_META = {
       'How VeriLock protects PDFs: local SHA-256 fingerprinting, wallet identity, on-chain hash seals on Nimiq, and verification without uploading your file. No invented certifications.',
     path: '/security',
   },
+  support: {
+    title: `Support${TITLE_SUFFIX}`,
+    description:
+      'Contact VeriLock support about signing, sealing, verification, or billing. Your PDF stays on your device — describe the issue without attaching files.',
+    path: '/support',
+  },
   verify: {
     title: `Verify a Document${TITLE_SUFFIX}`,
     description:

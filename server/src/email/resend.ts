@@ -19,6 +19,8 @@ export interface SendEmailInput {
   subject: string
   text: string
   html: string
+  /** Optional Reply-To (e.g. support form sender). */
+  replyTo?: string
 }
 
 export type SendEmailResult =
@@ -44,6 +46,7 @@ export async function sendTransactionalEmail(input: SendEmailInput): Promise<Sen
     const { data, error } = await resend.emails.send({
       from: resendFromAddress(),
       to: [input.to],
+      ...(input.replyTo ? { replyTo: input.replyTo } : {}),
       subject: input.subject,
       text: input.text,
       html: input.html,

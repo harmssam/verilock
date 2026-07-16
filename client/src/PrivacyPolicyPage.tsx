@@ -57,6 +57,16 @@ export function PrivacyPolicyPage() {
       </section>
 
       <section className="privacy-policy-section">
+        <h3>Support contact form</h3>
+        <p className="muted">
+          If you use the Support page, we receive the name, email, subject, and message you submit so we can
+          reply. Messages are delivered by email to VeriLock support. We also apply bot protections (rate
+          limits, honeypot checks, and when configured, Cloudflare Turnstile). Do not send PDF contents
+          through this form.
+        </p>
+      </section>
+
+      <section className="privacy-policy-section">
         <h3>Third-party services</h3>
         <ul className="privacy-policy-list muted">
           <li>
@@ -69,6 +79,13 @@ export function PrivacyPolicyPage() {
           </li>
           <li>
             <strong>Google Fonts</strong> — web fonts loaded from Google&apos;s CDN when you open the app
+          </li>
+          <li>
+            <strong>Resend</strong> — transactional email delivery (optional ready-to-seal notifications and
+            support form messages)
+          </li>
+          <li>
+            <strong>Cloudflare Turnstile</strong> — bot protection on the support form when enabled
           </li>
         </ul>
         <p className="muted">We do not use advertising or analytics trackers.</p>
