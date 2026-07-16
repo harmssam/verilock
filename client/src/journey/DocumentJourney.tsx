@@ -9,7 +9,6 @@ import {
   ShieldCheck,
   Trash2,
   Upload,
-  Users,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { normalizeAddress } from '../addresses'
@@ -41,14 +40,11 @@ import {
 import {
   documentTypeUsesNotes,
   type DocumentType,
-  type SealDocument,
   type VerifyResult,
 } from '../types'
 import { VerifyMatchesPanel } from '../VerifyMatchesPanel'
 import { DocumentStage } from './DocumentStage'
-import { FeatureRotator } from './FeatureRotator'
 import { HowVeriLockWorks } from './HowVeriLockWorks'
-import { JourneyAgreements } from './JourneyAgreements'
 import { NotFoundPage } from './NotFoundPage'
 import {
   clearJourneyIntent,
@@ -95,16 +91,8 @@ interface DocumentJourneyProps {
   navEpoch?: number
   /** Per-route document meta for SEO (title, canonical, noindex). */
   onPageMeta?: (meta: PageMeta) => void
-  /** Open full agreements page (header / welcome strip). */
-  onOpenAgreements?: () => void
   /** Return to home (invalid deep link). */
   onHome?: () => void
-  /**
-   * Landing redesign (and any shell that owns the path picker) — skip the
-   * in-journey “What are you here to do?” welcome so it does not double with
-   * the shell home. Production ExperimentApp leaves this unset.
-   */
-  suppressWelcome?: boolean
 }
 
 type VerifyOutcome =
@@ -146,9 +134,7 @@ export function DocumentJourney({
   wallet,
   navEpoch = 0,
   onPageMeta,
-  onOpenAgreements,
   onHome,
-  suppressWelcome = false,
 }: DocumentJourneyProps) {
   const {
     account,
@@ -201,16 +187,11 @@ export function DocumentJourney({
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
   const [lockMessage, setLockMessage] = useState<string | null>(null)
-  const [agreementsRefreshKey, setAgreementsRefreshKey] = useState(0)
   const [creditBalance, setCreditBalance] = useState(0)
   const [creditsRefresh, setCreditsRefresh] = useState(0)
   /** Deep-link /d/ or /v/ slug that does not resolve on the server. */
   const [missingDeepLink, setMissingDeepLink] = useState<string | null>(null)
   const fileSizeByDocIdRef = useRef<Record<string, number>>({})
-
-  const bumpAgreements = useCallback(() => {
-    setAgreementsRefreshKey(k => k + 1)
-  }, [])
 
   useEffect(() => {
     if (!onPageMeta) return
@@ -243,41 +224,6 @@ export function DocumentJourney({
     [],
   )
 
-  const openAgreementFromList = useCallback(
-    (document: SealDocument, preferSeal = false) => {
-      setActiveFromSeal(document)
-      setLocalError(null)
-      setLockMessage(null)
-      setSignFile(null)
-      setSignHash(null)
-      setSigBlob(null)
-      setSigPadKey(k => k + 1)
-
-      const creator = isDocumentCreator(document, address)
-      if (creator) {
-        setRole('creator')
-        saveJourneyIntent('creator')
-        syncIntentToUrl('creator')
-        // Shared-ack only for invite-sent UI; step uses sign-before-share resolution
-        const { signed, required, readyToLock } = document.signingProgress
-        setSharedAck(
-          preferSeal ||
-            readyToLock ||
-            document.status === 'ready_to_lock' ||
-            signed > 0 ||
-            required === 0,
-        )
-      } else {
-        setRole('signer')
-        saveJourneyIntent('signer')
-        syncIntentToUrl('signer')
-        setSharedAck(true)
-      }
-
-      window.history.pushState({}, '', `/d/${document.slug}`)
-    },
-    [address, setActiveFromSeal],
-  )
 
   // After Hub returns: restore role from ?intent= (or session on deep links).
   // Never rewrite the URL here — sticky session + syncIntentToUrl caused ?intent=signer loops.
@@ -442,7 +388,6 @@ export function DocumentJourney({
         setActiveFromSeal(sealed)
         setRole('creator')
         setLocalError(null)
-        bumpAgreements()
         window.history.replaceState({}, '', `/d/${sealed.slug}`)
       } catch (err) {
         setLocalError(err instanceof Error ? err.message : 'Hub seal return failed')
@@ -816,7 +761,6 @@ export function DocumentJourney({
       // Keep create-time PDF available for the creator’s own sign step
       setSignFile(pdfFile)
       setSignHash(pdfHash)
-      bumpAgreements()
       window.history.pushState({}, '', `/d/${document.slug}`)
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Create failed')
@@ -862,7 +806,6 @@ export function DocumentJourney({
       setRole(null)
       clearJourneyIntent()
       syncIntentToUrl(null)
-      bumpAgreements()
       window.history.pushState({}, '', '/')
       setLockMessage(null)
     } catch (err) {
@@ -913,7 +856,6 @@ export function DocumentJourney({
       setSignerName('')
       setSigBlob(null)
       setSigPadKey(k => k + 1)
-      bumpAgreements()
       if (document.signingProgress.readyToLock) {
         // Only the creator seals — co-signers should not be told to continue to seal.
         if (isDocumentCreator(document, address)) {
@@ -963,7 +905,6 @@ export function DocumentJourney({
     if (result.ok) {
       setActiveFromSeal(result.document, doc.fileSize)
       setLockMessage('Agreement locked on the Nimiq blockchain.')
-      bumpAgreements()
       setCreditsRefresh(k => k + 1)
     } else if (result.redirecting) {
       setLockMessage(result.message)
@@ -997,38 +938,12 @@ export function DocumentJourney({
     if (result.ok) {
       setActiveFromSeal(result.document, doc.fileSize)
       setLockMessage('Sealed forever on Nimiq (1 credit).')
-      bumpAgreements()
       setCreditsRefresh(k => k + 1)
     } else {
       setLocalError(result.message)
       setLockMessage(null)
     }
     setBusy(false)
-  }
-
-  const pickRole = (r: PathRole) => {
-    setRole(r)
-    saveJourneyIntent(r)
-    syncIntentToUrl(r)
-    setVerifyFile(null)
-    setVerifyOutcome({ kind: 'idle' })
-    setLocalError(null)
-    setLockMessage(null)
-    if (r === 'signer') {
-      // Invite link (/d/:slug) or PDF hash lookup - no fake demo doc
-      if (!slugFromPath(window.location.pathname)) {
-        setDoc(null)
-        setSignFile(null)
-        setSignHash(null)
-      }
-    } else if (r === 'creator') {
-      if (!slugFromPath(window.location.pathname)) {
-        setDoc(null)
-        setPdfFile(null)
-      }
-    } else {
-      setDoc(null)
-    }
   }
 
   const connectMode = resolveJourneyConnectMode({
@@ -1201,53 +1116,7 @@ export function DocumentJourney({
         )}
       </aside>
 
-      {/*
-        Quiet agreements strip on Journey welcome only.
-        Landing redesign (suppressWelcome) uses full /agreements instead.
-      */}
-      {token && !suppressWelcome && (step === 'welcome' || !doc) && (
-        <JourneyAgreements
-          token={token}
-          address={address}
-          refreshKey={agreementsRefreshKey}
-          onOpen={document => openAgreementFromList(document, false)}
-          onSeal={document => openAgreementFromList(document, true)}
-          onViewAll={onOpenAgreements}
-        />
-      )}
-
-      {step === 'welcome' && !suppressWelcome && (
-        <section className="hero-pick">
-          <div className="hero-pick-copy">
-            <FeatureRotator />
-            <h2>What are you here to do?</h2>
-            <p className="muted">Choose your role to get started.</p>
-          </div>
-          <div className="path-cards">
-            <button type="button" className="path-card path-card--create" onClick={() => pickRole('creator')}>
-              <span className="path-card-icon" aria-hidden>
-                <Fingerprint size={22} strokeWidth={2.25} />
-              </span>
-              <strong>Create &amp; seal</strong>
-              <span className="muted">Fingerprint, multi-party sign, lock on Nimiq</span>
-            </button>
-            <button type="button" className="path-card path-card--sign" onClick={() => pickRole('signer')}>
-              <span className="path-card-icon" aria-hidden>
-                <Users size={22} strokeWidth={2.25} />
-              </span>
-              <strong>I was invited</strong>
-              <span className="muted">Drop the shared PDF (or open your invite link), then sign</span>
-            </button>
-            <button type="button" className="path-card path-card--verify" onClick={() => pickRole('verifier')}>
-              <span className="path-card-icon" aria-hidden>
-                <ShieldCheck size={22} strokeWidth={2.25} />
-              </span>
-              <strong>Verify a PDF</strong>
-              <span className="muted">Drop a file - look up sealed fingerprints</span>
-            </button>
-          </div>
-        </section>
-      )}
+      {/* Path picker home is owned by App / LandingHome. */}
 
       {step !== 'welcome' && (
         <>

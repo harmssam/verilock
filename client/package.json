@@ -4,18 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --config vite.journey.config.ts",
-    "dev:legacy": "vite",
-    "dev:landing-redesign": "vite --config vite.landing-redesign.config.ts",
+    "dev": "vite",
     "build": "node scripts/package-service-b.mjs",
-    "build:journey": "tsc -b && vite build --config vite.journey.config.ts",
-    "build:legacy": "tsc -b && vite build",
-    "build:landing-redesign": "vite build --config vite.landing-redesign.config.ts",
+    "build:app": "tsc -b && vite build",
     "package:service-b": "node scripts/package-service-b.mjs",
     "test:service-b": "node scripts/verify-journey-service-b.mjs",
-    "preview": "vite preview --config vite.journey.config.ts",
-    "preview:legacy": "vite preview",
-    "preview:landing-redesign": "vite preview --config vite.landing-redesign.config.ts"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@nimiq/hub-api": "1.14.0",

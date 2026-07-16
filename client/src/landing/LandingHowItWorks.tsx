@@ -1,7 +1,7 @@
 /**
  * How VeriLock works — landing redesign only.
  * Same stages/copy as production; quieter motion + registry styling.
- * Does not edit experiment/HowVeriLockWorks.tsx.
+ * Production how-it-works for the light shell.
  */
 import {
   FileText,
@@ -16,8 +16,8 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
-import type { JourneyStage, JourneyStepId, PathRole } from '../experiment/types'
-import { CREATOR_STAGES, stagesForRole } from '../experiment/types'
+import type { JourneyStage, JourneyStepId, PathRole } from '../journey/types'
+import { CREATOR_STAGES, stagesForRole } from '../journey/types'
 
 interface LandingHowItWorksProps {
   role: PathRole | null

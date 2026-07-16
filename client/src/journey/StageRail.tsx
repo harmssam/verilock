@@ -2,45 +2,64 @@ import { Check } from 'lucide-react'
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import {
   allSigned,
-  CREATOR_STAGES,
+  stagesForRole,
   signedCount,
-  type DemoDoc,
+  type JourneyDoc,
   type JourneyStepId,
+  type PathRole,
 } from './types'
 
 interface StageRailProps {
+  role: PathRole
   step: JourneyStepId
   account: boolean
-  doc: DemoDoc | null
+  doc: JourneyDoc | null
   sharedAck: boolean
 }
 
 function isStepDone(
+  role: PathRole,
   stageId: JourneyStepId,
   step: JourneyStepId,
-  account: boolean,
-  doc: DemoDoc | null,
-  sharedAck: boolean,
+  _account: boolean,
+  doc: JourneyDoc | null,
 ): boolean {
   if (step === 'done') return true
-  if (!account && stageId === 'connect') return false
-  if (account && stageId === 'connect') return step !== 'connect'
-  if (doc && (stageId === 'connect' || stageId === 'fingerprint')) return true
-  if (doc && stageId === 'share' && (sharedAck || signedCount(doc) > 0 || doc.directSeal))
+
+  if (role === 'signer') {
+    // When step is 'done', early return above marks all stages complete
+    if (stageId === 'sign') return Boolean(doc && (allSigned(doc) || doc.sealed))
+    if (stageId === 'done') return Boolean(doc?.sealed)
+    return false
+  }
+
+  if (role === 'verifier') {
+    return false
+  }
+
+  // Creator path: Fingerprint → Sign → Share → Seal → Verify (login is not a stage)
+  if (doc && stageId === 'fingerprint') return true
+  // Sign is done once the creator has signed (or direct seal / everyone done)
+  if (doc && stageId === 'sign' && (signedCount(doc) > 0 || doc.directSeal || allSigned(doc)))
     return true
-  if (doc && stageId === 'sign' && allSigned(doc)) return true
+  // Share is done once everyone signed (moved on to seal) or direct seal
+  if (doc && stageId === 'share' && (allSigned(doc) || doc.directSeal)) return true
   if (doc?.sealed && stageId === 'seal') return true
   return false
 }
 
-export function StageRail({ step, account, doc, sharedAck }: StageRailProps) {
+export function StageRail({ role, step, account, doc, sharedAck: _sharedAck }: StageRailProps) {
+  const stages = stagesForRole(role)
   const railRef = useRef<HTMLElement>(null)
   const itemRefs = useRef<(HTMLDivElement | null)[]>([])
   const [pill, setPill] = useState({ left: 0, width: 0, ready: false })
 
   const currentIndex = (() => {
-    if (step === 'done') return CREATOR_STAGES.length - 1
-    const i = CREATOR_STAGES.findIndex(s => s.id === step)
+    if (role === 'signer' && (step === 'done' || doc?.sealed)) {
+      return Math.max(0, stages.findIndex(s => s.id === 'done'))
+    }
+    if (role === 'creator' && step === 'done') return stages.length - 1
+    const i = stages.findIndex(s => s.id === step)
     return i >= 0 ? i : 0
   })()
 
@@ -49,7 +68,6 @@ export function StageRail({ step, account, doc, sharedAck }: StageRailProps) {
     const item = itemRefs.current[currentIndex]
     if (!rail || !item) return
 
-    // Position relative to padding box + scroll
     const left = item.offsetLeft
     const width = item.offsetWidth
     setPill(prev => {
@@ -57,7 +75,6 @@ export function StageRail({ step, account, doc, sharedAck }: StageRailProps) {
       return { left, width, ready: true }
     })
 
-    // Keep current step visible on narrow screens
     const itemRight = item.offsetLeft + item.offsetWidth
     const viewLeft = rail.scrollLeft
     const viewRight = viewLeft + rail.clientWidth
@@ -83,10 +100,17 @@ export function StageRail({ step, account, doc, sharedAck }: StageRailProps) {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [measure, step, account, doc, sharedAck])
+  }, [measure, step, account, doc, role, stages.length])
+
+  const ariaLabel =
+    role === 'signer'
+      ? 'Signing journey'
+      : role === 'verifier'
+        ? 'Verify journey'
+        : 'Agreement journey'
 
   return (
-    <nav ref={railRef} className="stage-rail" aria-label="Agreement journey">
+    <nav ref={railRef} className="stage-rail" aria-label={ariaLabel}>
       <span
         className={`stage-rail-pill${pill.ready ? ' stage-rail-pill--ready' : ''}`}
         style={{
@@ -95,9 +119,9 @@ export function StageRail({ step, account, doc, sharedAck }: StageRailProps) {
         }}
         aria-hidden
       />
-      {CREATOR_STAGES.map((s, i) => {
+      {stages.map((s, i) => {
         const current = i === currentIndex
-        const done = isStepDone(s.id, step, account, doc, sharedAck) && !current
+        const done = isStepDone(role, s.id, step, account, doc) && !current
         return (
           <div
             key={s.id}

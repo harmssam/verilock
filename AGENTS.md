@@ -1,74 +1,70 @@
 # VeriLock — agent / contributor instructions
 
-## Production UI is Journey Edition (only)
+## Production UI is one SPA only
 
-**Default and only production frontend is the Journey SPA.**
+**Default and only production frontend** is the light shell + journey product flow.
 
 | Role | Path / command | Notes |
 |------|----------------|-------|
-| **PRIMARY UI** | `client/src/experiment/` | Journey Edition — edit here for product UX |
-| **PRIMARY entry** | `client/src/experiment/main.tsx` → `ExperimentApp` | Mounted via `client/journey.html` |
-| **PRIMARY Vite config** | `client/vite.journey.config.ts` | Default `npm run dev` / `npm run build` |
+| **PRIMARY shell** | `client/src/App.tsx` + `App.css` | Light landing, header, shell routes |
+| **PRIMARY home** | `client/src/landing/` | Path cards, how-it-works, path stills |
+| **PRIMARY product flow** | `client/src/journey/` | DocumentJourney, dock, seal, account, blog UI |
+| **PRIMARY entry** | `client/src/main.tsx` → `App` | Mounted via `client/index.html` |
+| **PRIMARY Vite config** | `client/vite.config.ts` | Default `npm run dev` / `npm run build` |
 | **PRIMARY production URL** | `https://verilock.online` | Packaged into `client/dist` as root SPA |
-| **Shared libraries** | `client/src/*.ts(x)` except `App.tsx` / legacy-only panels | `nimiq.ts`, `api.ts`, `NimiqPayOpenPanel`, seal helpers, etc. — OK to change when Journey needs them |
-| **LEGACY (do not extend)** | `client/src/App.tsx`, `client/src/main.tsx`, `client/index.html`, `client/vite.config.ts` | Pre-journey SPA — recovery / reference only |
-| **ARCHIVE (read-only)** | `client/src/archive/` | Snapshot of pre-journey UI — do not “fix” or port features by editing the archive |
+| **Shared libraries** | `client/src/*.ts(x)` except archive | `nimiq.ts`, `api.ts`, seal helpers, pricing, etc. |
+| **ARCHIVE (read-only)** | `client/src/archive/` | Pre-journey SPA, navy shell snapshot, orphans — do not extend |
 
 ### Commands (always prefer these)
 
 ```bash
-npm run dev                 # server + Journey (client :5176)
-npm run dev --prefix client # Journey only
+npm run dev                 # server + client (:5176)
+npm run dev --prefix client # client only
 npm run build --prefix client
 npm run test:service-b --prefix client
 ```
 
-**Do not** use as the default work path:
+**Do not** look for parallel product UIs:
 
 ```bash
-npm run dev:legacy
-npm run build:legacy
-vite --config vite.config.ts          # legacy
-vite --config vite.experiment.config.ts  # old experiment port (obsolete for day-to-day)
+npm run dev:legacy          # removed
+npm run dev:landing-redesign  # removed (promoted to production)
+vite --config vite.journey.config.ts  # removed
+vite --config vite.experiment.config.ts  # removed
 ```
 
 ### When implementing UI features
 
-1. **Start in** `client/src/experiment/` (`DocumentJourney.tsx`, `useJourneyWallet.ts`, `ExperimentApp.*`, etc.).
-2. **Reuse** shared modules under `client/src/` (`nimiq.ts`, wallet helpers, seal, pricing) — do not reimplement in Journey.
-3. **Never** restore or grow the legacy step-list UI in `App.tsx` unless the user **explicitly** asks to work on the pre-journey SPA.
-4. **Never** treat `client/src/archive/` as the active product. Read it only as historical reference (e.g. Pay UX patterns).
-5. Journey **flow / information architecture** (path picker, stage rail, action dock) stays unless the user asks to redesign it.
-6. Server APIs live under `server/` — shared by Journey and legacy; API changes must not assume legacy UI.
+1. **Shell / home** → `client/src/App.tsx`, `client/src/landing/`, `client/src/App.css`.
+2. **Path stages / dock / wallet** → `client/src/journey/` (`DocumentJourney.tsx`, etc.).
+3. **Reuse** shared modules under `client/src/` — do not reimplement seal, wallet, or pricing.
+4. **Never** treat `client/src/archive/` as the active product.
+5. Journey **flow / information architecture** (path picker → stage rail → action dock → document stage) stays unless the user asks to redesign it.
+6. Server APIs live under `server/` — shared; API changes must not assume a second client.
 
-### How to tell you are on Journey
+### How to tell you are on production
 
-- Files under `client/src/experiment/`
-- Styles in `ExperimentApp.css` (not loading full legacy `App.css` as the shell)
-- Dev URL from default config: port **5176** (or next free), `journey.html` / root rewrite
-- Build script: `package-service-b.mjs` / `vite.journey.config.ts` → `client/dist`
+- Entry: `client/src/main.tsx` → `App`
+- Product modules under `client/src/journey/`
+- Home under `client/src/landing/`
+- Dev URL: port **5176** (or next free), `index.html`
+- Build: `package-service-b.mjs` / `vite.config.ts` → `client/dist`
 
-### How to tell you are on legacy (stop unless asked)
+### Shared vs archive-only
 
-- Editing `client/src/App.tsx` as the main screen shell
-- `client/src/main.tsx` importing `./App.tsx`
-- Port **5174** / `npm run dev:legacy`
-
-### Shared vs legacy-only
-
-Safe shared edits (Journey may depend on these):
+Safe shared edits (production may depend on these):
 
 - `client/src/nimiq.ts`, `api.ts`, `session.ts`, hub redirect helpers
-- `NimiqPayOpenPanel.tsx`, seal pricing, PDF hash, ShareInviteCard (if Journey imports them)
+- `NimiqPayOpenPanel.tsx`, seal pricing, PDF hash, ShareInviteCard
+- `PricePage`, `SecurityPage`, blog posts
 
-Legacy-only (do not invest product work here without an explicit request):
+Archive-only (do not invest product work without an explicit request):
 
-- `App.tsx`, `WorkflowGuide`, legacy screen routing, legacy-only panels not imported by Journey
+- Anything under `client/src/archive/`
 
 ### Email / features
 
 - Optional ready-to-seal email is gated by client `FEATURES.emailNotifyUi` and server Resend flags.
-- Do not re-enable or redesign email in the legacy app by default.
 
 ### Blog
 
@@ -77,15 +73,17 @@ Legacy-only (do not invest product work here without an explicit request):
 
 ### If the user says “the app” / “production” / “VeriLock UI”
 
-Interpret as **Journey Edition** (`client/src/experiment/`), never the pre-journey SPA.
+Interpret as **`client/src/App.tsx` + `client/src/journey/` + `client/src/landing/`**, never archive snapshots.
 
 ### Redesign / Impeccable / visual overhaul
 
-**Feature parity is mandatory.** Any redesign is a restyle of Journey Edition only: same routes, paths, stages, docks, shell screens, and capabilities. Do not add or remove product features unless the user explicitly asks.
+**Feature parity is mandatory.** Any redesign is a restyle of the production SPA only: same routes, paths, stages, docks, shell screens, and capabilities. Do not add or remove product features unless the user explicitly asks.
 
 - Full inventory + acceptance checklist: **`PRODUCT.md`** (section *Feature parity law*)
-- **Anti-slop design checklist (load before any UI restyle):** **`docs/journey-anti-slop.md`**
-  - Positive system: navy + mint tokens, Bricolage/Figtree, path → rail → dock → stage
+- **Anti-slop design checklist:** **`docs/journey-anti-slop.md`**
+  - Production chrome: light shell tokens; dock may still use navy task styles until a full dock restyle
   - Negative bans: purple SaaS gradients, glass-everywhere, generic feature cards, fake testimonials, crypto-neon gimmick
   - Pre-ship self-check + ugly-state tests + copy-paste agent prompt block
 - Impeccable skills (if installed): `.github/skills/impeccable/` — always load `PRODUCT.md` first, then `docs/journey-anti-slop.md`
+
+Follow these instructions exactly. When working in subdirectories not listed above, check for additional project instruction files (AGENTS.md, Claude.md, etc.).

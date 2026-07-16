@@ -6,14 +6,14 @@ import { NimiqHexagonIcon } from './NimiqHexagonIcon'
 import { SealFeeAmount } from './SealFeeAmount'
 import { SealPricingDisplay } from './SealPricingDisplay'
 import { getSealPricing } from './sealPricing'
-import { CreditsPanel } from './experiment/CreditsPanel'
+import { CreditsPanel } from './journey/CreditsPanel'
 import {
   journeyLoginEntryLabels,
   journeyLoginNeedsSheet,
   type JourneyConnectMode,
   type JourneyConnectRequest,
-} from './experiment/journeyConnectUi'
-import { LoginSheet } from './experiment/LoginSheet'
+} from './journey/journeyConnectUi'
+import { LoginSheet } from './journey/LoginSheet'
 import './PricePage.css'
 
 const NIMIQ_URL = 'https://www.nimiq.com'

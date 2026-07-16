@@ -1,6 +1,6 @@
 # VeriLock blog - author notes
 
-Journey SPA blog under `/blog`. Content lives in `client/src/blog/posts/`. UI in `client/src/experiment/BlogPage.tsx`. Production deep links need `/blog` in `server/src/static.ts` (`isKnownAppPath`).
+Journey SPA blog under `/blog`. Content lives in `client/src/blog/posts/`. UI in `client/src/journey/BlogPage.tsx`. Production deep links need `/blog` in `server/src/static.ts` (`isKnownAppPath`).
 
 ## Voice
 

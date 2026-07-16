@@ -12,7 +12,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { formatBlogDate, getAllPosts } from '../blog'
 import { formatSealFeeNim, getSealPricing } from '../sealPricing'
-import type { PathRole } from '../experiment/types'
+import type { PathRole } from '../journey/types'
 import { LandingHowItWorks } from './LandingHowItWorks'
 import {
   formatObjectPosition,
