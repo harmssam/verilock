@@ -2,9 +2,9 @@
 
 ## Register
 
-**product** (primary). The live surface is a task-oriented mini app: create, invite, sign, seal, verify. Marketing-adjacent chrome (blog, pricing, taglines) exists, but design **serves the workflow**, not a campaign landing page.
+**product** (primary). The live surface is a task-oriented mini app: create, invite, sign, seal, verify. Marketing-adjacent chrome (pricing, taglines) exists, but design **serves the workflow**, not a campaign landing page.
 
-When a redesign task is scoped only to blog/pricing marketing copy, that slice may use **brand** register rules **without** inventing new product capabilities.
+When a redesign task is scoped only to pricing marketing copy, that slice may use **brand** register rules **without** inventing new product capabilities.
 
 ## Platform
 
@@ -65,7 +65,7 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 1. **Same routes, same deep links, same query flags** (see inventory).
 2. **Same three path roles** and **same stage rails** for each role.
 3. **Same action-dock steps and controls** (fields, toggles, CTAs, cancel, share, credits, signature pad).
-4. **Same shell screens** (home journey, pricing, privacy, agreements, blog, 404).
+4. **Same shell screens** (home journey, pricing, privacy, security, agreements, 404).
 5. **Same account/login/credits behaviors** (Hub vs Pay modes, balance chip → pricing, Stripe return).
 6. **Same privacy model** in UI copy and structure: PDF stays local; chain stores hash only.
 7. **Feature flags stay flags** (`FEATURES.emailNotifyUi`); do not hard-remove optional email when the flag exists.
@@ -86,7 +86,7 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 - [ ] Share invite (copy link, email package patterns) still present where creator can invite
 - [ ] Seal payment paths still: NIM fee / credits / progress UI as today
 - [ ] Signature pad + optional signature image still available on sign
-- [ ] Agreements list (welcome strip + full page) still open docs and prefer-seal CTA
+- [ ] Agreements list (`/agreements` full page) still open docs and prefer-seal CTA
 - [ ] No new primary CTA that invents a fourth path or skips an existing required gate
 
 If a visual idea conflicts with a row above, **drop the visual idea**, not the feature.
@@ -104,15 +104,15 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 | Brand home control | Logo + wordmark + tagline → reset to `/` journey home |
 | Nav: Agreements | Shown when wallet connected |
 | Nav: Pricing | Shown when credits chip not already covering pricing |
-| Nav: Security | Header on desktop; footer on narrow (with Blog on very small screens) |
+| Nav: Security | Header on desktop; footer on narrow |
 | Account menu | Login sheet, address, copy, agreements, credits → pricing, disconnect |
 | Credits balance chip | When credits enabled and logged in |
 | Wallet status / error banner | Connect and payment errors |
-| Back to home | On pricing / privacy / security / agreements / blog / 404 |
+| Back to home | On pricing / privacy / security / agreements / 404 |
 | Journey keep-alive | DocumentJourney stays mounted (hidden) when visiting other shell screens |
 | Stripe checkout return | Mint/refresh credits after card purchase |
-| Footer | Tagline + Blog + Security + Privacy Policy |
-| Home path picker | Light landing (`LandingHome`) — not the navy welcome strip |
+| Footer | Tagline + Security + Privacy Policy |
+| Home path picker | Light landing (`LandingHome`) |
 
 ### Routes
 
@@ -133,13 +133,13 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 
 | Feature | Notes |
 |---------|--------|
-| Feature rotator | Privacy, fee/promo line, verify, co-sign, hash-on-Nimiq |
+| Hero status claims | Rotating trust / fee lines under CTAs |
 | Path: Create & seal | Role `creator` |
 | Path: I was invited | Role `signer` |
 | Path: Verify a PDF | Role `verifier` |
 | How VeriLock works | Collapsible multi-beat story, role-aware |
 | Privacy / trust copy | Expandable privacy framing |
-| Journey agreements strip | When logged in: recent agreements, open, seal CTA, view all |
+| Agreements | Full page `/agreements` via header / AccountMenu (no home strip) |
 
 ### Creator path stages
 
@@ -184,11 +184,11 @@ Wallet login (LoginSheet / Hub / Pay) is a **gate** when creating, signing, or s
 - `PricePage` (credits NIM + Stripe)
 - `SignaturesPanel` / signing helpers
 - `VerifyMatchesPanel`
-- Blog posts + `BlogPage` rules (`client/src/blog/README.md`)
 
 ### Explicitly out of redesign scope (do not reintroduce as primary)
 
-- Archive UI under `client/src/archive/` (pre-journey SPA, navy shell snapshot)
+- Archive UI under `client/src/archive/` (local-only gitignored snapshots)
+- Product blog (`client/src/blog/`, `/blog` routes, BlogPage) — local-only, not production
 - New email product redesign beyond existing `FEATURES.emailNotifyUi` gate
 
 ---
@@ -218,4 +218,3 @@ Expanded bans, token table, critique workflow, and pre-ship checklist: **`docs/j
 
 - Primary product CTA remains path selection → create/sign/verify, not a vague “Get started” that drops features.
 - Promo seal fee must stay accurate via `sealPricing` (no invented fees).
-- Blog CTAs follow blog author rules (promo fee, no site-name CTAs, no em dashes).

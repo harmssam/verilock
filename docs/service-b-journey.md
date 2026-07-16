@@ -35,7 +35,7 @@ railway up --service VeriLock-Journey --ci -y
 |------|------|
 | `client/src/App.tsx` | Light shell (header, routes, home ↔ track blend) |
 | `client/src/landing/` | Path cards, hero, how-it-works |
-| `client/src/journey/` | DocumentJourney, login, seal, agreements, blog UI |
+| `client/src/journey/` | DocumentJourney, login, seal, agreements UI |
 
 ### Local verify
 

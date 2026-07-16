@@ -1,7 +1,6 @@
 /**
- * How VeriLock works — landing redesign only.
- * Same stages/copy as production; quieter motion + registry styling.
- * Production how-it-works for the light shell.
+ * How VeriLock works — shell home accordion (light production SPA).
+ * Stages/copy match the product flow; quieter motion for the landing surface.
  */
 import {
   FileText,

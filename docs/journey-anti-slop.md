@@ -22,7 +22,7 @@ Do **not** jump to “make it pretty.” Use a critique loop:
 intent → constraints → tokens/reference → one surface → visual review → reject/revise → systemize
 ```
 
-1. **Intent** — Which path/stage/shell screen? (Create / Invited / Verify, or pricing/blog/agreements.)
+1. **Intent** — Which path/stage/shell screen? (Create / Invited / Verify, or pricing/privacy/security/agreements.)
 2. **Constraints** — Feature parity: same routes, stages, dock controls, privacy model. See `PRODUCT.md`.
 3. **Positive reference** — Reuse existing tokens and components (section 2). Do not invent a second palette.
 4. **Negative reference** — Run the ban list (section 3) before coding decorative chrome.
@@ -60,7 +60,7 @@ Design **serves the workflow** (path → rail → dock → document stage).
 - Creator rail: Fingerprint → Sign → Share → Seal → Verify (login is a gate, not a step)
 - Signer rail: Sign → Done (login is a gate on submit)
 - Verifier: Verify only (wallet optional)
-- Shell: home, pricing, privacy, agreements, blog, 404
+- Shell: home, pricing, privacy, security, agreements, 404
 
 ### Patterns that already work
 
@@ -197,8 +197,7 @@ AI is good at the ideal screenshot. Product design is the rest:
 |------|------|
 | Any visual restyle | `PRODUCT.md` feature parity → this file → edit `App` / `landing/` / `journey/` only |
 | Impeccable craft/shape/polish | Impeccable setup + **product** register + this file |
-| Blog art / copy | `client/src/blog/README.md` (no em dashes; promo fee CTAs) |
-| Archive snapshots | `client/src/archive/` — read-only; never production |
+| Blog / archive | Local-only gitignored trees — never production; do not re-add `/blog` |
 
 **Feature parity wins over aesthetics.** If a visual idea conflicts with inventory, drop the visual idea.
 
@@ -237,4 +236,4 @@ Done only when docs/journey-anti-slop.md section 5 + PRODUCT.md parity checklist
 - Product inventory & parity: [`PRODUCT.md`](../PRODUCT.md)
 - Journey contributor rules: [`AGENTS.md`](../AGENTS.md)
 - Journey modules: [`client/src/journey/README.md`](../client/src/journey/README.md)
-- Blog voice: [`client/src/blog/README.md`](../client/src/blog/README.md)
+- Local-only blog/archive: gitignored; not production
