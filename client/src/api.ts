@@ -93,7 +93,26 @@ export const api = {
       emailNotifyUi: boolean
       emailNotifySendEnabled: boolean
       emailNotifyConfigured: boolean
+      turnstileRequired?: boolean
+      turnstileSiteKey?: string | null
+      supportSendEnabled?: boolean
     }>('/api/features'),
+
+  submitSupportContact: (body: {
+    name: string
+    email: string
+    subject: string
+    message: string
+    /** Honeypot — leave empty. */
+    website?: string
+    formStartedAt: number
+    turnstileToken?: string
+  }) =>
+    request<{ ok: boolean }>('/api/support/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
 
   setDocumentNotifyEmail: (token: string, docId: string, email: string | null) =>
     request<{ ok: boolean }>(`/api/documents/${docId}/notify-email`, {

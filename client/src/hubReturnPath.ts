@@ -54,6 +54,9 @@ export function isSecurityPath(path: string): boolean {
   return /^\/security\/?$/.test(path)
 }
 
+export function isSupportPath(path: string): boolean {
+  return /^\/support\/?$/.test(path)
+}
 
 export function isKnownAppPath(path: string): boolean {
   if (path === '/' || path === '') return true
@@ -61,6 +64,7 @@ export function isKnownAppPath(path: string): boolean {
   if (isPricingPath(path)) return true
   if (isPrivacyPath(path)) return true
   if (isSecurityPath(path)) return true
+  if (isSupportPath(path)) return true
   if (documentSlugFromPath(path)) return true
   if (verifySlugFromPath(path)) return true
   return false

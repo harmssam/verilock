@@ -10,6 +10,7 @@ import {
   isPricingPath,
   isPrivacyPath,
   isSecurityPath,
+  isSupportPath,
   saveHubReturnPath,
 } from './hubReturnPath'
 import { applyPageMeta, journeyPathMeta, PAGE_META, type PageMeta } from './seo'
@@ -17,6 +18,7 @@ import type { SealDocument } from './types'
 import { PricePage } from './PricePage'
 import { PrivacyPolicyPage } from './PrivacyPolicyPage'
 import { SecurityPage } from './SecurityPage'
+import { SupportPage } from './SupportPage'
 import { AccountMenu } from './journey/AccountMenu'
 import { AgreementsPage } from './journey/AgreementsPage'
 import { DocumentJourney } from './journey/DocumentJourney'
@@ -84,6 +86,7 @@ type ShellScreen =
   | 'pricing'
   | 'privacy'
   | 'security'
+  | 'support'
   | 'agreements'
   | 'not-found'
 
@@ -91,6 +94,7 @@ function screenFromPath(pathname: string): ShellScreen {
   if (isPricingPath(pathname)) return 'pricing'
   if (isPrivacyPath(pathname)) return 'privacy'
   if (isSecurityPath(pathname)) return 'security'
+  if (isSupportPath(pathname)) return 'support'
   if (isAgreementsPath(pathname)) return 'agreements'
   if (!isKnownAppPath(pathname)) return 'not-found'
   return 'journey'
@@ -220,6 +224,7 @@ export function App() {
       !isPricingPath(window.location.pathname) &&
       !isPrivacyPath(window.location.pathname) &&
       !isSecurityPath(window.location.pathname) &&
+      !isSupportPath(window.location.pathname) &&
       !isAgreementsPath(window.location.pathname)
     ) {
       journeyReturnPathRef.current = path || '/'
@@ -259,6 +264,12 @@ export function App() {
     scrollShellTop()
   }, [rememberJourneyPath])
 
+  const goSupport = useCallback(() => {
+    rememberJourneyPath()
+    setScreen('support')
+    pushShellUrl('/support')
+    scrollShellTop()
+  }, [rememberJourneyPath])
 
   const goAgreements = useCallback(() => {
     rememberJourneyPath()
@@ -416,6 +427,10 @@ export function App() {
       applyPageMeta({ ...PAGE_META.security })
       return
     }
+    if (screen === 'support') {
+      applyPageMeta({ ...PAGE_META.support })
+      return
+    }
     if (screen === 'agreements') {
       applyPageMeta({ ...PAGE_META.agreements })
       return
@@ -437,11 +452,12 @@ export function App() {
   const trackMeta = trackRole ? TRACK_META[trackRole] : null
   const TrackIcon = trackMeta?.icon
 
-  // Wider content shell (privacy, security, etc.). Agreements matches landing (960px), not this.
+  // Wider content shell (privacy, security, support, etc.). Agreements matches landing (960px), not this.
   const wideShell =
     screen === 'pricing' ||
     screen === 'privacy' ||
     screen === 'security' ||
+    screen === 'support' ||
     screen === 'not-found'
 
   return (
@@ -533,6 +549,7 @@ export function App() {
       {(screen === 'pricing' ||
         screen === 'privacy' ||
         screen === 'security' ||
+        screen === 'support' ||
         screen === 'agreements' ||
         screen === 'not-found') && (
         <button type="button" className="lr-back" onClick={goJourney}>
@@ -562,6 +579,7 @@ export function App() {
           onPrivacy={goPrivacy}
         />
       )}
+      {screen === 'support' && <SupportPage />}
       {screen === 'agreements' && (
         <AgreementsPage
           token={wallet.token}
@@ -658,6 +676,13 @@ export function App() {
             onClick={goPrivacy}
           >
             Privacy Policy
+          </button>
+          <button
+            type="button"
+            className={`lr-footer-link${screen === 'support' ? ' lr-footer-link--active' : ''}`}
+            onClick={goSupport}
+          >
+            Support
           </button>
         </div>
       </footer>

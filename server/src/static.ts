@@ -10,6 +10,7 @@ function isKnownAppPath(path: string): boolean {
   if (/^\/pricing\/?$/.test(path)) return true
   if (/^\/privacy\/?$/.test(path)) return true
   if (/^\/security\/?$/.test(path)) return true
+  if (/^\/support\/?$/.test(path)) return true
   if (/^\/d\/[^/]+\/?$/.test(path)) return true
   if (/^\/v\/[^/]+\/?$/.test(path)) return true
   return false

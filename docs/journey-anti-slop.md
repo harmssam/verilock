@@ -60,7 +60,7 @@ Design **serves the workflow** (path → rail → dock → document stage).
 - Creator rail: Fingerprint → Sign → Share → Seal → Verify (login is a gate, not a step)
 - Signer rail: Sign → Done (login is a gate on submit)
 - Verifier: Verify only (wallet optional)
-- Shell: home, pricing, privacy, security, agreements, 404
+- Shell: home, pricing, privacy, security, support, agreements, 404
 
 ### Patterns that already work
 

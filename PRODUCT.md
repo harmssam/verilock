@@ -65,7 +65,7 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 1. **Same routes, same deep links, same query flags** (see inventory).
 2. **Same three path roles** and **same stage rails** for each role.
 3. **Same action-dock steps and controls** (fields, toggles, CTAs, cancel, share, credits, signature pad).
-4. **Same shell screens** (home journey, pricing, privacy, security, agreements, 404).
+4. **Same shell screens** (home journey, pricing, privacy, security, support, agreements, 404).
 5. **Same account/login/credits behaviors** (Hub vs Pay modes, balance chip → pricing, Stripe return).
 6. **Same privacy model** in UI copy and structure: PDF stays local; chain stores hash only.
 7. **Feature flags stay flags** (`FEATURES.emailNotifyUi`); do not hard-remove optional email when the flag exists.
@@ -78,9 +78,9 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 - [ ] Signer stages still: Sign → Done (wallet login is a gate on submit, not a rail step)
 - [ ] Verifier stages still: Verify only (wallet optional)
 - [ ] Deep links `/d/:slug`, `/v/:slug`, `?intent=`, `?preferSeal=1` still work
-- [ ] Shell routes `/`, `/pricing`, `/privacy`, `/agreements`, `/security`, 404 still exist
+- [ ] Shell routes `/`, `/pricing`, `/privacy`, `/agreements`, `/security`, `/support`, 404 still exist
 - [ ] Header: brand home, Agreements (when logged in), Pricing (when no credits chip), Security (desktop), AccountMenu
-- [ ] Footer: tagline, Security, Privacy Policy
+- [ ] Footer: tagline, Security, Privacy Policy, Support
 - [ ] How it works + privacy notes still present
 - [ ] Document stage metaphor still present (fingerprint / signatures / seal feedback)
 - [ ] Share invite (copy link, email package patterns) still present where creator can invite
@@ -108,10 +108,10 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 | Account menu | Login sheet, address, copy, agreements, credits → pricing, disconnect |
 | Credits balance chip | When credits enabled and logged in |
 | Wallet status / error banner | Connect and payment errors |
-| Back to home | On pricing / privacy / security / agreements / 404 |
+| Back to home | On pricing / privacy / security / support / agreements / 404 |
 | Journey keep-alive | DocumentJourney stays mounted (hidden) when visiting other shell screens |
 | Stripe checkout return | Mint/refresh credits after card purchase |
-| Footer | Tagline + Security + Privacy Policy |
+| Footer | Tagline + Security + Privacy Policy + Support |
 | Home path picker | Light landing (`LandingHome`) |
 
 ### Routes
@@ -126,6 +126,7 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 | `/pricing` | Seal fee + buy credits (NIM / card) |
 | `/privacy` | Privacy policy |
 | `/security` | Security & integrity (product-true claims only) |
+| `/support` | Support contact form (bot-protected) |
 | `/agreements` | Full agreements list |
 | unknown | 404 page with home |
 
