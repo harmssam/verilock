@@ -145,56 +145,116 @@
 }
 
 .price-page-why {
-  margin-top: 1.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--border);
+  margin-top: 1.65rem;
+  padding: 1.2rem 1.15rem 1.25rem;
+  border-radius: var(--radius-md, 14px);
+  border: 1px solid var(--border);
+  background: var(--surface-raised, var(--surface, transparent));
 }
 
-.price-page-why-title {
+.price-page-why-head {
   display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.price-page-why-badge {
+  flex-shrink: 0;
+  display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  margin: 0 0 0.5rem;
-  font-family: var(--font-display);
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--text);
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 12px;
+  border: 1px solid rgba(233, 178, 19, 0.28);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 220, 120, 0.22), transparent 55%),
+    rgba(233, 178, 19, 0.1);
+  box-shadow: 0 4px 14px rgba(233, 178, 19, 0.12);
 }
 
 .price-page-nimiq-mark {
-  flex-shrink: 0;
   display: block;
-  width: 1.15rem;
+  width: 1.1rem;
   height: auto;
 }
 
-.price-page-why > p {
+.price-page-why-head-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.price-page-why-title {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.price-page-why-lead {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   line-height: 1.55;
+  max-width: 40rem;
 }
 
 .price-page-why-list {
-  margin: 0.75rem 0 0;
-  padding-left: 1.15rem;
-  font-size: 0.86rem;
-  line-height: 1.55;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.55rem;
 }
 
-.price-page-why-list li + li {
-  margin-top: 0.45rem;
+@media (min-width: 720px) {
+  .price-page-why-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+
+  /* Last odd card spans full width for balance when 5 items */
+  .price-page-why-item:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
 }
 
-.price-page-why-list strong {
+.price-page-why-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0.8rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface, rgba(255, 255, 255, 0.03));
+  min-width: 0;
+}
+
+.price-page-why-item-title {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
   color: var(--text);
-  font-weight: 600;
+}
+
+.price-page-why-item-body {
+  font-size: 0.84rem;
+  line-height: 1.5;
 }
 
 .price-page-why-cta {
-  margin: 0.9rem 0 0;
+  margin: 1rem 0 0;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
   font-size: 0.86rem;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
 .price-page-nimiq-link {

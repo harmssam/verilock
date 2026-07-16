@@ -3,7 +3,12 @@ import { useEffect, useRef, useState } from 'react'
 import { formatDisplayAddress } from '../addresses'
 import { buildNimiqAddressExplorerUrl } from '../explorer'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
-import { journeyLoginEntryLabels, type JourneyConnectMode } from './journeyConnectUi'
+import {
+  journeyLoginEntryLabels,
+  journeyLoginNeedsSheet,
+  type JourneyConnectMode,
+  type JourneyConnectRequest,
+} from './journeyConnectUi'
 import { LoginSheet } from './LoginSheet'
 import type { JourneyAccount } from './types'
 
@@ -15,7 +20,7 @@ interface AccountMenuProps {
   connectMode?: JourneyConnectMode
   /** Seal credit balance when credits are enabled (header chip). */
   creditBalance?: number | null
-  onConnect: () => void
+  onConnect: (options?: JourneyConnectRequest) => void
   onDisconnect: () => void
   onAgreements?: () => void
   /** Open pricing / buy credits. */
@@ -38,6 +43,7 @@ export function AccountMenu({
   const [copied, setCopied] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const loginRootRef = useRef<HTMLDivElement>(null)
+  const needsSheet = journeyLoginNeedsSheet(connectMode)
 
   useEffect(() => {
     if (!open) return
@@ -68,24 +74,33 @@ export function AccountMenu({
           type="button"
           data-login-trigger
           className={`btn btn-primary exp-connect-btn${connecting ? ' btn--busy' : ''}`}
-          onClick={() => setLoginOpen(v => !v)}
-          disabled={connecting && !loginOpen}
+          onClick={() => {
+            if (!needsSheet) {
+              // Desktop Hub (and in-Pay native): skip the intermediate modal.
+              onConnect()
+              return
+            }
+            setLoginOpen(v => !v)
+          }}
+          disabled={connecting}
           title={walletStatus ?? 'Login with your Nimiq wallet'}
-          aria-expanded={loginOpen}
-          aria-haspopup="dialog"
+          aria-expanded={needsSheet ? loginOpen : undefined}
+          aria-haspopup={needsSheet ? 'dialog' : undefined}
         >
           <NimiqHexagonIcon size={16} />
-          {connecting && loginOpen ? entry.busy : entry.idle}
+          {connecting ? entry.busy : entry.idle}
         </button>
-        <LoginSheet
-          open={loginOpen}
-          connectMode={connectMode}
-          connecting={connecting}
-          walletStatus={walletStatus}
-          onClose={() => setLoginOpen(false)}
-          onProceed={onConnect}
-          placement="popover"
-        />
+        {needsSheet && (
+          <LoginSheet
+            open={loginOpen}
+            connectMode={connectMode}
+            connecting={connecting}
+            walletStatus={walletStatus}
+            onClose={() => setLoginOpen(false)}
+            onProceed={onConnect}
+            placement="popover"
+          />
+        )}
       </div>
     )
   }

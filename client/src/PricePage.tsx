@@ -1,5 +1,5 @@
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
-import { Coins, ExternalLink } from 'lucide-react'
+import { Coins, ExternalLink, LoaderCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from './api'
 import { NimiqHexagonIcon } from './NimiqHexagonIcon'
@@ -9,7 +9,9 @@ import { getSealPricing } from './sealPricing'
 import { CreditsPanel } from './experiment/CreditsPanel'
 import {
   journeyLoginEntryLabels,
+  journeyLoginNeedsSheet,
   type JourneyConnectMode,
+  type JourneyConnectRequest,
 } from './experiment/journeyConnectUi'
 import { LoginSheet } from './experiment/LoginSheet'
 import './PricePage.css'
@@ -29,7 +31,7 @@ export interface PricePageProps {
   setNimiq?: (p: NimiqProvider | null) => void
   connecting?: boolean
   connectMode?: JourneyConnectMode
-  onConnect?: () => void
+  onConnect?: (options?: JourneyConnectRequest) => void
   onCreditsPurchased?: () => void
 }
 
@@ -169,42 +171,59 @@ export function PricePage({
       )}
 
       <section className="price-page-why" aria-labelledby="price-why-nimiq">
-        <h3 id="price-why-nimiq" className="price-page-why-title">
-          <NimiqHexagonIcon size={20} className="price-page-nimiq-mark" />
-          Why the Nimiq network?
-        </h3>
-        <p className="muted">
-          VeriLock seals documents on{' '}
-          <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
-            Nimiq
-            <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
-          </a>
-          - a browser-first Layer&nbsp;1 built so people can use the chain from a normal web app, without
-          a broker or middle service holding the truth. When you seal, your wallet signs and the
-          fingerprint is written directly on the Nimiq network. VeriLock never takes custody of the proof.
-        </p>
-        <ul className="price-page-why-list muted">
-          <li>
-            <strong>Direct to the chain</strong> - No attestation broker, escrow, or opaque API sits
-            between you and the record. The seal is a normal Nimiq transaction anyone can look up
-            independently of VeriLock.
+        <header className="price-page-why-head">
+          <span className="price-page-why-badge" aria-hidden>
+            <NimiqHexagonIcon size={18} className="price-page-nimiq-mark" />
+          </span>
+          <div className="price-page-why-head-copy">
+            <h3 id="price-why-nimiq" className="price-page-why-title">
+              Why the Nimiq network?
+            </h3>
+            <p className="price-page-why-lead muted">
+              VeriLock seals documents on{' '}
+              <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
+                Nimiq
+                <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
+              </a>
+              , a browser-first Layer&nbsp;1. Your wallet signs; the fingerprint goes on the network.
+              VeriLock never takes custody of the proof.
+            </p>
+          </div>
+        </header>
+        <ul className="price-page-why-list">
+          <li className="price-page-why-item">
+            <strong className="price-page-why-item-title">Direct to the chain</strong>
+            <span className="price-page-why-item-body muted">
+              No attestation broker, escrow, or opaque API sits between you and the record. The seal is
+              a normal Nimiq transaction anyone can look up independently of VeriLock.
+            </span>
           </li>
-          <li>
-            <strong>Fast and lightweight</strong> - Nimiq is designed for the web: quick confirmations,
-            lightweight clients, and no need for signers to run a full node. Sealing stays practical in
-            the browser or Nimiq Pay.
+          <li className="price-page-why-item">
+            <strong className="price-page-why-item-title">Fast and lightweight</strong>
+            <span className="price-page-why-item-body muted">
+              Built for the web: quick confirmations, lightweight clients, no full node for signers.
+              Sealing stays practical in the browser or Nimiq Pay.
+            </span>
           </li>
-          <li>
-            <strong>Cheap permanent proof</strong> - Network costs stay low, so one credit can anchor a
-            document fingerprint without enterprise blockchain pricing.
+          <li className="price-page-why-item">
+            <strong className="price-page-why-item-title">Cheap permanent proof</strong>
+            <span className="price-page-why-item-body muted">
+              Network costs stay low, so one credit can anchor a document fingerprint without
+              enterprise blockchain pricing.
+            </span>
           </li>
-          <li>
-            <strong>Your PDF never leaves your device</strong> - Only a SHA-256 fingerprint is written
-            on-chain. The file itself stays local.
+          <li className="price-page-why-item">
+            <strong className="price-page-why-item-title">PDF stays on your device</strong>
+            <span className="price-page-why-item-body muted">
+              Only a short integrity fingerprint is written on-chain. The file itself never uploads.
+            </span>
           </li>
-          <li>
-            <strong>Self-custodial identity</strong> - Each party signs with their own wallet. VeriLock
-            never holds your keys, and the proof outlives our servers.
+          <li className="price-page-why-item">
+            <strong className="price-page-why-item-title">Self-custodial identity</strong>
+            <span className="price-page-why-item-body muted">
+              Each party signs with their own wallet. VeriLock never holds your keys, and the proof
+              outlives our servers.
+            </span>
           </li>
         </ul>
         <p className="muted price-page-why-cta">
@@ -213,7 +232,6 @@ export function PricePage({
             nimiq.com
             <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
           </a>
-          .
         </p>
       </section>
     </div>
@@ -227,14 +245,15 @@ function PriceCreditsLogin({
 }: {
   connectMode: JourneyConnectMode
   connecting: boolean
-  onConnect: () => void
+  onConnect: (options?: JourneyConnectRequest) => void
 }) {
   const [loginOpen, setLoginOpen] = useState(false)
   const entry = journeyLoginEntryLabels()
+  const needsSheet = journeyLoginNeedsSheet(connectMode)
 
   return (
     <div className="price-page-credits-connect">
-      {!loginOpen ? (
+      {!needsSheet || !loginOpen ? (
         <>
           <p className="muted" style={{ margin: 0, fontSize: '0.86rem' }}>
             Login with your Nimiq wallet to choose a pack.
@@ -242,11 +261,27 @@ function PriceCreditsLogin({
           <button
             type="button"
             data-login-trigger
-            className="btn btn-primary"
-            onClick={() => setLoginOpen(true)}
+            className={`btn btn-primary${connecting ? ' btn--busy' : ''}`}
+            disabled={connecting}
+            onClick={() => {
+              if (!needsSheet) {
+                onConnect()
+                return
+              }
+              setLoginOpen(true)
+            }}
           >
-            <NimiqHexagonIcon size={16} />
-            {entry.idle}
+            {connecting ? (
+              <>
+                <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+                {entry.busy}
+              </>
+            ) : (
+              <>
+                <NimiqHexagonIcon size={16} />
+                {entry.idle}
+              </>
+            )}
           </button>
         </>
       ) : (

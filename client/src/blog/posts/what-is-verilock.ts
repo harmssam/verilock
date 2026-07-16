@@ -109,11 +109,11 @@ export const post: BlogPost = {
     },
     {
       type: 'h2',
-      text: 'How it fits the Journey app',
+      text: 'How you use it',
     },
     {
       type: 'p',
-      text: 'Production UI is Journey Edition: pick a path to create and seal, join as a co-signer, or verify. The stages stay focused. Under the hood the loop is still fingerprint, sign, seal, and verify. For the step-by-step pipeline, read How VeriLock works.',
+      text: 'On the home screen, pick a path: create and seal, join as a co-signer, or verify. Steps stay focused on one job at a time. Under the hood the loop is still fingerprint, sign, seal, and verify. For the step-by-step pipeline, read How VeriLock works.',
     },
     {
       type: 'p',

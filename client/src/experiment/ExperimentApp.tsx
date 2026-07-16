@@ -263,7 +263,7 @@ export function ExperimentApp() {
     showOpenInPay: wallet.showOpenInPay,
   })
 
-  const connectPreservingPath = () => {
+  const connectPreservingPath = (options?: { useRedirect?: boolean }) => {
     // Prefer session intent only if already mid-path (do not rehydrate from sticky storage alone).
     const intent = resolveIntentForConnect(null)
     if (intent) {
@@ -271,7 +271,8 @@ export function ExperimentApp() {
       syncIntentToUrl(intent)
     }
     saveHubReturnPath()
-    void wallet.connect(journeyConnectOptions(connectMode))
+    // Explicit options from mobile chooser (Pay vs Hub); otherwise resolve from mode.
+    void wallet.connect(options !== undefined ? options : journeyConnectOptions(connectMode))
   }
 
   const wideShell =

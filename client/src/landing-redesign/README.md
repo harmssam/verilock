@@ -20,7 +20,7 @@ See root `PRODUCT.md` → *Landing redesign preview*.
 ## Rules
 
 - **Does not modify** production files under `client/src/experiment/` (except by import).
-- **Feature parity** with the live landing: same paths, shell routes, trust copy, how-it-works, agreements strip, account/credits, footer. See root `PRODUCT.md`.
+- **Feature parity** with the live landing: same paths, shell routes, trust copy, how-it-works, account/credits, footer. Agreements open via header/AccountMenu → `/agreements` (no quiet home strip). See root `PRODUCT.md`.
 - **`/security`** - Security & integrity (product-true; no invented certs). Shared `SecurityPage`. Header on desktop; footer-only on narrow (with Blog on very small screens).
 - **Journey keep-alive:** `DocumentJourney` stays mounted (hidden) when visiting pricing/blog/privacy/security, matching production.
 - After you pick a path, the **existing** `DocumentJourney` continues the flow (original UI for connect → seal). Only the landing shell is redesigned.
@@ -38,15 +38,9 @@ npm run dev:landing-redesign --prefix client
 
 Production Journey stays on port **5176** (`npm run dev --prefix client`).
 
-### Path image placement (dev only)
+### Path stills
 
-Designer chrome for pan/zoom of path stills. **Hidden by default.**
-
-```text
-http://localhost:5178/?place=1
-```
-
-Requires `import.meta.env.DEV` **and** `?place=1`. Copy placements into `pathMedia.ts` to lock defaults. Never shown in production builds.
+Crops for home path cards and track banners are locked in `pathMedia.ts` (`PATH_PLACEMENTS`).
 
 ## Files
 
@@ -56,6 +50,7 @@ Requires `import.meta.env.DEV` **and** `?place=1`. Copy placements into `pathMed
 | `vite.landing-redesign.config.ts` | Vite on :5178 |
 | `src/landing-redesign/*` | Redesign app + styles |
 | `public/landing-redesign/path-*.jpg` | Role stills behind path cards |
+| `public/landing-redesign/hero.jpg` | Home hero: VeriLock mark + Nimiq hex network |
 
 ## Pricing restyle
 
@@ -66,24 +61,24 @@ Visual only: CSS under `.lr-app` / `.lr-app--pricing` in `LandingRedesign.css`.
 
 UI uses production **`/verilock-mark.png`** (same as Journey). Gold redesign exports under `public/landing-redesign/verilock-mark-gold*` are unused archive assets.
 
-## Path backgrounds
+## Hero + path backgrounds
 
-| File | Path |
-|------|------|
-| `path-create.jpg` | Create & seal (sealed document / wax seal) |
-| `path-invite.jpg` | I was invited (folder handoff, portrait 3:4) |
-| `path-verify.jpg` | Verify a PDF (magnifier + stamp) |
+| File | Use |
+|------|-----|
+| `hero.jpg` | Home hero visual (VeriLock lock mark + gold Nimiq hex network on mint light) |
+| `path-create.jpg` | Create & seal path card / track |
+| `path-invite.jpg` | I was invited path card / track |
+| `path-verify.jpg` | Verify a PDF path card / track |
 
-Images are decorative only (`alt=""`). Label strips stay near-solid white for contrast; stills keep color and crop focus.
+Images are decorative only (`alt=""`). Hero is brand-led; path stills keep role metaphors. Label strips stay near-solid white for contrast.
 
 ## Logged-in chrome (parity)
 
 Same as production Journey shell:
 
-- Agreements nav when wallet connected
+- Agreements nav when wallet connected → full `/agreements` page
 - Credits chip when balance is finite → Pricing (hides Pricing nav link)
 - Account menu: address, copy, agreements, credits, disconnect
-- Home agreements strip via `JourneyAgreements`
 
 ## Not production
 

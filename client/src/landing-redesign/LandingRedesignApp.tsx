@@ -45,7 +45,7 @@ import {
 } from '../experiment/stripeCheckoutReturn'
 import type { PathRole } from '../experiment/types'
 import { LandingHome } from './LandingHome'
-import { formatObjectPosition, PATH_PLACEMENTS, PATH_STILLS } from './pathMedia'
+import { PATH_PLACEMENTS, PATH_STILLS, placementImageStyle } from './pathMedia'
 
 /** Path card labels — stills + placement from pathMedia. */
 const TRACK_META: Record<
@@ -59,7 +59,7 @@ const TRACK_META: Record<
 > = {
   creator: {
     title: 'Create & seal',
-    detail: 'Fingerprint, multi-party sign, lock on Nimiq',
+    detail: 'Start an agreement, invite co-signers, lock a permanent proof',
     icon: Fingerprint,
     accent: 'creator',
   },
@@ -71,7 +71,7 @@ const TRACK_META: Record<
   },
   verifier: {
     title: 'Verify a PDF',
-    detail: 'Drop a file. Look up sealed fingerprints',
+    detail: 'Drop a file to check it still matches a sealed proof',
     icon: ScanSearch,
     accent: 'verifier',
   },
@@ -114,6 +114,28 @@ function shouldShowJourneyFlow(pathname: string, forceFlow: boolean): boolean {
   return false
 }
 
+/** SPA screens keep scroll; always open path / shell views at the top. */
+function scrollShellTop(): void {
+  if (typeof window === 'undefined') return
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  document.documentElement.scrollTop = 0
+  document.body.scrollTop = 0
+}
+
+/**
+ * Push a new history entry without replaceState-mutating the previous one.
+ * Critical for path cards: Back must restore clean landing `/`, not a prior shell page.
+ */
+function pushShellUrl(next: string): void {
+  if (typeof window === 'undefined') return
+  const cur = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  if (cur === next) {
+    window.history.replaceState(window.history.state, '', next)
+    return
+  }
+  window.history.pushState({}, '', next)
+}
+
 export function LandingRedesignApp() {
   const wallet = useJourneyWallet()
   const { balance: creditBalance, refresh: refreshCredits } = useCreditBalance(wallet.token)
@@ -124,7 +146,7 @@ export function LandingRedesignApp() {
   const [journeyEpoch, setJourneyEpoch] = useState(0)
   const [navEpoch, setNavEpoch] = useState(0)
   const [journeyMeta, setJourneyMeta] = useState<PageMeta | null>(null)
-  /** Active path for track title (shell-owned; intent can lag after Start over). */
+  /** Active path for track title (shell-owned; intent can lag after Back home). */
   const [trackRole, setTrackRole] = useState<PathRole | null>(() =>
     typeof window !== 'undefined' ? resolveJourneyIntent() : null,
   )
@@ -214,44 +236,50 @@ export function LandingRedesignApp() {
   const goJourney = useCallback(() => {
     setScreen('journey')
     clearJourneyIntent()
-    syncIntentToUrl(null)
     journeyReturnPathRef.current = '/'
-    window.history.pushState({}, '', '/')
+    // Push clean home — do not replaceState the track entry (that would break Back).
+    pushShellUrl('/')
     setNavEpoch(n => n + 1)
     // Remount + clear title at blend mid so the current track fades out cleanly.
     blendToSurface('home', { clearTrackRole: true, remountJourney: true })
+    scrollShellTop()
   }, [blendToSurface])
 
   const goPricing = useCallback(() => {
     rememberJourneyPath()
     setScreen('pricing')
-    window.history.pushState({}, '', '/pricing')
+    pushShellUrl('/pricing')
+    scrollShellTop()
   }, [rememberJourneyPath])
 
   const goPrivacy = useCallback(() => {
     rememberJourneyPath()
     setScreen('privacy')
-    window.history.pushState({}, '', '/privacy')
+    pushShellUrl('/privacy')
+    scrollShellTop()
   }, [rememberJourneyPath])
 
   const goSecurity = useCallback(() => {
     rememberJourneyPath()
     setScreen('security')
-    window.history.pushState({}, '', '/security')
+    pushShellUrl('/security')
+    scrollShellTop()
   }, [rememberJourneyPath])
 
   const goBlog = useCallback((slug?: string) => {
     rememberJourneyPath()
     setScreen('blog')
     const next = slug ? `/blog/${slug}` : '/blog'
-    window.history.pushState({}, '', next)
+    pushShellUrl(next)
     setNavEpoch(n => n + 1)
+    scrollShellTop()
   }, [rememberJourneyPath])
 
   const goAgreements = useCallback(() => {
     rememberJourneyPath()
     setScreen('agreements')
-    window.history.pushState({}, '', '/agreements')
+    pushShellUrl('/agreements')
+    scrollShellTop()
   }, [rememberJourneyPath])
 
   const openAgreement = useCallback(
@@ -259,10 +287,11 @@ export function LandingRedesignApp() {
       setScreen('journey')
       setTrackRole(null)
       const q = preferSeal ? '?preferSeal=1' : ''
-      window.history.pushState({}, '', `/d/${doc.slug}${q}`)
+      pushShellUrl(`/d/${doc.slug}${q}`)
       setJourneyEpoch(n => n + 1)
       setNavEpoch(n => n + 1)
       blendToSurface('track')
+      scrollShellTop()
     },
     [blendToSurface],
   )
@@ -270,51 +299,66 @@ export function LandingRedesignApp() {
   const startCreate = useCallback(() => {
     clearJourneyIntent()
     saveJourneyIntent('creator')
-    syncIntentToUrl('creator')
+    // Do NOT syncIntentToUrl before push — replaceState would overwrite landing `/`.
     setTrackRole('creator')
     setScreen('journey')
     setJourneyEpoch(n => n + 1)
-    window.history.pushState({}, '', '/?intent=creator')
+    pushShellUrl('/?intent=creator')
     setNavEpoch(n => n + 1)
     blendToSurface('track')
+    scrollShellTop()
   }, [blendToSurface])
 
   const pickRole = useCallback(
     (role: PathRole) => {
       saveJourneyIntent(role)
-      syncIntentToUrl(role)
+      // Single push of ?intent= only. syncIntentToUrl uses replaceState and was
+      // destroying the clean landing history entry, so Back skipped home.
       setTrackRole(role)
       setScreen('journey')
       setJourneyEpoch(n => n + 1)
-      window.history.pushState({}, '', `/?intent=${role}`)
+      pushShellUrl(`/?intent=${role}`)
       setNavEpoch(n => n + 1)
       blendToSurface('track')
+      scrollShellTop()
     },
     [blendToSurface],
   )
 
-  const connectPreservingPath = useCallback(() => {
-    const intent = resolveIntentForConnect(null)
-    if (intent) {
-      saveJourneyIntent(intent)
-      syncIntentToUrl(intent)
-    }
-    saveHubReturnPath()
-    void wallet.connect(journeyConnectOptions(connectMode))
-  }, [connectMode, wallet])
+  const connectPreservingPath = useCallback(
+    (options?: { useRedirect?: boolean }) => {
+      const intent = resolveIntentForConnect(null)
+      if (intent) {
+        saveJourneyIntent(intent)
+        // replaceState OK here: keep Hub return URL accurate without a new stack entry.
+        syncIntentToUrl(intent)
+      }
+      saveHubReturnPath()
+      // Explicit options from mobile chooser (Pay vs Hub); otherwise resolve from mode.
+      void wallet.connect(options !== undefined ? options : journeyConnectOptions(connectMode))
+    },
+    [connectMode, wallet],
+  )
 
   useEffect(() => {
     const onPopState = () => {
       const path = window.location.pathname
       const nextScreen = screenFromPath(path)
       setScreen(nextScreen)
-      const flow = shouldShowJourneyFlow(path, false)
-      const intent = resolveJourneyIntent()
-      setTrackRole(intent)
       setNavEpoch(n => n + 1)
       if (nextScreen === 'journey') {
-        blendToSurface(flow || intent ? 'track' : 'home')
+        // resolveJourneyIntent clears sticky session intent on clean `/`.
+        const intent = resolveJourneyIntent()
+        const deep = isDeepLinkPath(path)
+        const showTrack = deep || Boolean(intent)
+        setTrackRole(intent)
+        if (showTrack) {
+          blendToSurface('track')
+        } else {
+          blendToSurface('home', { clearTrackRole: true, remountJourney: true })
+        }
       }
+      scrollShellTop()
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -607,11 +651,7 @@ export function LandingRedesignApp() {
         >
           {showHome && (
             <LandingHome
-              token={wallet.token}
-              address={wallet.address}
               onPickRole={pickRole}
-              onOpenAgreement={openAgreement}
-              onViewAllAgreements={goAgreements}
               onOpenBlogPost={slug => goBlog(slug)}
               onOpenBlogIndex={() => goBlog()}
             />
@@ -631,9 +671,8 @@ export function LandingRedesignApp() {
                     width={1280}
                     height={720}
                     decoding="async"
-                    style={{
-                      objectPosition: formatObjectPosition(PATH_PLACEMENTS.track[trackRole]),
-                    }}
+                    draggable={false}
+                    style={placementImageStyle(PATH_PLACEMENTS.track[trackRole])}
                   />
                   <span className="lr-header-track-wash" />
                 </span>

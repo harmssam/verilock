@@ -38,8 +38,8 @@ const STEP_ICONS: Record<JourneyStepId, LucideIcon> = {
 
 function roleSubtitle(role: PathRole | null): string {
   if (role === 'signer') return 'Match the shared PDF and sign with your wallet'
-  if (role === 'verifier') return 'Check a sealed fingerprint anytime. No wallet needed'
-  return 'Fingerprint locally, sign together, seal permanently on Nimiq'
+  if (role === 'verifier') return 'Check a sealed proof anytime. No wallet needed'
+  return 'Sign together on your device, then lock a permanent proof'
 }
 
 function prefersReducedMotion(): boolean {

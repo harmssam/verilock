@@ -62,7 +62,7 @@ export const post: BlogPost = {
     {
       type: 'ul',
       items: [
-        'Open Journey and choose create (or open an in-progress agreement).',
+        'On the home screen, choose Create & seal (or open an in-progress agreement).',
         'Connect your Nimiq wallet.',
         'Fingerprint the PDF in the browser. Confirm the file is the version you intend to freeze later.',
         'Share the agreement link with co-signers. Send them the same PDF if they do not already have it.',

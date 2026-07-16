@@ -8,6 +8,7 @@ Journey SPA blog under `/blog`. Content lives in `client/src/blog/posts/`. UI in
 - Short sentences; privacy and permanence as design facts, not hype
 - Prefer: sign, seal, fingerprint, permanent record, stays on your device, verify
 - Avoid: legal overclaims (legally binding / court-admissible unless counsel-approved), moon language, absolute security claims
+- **No internal codenames in reader copy.** Do not write "Journey", "Journey Edition", or "Journey home". Say "home screen", "Create & seal", "I was invited", "Verify a PDF", or "the app".
 
 ## Hard rules
 

@@ -339,6 +339,60 @@
   color: var(--sky);
 }
 
+/* Mobile dual choice: Pay app vs Hub in browser */
+.login-sheet-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.login-sheet-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.login-sheet-choice-hint {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.login-sheet-choice-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.1rem 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.login-sheet-choice-divider::before,
+.login-sheet-choice-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.login-sheet-store-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.login-sheet-store-row .btn,
+.login-sheet-store-link {
+  flex: 1 1 auto;
+  min-width: min(100%, 6.5rem);
+  justify-content: center;
+  font-size: 0.76rem;
+  padding: 0.4rem 0.55rem;
+}
+
 .login-sheet-stores {
   display: flex;
   flex-direction: column;
@@ -350,20 +404,6 @@
 .login-sheet-stores-label {
   margin: 0;
   font-size: 0.78rem;
-}
-
-.login-sheet-store-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.login-sheet-store-row .btn {
-  flex: 1 1 auto;
-  min-width: min(100%, 7.5rem);
-  justify-content: center;
-  font-size: 0.78rem;
-  padding: 0.45rem 0.65rem;
 }
 
 @media (max-width: 640px) {
@@ -1978,25 +2018,40 @@ a.hash-chip.text-link:focus-visible {
   color: var(--mint);
 }
 
+/*
+ * Title + type badge on one row.
+ * nowrap + title min-width:0 keeps the badge beside the title (never orphaned below);
+ * title does not flex-grow so short names stay flush with the badge.
+ */
 .agreements-page-title-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.4rem 0.55rem;
   width: 100%;
+  min-width: 0;
 }
 
 .agreements-page-title {
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: -0.01em;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .agreements-page-type {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  line-height: 1.2;
+  white-space: nowrap;
   padding: 0.15rem 0.45rem;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
