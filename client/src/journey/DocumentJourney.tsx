@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { isValidNimiqAddress, normalizeAddress, shortAddress } from '../addresses'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
 import {
@@ -972,10 +973,11 @@ export function DocumentJourney({
       inviteToastTimerRef.current = null
     }
     setInviteToast({ key: Date.now(), contactLabel })
+    // Long enough to read the PDF handoff reminder
     inviteToastTimerRef.current = setTimeout(() => {
       setInviteToast(null)
       inviteToastTimerRef.current = null
-    }, 6500)
+    }, 10000)
   }, [])
 
   useEffect(() => {
@@ -3300,40 +3302,47 @@ export function DocumentJourney({
         onToggle={() => setHowOpen(v => !v)}
       />
 
-      {inviteToast && (
-        <div
-          key={inviteToast.key}
-          className="invite-sent-toast"
-          role="status"
-          aria-live="polite"
-        >
-          <span className="invite-sent-toast-icon" aria-hidden>
-            <MailCheck size={20} strokeWidth={2.25} />
-          </span>
-          <div className="invite-sent-toast-body">
-            <strong>Email sent</strong>
-            <p>
-              Remember to send the PDF to{' '}
-              <span className="invite-sent-toast-contact">{inviteToast.contactLabel}</span>{' '}
-              separately — VeriLock never attaches the file.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="invite-sent-toast-dismiss"
-            aria-label="Dismiss"
-            onClick={() => {
-              if (inviteToastTimerRef.current) {
-                clearTimeout(inviteToastTimerRef.current)
-                inviteToastTimerRef.current = null
-              }
-              setInviteToast(null)
-            }}
+      {/*
+        Portal to body: .lr-view-blend uses transform, which traps position:fixed
+        and hid this toast under the scroll container.
+      */}
+      {inviteToast &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            key={inviteToast.key}
+            className="invite-sent-toast"
+            role="status"
+            aria-live="polite"
           >
-            <X size={16} strokeWidth={2.25} aria-hidden />
-          </button>
-        </div>
-      )}
+            <span className="invite-sent-toast-icon" aria-hidden>
+              <MailCheck size={22} strokeWidth={2.25} />
+            </span>
+            <div className="invite-sent-toast-body">
+              <strong>Email sent — PDF not attached</strong>
+              <p>
+                Send the agreement PDF to{' '}
+                <span className="invite-sent-toast-contact">{inviteToast.contactLabel}</span>{' '}
+                yourself (email, Messages, Drive…). VeriLock only sends the signing link.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="invite-sent-toast-dismiss"
+              aria-label="Dismiss"
+              onClick={() => {
+                if (inviteToastTimerRef.current) {
+                  clearTimeout(inviteToastTimerRef.current)
+                  inviteToastTimerRef.current = null
+                }
+                setInviteToast(null)
+              }}
+            >
+              <X size={16} strokeWidth={2.25} aria-hidden />
+            </button>
+          </div>,
+          document.body,
+        )}
 
     </div>
   )

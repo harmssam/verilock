@@ -4288,24 +4288,25 @@ a.hash-chip.text-link:focus-visible {
   }
 }
 
-/* ── Invite-sent toast (bottom center, after Resend invite) ── */
+/* ── Invite-sent toast (bottom center, portaled to body after Resend invite) ── */
 
 .invite-sent-toast {
   position: fixed;
   left: 50%;
-  bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
-  z-index: 80;
+  bottom: max(1.35rem, env(safe-area-inset-bottom, 0px));
+  /* Above sticky header (backdrop-filter) and dock; below login sheet (200) was wrong when trapped */
+  z-index: 400;
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  width: min(26rem, calc(100vw - 1.5rem));
-  padding: 0.9rem 0.85rem 0.9rem 0.95rem;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, #0d9488 28%, #e2e8f0);
+  gap: 0.8rem;
+  width: min(28rem, calc(100vw - 1.5rem));
+  padding: 1rem 0.95rem 1rem 1.05rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, #0d9488 35%, #e2e8f0);
   background: #ffffff;
   box-shadow:
-    0 12px 40px rgba(15, 23, 42, 0.14),
-    0 2px 8px rgba(15, 23, 42, 0.06);
+    0 18px 48px rgba(15, 23, 42, 0.2),
+    0 4px 14px rgba(15, 23, 42, 0.1);
   transform: translateX(-50%);
   animation: invite-toast-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
   pointer-events: auto;

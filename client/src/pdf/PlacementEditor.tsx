@@ -6,6 +6,7 @@ import {
   Check,
   Lock,
   PenLine,
+  Pencil,
   Trash2,
   Type,
   UserRound,
@@ -565,10 +566,9 @@ export function PlacementEditor({
         </label>
 
         <p className="muted" style={{ margin: '0 0 0.5rem', fontSize: '0.78rem' }}>
-          <strong>Name people now</strong> (click each person card and type e.g. Tom). Optional{' '}
-          <strong>Nimiq address</strong> locks that wallet to that person. After you lock
-          placements, names freeze — you only invite next. Name-only people pick themselves (or
-          open a personal link).
+          <strong>Rename each person</strong> in the dashed name field (e.g. Tom) — click the
+          placeholder text to edit. Optional <strong>Nimiq address</strong> locks that wallet.
+          After you lock placements, names freeze — you only invite next.
         </p>
 
         <p className="placement-editor-active-banner" style={{ ['--person-color' as string]: personColor(activePerson) }}>
@@ -614,23 +614,45 @@ export function PlacementEditor({
                     <span className="placement-person-label">Person {p.slotIndex}</span>
                     {!locked ? (
                       <>
-                        <input
-                          className="placement-person-name"
-                          value={p.displayName}
-                          disabled={editDisabled}
-                          maxLength={80}
-                          placeholder={`Name (e.g. Tom)`}
-                          onFocus={() => selectPerson(p.slotIndex)}
-                          onClick={e => {
-                            e.stopPropagation()
-                            selectPerson(p.slotIndex)
-                          }}
-                          onChange={e => {
-                            selectPerson(p.slotIndex)
-                            renamePerson(p.slotIndex, e.target.value)
-                          }}
-                          aria-label={`Name for person ${p.slotIndex}`}
-                        />
+                        <label
+                          className="placement-person-name-wrap"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <span className="placement-person-name-hint">
+                            <Pencil size={12} strokeWidth={2.25} aria-hidden />
+                            Click to rename
+                          </span>
+                          <input
+                            className={[
+                              'placement-person-name',
+                              /^Person\s+\d+$/i.test(p.displayName.trim())
+                                ? 'is-placeholder-name'
+                                : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
+                            value={p.displayName}
+                            disabled={editDisabled}
+                            maxLength={80}
+                            placeholder="Type their name…"
+                            onFocus={e => {
+                              selectPerson(p.slotIndex)
+                              // Default "Person 1" → select all so typing replaces immediately
+                              if (/^Person\s+\d+$/i.test(p.displayName.trim())) {
+                                e.currentTarget.select()
+                              }
+                            }}
+                            onClick={e => {
+                              e.stopPropagation()
+                              selectPerson(p.slotIndex)
+                            }}
+                            onChange={e => {
+                              selectPerson(p.slotIndex)
+                              renamePerson(p.slotIndex, e.target.value)
+                            }}
+                            aria-label={`Rename person ${p.slotIndex}`}
+                          />
+                        </label>
                         <input
                           className="placement-person-wallet"
                           value={walletRaw}
@@ -925,22 +947,33 @@ export function PlacementEditor({
                 const person =
                   people.find(p => p.slotIndex === slot.personSlotIndex)?.displayName ||
                   `Person ${slot.personSlotIndex}`
+                const kind =
+                  slot.kind === 'text' && slot.lockedContent?.text?.trim()
+                    ? slot.lockedContent.text.trim()
+                    : kindLabel(slot.kind)
                 return (
                   <li key={slot.id}>
                     <button
                       type="button"
                       className={`placement-slot-list-item${selectedId === slot.id ? ' is-selected' : ''}`}
-                      style={{ borderLeftColor: personColor(slot.personSlotIndex) }}
+                      style={
+                        {
+                          ['--person-color' as string]: personColor(slot.personSlotIndex),
+                        } as React.CSSProperties
+                      }
                       onClick={() => setSelectedId(slot.id)}
                     >
-                      <span>
-                        {person} · {kindLabel(slot.kind)}
+                      <span className="placement-slot-list-swatch" aria-hidden />
+                      <span className="placement-slot-list-meta">
+                        <span className="placement-slot-list-person">{person}</span>
+                        <span className="placement-slot-list-kind">{kind}</span>
                       </span>
                       {!locked && (
                         <span
                           role="button"
                           tabIndex={0}
                           className="placement-slot-list-del"
+                          aria-label={`Remove ${kind} for ${person}`}
                           onClick={e => {
                             e.stopPropagation()
                             removeSlot(slot.id)
@@ -953,7 +986,7 @@ export function PlacementEditor({
                             }
                           }}
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={13} strokeWidth={2.25} aria-hidden />
                         </span>
                       )}
                     </button>
