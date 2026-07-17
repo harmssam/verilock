@@ -1,14 +1,15 @@
 /**
  * DocuSign-style signing: the PDF is the surface. Click your highlighted fields
- * on the page to type or draw; others’ fields stay dim and non-interactive.
+ * to open a modal (stay on the page preview); ink is reused across signature boxes.
  */
-import { Check, ChevronLeft, ChevronRight, PenLine } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, PenLine, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import {
   type BlobPayload,
   type ConstructionPlan,
   type PlacementSlot,
+  isInkPlacementKind,
 } from './placements'
 import {
   normalizedToCanvasRect,
@@ -28,6 +29,19 @@ const PERSON_COLORS = ['#0f766e', '#b45309', '#1d4ed8', '#7c3aed'] as const
 
 function personColor(slotIndex: number): string {
   return PERSON_COLORS[(Math.max(1, slotIndex) - 1) % PERSON_COLORS.length]!
+}
+
+function inkFromLocal(
+  path: SignaturePathData,
+  imageDataUrl?: string,
+): SignatureStrokeResult {
+  return {
+    path,
+    imageDataUrl: imageDataUrl ?? '',
+    rawPoints: 0,
+    simplifiedPoints: 0,
+    epsilon: path.epsilon ?? 1.5,
+  }
 }
 
 export interface SignerFillResult {
@@ -65,6 +79,7 @@ export function SignerFillView({
   pageWidth = 640,
 }: SignerFillViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const modalPanelRef = useRef<HTMLDivElement>(null)
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [pageCount, setPageCount] = useState(1)
   const [pageNumber, setPageNumber] = useState(1)
@@ -73,9 +88,16 @@ export function SignerFillView({
   const [loading, setLoading] = useState(true)
   /** Local drafts for my fillable slots (not yet submitted). */
   const [localFills, setLocalFills] = useState<Record<string, LocalFill>>({})
-  /** Shared ink reused across signature slots when user draws once. */
+  /** Shared full signature ink (reused across signature slots). */
   const [sharedInk, setSharedInk] = useState<SignatureStrokeResult | null>(null)
+  /** Shared initials ink (reused across initial slots only). */
+  const [sharedInitials, setSharedInitials] = useState<SignatureStrokeResult | null>(null)
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null)
+  /** reuse = show saved stroke; draw = stroke pad */
+  const [sigModalMode, setSigModalMode] = useState<'reuse' | 'draw'>('draw')
+  const [modalDraftInk, setModalDraftInk] = useState<SignatureStrokeResult | null>(null)
+  const [modalDraftText, setModalDraftText] = useState('')
+  const [sigPadKey, setSigPadKey] = useState(0)
   const [localError, setLocalError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -91,9 +113,22 @@ export function SignerFillView({
       plan.slots.filter(
         s =>
           s.personSlotIndex === personSlotIndex &&
-          (s.kind === 'signature' || s.kind === 'name' || s.kind === 'text'),
+          (s.kind === 'signature' ||
+            s.kind === 'initial' ||
+            s.kind === 'name' ||
+            s.kind === 'text'),
       ),
     [plan.slots, personSlotIndex],
+  )
+
+  const mySignatureSlots = useMemo(
+    () => myFillable.filter(s => s.kind === 'signature'),
+    [myFillable],
+  )
+
+  const myInitialSlots = useMemo(
+    () => myFillable.filter(s => s.kind === 'initial'),
+    [myFillable],
   )
 
   const isServerFilled = useCallback(
@@ -106,14 +141,14 @@ export function SignerFillView({
       if (isServerFilled(slot.id)) return true
       const f = localFills[slot.id]
       if (!f) {
-        // Signature can inherit shared ink
         if (slot.kind === 'signature' && sharedInk?.path?.strokes?.length) return true
+        if (slot.kind === 'initial' && sharedInitials?.path?.strokes?.length) return true
         return false
       }
       if (f.kind === 'ink') return Boolean(f.path.strokes?.length)
       return f.text.trim().length > 0
     },
-    [localFills, sharedInk, isServerFilled],
+    [localFills, sharedInk, sharedInitials, isServerFilled],
   )
 
   const pendingSlots = useMemo(
@@ -175,6 +210,38 @@ export function SignerFillView({
     }
   }, [doc, pageNumber, pageWidth])
 
+  // Lock background scroll while modal is open
+  useEffect(() => {
+    if (!activeSlotId) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [activeSlotId])
+
+  // Escape closes modal
+  useEffect(() => {
+    if (!activeSlotId) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setActiveSlotId(null)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [activeSlotId])
+
+  // Focus modal panel when opened
+  useEffect(() => {
+    if (!activeSlotId) return
+    const t = window.setTimeout(() => {
+      modalPanelRef.current?.focus()
+    }, 30)
+    return () => window.clearTimeout(t)
+  }, [activeSlotId])
+
   const pageSlots = useMemo(
     () => plan.slots.filter(s => s.pageIndex === pageNumber - 1),
     [plan.slots, pageNumber],
@@ -184,53 +251,57 @@ export function SignerFillView({
     ? plan.slots.find(s => s.id === activeSlotId) ?? null
     : null
 
+  const resolveExistingInk = (
+    slot: PlacementSlot,
+  ): SignatureStrokeResult | null => {
+    const local = localFills[slot.id]
+    if (local?.kind === 'ink' && local.path.strokes?.length) {
+      return inkFromLocal(local.path, local.imageDataUrl)
+    }
+    if (slot.kind === 'signature' && sharedInk?.path?.strokes?.length) return sharedInk
+    if (slot.kind === 'initial' && sharedInitials?.path?.strokes?.length) {
+      return sharedInitials
+    }
+    return null
+  }
+
+  const closeModal = () => {
+    setActiveSlotId(null)
+    setModalDraftInk(null)
+    setModalDraftText('')
+  }
+
   const openSlot = (slot: PlacementSlot) => {
     if (disabled || busy || submitting) return
     if (slot.personSlotIndex !== personSlotIndex) return
     if (slot.kind === 'checkmark' || slot.kind === 'cross') return
     if (isServerFilled(slot.id)) return
-    setActiveSlotId(slot.id)
     setLocalError(null)
     if (slot.pageIndex !== pageNumber - 1) {
       setPageNumber(slot.pageIndex + 1)
     }
-  }
 
-  const applySharedInkToAllSigs = (result: SignatureStrokeResult) => {
-    setSharedInk(result)
-    setLocalFills(prev => {
-      const next = { ...prev }
-      for (const s of myFillable) {
-        if (s.kind === 'signature' && !isServerFilled(s.id)) {
-          next[s.id] = {
-            kind: 'ink',
-            path: result.path,
-            imageDataUrl: result.imageDataUrl,
-          }
-        }
+    if (isInkPlacementKind(slot.kind)) {
+      const existing = resolveExistingInk(slot)
+      if (existing) {
+        setSigModalMode('reuse')
+        setModalDraftInk(existing)
+      } else {
+        setSigModalMode('draw')
+        setModalDraftInk(null)
+        setSigPadKey(k => k + 1)
       }
-      return next
-    })
-  }
-
-  const setTextForSlot = (slotId: string, text: string) => {
-    setLocalFills(prev => ({
-      ...prev,
-      [slotId]: { kind: 'text', text },
-    }))
-  }
-
-  const goNextPending = () => {
-    const pending = myFillable.filter(s => !isLocallyFilled(s) && !isServerFilled(s.id))
-    if (pending.length === 0) {
-      setActiveSlotId(null)
-      return
+      setModalDraftText('')
+    } else {
+      const existingText =
+        localFills[slot.id]?.kind === 'text'
+          ? (localFills[slot.id] as { text: string }).text
+          : ''
+      setModalDraftText(existingText)
+      setModalDraftInk(null)
     }
-    // Prefer next after active
-    let idx = pending.findIndex(s => s.id === activeSlotId)
-    const next = pending[(idx >= 0 ? idx + 1 : 0) % pending.length]!
-    setActiveSlotId(next.id)
-    setPageNumber(next.pageIndex + 1)
+
+    setActiveSlotId(slot.id)
   }
 
   const previewForSlot = (slot: PlacementSlot): LocalFill | null => {
@@ -242,7 +313,117 @@ export function SignerFillView({
         imageDataUrl: sharedInk.imageDataUrl,
       }
     }
+    if (slot.kind === 'initial' && sharedInitials?.path) {
+      return {
+        kind: 'ink',
+        path: sharedInitials.path,
+        imageDataUrl: sharedInitials.imageDataUrl,
+      }
+    }
     return null
+  }
+
+  /** After applying one field, open the next incomplete one (or close). */
+  const openNextAfter = (
+    justFilledId: string,
+    fillsSnapshot: Record<string, LocalFill>,
+    sharedSig: SignatureStrokeResult | null,
+    sharedInit: SignatureStrokeResult | null,
+  ) => {
+    const isFilled = (slot: PlacementSlot) => {
+      if (isServerFilled(slot.id)) return true
+      if (slot.id === justFilledId) return true
+      const f = fillsSnapshot[slot.id]
+      if (f?.kind === 'ink') return Boolean(f.path.strokes?.length)
+      if (f?.kind === 'text') return f.text.trim().length > 0
+      if (slot.kind === 'signature' && sharedSig?.path?.strokes?.length) return true
+      if (slot.kind === 'initial' && sharedInit?.path?.strokes?.length) return true
+      return false
+    }
+    const next = myFillable.find(s => !isFilled(s))
+    if (!next) {
+      closeModal()
+      return
+    }
+    // Open next without full close (smoother)
+    if (next.pageIndex !== pageNumber - 1) {
+      setPageNumber(next.pageIndex + 1)
+    }
+    if (isInkPlacementKind(next.kind)) {
+      const existing = (() => {
+        const local = fillsSnapshot[next.id]
+        if (local?.kind === 'ink' && local.path.strokes?.length) {
+          return inkFromLocal(local.path, local.imageDataUrl)
+        }
+        return next.kind === 'initial' ? sharedInit : sharedSig
+      })()
+      if (existing?.path?.strokes?.length) {
+        setSigModalMode('reuse')
+        setModalDraftInk(existing)
+      } else {
+        setSigModalMode('draw')
+        setModalDraftInk(null)
+        setSigPadKey(k => k + 1)
+      }
+      setModalDraftText('')
+    } else {
+      const existingText =
+        fillsSnapshot[next.id]?.kind === 'text'
+          ? (fillsSnapshot[next.id] as { text: string }).text
+          : ''
+      setModalDraftText(existingText)
+      setModalDraftInk(null)
+    }
+    setActiveSlotId(next.id)
+  }
+
+  const confirmModal = () => {
+    if (!activeSlot) return
+    if (isInkPlacementKind(activeSlot.kind)) {
+      const isInitial = activeSlot.kind === 'initial'
+      if (!modalDraftInk?.path?.strokes?.length) {
+        setLocalError(
+          isInitial ? 'Draw your initials before applying.' : 'Draw your signature before applying.',
+        )
+        return
+      }
+      const result = modalDraftInk
+      const targets = isInitial ? myInitialSlots : mySignatureSlots
+      const nextFills = { ...localFills }
+      for (const s of targets) {
+        if (!isServerFilled(s.id)) {
+          nextFills[s.id] = {
+            kind: 'ink',
+            path: result.path,
+            imageDataUrl: result.imageDataUrl,
+          }
+        }
+      }
+      const nextSharedSig = isInitial ? sharedInk : result
+      const nextSharedInit = isInitial ? result : sharedInitials
+      if (isInitial) setSharedInitials(result)
+      else setSharedInk(result)
+      setLocalFills(nextFills)
+      setLocalError(null)
+      // Stamp every same-kind line immediately, then move to remaining fields.
+      openNextAfter(activeSlot.id, nextFills, nextSharedSig, nextSharedInit)
+      return
+    }
+
+    const t = modalDraftText.trim()
+    if (!t) {
+      setLocalError(
+        activeSlot.kind === 'name' ? 'Enter your name.' : 'Enter the required text.',
+      )
+      return
+    }
+    const nextFills = {
+      ...localFills,
+      [activeSlot.id]: { kind: 'text' as const, text: t },
+    }
+    setLocalFills(nextFills)
+    setLocalError(null)
+    openNextAfter(activeSlot.id, nextFills, sharedInk, sharedInitials)
   }
 
   const handleFinish = useCallback(async () => {
@@ -257,15 +438,17 @@ export function SignerFillView({
       const draft = previewForSlot(slot)
       if (!draft) {
         setLocalError('Complete all of your highlighted fields on the PDF.')
-        setActiveSlotId(slot.id)
-        setPageNumber(slot.pageIndex + 1)
+        openSlot(slot)
         return
       }
       if (draft.kind === 'ink') {
         if (!draft.path.strokes?.length) {
-          setLocalError('Draw your signature in each signature box.')
-          setActiveSlotId(slot.id)
-          setPageNumber(slot.pageIndex + 1)
+          setLocalError(
+            slot.kind === 'initial'
+              ? 'Draw your initials in each initial box.'
+              : 'Draw your signature in each signature box.',
+          )
+          openSlot(slot)
           return
         }
         fills.push({
@@ -279,8 +462,7 @@ export function SignerFillView({
         const t = draft.text.trim()
         if (!t) {
           setLocalError('Fill in every text box assigned to you.')
-          setActiveSlotId(slot.id)
-          setPageNumber(slot.pageIndex + 1)
+          openSlot(slot)
           return
         }
         fills.push({
@@ -297,7 +479,6 @@ export function SignerFillView({
     }
 
     if (fills.length === 0) {
-      // No fillable slots (or already on server) — continue to parent wallet bind.
       setSubmitting(true)
       try {
         await onSubmit({
@@ -331,14 +512,23 @@ export function SignerFillView({
     myFillable,
     personSlotIndex,
     onSubmit,
-    allAlreadyOnServer,
     isServerFilled,
     localFills,
     sharedInk,
+    sharedInitials,
   ])
 
   const remaining = pendingSlots.length
   const nextHint = pendingSlots[0]
+  const modalCanApply =
+    activeSlot && isInkPlacementKind(activeSlot.kind)
+      ? Boolean(modalDraftInk?.path?.strokes?.length)
+      : modalDraftText.trim().length > 0
+
+  const sigCount = mySignatureSlots.filter(s => !isServerFilled(s.id)).length
+  const initCount = myInitialSlots.filter(s => !isServerFilled(s.id)).length
+  const activeIsInitial = activeSlot?.kind === 'initial'
+  const activeInkPeerCount = activeIsInitial ? initCount : sigCount
 
   return (
     <div className={`signer-fill-view${disabled ? ' is-disabled' : ''}`}>
@@ -358,8 +548,12 @@ export function SignerFillView({
           )}
         </div>
         <p className="muted signer-fill-help">
-          Tap each <strong>highlighted</strong> box on the PDF to sign or type. Other people&apos;s
-          fields stay locked until they sign.
+          Tap each <strong>highlighted</strong> box on the PDF. Signing opens in a panel so you stay
+          with the document
+          {sigCount > 1 || initCount > 1
+            ? ' — each signature and each initial is reused on every matching box after the first.'
+            : '.'}{' '}
+          Other people&apos;s fields stay locked.
         </p>
       </header>
 
@@ -393,10 +587,7 @@ export function SignerFillView({
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={() => {
-              setActiveSlotId(nextHint.id)
-              setPageNumber(nextHint.pageIndex + 1)
-            }}
+            onClick={() => openSlot(nextHint)}
           >
             Next field
           </button>
@@ -421,7 +612,10 @@ export function SignerFillView({
                   mine &&
                   !serverDone &&
                   !disabled &&
-                  (slot.kind === 'signature' || slot.kind === 'name' || slot.kind === 'text')
+                  (slot.kind === 'signature' ||
+                    slot.kind === 'initial' ||
+                    slot.kind === 'name' ||
+                    slot.kind === 'text')
 
                 return (
                   <button
@@ -447,7 +641,7 @@ export function SignerFillView({
                     onClick={() => openSlot(slot)}
                     aria-label={
                       mine
-                        ? `${slot.kind} field${serverDone || draft ? ' (filled)' : ' (tap to fill)'}`
+                        ? `${slot.kind} field${serverDone || draft ? ' (filled — tap to edit)' : ' (tap to fill)'}`
                         : `Reserved for person ${slot.personSlotIndex}`
                     }
                   >
@@ -466,9 +660,11 @@ export function SignerFillView({
                       <span className="signer-fill-field-cta">
                         {slot.kind === 'signature'
                           ? 'Sign here'
-                          : slot.kind === 'name'
-                            ? 'Type name'
-                            : slot.lockedContent?.text?.trim() || 'Type here'}
+                          : slot.kind === 'initial'
+                            ? 'Initial'
+                            : slot.kind === 'name'
+                              ? 'Type name'
+                              : slot.lockedContent?.text?.trim() || 'Type here'}
                       </span>
                     ) : serverDone && mine ? (
                       <span className="signer-fill-field-cta is-saved">Saved</span>
@@ -486,96 +682,158 @@ export function SignerFillView({
         </div>
       </div>
 
-      {/* In-context editor for the active field */}
+      {/* Centered modal — stay with the PDF; no scroll-to-pad */}
       {activeSlot &&
         activeSlot.personSlotIndex === personSlotIndex &&
         !isServerFilled(activeSlot.id) && (
           <div
-            className="signer-fill-popover"
-            style={{ ['--person-color' as string]: color }}
-            role="dialog"
-            aria-label="Fill field"
+            className="signer-fill-modal"
+            role="presentation"
+            onMouseDown={e => {
+              if (e.target === e.currentTarget) closeModal()
+            }}
           >
-            <div className="signer-fill-popover-head">
-              <strong>
-                {activeSlot.kind === 'signature'
-                  ? 'Draw your signature'
-                  : activeSlot.kind === 'name'
-                    ? 'Type your name'
-                    : activeSlot.lockedContent?.text?.trim() || 'Enter text'}
-              </strong>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setActiveSlotId(null)}
-              >
-                Close
-              </button>
-            </div>
+            <div
+              ref={modalPanelRef}
+              className="signer-fill-modal-panel"
+              style={{ ['--person-color' as string]: color }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="signer-fill-modal-title"
+              tabIndex={-1}
+            >
+              <div className="signer-fill-modal-head">
+                <div>
+                  <p className="signer-fill-modal-eyebrow">
+                    {person.displayName || `Person ${personSlotIndex}`}
+                  </p>
+                  <h4 id="signer-fill-modal-title">
+                    {isInkPlacementKind(activeSlot.kind)
+                      ? sigModalMode === 'reuse'
+                        ? activeIsInitial
+                          ? 'Use your initials'
+                          : 'Use your signature'
+                        : activeIsInitial
+                          ? 'Draw your initials'
+                          : 'Draw your signature'
+                      : activeSlot.kind === 'name'
+                        ? 'Type your name'
+                        : activeSlot.lockedContent?.text?.trim() || 'Enter text'}
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  className="signer-fill-modal-close"
+                  aria-label="Close"
+                  onClick={closeModal}
+                >
+                  <X size={18} strokeWidth={2.25} aria-hidden />
+                </button>
+              </div>
 
-            {activeSlot.kind === 'signature' ? (
-              <>
-                <SignatureStrokePad
-                  onChange={result => {
-                    if (!result) {
-                      setSharedInk(null)
-                      setLocalFills(prev => {
-                        const next = { ...prev }
-                        delete next[activeSlot.id]
-                        return next
-                      })
-                      return
+              <div
+                className={`signer-fill-modal-body${activeIsInitial ? ' is-initial' : ''}`}
+              >
+                {isInkPlacementKind(activeSlot.kind) ? (
+                  sigModalMode === 'reuse' && modalDraftInk?.path?.strokes?.length ? (
+                    <div className="signer-fill-reuse">
+                      <div
+                        className={`signer-fill-reuse-preview${activeIsInitial ? ' is-initial' : ''}`}
+                      >
+                        {modalDraftInk.imageDataUrl ? (
+                          <img
+                            src={modalDraftInk.imageDataUrl}
+                            alt={activeIsInitial ? 'Your initials' : 'Your signature'}
+                            className="signer-fill-reuse-img"
+                          />
+                        ) : (
+                          <InkPreview
+                            path={modalDraftInk.path}
+                            width={activeIsInitial ? 140 : 280}
+                            height={activeIsInitial ? 80 : 100}
+                          />
+                        )}
+                      </div>
+                      <p className="muted signer-fill-reuse-note">
+                        {activeInkPeerCount > 1
+                          ? activeIsInitial
+                            ? 'These initials are applied to every initial box assigned to you.'
+                            : 'This signature is applied to every signature line assigned to you.'
+                          : activeIsInitial
+                            ? 'Apply to place your initials on the document.'
+                            : 'Apply to place this signature on the document.'}
+                      </p>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => {
+                          setSigModalMode('draw')
+                          setModalDraftInk(null)
+                          setSigPadKey(k => k + 1)
+                        }}
+                      >
+                        {activeIsInitial ? 'Draw different initials' : 'Draw a different signature'}
+                      </button>
+                    </div>
+                  ) : (
+                    <SignatureStrokePad
+                      key={sigPadKey}
+                      productMode
+                      label={
+                        activeIsInitial
+                          ? 'Initials in the box below'
+                          : 'Sign in the box below'
+                      }
+                      onChange={result => setModalDraftInk(result)}
+                      disabled={disabled || busy || submitting}
+                    />
+                  )
+                ) : (
+                  <input
+                    className="field-input signer-fill-inline-input"
+                    autoFocus
+                    value={modalDraftText}
+                    onChange={e => setModalDraftText(e.target.value.slice(0, 200))}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        confirmModal()
+                      }
+                    }}
+                    placeholder={
+                      activeSlot.kind === 'name'
+                        ? 'Full name'
+                        : activeSlot.lockedContent?.text?.trim() || 'Type here'
                     }
-                    applySharedInkToAllSigs(result)
-                  }}
-                  disabled={disabled || busy || submitting}
-                />
-                <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
-                  This signature is applied to all of your signature boxes on the document.
-                </p>
-              </>
-            ) : (
-              <input
-                className="field-input signer-fill-inline-input"
-                autoFocus
-                value={
-                  localFills[activeSlot.id]?.kind === 'text'
-                    ? (localFills[activeSlot.id] as { text: string }).text
-                    : ''
-                }
-                onChange={e => setTextForSlot(activeSlot.id, e.target.value.slice(0, 200))}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    goNextPending()
-                  }
-                }}
-                placeholder={
-                  activeSlot.kind === 'name'
-                    ? 'Full name'
-                    : activeSlot.lockedContent?.text?.trim() || 'Type here'
-                }
-                maxLength={200}
-                disabled={disabled || busy || submitting}
-              />
-            )}
+                    maxLength={200}
+                    disabled={disabled || busy || submitting}
+                  />
+                )}
+              </div>
 
-            <div className="signer-fill-popover-actions">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => goNextPending()}
-                disabled={
-                  activeSlot.kind === 'signature'
-                    ? !sharedInk?.path?.strokes?.length
-                    : !(
-                        localFills[activeSlot.id]?.kind === 'text' &&
-                        (localFills[activeSlot.id] as { text: string }).text.trim()
-                      )
-                }
-              >
-                {remaining <= 1 ? 'Done with fields' : 'Next field'}
-              </button>
+              <div className="signer-fill-modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={closeModal}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={!modalCanApply || disabled || busy || submitting}
+                  onClick={confirmModal}
+                >
+                  {isInkPlacementKind(activeSlot.kind)
+                    ? activeInkPeerCount > 1 && sigModalMode === 'draw'
+                      ? activeIsInitial
+                        ? 'Apply to all initial boxes'
+                        : 'Apply to all signature lines'
+                      : activeIsInitial
+                        ? 'Apply initials'
+                        : 'Apply signature'
+                    : remaining > 1
+                      ? 'Save & next field'
+                      : 'Save'}
+                </button>
+              </div>
             </div>
           </div>
         )}
