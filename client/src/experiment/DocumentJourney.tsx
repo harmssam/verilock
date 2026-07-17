@@ -57,13 +57,14 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
     broadcastEnabled?: boolean
   } | null>(null)
   const [chainRecon, setChainRecon] = useState<{
-    source: 'index' | 'chain'
+    source: 'index' | 'chain' | 'wire'
     annotations: PdfAnnotation[]
     frameCount: number
     txHashes: string[]
     onChain: boolean
     confirmedFrames?: number
     chainError?: string
+    chainSampleOk?: boolean
     integrityOk?: boolean
   } | null>(null)
 
@@ -226,11 +227,18 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
           onChain: recon.onChain,
           confirmedFrames: recon.confirmedFrames,
           chainError: recon.chainError,
+          chainSampleOk: recon.chainSampleOk,
           integrityOk: recon.integrityOk,
         })
         setVerifyAnnotations(recon.annotations as PdfAnnotation[])
-        if (recon.chainError) {
-          setError(`Chain read failed (${recon.chainError}); showing index copy.`)
+        // Soft note only — wire/index reconstruct still succeeds on RPC rate limits
+        if (recon.chainError && recon.source === 'index' && recon.integrityOk === false) {
+          setError(
+            `Could not fully re-read chain (${recon.chainError}). Showing stored stream copy.`,
+          )
+        } else if (recon.chainError && recon.source === 'wire') {
+          // Rate limit on optional HEAD/END sample — not fatal
+          setError(null)
         }
         return
       } catch {

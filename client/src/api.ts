@@ -144,12 +144,14 @@ export const api = {
     return request<{
       originalSha256: string
       annotations: unknown[]
-      source: 'index' | 'chain'
+      /** wire = packed frames from DB (same bytes as broadcast); chain = full RPC re-read */
+      source: 'index' | 'chain' | 'wire'
       frameCount: number
       txHashes: string[]
       onChain: boolean
       confirmedFrames?: number
       chainError?: string
+      chainSampleOk?: boolean
       integrityOk?: boolean
     }>(`/api/annotation-streams/${sha256.toLowerCase()}/reconstruct${q}`)
   },

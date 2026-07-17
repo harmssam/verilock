@@ -82,19 +82,39 @@ export function isTransactionNotFoundError(message: string): boolean {
 }
 
 async function rpcCall<T>(method: string, params: unknown[], options?: { allowEmpty?: boolean }): Promise<T> {
-  const res = await fetch(RPC_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', method, params, id: 1 }),
-  })
-  if (!res.ok) throw new Error(`Nimiq RPC HTTP ${res.status}`)
-  const json = (await res.json()) as RpcResponse<T>
-  if (json.error) throw new Error(formatRpcError(json.error))
-  if (json.result?.data === undefined || json.result?.data === null) {
-    if (options?.allowEmpty) return undefined as T
-    throw new Error('Empty RPC response')
+  const maxAttempts = 4
+  let lastErr: Error | null = null
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(RPC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', method, params, id: 1 }),
+      })
+      if (res.status === 429) {
+        lastErr = new Error('Nimiq RPC HTTP 429')
+        const backoff = 400 * attempt * attempt
+        await new Promise(r => setTimeout(r, backoff))
+        continue
+      }
+      if (!res.ok) throw new Error(`Nimiq RPC HTTP ${res.status}`)
+      const json = (await res.json()) as RpcResponse<T>
+      if (json.error) throw new Error(formatRpcError(json.error))
+      if (json.result?.data === undefined || json.result?.data === null) {
+        if (options?.allowEmpty) return undefined as T
+        throw new Error('Empty RPC response')
+      }
+      return json.result.data
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err))
+      if (attempt < maxAttempts && /429|rate|timeout|fetch failed/i.test(lastErr.message)) {
+        await new Promise(r => setTimeout(r, 400 * attempt * attempt))
+        continue
+      }
+      throw lastErr
+    }
   }
-  return json.result.data
+  throw lastErr ?? new Error('Nimiq RPC failed')
 }
 
 /** Nimiq basic transactions allow at most 64 bytes of unstructured data. */
