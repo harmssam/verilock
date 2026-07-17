@@ -37,10 +37,10 @@ export const CREATOR_STAGES: JourneyStage[] = [
   },
   {
     id: 'share',
-    label: 'Arrange',
-    verb: 'Name people, place fields, choose if you sign',
+    label: 'Create and Invite',
+    verb: 'Name people, place fields, invite signers',
     blurb:
-      'Name each signer, place their boxes on the PDF, and choose whether you are one of them (or only organizing). Lock when the layout is right.',
+      'Name each signer, place their boxes on the PDF, and choose whether you are one of them (or only organizing). Lock the layout, then invite each person.',
     privacyNote: 'Only placement geometry is stored — not the PDF bytes.',
   },
   {

@@ -4,11 +4,14 @@ import {
   Fingerprint,
   LoaderCircle,
   Lock,
+  MailCheck,
   RotateCcw,
+  Share2,
   Shield,
   ShieldCheck,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isValidNimiqAddress, normalizeAddress, shortAddress } from '../addresses'
@@ -32,7 +35,7 @@ import { getPdfPageCount, sha256Hex, shortHash } from '../pdf/hashPdf'
 import { prepareSignatureImageUpload } from '../signatureImage'
 import { isMobileDevice } from '../nimiq'
 import { SealPricingDisplay } from '../SealPricingDisplay'
-import { ShareInviteCard } from '../ShareInviteCard'
+import { canShareFiles, shareInviteWithPdf } from '../shareInvite'
 import {
   formatPartyRole,
   partyNeedsSignerName,
@@ -194,7 +197,6 @@ export function DocumentJourney({
   const [busy, setBusy] = useState(false)
   const [doc, setDoc] = useState<JourneyDoc | null>(null)
   const [sharedAck, setSharedAck] = useState(false)
-  const [linkCopied, setLinkCopied] = useState(false)
   const [signFile, setSignFile] = useState<File | null>(null)
   const [signHash, setSignHash] = useState<string | null>(null)
   const [signerName, setSignerName] = useState('')
@@ -216,6 +218,12 @@ export function DocumentJourney({
   /** partyId → last invite send status for UI feedback */
   const [inviteSendBusyId, setInviteSendBusyId] = useState<string | null>(null)
   const [inviteSendNote, setInviteSendNote] = useState<Record<string, string>>({})
+  /** Floating reminder after any successful invite email (PDF is never attached). */
+  const [inviteToast, setInviteToast] = useState<{
+    key: number
+    contactLabel: string
+  } | null>(null)
+  const inviteToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [emailSendEnabled, setEmailSendEnabled] = useState(false)
   const [verifyFile, setVerifyFile] = useState<File | null>(null)
   const [verifyOutcome, setVerifyOutcome] = useState<VerifyOutcome>({ kind: 'idle' })
@@ -945,18 +953,85 @@ export function DocumentJourney({
     }
   }
 
-  /** Returns false when clipboard failed so ShareInviteCard can skip the reminder modal. */
-  const copyLink = async (): Promise<boolean> => {
-    if (!doc) return false
+  const copyText = async (text: string, notePartyId?: string): Promise<boolean> => {
     try {
-      await navigator.clipboard.writeText(doc.shareUrl)
-      setLinkCopied(true)
-      // Copy alone stays on share — co-signers sign via the invite path.
-      window.setTimeout(() => setLinkCopied(false), 4000)
+      await navigator.clipboard.writeText(text)
+      if (notePartyId) {
+        setInviteSendNote(prev => ({ ...prev, [notePartyId]: 'Link copied' }))
+      }
       return true
     } catch {
-      setLocalError('Could not copy link — select and copy it manually if needed.')
+      setLocalError('Could not copy — select the link and copy it manually.')
       return false
+    }
+  }
+
+  const showInviteSentToast = useCallback((contactLabel: string) => {
+    if (inviteToastTimerRef.current) {
+      clearTimeout(inviteToastTimerRef.current)
+      inviteToastTimerRef.current = null
+    }
+    setInviteToast({ key: Date.now(), contactLabel })
+    inviteToastTimerRef.current = setTimeout(() => {
+      setInviteToast(null)
+      inviteToastTimerRef.current = null
+    }, 6500)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (inviteToastTimerRef.current) clearTimeout(inviteToastTimerRef.current)
+    }
+  }, [])
+
+  /** Mobile: system share sheet (iMessage, WhatsApp, …) with personal link + local PDF when allowed. */
+  const sharePersonInvite = async (opts: {
+    partyId: string
+    personName: string
+    personLink: string
+  }) => {
+    if (!doc) return
+    const localPdf = pdfFile ?? signFile
+    setLocalError(null)
+    try {
+      if (localPdf && canShareFiles([localPdf])) {
+        // Prefer sharing PDF + invite text (personal link in the body).
+        const result = await shareInviteWithPdf(doc.source, opts.personLink, localPdf)
+        if (result === 'shared') {
+          setInviteSendNote(prev => ({
+            ...prev,
+            [opts.partyId]: 'Opened share sheet (include PDF when the app allows)',
+          }))
+          return
+        }
+        if (result === 'cancelled') return
+      }
+      if (typeof navigator.share === 'function') {
+        const organizerLabel = creatorName.trim() || 'The organizer'
+        await navigator.share({
+          title: `${organizerLabel} requested you sign: ${doc.title}`,
+          text: [
+            `${organizerLabel} has requested you sign “${doc.title}” on VeriLock.`,
+            opts.personName ? `This invite is for ${opts.personName}.` : '',
+            'Open your personal link (use the exact PDF the organizer shared with you):',
+            opts.personLink,
+          ]
+            .filter(Boolean)
+            .join('\n'),
+          url: opts.personLink,
+        })
+        setInviteSendNote(prev => ({
+          ...prev,
+          [opts.partyId]: 'Opened share sheet',
+        }))
+        return
+      }
+      await copyText(opts.personLink, opts.partyId)
+    } catch (err) {
+      if (err && typeof err === 'object' && 'name' in err && (err as { name: string }).name === 'AbortError') {
+        return
+      }
+      setLocalError(err instanceof Error ? err.message : 'Could not open share sheet')
     }
   }
 
@@ -1859,13 +1934,13 @@ export function DocumentJourney({
                       onChange={e =>
                         setCreatorName(clampField(e.target.value, MAX_DISPLAY_NAME_LENGTH))
                       }
-                      placeholder="Organizer name — not assumed to be a signer"
+                      placeholder="Organizer name"
                       autoComplete="name"
                       maxLength={MAX_DISPLAY_NAME_LENGTH}
                     />
                     <span className="muted" style={{ fontSize: '0.78rem' }}>
-                      For your records only. On Arrange you choose whether you sign as one of the
-                      people (or none).
+                      Shown on invite emails (“Alex has requested you sign…”). On Arrange you choose
+                      whether you sign as one of the people (or none).
                     </span>
                   </label>
                   {documentTypeUsesNotes(docType) && (
@@ -1923,7 +1998,7 @@ export function DocumentJourney({
                     ) : (
                       <>
                         <Fingerprint size={18} strokeWidth={2.25} />
-                        Fingerprint &amp; arrange fields
+                        Continue
                       </>
                     )}
                   </button>
@@ -2238,6 +2313,7 @@ export function DocumentJourney({
                                                 ...prev,
                                                 [p.id]: `Invite sent to ${to}`,
                                               }))
+                                              showInviteSentToast(label)
                                             })
                                             .catch(err => {
                                               setLocalError(
@@ -2262,27 +2338,30 @@ export function DocumentJourney({
                                           'Send invite email'
                                         )}
                                       </button>
+                                      {/* Mobile: OS share sheet (iMessage, WhatsApp, …) + PDF when allowed */}
+                                      {typeof navigator !== 'undefined' &&
+                                        typeof navigator.share === 'function' && (
+                                          <button
+                                            type="button"
+                                            className="btn btn-secondary"
+                                            disabled={busy || p.signed}
+                                            onClick={() =>
+                                              void sharePersonInvite({
+                                                partyId: p.id,
+                                                personName: label,
+                                                personLink,
+                                              })
+                                            }
+                                          >
+                                            <Share2 size={16} strokeWidth={2.25} aria-hidden />
+                                            Share
+                                          </button>
+                                        )}
                                       <button
                                         type="button"
                                         className="btn btn-secondary"
                                         disabled={busy || p.signed}
-                                        onClick={() => {
-                                          void navigator.clipboard
-                                            .writeText(personLink)
-                                            .then(() => {
-                                              setLinkCopied(true)
-                                              setInviteSendNote(prev => ({
-                                                ...prev,
-                                                [p.id]: 'Personal link copied',
-                                              }))
-                                              window.setTimeout(() => setLinkCopied(false), 3000)
-                                            })
-                                            .catch(() => {
-                                              setLocalError(
-                                                'Could not copy link — select it manually below.',
-                                              )
-                                            })
-                                        }}
+                                        onClick={() => void copyText(personLink, p.id)}
                                       >
                                         Copy personal link
                                       </button>
@@ -2435,18 +2514,6 @@ export function DocumentJourney({
 
                   {(requiredCount(doc) > 1 || inviteeSlotCount > 0) && (
                     <>
-                      <ShareInviteCard
-                        document={doc.source}
-                        shareUrl={doc.shareUrl}
-                        linkCopied={linkCopied}
-                        onCopyLink={() => copyLink()}
-                        pdfFile={pdfFile ?? signFile}
-                        inviteRecipients={coSignerEmails
-                          .slice(0, Math.max(0, inviteeSlotCount))
-                          .map(e => e.trim())
-                          .filter(Boolean)}
-                        embedded
-                      />
                       {sharedAck ? (
                         <div className="result-banner result-banner--ok">
                           <Check size={18} strokeWidth={2.5} />
@@ -2463,8 +2530,9 @@ export function DocumentJourney({
                         </button>
                       )}
                       <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                        Send each personal link (above) or the main share link, plus the same PDF.
-                        VeriLock never emails for you. This view updates when they sign.
+                        Use each card above to email or share a personal link. Hand off the PDF
+                        separately (or via mobile Share when the OS includes the file). This view
+                        updates when they sign.
                       </p>
                     </>
                   )}
@@ -3230,6 +3298,41 @@ export function DocumentJourney({
         open={howOpen}
         onToggle={() => setHowOpen(v => !v)}
       />
+
+      {inviteToast && (
+        <div
+          key={inviteToast.key}
+          className="invite-sent-toast"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="invite-sent-toast-icon" aria-hidden>
+            <MailCheck size={20} strokeWidth={2.25} />
+          </span>
+          <div className="invite-sent-toast-body">
+            <strong>Email sent</strong>
+            <p>
+              Remember to send the PDF to{' '}
+              <span className="invite-sent-toast-contact">{inviteToast.contactLabel}</span>{' '}
+              separately — VeriLock never attaches the file.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="invite-sent-toast-dismiss"
+            aria-label="Dismiss"
+            onClick={() => {
+              if (inviteToastTimerRef.current) {
+                clearTimeout(inviteToastTimerRef.current)
+                inviteToastTimerRef.current = null
+              }
+              setInviteToast(null)
+            }}
+          >
+            <X size={16} strokeWidth={2.25} aria-hidden />
+          </button>
+        </div>
+      )}
 
     </div>
   )

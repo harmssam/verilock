@@ -107,6 +107,10 @@ if (!documentColumns.some(col => col.name === 'ready_to_seal_email_sent_at')) {
 if (!documentColumns.some(col => col.name === 'annotations')) {
   db.exec('ALTER TABLE documents ADD COLUMN annotations TEXT')
 }
+/** Organizer label from step 1 — used in invite emails; not the same as a signer slot. */
+if (!documentColumns.some(col => col.name === 'creator_display_name')) {
+  db.exec('ALTER TABLE documents ADD COLUMN creator_display_name TEXT')
+}
 
 /** Drop duplicate rows so unique indexes can be applied on existing DBs. */
 function dedupeSignaturesForUniqueness(): void {
@@ -192,6 +196,8 @@ export interface DocumentRecord {
   /** Optional creator email for ready-to-seal notify (never public). */
   creatorNotifyEmail: string | null
   readyToSealEmailSentAt: number | null
+  /** Organizer name from create (invite copy); independent of signing roster. */
+  creatorDisplayName: string | null
 }
 
 export interface PartyRecord {
@@ -308,6 +314,7 @@ function rowToDocument(row: Record<string, unknown>): DocumentRecord {
     creatorNotifyEmail: (row.creator_notify_email as string | null) ?? null,
     readyToSealEmailSentAt:
       (row.ready_to_seal_email_sent_at as number | null | undefined) ?? null,
+    creatorDisplayName: (row.creator_display_name as string | null | undefined) ?? null,
   }
 }
 
@@ -316,12 +323,12 @@ export function insertDocument(doc: DocumentRecord): void {
     INSERT INTO documents (
       id, slug, title, original_filename, type, status, creator_address,
       original_sha256, final_sha256, page_count, metadata, annotations, required_signatures,
-      created_at, locked_at, creator_notify_email, ready_to_seal_email_sent_at
+      created_at, locked_at, creator_notify_email, ready_to_seal_email_sent_at, creator_display_name
     )
     VALUES (
       @id, @slug, @title, @originalFilename, @type, @status, @creatorAddress,
       @originalSha256, @finalSha256, @pageCount, @metadata, @annotations, @requiredSignatures,
-      @createdAt, @lockedAt, @creatorNotifyEmail, @readyToSealEmailSentAt
+      @createdAt, @lockedAt, @creatorNotifyEmail, @readyToSealEmailSentAt, @creatorDisplayName
     )
   `).run({
     id: doc.id,
@@ -342,6 +349,7 @@ export function insertDocument(doc: DocumentRecord): void {
     lockedAt: doc.lockedAt,
     creatorNotifyEmail: doc.creatorNotifyEmail,
     readyToSealEmailSentAt: doc.readyToSealEmailSentAt,
+    creatorDisplayName: doc.creatorDisplayName,
   })
 }
 

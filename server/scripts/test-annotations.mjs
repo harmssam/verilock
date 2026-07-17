@@ -96,6 +96,7 @@ insertDocument({
   lockedAt: null,
   creatorNotifyEmail: null,
   readyToSealEmailSentAt: null,
+  creatorDisplayName: null,
 })
 const loadedNo = getDocumentById(idNoAnn)
 assert(loadedNo != null, 'legacy doc loads')
@@ -122,6 +123,7 @@ insertDocument({
   lockedAt: null,
   creatorNotifyEmail: null,
   readyToSealEmailSentAt: null,
+  creatorDisplayName: null,
 })
 const loadedAnn = getDocumentById(idAnn)
 assert(loadedAnn != null, 'annotated doc loads')

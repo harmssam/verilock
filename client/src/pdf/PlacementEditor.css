@@ -7,10 +7,11 @@
 }
 
 .placement-editor-people {
-  border: 1px solid var(--border, #e2e8f0);
-  border-radius: 10px;
-  padding: 0.65rem 0.75rem;
-  background: #f8fafc;
+  border: 1px solid var(--border, rgba(15, 23, 42, 0.09));
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  background: var(--surface-raised, #ffffff);
+  box-shadow: var(--shadow-soft, 0 10px 36px rgba(15, 23, 42, 0.04));
 }
 
 .placement-editor-people-head {
@@ -61,16 +62,35 @@
 }
 
 .placement-editor-active-banner {
-  margin: 0 0 0.55rem;
-  padding: 0.4rem 0.55rem;
-  border-radius: 8px;
-  border-left: 3px solid var(--person-color, #0f766e);
-  background: color-mix(in srgb, var(--person-color, #0f766e) 10%, #fff);
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(15, 23, 42, 0.09));
+  border-left: 3px solid var(--person-color, var(--mint-deep, #0f766e));
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--person-color, var(--mint, #0d9488)) 12%, transparent) 0%,
+      var(--surface, rgba(13, 148, 136, 0.05)) 48%,
+      var(--surface-raised, #ffffff) 100%
+    );
+  color: var(--text, #0f172a);
   font-size: 0.8125rem;
-  line-height: 1.35;
+  line-height: 1.4;
+  box-shadow: var(--shadow-soft, 0 10px 36px rgba(15, 23, 42, 0.04));
+}
+
+.placement-editor-active-banner strong {
+  color: var(--person-color, var(--mint-deep, #0f766e));
+  font-weight: 650;
+}
+
+.placement-editor-active-banner .muted {
+  color: var(--text-muted, #4b5c6b);
 }
 
 .placement-person-chip {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
@@ -94,17 +114,27 @@
   border-color: var(--person-color, #0f766e);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--person-color, #0f766e) 35%, transparent);
   background: color-mix(in srgb, var(--person-color, #0f766e) 8%, #fff);
+  /* Room for absolute Active badge so inputs keep full width */
+  padding-right: 3.25rem;
 }
 
 .placement-person-active-tag {
-  margin-left: auto;
-  align-self: center;
-  font-size: 0.65rem;
+  position: absolute;
+  top: 0.4rem;
+  right: 0.45rem;
+  margin: 0;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--person-color, #0f766e);
-  flex-shrink: 0;
+  line-height: 1.2;
+  color: var(--person-color, var(--mint-deep, #0f766e));
+  background: color-mix(in srgb, var(--person-color, var(--mint, #0d9488)) 12%, #fff);
+  border: 1px solid color-mix(in srgb, var(--person-color, var(--mint, #0d9488)) 28%, transparent);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .placement-text-label-field input {
