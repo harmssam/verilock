@@ -23,6 +23,8 @@ import {
   setDocumentFinalSha256,
   setDocumentNotifyEmail,
   updateDocumentStatus,
+  updateDocumentRequiredSignatures,
+  deletePartyById,
   type DocumentRecord,
   type PartyRecord,
 } from './db.js'
@@ -405,6 +407,137 @@ export function createDocument(input: {
     document: publicDocument(doc, { viewerAddress: input.creatorAddress }),
     hashWarning,
   }
+}
+
+/**
+ * Creator configures total required signatures after create (step 3 / share).
+ * Starts solo (1); can expand to 2–4 with optional co-signer display names.
+ * Cannot change after lock, or remove parties that already signed.
+ */
+export function configureDocumentCosigners(
+  documentId: string,
+  requesterAddress: string,
+  input: {
+    requiredSignatures: number
+    /** Optional names for co-signer slots (index 0 = first invited party). */
+    coSignerNames?: string[]
+  },
+): ReturnType<typeof publicDocument> {
+  return runInTransaction(() => {
+    const doc = getDocumentById(documentId)
+    if (!doc) throw new Error('Document not found')
+    if (normalizeAddress(doc.creatorAddress) !== normalizeAddress(requesterAddress)) {
+      throw new Error('Only the creator can modify this agreement')
+    }
+    if (doc.status === 'locked' || doc.status === 'locking') {
+      throw new Error('Cannot change signers after sealing has started')
+    }
+
+    const parties = getPartiesForDocument(documentId)
+    const signatures = getSignaturesForDocument(documentId)
+    const signedPartyIds = new Set(signatures.map(s => s.partyId))
+    const signedRequired = countSignedRequiredParties(parties, signatures)
+
+    const nextRequired = clampRequiredSignatures(input.requiredSignatures, doc.requiredSignatures)
+    if (nextRequired < 1) {
+      throw new Error('At least one signature is required')
+    }
+    if (nextRequired < signedRequired) {
+      throw new Error(
+        `Cannot set required signatures below ${signedRequired} — that many parties have already signed`,
+      )
+    }
+
+    const type = sanitizeDocumentType(doc.type)
+    const creatorParty =
+      parties.find(p => p.walletAddress && normalizeAddress(p.walletAddress) === normalizeAddress(doc.creatorAddress)) ??
+      parties.find(p => p.sortOrder === 0) ??
+      parties[0]
+    if (!creatorParty) {
+      throw new Error('Agreement is missing a creator party')
+    }
+
+    const creatorRole = creatorParty.role
+    const otherRole = resolveOtherRole(type, creatorRole === 'landlord' || creatorRole === 'tenant' ? creatorRole : 'signer')
+    const names = input.coSignerNames ?? []
+
+    // Desired co-signer slots (everyone except creator party).
+    const desiredOthers = Math.max(0, nextRequired - 1)
+    const otherParties = parties
+      .filter(p => p.id !== creatorParty.id)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+
+    // When shrinking, drop unsigned/unclaimed open slots anywhere (not only trailing).
+    // Keep signed or wallet-claimed parties; fail only if remaining locked slots exceed desired.
+    if (otherParties.length > desiredOthers) {
+      const removable = otherParties.filter(
+        p => !signedPartyIds.has(p.id) && !p.walletAddress,
+      )
+      const lockedCount = otherParties.length - removable.length
+      if (lockedCount > desiredOthers) {
+        throw new Error(
+          'Cannot remove a party that has already signed or claimed a wallet slot',
+        )
+      }
+      const toRemove = removable.slice(desiredOthers - lockedCount)
+      for (const party of toRemove) {
+        deletePartyById(party.id)
+      }
+    }
+
+    // Refresh after deletes; compact sortOrder so slots stay dense.
+    let remainingOthers = getPartiesForDocument(documentId)
+      .filter(p => p.id !== creatorParty.id)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+
+    // Update names on existing co-signer slots when provided.
+    for (let i = 0; i < remainingOthers.length; i++) {
+      const party = remainingOthers[i]!
+      const provided = names[i]?.trim()
+      if (!provided) continue
+      if (signedPartyIds.has(party.id)) continue
+      updatePartyDisplayName(party.id, sanitizeDisplayName(provided, party.displayName))
+    }
+
+    // Insert missing co-signer slots.
+    // First co-signer uses the counterpart role (e.g. tenant); further slots are generic signers.
+    for (let i = remainingOthers.length; i < desiredOthers; i++) {
+      const providedName = names[i]?.trim()
+      const slotRole = i === 0 ? otherRole : 'signer'
+      const fallbackName = defaultOtherDisplayName(slotRole, i, desiredOthers)
+      insertParty({
+        id: uuid(),
+        documentId,
+        role: slotRole,
+        displayName: providedName
+          ? sanitizeDisplayName(providedName, fallbackName)
+          : fallbackName,
+        walletAddress: null,
+        sortOrder: i + 1,
+        required: true,
+        status: 'pending',
+        signedAt: null,
+      })
+    }
+
+    updateDocumentRequiredSignatures(documentId, nextRequired)
+
+    // Expanding after creator signed alone: leave ready_to_lock if more sigs needed.
+    const refreshed = getDocumentById(documentId)!
+    const refreshedParties = getPartiesForDocument(documentId)
+    const refreshedSigs = getSignaturesForDocument(documentId)
+    if (signaturesComplete(refreshed, refreshedParties, refreshedSigs)) {
+      if (refreshed.status === 'collecting_signatures' || refreshed.status === 'draft') {
+        updateDocumentStatus(documentId, 'ready_to_lock')
+      }
+    } else if (refreshed.status === 'ready_to_lock') {
+      updateDocumentStatus(documentId, 'collecting_signatures')
+    }
+
+    reconcileDocumentParties(documentId)
+    const finalDoc = getDocumentById(documentId)!
+    return publicDocument(finalDoc, { viewerAddress: requesterAddress })
+  })
 }
 
 /**

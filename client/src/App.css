@@ -162,7 +162,8 @@ body[data-verilock-surface='journey'] #root::after {
 
 /*
  * Path card lives in .lr-track (page surface), not sticky header.
- * Solid white under copy; path still is a right-side panel only — never under text.
+ * Full-bleed still with a light left veil — enough for title contrast without
+ * boxing the photo into a hard right strip.
  */
 .lr-header-track {
   position: relative;
@@ -175,14 +176,9 @@ body[data-verilock-surface='journey'] #root::after {
   min-height: 7.25rem;
 }
 
-/* Decorative still: right third only. Copy sits on pure white, not on the photo. */
 .lr-header-track-media {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: auto;
-  width: min(42%, 18.5rem);
+  inset: 0;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
@@ -196,50 +192,51 @@ body[data-verilock-surface='journey'] #root::after {
   filter: saturate(1.05) brightness(1.01) contrast(1.06);
   /* Zoom via placementImageStyle --lr-path-zoom / transform */
   --lr-path-zoom: 1;
-  opacity: 1;
+  opacity: 0.9;
   pointer-events: none;
 }
 
-/* Soft blend at the media’s left edge into the white card — not a full-card fog. */
+/* Soft left veil for copy; photo stays visible through the mid/right. */
 .lr-header-track-wash {
   position: absolute;
   inset: 0;
   background: linear-gradient(
-    90deg,
-    #ffffff 0%,
-    rgba(255, 255, 255, 0.92) 14%,
-    rgba(255, 255, 255, 0.35) 42%,
-    transparent 72%
+    100deg,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(255, 255, 255, 0.72) 26%,
+    rgba(255, 255, 255, 0.28) 52%,
+    rgba(255, 255, 255, 0.06) 78%,
+    transparent 100%
   );
 }
 
 .lr-header-track--creator .lr-header-track-wash {
   background: linear-gradient(
-    90deg,
-    #ffffff 0%,
-    rgba(240, 253, 250, 0.95) 12%,
-    rgba(255, 255, 255, 0.28) 40%,
-    transparent 70%
+    100deg,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(240, 253, 250, 0.7) 24%,
+    rgba(255, 255, 255, 0.24) 50%,
+    transparent 78%
   );
 }
 
 .lr-header-track--signer .lr-header-track-wash {
   background: linear-gradient(
-    90deg,
-    #ffffff 0%,
-    rgba(236, 254, 255, 0.95) 12%,
-    rgba(255, 255, 255, 0.28) 40%,
-    transparent 70%
+    100deg,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(236, 254, 255, 0.7) 24%,
+    rgba(255, 255, 255, 0.24) 50%,
+    transparent 78%
   );
 }
 
 .lr-header-track--verifier .lr-header-track-wash {
   background: linear-gradient(
-    90deg,
-    #ffffff 0%,
-    rgba(247, 254, 231, 0.95) 12%,
-    rgba(255, 255, 255, 0.28) 40%,
-    transparent 70%
+    100deg,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(247, 254, 231, 0.68) 24%,
+    rgba(255, 255, 255, 0.24) 50%,
+    transparent 78%
   );
 }
 
@@ -259,8 +256,7 @@ body[data-verilock-surface='journey'] #root::after {
   flex-direction: column;
   gap: 0.25rem;
   min-width: 0;
-  /* Stay clear of the right-side still */
-  max-width: min(36rem, calc(100% - min(42%, 18.5rem) + 0.5rem));
+  max-width: min(36rem, 68%);
 }
 
 .lr-header-track .lr-track-title-row {
@@ -309,26 +305,25 @@ body[data-verilock-surface='journey'] #root::after {
     padding: 1.05rem 1rem;
   }
 
-  /* Narrow: smaller right still, more white under the title */
-  .lr-header-track-media {
-    width: min(36%, 9.5rem);
+  .lr-header-track-bg {
+    opacity: 0.82;
   }
 
   .lr-header-track-copy {
-    max-width: min(100%, calc(100% - 7.5rem));
-    padding-right: 0.25rem;
+    max-width: min(36rem, 78%);
   }
 
+  /* Slightly stronger left veil on small screens — still not a solid slab */
   .lr-header-track-wash,
   .lr-header-track--creator .lr-header-track-wash,
   .lr-header-track--signer .lr-header-track-wash,
   .lr-header-track--verifier .lr-header-track-wash {
     background: linear-gradient(
-      90deg,
-      #ffffff 0%,
-      rgba(255, 255, 255, 0.96) 22%,
-      rgba(255, 255, 255, 0.4) 55%,
-      transparent 85%
+      100deg,
+      rgba(255, 255, 255, 0.94) 0%,
+      rgba(255, 255, 255, 0.82) 34%,
+      rgba(255, 255, 255, 0.38) 62%,
+      rgba(255, 255, 255, 0.1) 100%
     );
   }
 }
@@ -1373,6 +1368,59 @@ body[data-verilock-surface='journey'] .party-list-item {
   background: rgba(13, 148, 136, 0.04);
   border-color: rgba(13, 148, 136, 0.12);
   color: var(--lr-text);
+}
+
+/* Share-step Signatures config card */
+body[data-verilock-surface='journey'] .signatures-config {
+  background: #ffffff;
+  border-color: var(--lr-line);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+}
+
+body[data-verilock-surface='journey'] .signatures-config-head h3 {
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .signatures-config-form {
+  border-top-color: var(--lr-line);
+}
+
+/* Recorded signatures: light cards (base CSS used dark glass → muddy grey slabs). */
+body[data-verilock-surface='journey'] .signatures-panel {
+  border-top-color: var(--lr-line);
+}
+
+body[data-verilock-surface='journey'] .signatures-panel-title {
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .signatures-panel-item {
+  background: #ffffff;
+  border-color: var(--lr-line);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .signatures-panel-meta strong {
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .signatures-panel-meta .muted,
+body[data-verilock-surface='journey'] .signatures-panel-privacy-note,
+body[data-verilock-surface='journey'] .signatures-panel-typed,
+body[data-verilock-surface='journey'] .signatures-panel-typed.muted {
+  color: var(--lr-muted);
+  background: none !important;
+}
+
+body[data-verilock-surface='journey'] .signatures-panel-address:hover,
+body[data-verilock-surface='journey'] .signatures-panel-address:focus-visible {
+  color: var(--lr-accent);
+}
+
+body[data-verilock-surface='journey'] .signatures-panel-image {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.1);
 }
 
 body[data-verilock-surface='journey'] .party-list-item--done {

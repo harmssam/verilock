@@ -196,8 +196,14 @@ export function shareEmlDownloadName(doc: SealDocument): string {
 }
 
 /**
- * Build a multipart .eml the user can open in their mail app.
+ * Build a multipart .eml the user can open in their mail app as a **compose draft**.
  * PDF bytes stay on-device; VeriLock never receives the file.
+ *
+ * Important headers:
+ * - `X-Unsent: 1` — Outlook / Apple Mail / Thunderbird open as editable draft
+ *   (without this, many clients open the file as a received message → To is locked
+ *   and users must Forward to add an address).
+ * - Empty `To:` — compose field is present and blank for the user to fill.
  */
 export async function buildShareEmlBlob(
   doc: SealDocument,
@@ -211,6 +217,9 @@ export async function buildShareEmlBlob(
   const boundary = `----=_VeriLock_${crypto.randomUUID().replace(/-/g, '')}`
 
   const headers = [
+    // Draft / unsent — open in compose mode, not as a sealed inbox message
+    'X-Unsent: 1',
+    'To: ',
     `Subject: ${encodeRfc2047Subject(content.subject)}`,
     'MIME-Version: 1.0',
     'X-Mailer: VeriLock',

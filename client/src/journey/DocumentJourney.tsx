@@ -93,6 +93,8 @@ interface DocumentJourneyProps {
   onPageMeta?: (meta: PageMeta) => void
   /** Return to home (invalid deep link). */
   onHome?: () => void
+  /** Fresh create path after “Start another agreement” (shell remounts journey). */
+  onStartCreate?: () => void
 }
 
 type VerifyOutcome =
@@ -135,6 +137,7 @@ export function DocumentJourney({
   navEpoch = 0,
   onPageMeta,
   onHome,
+  onStartCreate,
 }: DocumentJourneyProps) {
   const {
     account,
@@ -170,7 +173,8 @@ export function DocumentJourney({
   /** Optional display names for other parties (index 0 = first co-signer). */
   const [coSignerNames, setCoSignerNames] = useState<string[]>([''])
   const [docNotes, setDocNotes] = useState('')
-  const [requiredSigners, setRequiredSigners] = useState(2)
+  /** Draft total parties for share-step Signatures UI (applied via API). */
+  const [requiredSigners, setRequiredSigners] = useState(1)
   const [busy, setBusy] = useState(false)
   const [doc, setDoc] = useState<JourneyDoc | null>(null)
   const [sharedAck, setSharedAck] = useState(false)
@@ -322,13 +326,15 @@ export function DocumentJourney({
         if (isCreator) {
           setRole('creator')
           saveJourneyIntent('creator')
-          const { signed, required, readyToLock } = document.signingProgress
+          const { signed, required } = document.signingProgress
+          // Solo agreements must re-open on share (Signatures) so co-signers can still
+          // be added — do not auto-ack just because the creator already signed.
+          // Multi incomplete: treat as invite-sent so polling/share banner works.
+          // preferSeal / agreements “seal now” skips share intentionally.
           setSharedAck(
             preferSeal ||
-              readyToLock ||
-              document.status === 'ready_to_lock' ||
-              signed > 0 ||
-              required === 0,
+              required === 0 ||
+              (required > 1 && signed > 0),
           )
         } else {
           // /d/:slug is the invite path — land on signer flow (connect → sign), not verify.
@@ -417,27 +423,32 @@ export function DocumentJourney({
       if (doc.sealed || meSigned || allSigned(doc)) return 'done'
       return 'sign'
     }
-    // Creator path: fingerprint → sign (you first) → share (invite) → seal → done
+    // Creator path: fingerprint → sign (you) → share (signatures / co-signers) → seal → done
     if (!doc) return 'fingerprint'
     if (doc.sealed) return 'done'
-    if (doc.directSeal || allSigned(doc)) return 'seal'
-    // Sign before share: stay on sign while this wallet can still take a party slot
+    if (doc.directSeal) return 'seal'
+    // Sign first while this wallet can still take a party slot
     if (address) {
       const resolution = resolveSigningParty(doc.source, address)
       if (resolution.ok) return 'sign'
     } else if (signedCount(doc) === 0) {
       return 'sign'
     }
-    // Creator already signed (or no open slot) — invite remaining co-signers
-    return 'share'
-  }, [role, doc, address])
+    // Waiting on co-signers
+    if (!allSigned(doc)) return 'share'
+    // Solo after your signature: land on share once so you can add co-signers or continue to seal.
+    // multi complete → seal. sharedAck / preferSeal skip the solo stop.
+    if (requiredCount(doc) <= 1 && !sharedAck) return 'share'
+    return 'seal'
+  }, [role, doc, address, sharedAck])
 
   const pathStages = useMemo(() => stagesForRole(role), [role])
 
   // Quiet refresh while creator waits for co-signers after signing (share step).
   useEffect(() => {
-    if (role !== 'creator' || !doc || doc.sealed || allSigned(doc)) return
+    if (role !== 'creator' || !doc || doc.sealed) return
     if (step !== 'share') return
+    if (allSigned(doc)) return
     const slug = doc.slug
     const size = fileSizeByDocIdRef.current[doc.id] ?? doc.fileSize
     const tick = () => {
@@ -453,6 +464,29 @@ export function DocumentJourney({
     const id = window.setInterval(tick, 12_000)
     return () => window.clearInterval(id)
   }, [role, doc, step, token, setActiveFromSeal])
+
+  // Seed share-step cosigner draft from the live document once per agreement.
+  useEffect(() => {
+    if (!doc || step !== 'share') return
+    const need = Math.max(1, Math.min(4, requiredCount(doc)))
+    setRequiredSigners(need)
+    const others = Math.max(0, need - 1)
+    const creatorNorm = address ? normalizeAddress(address) : null
+    const coNames = doc.parties
+      .filter(p => {
+        if (!p.required) return false
+        if (creatorNorm && p.walletAddress && normalizeAddress(p.walletAddress) === creatorNorm) {
+          return false
+        }
+        return true
+      })
+      .map(p => (p.displayName && !/^invited\s/i.test(p.displayName) ? p.displayName : ''))
+    setCoSignerNames(() => {
+      const next = coNames.slice(0, others)
+      while (next.length < others) next.push('')
+      return next
+    })
+  }, [doc?.id, step]) // eslint-disable-line react-hooks/exhaustive-deps -- seed on open only
 
   const revealParticipantPrivate = Boolean(
     doc && canRevealParticipantDetails(doc.source, address),
@@ -509,7 +543,14 @@ export function DocumentJourney({
   // Hash PDF on select (sign path) + match check
   useEffect(() => {
     if (!signFile || !doc) {
-      setSignHash(null)
+      // Do not clear a hash that still matches the create-time PDF (session continuity).
+      if (!signFile && !(pdfFile && pdfHash && doc && pdfHash === doc.fingerprint)) {
+        setSignHash(null)
+      }
+      return
+    }
+    // Already verified for this file + agreement — skip re-hash churn.
+    if (signHash === doc.fingerprint && pdfHash === doc.fingerprint && signFile === pdfFile) {
       return
     }
     let cancelled = false
@@ -536,7 +577,19 @@ export function DocumentJourney({
     return () => {
       cancelled = true
     }
-  }, [signFile, doc])
+  }, [signFile, doc, signHash, pdfFile, pdfHash])
+
+  // Session continuity: carry the fingerprinted create-time PDF into the sign step.
+  // Only prompt for a second drop when this browser session no longer holds a matching file
+  // (e.g. user left and returned via invite link).
+  useEffect(() => {
+    if (!doc?.fingerprint) return
+    if (signFile && signHash === doc.fingerprint) return
+    if (pdfFile && pdfHash && pdfHash === doc.fingerprint) {
+      setSignFile(pdfFile)
+      setSignHash(pdfHash)
+    }
+  }, [doc, pdfFile, pdfHash, signFile, signHash])
 
   // Verify path: hash once per selected file, then look up matches.
   // Important: do NOT depend on `doc` - loading a match used to setActiveFromSeal,
@@ -643,6 +696,33 @@ export function DocumentJourney({
     })()
   }, [verifyFile, setActiveFromSeal])
 
+  const clearLocalJourneyState = () => {
+    setPdfFile(null)
+    setPdfHash(null)
+    setTitle('')
+    setCreatorName('')
+    setCreatorNotifyEmail('')
+    setDocType('contract')
+    setCreatorRole('landlord')
+    setCoSignerNames([''])
+    setDocNotes('')
+    setRequiredSigners(1)
+    setDoc(null)
+    setSharedAck(false)
+    setSignFile(null)
+    setSignHash(null)
+    setSignerName('')
+    setSigBlob(null)
+    setSigPadKey(k => k + 1)
+    setVerifyFile(null)
+    setVerifyOutcome({ kind: 'idle' })
+    verifyCacheRef.current = null
+    verifyRunIdRef.current += 1
+    setLocalError(null)
+    setLockMessage(null)
+    setError(null)
+  }
+
   const resetAll = () => {
     // Prefer shell home (path picker / redesign landing) so we don't flash an
     // in-component welcome under a track title. Keep local UI for the fade-out.
@@ -666,30 +746,7 @@ export function DocumentJourney({
     setRole(null)
     clearJourneyIntent()
     syncIntentToUrl(null)
-    setPdfFile(null)
-    setPdfHash(null)
-    setTitle('')
-    setCreatorName('')
-    setCreatorNotifyEmail('')
-    setDocType('contract')
-    setCreatorRole('landlord')
-    setCoSignerNames([''])
-    setDocNotes('')
-    setRequiredSigners(2)
-    setDoc(null)
-    setSharedAck(false)
-    setSignFile(null)
-    setSignHash(null)
-    setSignerName('')
-    setSigBlob(null)
-    setSigPadKey(k => k + 1)
-    setVerifyFile(null)
-    setVerifyOutcome({ kind: 'idle' })
-    verifyCacheRef.current = null
-    verifyRunIdRef.current += 1
-    setLocalError(null)
-    setLockMessage(null)
-    setError(null)
+    clearLocalJourneyState()
     if (
       window.location.pathname.startsWith('/d/') ||
       window.location.pathname.startsWith('/v/') ||
@@ -697,6 +754,23 @@ export function DocumentJourney({
     ) {
       window.history.pushState({}, '', '/')
     }
+  }
+
+  /** Done step: new create flow (not path-picker home). */
+  const startAnotherAgreement = () => {
+    setLocalError(null)
+    setLockMessage(null)
+    setError(null)
+    if (onStartCreate) {
+      onStartCreate()
+      return
+    }
+    // Fallback when shell is not wired: reset local state onto fingerprint create.
+    clearLocalJourneyState()
+    setRole('creator')
+    saveJourneyIntent('creator')
+    syncIntentToUrl('creator')
+    window.history.pushState({}, '', '/?intent=creator')
   }
 
   const createDoc = async () => {
@@ -708,31 +782,7 @@ export function DocumentJourney({
     setBusy(true)
     setLocalError(null)
     try {
-      const effectiveRequired = requiredSigners
-      const extraSigners = Math.max(0, effectiveRequired - 1)
-      // Creator is always a required party; remaining slots are co-signers.
-      // "1 signature" = you only (no co-signers). Direct hash-only (0) is not offered here.
-      const parties = Array.from({ length: extraSigners }, (_, index) => {
-        const named = coSignerNames[index]?.trim()
-        const fallback =
-          extraSigners === 1 ? 'Invited signer' : `Invited signer ${index + 1}`
-        // Rental: first co-signer is the other role; further parties are generic signers.
-        let role = 'signer'
-        if (docType === 'rental' && index === 0) {
-          role = creatorRole === 'landlord' ? 'tenant' : 'landlord'
-        }
-        return {
-          role,
-          displayName: clampField(named || fallback, MAX_DISPLAY_NAME_LENGTH),
-          required: true,
-        }
-      })
-
-      const notifyEmail =
-        FEATURES.emailNotifyUi && requiredSigners > 1 && creatorNotifyEmail.trim()
-          ? creatorNotifyEmail.trim()
-          : undefined
-
+      // Always start solo. Co-signers are configured on the share step (Signatures).
       const metadata =
         documentTypeUsesNotes(docType) && docNotes.trim()
           ? { notes: clampField(docNotes.trim(), MAX_DOCUMENT_NOTES_LENGTH) }
@@ -746,10 +796,8 @@ export function DocumentJourney({
         creatorDisplayName: clampField(creatorName.trim(), MAX_DISPLAY_NAME_LENGTH),
         originalSha256: pdfHash,
         pageCount,
-        requiredSignatures: effectiveRequired,
-        parties: parties.length > 0 ? parties : undefined,
+        requiredSignatures: 1,
         ...(metadata ? { metadata } : {}),
-        ...(notifyEmail ? { creatorNotifyEmail: notifyEmail } : {}),
       })
 
       if (hashWarning) setLocalError(hashWarning)
@@ -778,9 +826,40 @@ export function DocumentJourney({
     }
   }
 
-  /** Mark invite as sent (share is already after creator sign). */
+  /** Mark invite as sent, or solo “continue to seal” (share is after creator sign). */
   const acknowledgeShare = () => {
     setSharedAck(true)
+  }
+
+  /** Apply cosigner count + optional names from the share-step Signatures UI. */
+  const applyCosigners = async () => {
+    if (!token || !doc) return
+    const total = Math.max(1, Math.min(4, requiredSigners))
+    setBusy(true)
+    setLocalError(null)
+    try {
+      const others = Math.max(0, total - 1)
+      const { document } = await api.configureCosigners(token, doc.id, {
+        requiredSignatures: total,
+        coSignerNames: coSignerNames.slice(0, others).map(n => n.trim()),
+      })
+      setActiveFromSeal(document, doc.fileSize)
+      if (FEATURES.emailNotifyUi) {
+        const email =
+          total > 1 && creatorNotifyEmail.trim() ? creatorNotifyEmail.trim() : null
+        try {
+          await api.setDocumentNotifyEmail(token, doc.id, email)
+        } catch {
+          /* non-fatal — cosigners already saved */
+        }
+      }
+      // Expanding beyond solo: stay on share for invites (sharedAck resets for multi wait).
+      if (total > 1) setSharedAck(false)
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Could not update signers')
+    } finally {
+      setBusy(false)
+    }
   }
 
   /** Creator-only: cancel before anyone has signed. */
@@ -813,7 +892,19 @@ export function DocumentJourney({
   }
 
   const signAsCurrentUser = async () => {
-    if (!token || !doc || !address || !signHash) return
+    if (!token || !doc || !address) return
+
+    // Prefer explicit sign-step hash; fall back to create-time PDF still in this session.
+    const clientHash =
+      signHash && signHash === doc.fingerprint
+        ? signHash
+        : pdfHash && pdfHash === doc.fingerprint
+          ? pdfHash
+          : null
+    if (!clientHash) {
+      setLocalError('Choose the matching PDF before signing')
+      return
+    }
 
     const resolution = resolveSigningParty(doc.source, address)
     if (!resolution.ok) {
@@ -825,10 +916,6 @@ export function DocumentJourney({
       setLocalError('Enter your full name before signing')
       return
     }
-    if (signHash !== doc.fingerprint) {
-      setLocalError('Choose the matching PDF before signing')
-      return
-    }
     if (!sigBlob) {
       setLocalError('Draw your signature before signing')
       return
@@ -838,31 +925,47 @@ export function DocumentJourney({
     setLocalError(null)
     try {
       const signatureImage = await prepareSignatureImageUpload(sigBlob)
-      const { document } = await api.signDocument(token, doc.id, {
+      const { document: signedDoc } = await api.signDocument(token, doc.id, {
         partyId: myParty.id,
         signatureType: 'drawn',
-        clientSha256: doc.fingerprint,
+        clientSha256: clientHash,
         displayName: partyNeedsSignerName(myParty)
           ? clampField(signerName.trim(), MAX_DISPLAY_NAME_LENGTH)
           : undefined,
         signatureImage,
       })
-      setActiveFromSeal(document, doc.fileSize)
-      setSignFile(null)
-      setSignHash(null)
+      setActiveFromSeal(signedDoc, doc.fileSize)
+      // Keep the matched PDF in this session for share / any return to sign.
+      // Re-upload is only needed after a full leave (reload) drops local File state.
       setSignerName('')
       setSigBlob(null)
       setSigPadKey(k => k + 1)
-      if (document.signingProgress.readyToLock) {
+      if (signedDoc.signingProgress.readyToLock) {
         // Only the creator seals — co-signers should not be told to continue to seal.
-        if (isDocumentCreator(document, address)) {
-          setLockMessage('All signatures collected — continue to seal.')
+        const solo = signedDoc.signingProgress.required <= 1
+        if (isDocumentCreator(signedDoc, address)) {
+          setLockMessage(
+            solo
+              ? 'Signature complete — continue to seal.'
+              : 'All signatures collected — continue to seal.',
+          )
         } else {
           setLockMessage(
-            'All signatures are in. The creator can seal this agreement on the Nimiq blockchain.',
+            solo
+              ? 'Signature complete. The creator can seal this agreement on the Nimiq blockchain.'
+              : 'All signatures are in. The creator can seal this agreement on the Nimiq blockchain.',
           )
         }
       }
+      // Sign form is mid-page; after success the UI swaps to done/share and the old
+      // scroll offset lands near the bottom. Snap to top so the confirmation is visible.
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+          window.document.documentElement.scrollTop = 0
+          window.document.body.scrollTop = 0
+        })
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign failed'
       setLocalError(message)
@@ -1056,6 +1159,17 @@ export function DocumentJourney({
   }
 
   const signFileMatches = Boolean(signHash && doc && signHash === doc.fingerprint)
+  /**
+   * Session still holds a matching PDF. Prefer the active sign-step file when set;
+   * only fall back to create-time pdf when no separate sign drop is in play.
+   * (Avoid green “match” while a non-matching signFile is selected.)
+   */
+  const hasVerifiedLocalPdf = Boolean(
+    doc &&
+      (signFile
+        ? signHash === doc.fingerprint
+        : Boolean(pdfFile && pdfHash === doc.fingerprint)),
+  )
   const displayError = localError
 
   if (missingDeepLink) {
@@ -1281,93 +1395,6 @@ export function DocumentJourney({
                       }
                     />
                   </label>
-                  <label className="field">
-                    <span className="field-label">How many parties must sign?</span>
-                    <select
-                      value={requiredSigners}
-                      onChange={e => {
-                        const n = Number(e.target.value)
-                        setRequiredSigners(n)
-                        const others = Math.max(0, n - 1)
-                        setCoSignerNames(prev => {
-                          const next = prev.slice(0, others)
-                          while (next.length < others) next.push('')
-                          return next
-                        })
-                        // Solo path has no co-signers — drop notify email if switching to 1.
-                        if (n <= 1) setCreatorNotifyEmail('')
-                      }}
-                    >
-                      {[1, 2, 3, 4].map(n => (
-                        <option key={n} value={n}>
-                          {n === 1
-                            ? '1 signature (you only — no co-signers)'
-                            : `${n} signatures (you + ${n - 1} other${n - 1 === 1 ? '' : 's'})`}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {FEATURES.emailNotifyUi && requiredSigners > 1 && (
-                    <label className="field">
-                      <span className="field-label">Email when everyone has signed (optional)</span>
-                      <input
-                        type="email"
-                        value={creatorNotifyEmail}
-                        onChange={e => setCreatorNotifyEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        autoComplete="email"
-                      />
-                      <span className="muted" style={{ fontSize: '0.78rem' }}>
-                        We only use this to tell you the agreement is ready to seal. Never required.
-                      </span>
-                    </label>
-                  )}
-                  {Math.max(0, requiredSigners - 1) > 0 && (
-                    <div className="field-stack">
-                      <span className="field-label">
-                        Co-signer name{requiredSigners - 1 > 1 ? 's' : ''} (optional)
-                      </span>
-                      <p className="muted" style={{ margin: '0 0 0.45rem', fontSize: '0.8rem' }}>
-                        Leave blank if they will enter their name when they sign.
-                      </p>
-                      {Array.from({ length: Math.max(0, requiredSigners - 1) }, (_, index) => {
-                        const rentalOther =
-                          docType === 'rental' && index === 0
-                            ? creatorRole === 'landlord'
-                              ? 'Tenant'
-                              : 'Landlord'
-                            : null
-                        return (
-                          <label key={index} className="field">
-                            <span className="field-label">
-                              {rentalOther ?? `Party ${index + 2}`} name
-                            </span>
-                            <input
-                              value={coSignerNames[index] ?? ''}
-                              onChange={e => {
-                                const value = clampField(
-                                  e.target.value,
-                                  MAX_DISPLAY_NAME_LENGTH,
-                                )
-                                setCoSignerNames(prev => {
-                                  const next = [...prev]
-                                  while (next.length <= index) next.push('')
-                                  next[index] = value
-                                  return next
-                                })
-                              }}
-                              maxLength={MAX_DISPLAY_NAME_LENGTH}
-                              placeholder={
-                                rentalOther
-                                  ? `${rentalOther} full name`
-                                  : 'Name (optional)'
-                              }
-                            />
-                          </label>
-                        )
-                      })}
-                    </div>
-                  )}
                   {documentTypeUsesNotes(docType) && (
                     <label className="field">
                       <span className="field-label">Notes (optional)</span>
@@ -1454,45 +1481,214 @@ export function DocumentJourney({
               {step === 'share' && doc && (
                 <div className="action-stack">
                   <DocumentStage step={step} doc={doc} file={pdfFile} accepting={false} />
-                  <div className="progress-bar-wrap">
-                    <div className="progress-bar-meta">
-                      <span>
-                        Signatures {signedCount(doc)}/{requiredCount(doc)}
-                      </span>
-                      <span className="muted">{doc.title}</span>
+
+                  <section className="signatures-config" aria-labelledby="signatures-config-title">
+                    <header className="signatures-config-head">
+                      <h3 id="signatures-config-title">Signatures</h3>
+                      <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
+                        You signed. Seal alone, or add co-signers and share the invite before sealing.
+                      </p>
+                    </header>
+
+                    <div className="progress-bar-wrap">
+                      <div className="progress-bar-meta">
+                        <span>
+                          Signatures {signedCount(doc)}/{requiredCount(doc)}
+                        </span>
+                        <span className="muted">{doc.title}</span>
+                      </div>
+                      <div className="progress-bar-track">
+                        <div
+                          className="progress-bar-fill"
+                          style={{
+                            width: `${requiredCount(doc) ? (signedCount(doc) / requiredCount(doc)) * 100 : 0}%`,
+                          }}
+                        />
+                      </div>
                     </div>
-                    <div className="progress-bar-track">
-                      <div
-                        className="progress-bar-fill"
-                        style={{
-                          width: `${requiredCount(doc) ? (signedCount(doc) / requiredCount(doc)) * 100 : 0}%`,
-                        }}
+
+                    <PartyList doc={doc} revealNames={revealParticipantPrivate} />
+
+                    {role === 'creator' && !doc.sealed && (
+                      <div className="signatures-config-form">
+                        <label className="field">
+                          <span className="field-label">How many parties must sign?</span>
+                          <select
+                            value={Math.max(requiredSigners, signedCount(doc))}
+                            onChange={e => {
+                              const n = Number(e.target.value)
+                              setRequiredSigners(n)
+                              const others = Math.max(0, n - 1)
+                              setCoSignerNames(prev => {
+                                const next = prev.slice(0, others)
+                                while (next.length < others) next.push('')
+                                return next
+                              })
+                              if (n <= 1) setCreatorNotifyEmail('')
+                            }}
+                            disabled={busy}
+                          >
+                            {[1, 2, 3, 4]
+                              .filter(n => n >= Math.max(1, signedCount(doc)))
+                              .map(n => (
+                                <option key={n} value={n}>
+                                  {n === 1
+                                    ? '1 signature (you only — no co-signers)'
+                                    : `${n} signatures (you + ${n - 1} other${n - 1 === 1 ? '' : 's'})`}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+
+                        {requiredSigners > 1 && (
+                          <div className="field-stack">
+                            <span className="field-label">
+                              Co-signer name{requiredSigners - 1 > 1 ? 's' : ''} (optional)
+                            </span>
+                            <p className="muted" style={{ margin: '0 0 0.45rem', fontSize: '0.8rem' }}>
+                              Leave blank if they will enter their name when they sign.
+                            </p>
+                            {Array.from({ length: requiredSigners - 1 }, (_, index) => {
+                              const rentalOther =
+                                doc.source.type === 'rental' && index === 0
+                                  ? doc.source.parties.find(
+                                      p =>
+                                        p.walletAddress &&
+                                        address &&
+                                        normalizeAddress(p.walletAddress) ===
+                                          normalizeAddress(address),
+                                    )?.role === 'landlord'
+                                    ? 'Tenant'
+                                    : 'Landlord'
+                                  : null
+                              return (
+                                <label key={index} className="field">
+                                  <span className="field-label">
+                                    {rentalOther ?? `Party ${index + 2}`} name
+                                  </span>
+                                  <input
+                                    value={coSignerNames[index] ?? ''}
+                                    onChange={e => {
+                                      const value = clampField(
+                                        e.target.value,
+                                        MAX_DISPLAY_NAME_LENGTH,
+                                      )
+                                      setCoSignerNames(prev => {
+                                        const next = [...prev]
+                                        while (next.length <= index) next.push('')
+                                        next[index] = value
+                                        return next
+                                      })
+                                    }}
+                                    maxLength={MAX_DISPLAY_NAME_LENGTH}
+                                    placeholder={
+                                      rentalOther
+                                        ? `${rentalOther} full name`
+                                        : 'Name (optional)'
+                                    }
+                                    disabled={busy}
+                                  />
+                                </label>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {FEATURES.emailNotifyUi && requiredSigners > 1 && (
+                          <label className="field">
+                            <span className="field-label">
+                              Email when everyone has signed (optional)
+                            </span>
+                            <input
+                              type="email"
+                              value={creatorNotifyEmail}
+                              onChange={e => setCreatorNotifyEmail(e.target.value)}
+                              placeholder="you@example.com"
+                              autoComplete="email"
+                              disabled={busy}
+                            />
+                            <span className="muted" style={{ fontSize: '0.78rem' }}>
+                              We only use this to tell you the agreement is ready to seal. Never
+                              required.
+                            </span>
+                          </label>
+                        )}
+
+                        <button
+                          type="button"
+                          className={`btn btn-secondary${busy ? ' btn--busy' : ''}`}
+                          disabled={busy}
+                          onClick={() => void applyCosigners()}
+                        >
+                          {busy ? (
+                            <>
+                              <LoaderCircle
+                                className="btn-spinner"
+                                size={16}
+                                strokeWidth={2.5}
+                              />
+                              Saving…
+                            </>
+                          ) : requiredSigners > requiredCount(doc) ? (
+                            'Add co-signers'
+                          ) : requiredSigners < requiredCount(doc) ? (
+                            'Update signatures'
+                          ) : (
+                            'Save signature settings'
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </section>
+
+                  {requiredCount(doc) > 1 && (
+                    <>
+                      <ShareInviteCard
+                        document={doc.source}
+                        shareUrl={doc.shareUrl}
+                        linkCopied={linkCopied}
+                        onCopyLink={() => void copyLink()}
+                        pdfFile={pdfFile ?? signFile}
+                        embedded
                       />
-                    </div>
-                  </div>
-                  <PartyList doc={doc} revealNames={revealParticipantPrivate} />
-                  <ShareInviteCard
-                    document={doc.source}
-                    shareUrl={doc.shareUrl}
-                    linkCopied={linkCopied}
-                    onCopyLink={() => void copyLink()}
-                    pdfFile={pdfFile ?? signFile}
-                    embedded
-                  />
-                  {sharedAck ? (
-                    <div className="result-banner result-banner--ok">
-                      <Check size={18} strokeWidth={2.5} />
-                      Invite sent — waiting for co-signers. You can seal when everyone has signed.
-                    </div>
-                  ) : (
+                      {sharedAck ? (
+                        <div className="result-banner result-banner--ok">
+                          <Check size={18} strokeWidth={2.5} />
+                          Invite sent — waiting for co-signers. You can seal when everyone has
+                          signed.
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-lg"
+                          onClick={acknowledgeShare}
+                        >
+                          I&apos;ve shared the invite
+                        </button>
+                      )}
+                      <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                        Send the invite link and the same PDF to co-signers. This view updates when
+                        they sign.
+                      </p>
+                    </>
+                  )}
+
+                  {requiredCount(doc) <= 1 && allSigned(doc) && (
                     <button
                       type="button"
                       className="btn btn-primary btn-lg"
+                      disabled={requiredSigners !== requiredCount(doc)}
+                      title={
+                        requiredSigners !== requiredCount(doc)
+                          ? 'Save signature settings (or set parties back to 1) before sealing'
+                          : undefined
+                      }
                       onClick={acknowledgeShare}
                     >
-                      I&apos;ve shared the invite
+                      Continue to seal
                     </button>
                   )}
+
                   {canCancelCurrent && (
                     <button
                       type="button"
@@ -1513,11 +1709,6 @@ export function DocumentJourney({
                       )}
                     </button>
                   )}
-                  <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                    You already signed as the creator. Send the link and the same PDF to
-                    co-signers. Prefer a ready-made message? Download the email package. This
-                    view updates when they sign.
-                  </p>
                 </div>
               )}
 
@@ -1584,8 +1775,12 @@ export function DocumentJourney({
                         <div className="result-banner result-banner--ok">
                           <Check size={18} strokeWidth={2.5} />
                           {role === 'creator'
-                            ? 'All parties signed — continue to seal'
-                            : 'All parties have signed. The creator can seal this on Nimiq.'}
+                            ? requiredCount(doc) <= 1
+                              ? 'Signature complete — continue to seal'
+                              : 'All parties signed — continue to seal'
+                            : requiredCount(doc) <= 1
+                              ? 'Signature complete. The creator can seal this on Nimiq.'
+                              : 'All parties have signed. The creator can seal this on Nimiq.'}
                         </div>
                       ) : (
                         <>
@@ -1646,39 +1841,46 @@ export function DocumentJourney({
                                 </span>
                               </div>
 
-                              <div className="sign-upload-callout" role="status">
-                                <Upload size={18} strokeWidth={2.25} aria-hidden />
-                                <div>
-                                  <strong>Upload your copy of the PDF</strong>
-                                  <p className="muted" style={{ margin: '0.2rem 0 0' }}>
-                                    Drop the same PDF from your computer so we can verify the
-                                    document is identical.
-                                  </p>
+                              {!hasVerifiedLocalPdf && (
+                                <div className="sign-upload-callout" role="status">
+                                  <Upload size={18} strokeWidth={2.25} aria-hidden />
+                                  <div>
+                                    <strong>Upload your copy of the PDF</strong>
+                                    <p className="muted" style={{ margin: '0.2rem 0 0' }}>
+                                      Drop the same PDF from your computer so we can verify the
+                                      document is identical. Required after leaving and returning
+                                      to this agreement.
+                                    </p>
+                                  </div>
                                 </div>
-                              </div>
+                              )}
 
                               <DocumentStage
                                 step={step}
                                 doc={doc}
-                                file={signFile}
+                                file={signFile ?? (hasVerifiedLocalPdf ? pdfFile : null)}
                                 onFileChange={setSignFile}
-                                accepting
+                                accepting={!hasVerifiedLocalPdf}
                                 localCopyRequired
                                 localCopyMatches={
-                                  !signFile ? null : signFileMatches
+                                  hasVerifiedLocalPdf
+                                    ? true
+                                    : !signFile
+                                      ? null
+                                      : signFileMatches
                                 }
                               />
 
-                              {signFile && !signFileMatches && (
+                              {signFile && !signFileMatches && !hasVerifiedLocalPdf && (
                                 <div className="result-banner result-banner--bad">
                                   PDF doesn&apos;t match the fingerprinted file (
                                   <strong>{doc.fileName}</strong>). Drop the same document.
                                 </div>
                               )}
-                              {signFile && signFileMatches && (
+                              {hasVerifiedLocalPdf && (
                                 <div className="result-banner result-banner--ok">
                                   <ShieldCheck size={16} strokeWidth={2.5} />
-                                  Local match - same fingerprint as the agreement
+                                  Local match — same PDF as the fingerprint on this device
                                 </div>
                               )}
 
@@ -1703,8 +1905,7 @@ export function DocumentJourney({
                                 type="button"
                                 className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
                                 disabled={
-                                  !signFile ||
-                                  !signFileMatches ||
+                                  !hasVerifiedLocalPdf ||
                                   !sigBlob ||
                                   (partyNeedsSignerName(signingResolution.party) &&
                                     !signerName.trim()) ||
@@ -1779,7 +1980,9 @@ export function DocumentJourney({
                           {doc.directSeal
                             ? 'Direct seal - no signatures required.'
                             : allSigned(doc)
-                              ? `All ${requiredCount(doc)} signatures collected.`
+                              ? requiredCount(doc) <= 1
+                                ? 'Signature complete.'
+                                : `All ${requiredCount(doc)} signatures collected.`
                               : `${signedCount(doc)} of ${requiredCount(doc)} signatures collected — waiting on remaining signers.`}
                         </p>
                       </div>
@@ -2080,7 +2283,11 @@ export function DocumentJourney({
                   )}
 
                   {step === 'done' && (
-                    <button type="button" className="btn btn-secondary" onClick={resetAll}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={startAnotherAgreement}
+                    >
                       <RotateCcw size={15} strokeWidth={2.25} />
                       Start another agreement
                     </button>

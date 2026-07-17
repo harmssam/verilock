@@ -121,6 +121,18 @@ export const api = {
       body: JSON.stringify({ email }),
     }),
 
+  /** Creator share step: set total required signatures (1–4) and optional co-signer names. */
+  configureCosigners: (
+    token: string,
+    docId: string,
+    body: { requiredSignatures: number; coSignerNames?: string[] },
+  ) =>
+    request<{ document: SealDocument }>(`/api/documents/${docId}/cosigners`, {
+      method: 'PATCH',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+
   getDocument: (id: string, token?: string | null) =>
     request<{ document: SealDocument }>(
       `/api/documents/${id}`,

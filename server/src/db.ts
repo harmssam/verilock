@@ -362,6 +362,17 @@ export function updateDocumentStatus(id: string, status: DocumentStatus): void {
   db.prepare('UPDATE documents SET status = ? WHERE id = ?').run(status, id)
 }
 
+export function updateDocumentRequiredSignatures(id: string, requiredSignatures: number): void {
+  db.prepare('UPDATE documents SET required_signatures = ? WHERE id = ?').run(
+    requiredSignatures,
+    id,
+  )
+}
+
+export function deletePartyById(partyId: string): void {
+  db.prepare('DELETE FROM document_parties WHERE id = ?').run(partyId)
+}
+
 export function setDocumentFinalSha256(id: string, finalSha256: string, status: DocumentStatus): void {
   db.prepare('UPDATE documents SET final_sha256 = ?, status = ? WHERE id = ?').run(finalSha256, status, id)
 }

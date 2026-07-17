@@ -38,15 +38,15 @@ export const CREATOR_STAGES: JourneyStage[] = [
     id: 'sign',
     label: 'Sign',
     verb: 'Add your signature',
-    blurb: 'Draw your signature on this fingerprint. Invite co-signers only when the agreement needs more than one party.',
+    blurb: 'Draw your signature on this fingerprint. Co-signers come next if you need them.',
     privacyNote: 'You prove you hold these bytes - still no upload.',
   },
   {
     id: 'share',
     label: 'Share',
-    verb: 'Invite co-signers',
+    verb: 'Signatures & invites',
     blurb:
-      'Send people the invite link and the PDF file together (email, chat, AirDrop). We never upload the document.',
+      'Seal alone, or add co-signers under Signatures and send the invite link with the PDF. We never upload the document.',
     privacyNote: 'You send the file yourself. We only host the agreement record and link.',
   },
   {

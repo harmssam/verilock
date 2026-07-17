@@ -63,7 +63,7 @@ function PrivateSignatureImage({
   }, [src, token])
 
   if (!objectUrl) {
-    return <span className="signatures-panel-typed muted">Loading signature…</span>
+    return <span className="signatures-panel-typed">Loading signature…</span>
   }
   return (
     <img
@@ -129,15 +129,15 @@ export function SignaturesPanel({
                   {signedAt}
                 </span>
                 {showPrivate && sig.signatureType === 'typed' && !imageUrl && (
-                  <span className="signatures-panel-typed muted">Typed acknowledgment</span>
+                  <span className="signatures-panel-typed">Typed acknowledgment</span>
                 )}
                 {hasHiddenImage && (
-                  <span className="signatures-panel-typed muted">
+                  <span className="signatures-panel-typed">
                     Signature image private — connect as a party to view
                   </span>
                 )}
                 {!showPrivate && sig.signatureType === 'typed' && !hasHiddenImage && (
-                  <span className="signatures-panel-typed muted">
+                  <span className="signatures-panel-typed">
                     Signed — name private until you connect as a party
                   </span>
                 )}
