@@ -521,36 +521,112 @@ export function getStreamByHash(originalSha256: string): AnnotationStreamRecord 
   return getAnnotationStream(originalSha256.toLowerCase())
 }
 
+/**
+ * Reconstruct overlays for a PDF hash.
+ *
+ * Strategy (avoids Nimiq RPC 429 on 20+ frame streams):
+ * 1. Unpack stored wire frames (same bytes we broadcast) — CRC-checked.
+ * 2. Optionally sample 1–2 on-chain txs (HEAD + END) when not rate-limited.
+ * 3. Full chain re-read only when framesHex missing or caller forces it.
+ */
 export async function reconstructFromStoredOrChain(
   originalSha256: string,
-  options?: { fallbackIndex?: boolean },
+  options?: { fallbackIndex?: boolean; preferFullChain?: boolean },
 ): Promise<{
   originalSha256: string
   annotations: unknown[]
-  source: 'index' | 'chain'
+  source: 'index' | 'chain' | 'wire'
   frameCount: number
   txHashes: string[]
   onChain: boolean
   confirmedFrames: number
   chainError?: string
+  chainSampleOk?: boolean
   integrityOk?: boolean
 }> {
   const hash = originalSha256.toLowerCase()
   const stored = getAnnotationStream(hash)
   if (!stored) throw new Error('No annotation stream for this PDF hash')
 
-  const fallbackIndex = options?.fallbackIndex !== false // default allow fallback for UX
+  const fallbackIndex = options?.fallbackIndex !== false
   const forceNoFallback = options?.fallbackIndex === false
+  const preferFullChain = options?.preferFullChain === true
 
-  if (stored.txHashes.length > 0) {
+  // ── Primary: unpack the exact frames we packed/broadcast (no RPC flood) ──
+  if (stored.framesHex.length > 0 && !preferFullChain) {
     try {
-      if (stored.txHashes.length !== stored.framesHex.length) {
+      const frames = stored.framesHex.map(hex => {
+        const buf = Buffer.from(hex, 'hex')
+        if (buf.length !== FRAME_SIZE) {
+          throw new Error(`Stored frame wrong size (${buf.length})`)
+        }
+        return buf
+      })
+      const unpacked = unpackAnnotationStream(frames)
+      if (unpacked.pdfSha256 !== hash) {
+        throw new Error('Stored stream hash does not match PDF fingerprint')
+      }
+
+      // Optional light chain sample (HEAD + END only) — ignore 429
+      let chainSampleOk: boolean | undefined
+      let chainError: string | undefined
+      if (stored.txHashes.length >= 2) {
+        try {
+          const samples = [stored.txHashes[0]!, stored.txHashes[stored.txHashes.length - 1]!]
+          let ok = 0
+          for (const txHash of samples) {
+            await new Promise(r => setTimeout(r, 150))
+            const tx = await fetchTransaction(txHash)
+            if (tx && tx.executionResult !== false) {
+              const bytes = decodeRecipientDataBytes(tx.recipientData)
+              if (bytes.length === FRAME_SIZE) ok++
+            }
+          }
+          chainSampleOk = ok === samples.length
+          if (!chainSampleOk) {
+            chainError = `Sampled ${ok}/${samples.length} on-chain frames (HEAD/END)`
+          }
+        } catch (err) {
+          chainError = err instanceof Error ? err.message : String(err)
+          chainSampleOk = false
+          // 429 / rate limit: still return wire reconstruct — not a hard failure
+          console.warn('[annotation-stream] chain sample skipped', chainError)
+        }
+      }
+
+      return {
+        originalSha256: hash,
+        annotations: unpacked.annotations,
+        source: 'wire',
+        frameCount: unpacked.frameCount,
+        txHashes: stored.txHashes,
+        onChain: stored.onChain || stored.txHashes.length > 0,
+        confirmedFrames: stored.confirmedFrames,
+        ...(chainError ? { chainError } : {}),
+        ...(chainSampleOk != null ? { chainSampleOk } : {}),
+        integrityOk: true,
+      }
+    } catch (err) {
+      console.warn('[annotation-stream] wire reconstruct failed', err)
+      // fall through to full chain or index
+    }
+  }
+
+  // ── Full chain re-read (throttled) — only when forced or no framesHex ──
+  if (stored.txHashes.length > 0 && (preferFullChain || stored.framesHex.length === 0)) {
+    try {
+      if (
+        stored.framesHex.length > 0 &&
+        stored.txHashes.length !== stored.framesHex.length
+      ) {
         throw new Error(
           `Incomplete tx set: ${stored.txHashes.length}/${stored.framesHex.length} frames broadcast`,
         )
       }
       const frames: Buffer[] = []
-      for (const txHash of stored.txHashes) {
+      for (let i = 0; i < stored.txHashes.length; i++) {
+        const txHash = stored.txHashes[i]!
+        if (i > 0) await new Promise(r => setTimeout(r, 200))
         const tx = await fetchTransaction(txHash)
         if (!tx) throw new Error(`Tx not found: ${txHash.slice(0, 12)}…`)
         if (tx.executionResult === false) {
@@ -577,10 +653,11 @@ export async function reconstructFromStoredOrChain(
         onChain: true,
         confirmedFrames: stored.txHashes.length,
         integrityOk: true,
+        chainSampleOk: true,
       }
     } catch (err) {
       const chainError = err instanceof Error ? err.message : String(err)
-      console.warn('[annotation-stream] chain reconstruct failed', chainError)
+      console.warn('[annotation-stream] full chain reconstruct failed', chainError)
       if (forceNoFallback || !fallbackIndex) {
         throw new Error(`Chain reconstruct failed: ${chainError}`)
       }
@@ -589,7 +666,7 @@ export async function reconstructFromStoredOrChain(
         originalSha256: hash,
         annotations: annotationsForPublic(annotations),
         source: 'index',
-        frameCount: stored.framesHex.length,
+        frameCount: stored.framesHex.length || annotations.length,
         txHashes: stored.txHashes,
         onChain: stored.onChain,
         confirmedFrames: stored.confirmedFrames,
