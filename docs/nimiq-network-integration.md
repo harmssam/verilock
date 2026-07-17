@@ -176,6 +176,27 @@ Built identically on client and server (`buildAttestationPayloadBytes`):
 
 **Total: 37 bytes** (under the 64-byte basic-tx data limit).
 
+### Annotation stream payloads (experiment, magic `0xA1`)
+
+Separate from seals. Multi-tx overlay frames for PDF annotations (path/text/check/X), indexed by PDF SHA-256:
+
+| Byte | Meaning |
+|------|---------|
+| 0 | Magic **`0xA1`** (never `0x01` — seal verifier will reject stream txs as seals) |
+| 1 | Stream version (`1`) |
+| 2 | Frame type: HEAD / DATA / END |
+| 3–4 | seq / total frames |
+| 5–8 | PDF hash prefix |
+| 9–63 | Body (55 B) |
+
+- Cap: **32 frames** per stream (`MAX_STREAM_FRAMES`).
+- Value: **1 luna** per frame (aligned with credit seal dust), fee 0.
+- Broadcast: service wallet → attestation sink; feature flag `ANNOTATION_STREAM_BROADCAST` (prod requires explicit enable).
+- Ownership: stream row bound to publisher wallet; overwrite only by same address.
+- Reconstruct: re-read `recipientData` from each tx hash; require `executionResult !== false` and exact 64 B; optional `?fallback=index` vs `?fallback=none`.
+
+Seal verification still requires exact 37-byte `0x01` payload — stream txs cannot satisfy `verifyAttestationPayload`.
+
 ```ts
 // client/src/nimiq.ts — buildAttestationPayloadBytes()
 payload[0] = ATTESTATION_PAYLOAD_VERSION // 1

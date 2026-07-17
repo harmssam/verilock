@@ -46,6 +46,14 @@ import {
   verifyTurnstileToken,
   type SupportContactBody,
 } from './supportContact.js'
+import {
+  annotationsForPublic,
+  getStreamByHash,
+  isAnnotationStreamBroadcastEnabled,
+  publishAnnotationStream,
+  reconstructFromStoredOrChain,
+} from './annotationStream.js'
+import { isServiceWalletConfigured } from './serviceWallet.js'
 import { broadcastRawTransaction, normalizeRawTransactionHex, verifySignature } from './nimiq-rpc.js'
 import {
   assertSafeBootConfig,
@@ -117,6 +125,8 @@ const creditsLimit = rateLimit(30, 60_000)
 /** Cheap SQLite balance reads — header + panel may both load. */
 const creditsBalanceLimit = rateLimit(120, 60_000)
 const publicReadLimit = rateLimit(60, 60_000)
+/** Multi-tx annotation stream broadcast — tight (service wallet cost). */
+const annotationStreamLimit = rateLimit(6, 60_000)
 // Hash verify is read-only and easy to double-fire from UI retries; allow a higher burst.
 const verifyHashLimit = rateLimit(60, 60_000)
 /** Public contact form — tight limit against spam floods. */
@@ -546,11 +556,22 @@ app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req
     creatorRole?: string
     creatorDisplayName?: string
     creatorNotifyEmail?: string
+    /** Client PDF overlays only — never PDF file bytes. */
+    annotations?: unknown
   }
 
   if (!body.originalSha256 || !/^[a-f0-9]{64}$/i.test(body.originalSha256)) {
     res.status(400).json({ error: 'Valid originalSha256 required' })
     return
+  }
+
+  // Reject accidental PDF byte fields (privacy: file never uploaded).
+  const pdfByteKeys = ['pdf', 'pdfBytes', 'file', 'fileBytes', 'documentBytes', 'content'] as const
+  for (const key of pdfByteKeys) {
+    if (key in body && (body as Record<string, unknown>)[key] != null) {
+      res.status(400).json({ error: 'PDF file bytes are not accepted — send hash + annotations only' })
+      return
+    }
   }
 
   const address = res.locals.address as string
@@ -569,22 +590,28 @@ app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req
     return
   }
 
-  const { document: doc, hashWarning } = createDocument({
-    title: body.title ?? 'Untitled agreement',
-    originalFileName: body.originalFileName,
-    type: body.type ?? 'rental',
-    creatorAddress: address,
-    creatorRole: body.creatorRole,
-    creatorDisplayName: body.creatorDisplayName,
-    originalSha256: body.originalSha256,
-    pageCount: Number(body.pageCount ?? 1),
-    metadata: body.metadata,
-    parties: body.parties,
-    requiredSignatures: body.requiredSignatures,
-    creatorNotifyEmail,
-  })
+  try {
+    const { document: doc, hashWarning } = createDocument({
+      title: body.title ?? 'Untitled agreement',
+      originalFileName: body.originalFileName,
+      type: body.type ?? 'rental',
+      creatorAddress: address,
+      creatorRole: body.creatorRole,
+      creatorDisplayName: body.creatorDisplayName,
+      originalSha256: body.originalSha256,
+      pageCount: Number(body.pageCount ?? 1),
+      metadata: body.metadata,
+      parties: body.parties,
+      requiredSignatures: body.requiredSignatures,
+      creatorNotifyEmail,
+      annotations: body.annotations,
+    })
 
-  res.status(201).json({ document: doc, ...(hashWarning ? { hashWarning } : {}) })
+    res.status(201).json({ document: doc, ...(hashWarning ? { hashWarning } : {}) })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Create failed'
+    res.status(400).json({ error: message })
+  }
 })
 
 /** Creator-only: set total required signatures + optional co-signer names (share step). */
@@ -871,6 +898,104 @@ app.get('/api/documents/:id/certificate', publicReadLimit, (req, res) => {
     return
   }
   res.json(cert)
+})
+
+/**
+ * Experiment: pack annotations into 64-byte frames, index by PDF hash,
+ * optionally broadcast each frame via service wallet (on-chain).
+ * Owner-scoped: only the publishing wallet may overwrite a hash.
+ */
+app.post(
+  '/api/annotation-streams',
+  annotationStreamLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  async (req, res) => {
+    const body = req.body as {
+      originalSha256?: string
+      annotations?: unknown
+      broadcast?: boolean
+    }
+    if (!body.originalSha256 || !/^[a-f0-9]{64}$/i.test(body.originalSha256)) {
+      res.status(400).json({ error: 'Valid originalSha256 required' })
+      return
+    }
+    const address = res.locals.address as string
+    try {
+      const result = await publishAnnotationStream({
+        originalSha256: body.originalSha256,
+        annotations: body.annotations,
+        creatorAddress: address,
+        broadcast: Boolean(body.broadcast),
+      })
+      res.status(201).json({
+        ...result,
+        serviceWalletConfigured: isServiceWalletConfigured(),
+        broadcastEnabled: isAnnotationStreamBroadcastEnabled(),
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Publish failed'
+      const status = message.includes('Only the stream owner') ? 403 : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
+
+/** Look up packed stream by PDF fingerprint (no PDF upload). Slim annotations only. */
+app.get('/api/annotation-streams/:sha256', publicReadLimit, (req, res) => {
+  const sha = routeParam(req.params.sha256).toLowerCase()
+  if (!/^[a-f0-9]{64}$/.test(sha)) {
+    res.status(400).json({ error: 'Valid sha256 required' })
+    return
+  }
+  const stream = getStreamByHash(sha)
+  if (!stream) {
+    res.status(404).json({ error: 'No annotation stream for this PDF hash' })
+    return
+  }
+  let annotations: unknown[] = []
+  try {
+    annotations = annotationsForPublic(JSON.parse(stream.annotationsJson) as unknown[])
+  } catch {
+    annotations = []
+  }
+  res.json({
+    originalSha256: stream.originalSha256,
+    creatorAddress: stream.creatorAddress,
+    frameCount: stream.framesHex.length,
+    payloadBytes: stream.payloadBytes,
+    annotationCount: stream.annotationCount,
+    // framesHex omitted from public GET — use reconstruct for verified payload
+    txHashes: stream.txHashes,
+    onChain: stream.onChain,
+    confirmedFrames: stream.confirmedFrames,
+    annotations,
+    createdAt: stream.createdAt,
+    updatedAt: stream.updatedAt,
+    serviceWalletConfigured: isServiceWalletConfigured(),
+    broadcastEnabled: isAnnotationStreamBroadcastEnabled(),
+  })
+})
+
+/**
+ * Reconstruct annotations for a PDF hash — prefers re-reading frame payloads
+ * from Nimiq when tx hashes are stored.
+ * Query: ?fallback=index (default) | ?fallback=none (fail closed on chain errors)
+ */
+app.get('/api/annotation-streams/:sha256/reconstruct', publicReadLimit, async (req, res) => {
+  const sha = routeParam(req.params.sha256).toLowerCase()
+  if (!/^[a-f0-9]{64}$/.test(sha)) {
+    res.status(400).json({ error: 'Valid sha256 required' })
+    return
+  }
+  const fallbackRaw = String(req.query.fallback ?? 'index').toLowerCase()
+  const fallbackIndex = fallbackRaw !== 'none' && fallbackRaw !== '0' && fallbackRaw !== 'false'
+  try {
+    const result = await reconstructFromStoredOrChain(sha, { fallbackIndex })
+    res.json(result)
+  } catch (err) {
+    res.status(404).json({ error: err instanceof Error ? err.message : 'Not found' })
+  }
 })
 
 app.post('/api/verify/hash', verifyHashLimit, (req, res) => {

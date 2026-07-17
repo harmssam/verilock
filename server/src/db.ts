@@ -103,6 +103,10 @@ if (!documentColumns.some(col => col.name === 'creator_notify_email')) {
 if (!documentColumns.some(col => col.name === 'ready_to_seal_email_sent_at')) {
   db.exec('ALTER TABLE documents ADD COLUMN ready_to_seal_email_sent_at INTEGER')
 }
+/** JSON array of client PDF annotations (nullable — legacy docs have none). */
+if (!documentColumns.some(col => col.name === 'annotations')) {
+  db.exec('ALTER TABLE documents ADD COLUMN annotations TEXT')
+}
 
 /** Drop duplicate rows so unique indexes can be applied on existing DBs. */
 function dedupeSignaturesForUniqueness(): void {
@@ -177,6 +181,11 @@ export interface DocumentRecord {
   finalSha256: string | null
   pageCount: number
   metadata: Record<string, unknown> | null
+  /**
+   * Client-placed PDF annotations (signature/text overlays). Nullable JSON.
+   * PDF bytes are never stored — only geometry + small image/text payloads.
+   */
+  annotations: unknown[] | null
   requiredSignatures: number
   createdAt: number
   lockedAt: number | null
@@ -267,6 +276,17 @@ export function purgeExpiredSessions(): number {
   return result.changes
 }
 
+function parseAnnotationsColumn(raw: unknown): unknown[] | null {
+  if (raw == null || raw === '') return null
+  if (typeof raw !== 'string') return null
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 function rowToDocument(row: Record<string, unknown>): DocumentRecord {
   const requiredSignatures = row.required_signatures as number | null | undefined
   return {
@@ -281,6 +301,7 @@ function rowToDocument(row: Record<string, unknown>): DocumentRecord {
     finalSha256: (row.final_sha256 as string | null) ?? null,
     pageCount: row.page_count as number,
     metadata: row.metadata ? (JSON.parse(row.metadata as string) as Record<string, unknown>) : null,
+    annotations: parseAnnotationsColumn(row.annotations),
     requiredSignatures: requiredSignatures ?? 0,
     createdAt: row.created_at as number,
     lockedAt: (row.locked_at as number | null) ?? null,
@@ -294,12 +315,12 @@ export function insertDocument(doc: DocumentRecord): void {
   db.prepare(`
     INSERT INTO documents (
       id, slug, title, original_filename, type, status, creator_address,
-      original_sha256, final_sha256, page_count, metadata, required_signatures,
+      original_sha256, final_sha256, page_count, metadata, annotations, required_signatures,
       created_at, locked_at, creator_notify_email, ready_to_seal_email_sent_at
     )
     VALUES (
       @id, @slug, @title, @originalFilename, @type, @status, @creatorAddress,
-      @originalSha256, @finalSha256, @pageCount, @metadata, @requiredSignatures,
+      @originalSha256, @finalSha256, @pageCount, @metadata, @annotations, @requiredSignatures,
       @createdAt, @lockedAt, @creatorNotifyEmail, @readyToSealEmailSentAt
     )
   `).run({
@@ -314,6 +335,8 @@ export function insertDocument(doc: DocumentRecord): void {
     finalSha256: doc.finalSha256,
     pageCount: doc.pageCount,
     metadata: doc.metadata ? JSON.stringify(doc.metadata) : null,
+    annotations:
+      doc.annotations && doc.annotations.length > 0 ? JSON.stringify(doc.annotations) : null,
     requiredSignatures: doc.requiredSignatures,
     createdAt: doc.createdAt,
     lockedAt: doc.lockedAt,
@@ -754,6 +777,118 @@ export function findDocumentsByHash(sha256: string): DocumentRecord[] {
     )
     .all(sha256.toLowerCase(), sha256.toLowerCase()) as Record<string, unknown>[]
   return rows.map(rowToDocument)
+}
+
+// ── Annotation streams (experiment: multi-tx overlay index by PDF hash) ────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS annotation_streams (
+    original_sha256 TEXT PRIMARY KEY,
+    creator_address TEXT NOT NULL DEFAULT '',
+    frames_json TEXT NOT NULL,
+    tx_hashes_json TEXT,
+    annotation_count INTEGER NOT NULL DEFAULT 0,
+    payload_bytes INTEGER NOT NULL DEFAULT 0,
+    on_chain INTEGER NOT NULL DEFAULT 0,
+    confirmed_frames INTEGER NOT NULL DEFAULT 0,
+    annotations_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+`)
+
+const annotationStreamColumns = db
+  .prepare('PRAGMA table_info(annotation_streams)')
+  .all() as Array<{ name: string }>
+if (!annotationStreamColumns.some(col => col.name === 'creator_address')) {
+  db.exec(`ALTER TABLE annotation_streams ADD COLUMN creator_address TEXT NOT NULL DEFAULT ''`)
+}
+if (!annotationStreamColumns.some(col => col.name === 'confirmed_frames')) {
+  db.exec(`ALTER TABLE annotation_streams ADD COLUMN confirmed_frames INTEGER NOT NULL DEFAULT 0`)
+}
+
+export interface AnnotationStreamRecord {
+  originalSha256: string
+  /** Wallet that published; only this address may overwrite. */
+  creatorAddress: string
+  framesHex: string[]
+  txHashes: string[]
+  annotationCount: number
+  payloadBytes: number
+  onChain: boolean
+  confirmedFrames: number
+  annotationsJson: string
+  createdAt: number
+  updatedAt: number
+}
+
+function rowToAnnotationStream(row: Record<string, unknown>): AnnotationStreamRecord {
+  let framesHex: string[] = []
+  let txHashes: string[] = []
+  try {
+    framesHex = JSON.parse(String(row.frames_json ?? '[]')) as string[]
+  } catch {
+    framesHex = []
+  }
+  try {
+    txHashes = JSON.parse(String(row.tx_hashes_json ?? '[]')) as string[]
+  } catch {
+    txHashes = []
+  }
+  return {
+    originalSha256: row.original_sha256 as string,
+    creatorAddress: String(row.creator_address ?? ''),
+    framesHex: Array.isArray(framesHex) ? framesHex : [],
+    txHashes: Array.isArray(txHashes) ? txHashes : [],
+    annotationCount: Number(row.annotation_count ?? 0),
+    payloadBytes: Number(row.payload_bytes ?? 0),
+    onChain: Boolean(row.on_chain),
+    confirmedFrames: Number(row.confirmed_frames ?? 0),
+    annotationsJson: String(row.annotations_json ?? '[]'),
+    createdAt: row.created_at as number,
+    updatedAt: row.updated_at as number,
+  }
+}
+
+export function upsertAnnotationStream(rec: AnnotationStreamRecord): void {
+  db.prepare(`
+    INSERT INTO annotation_streams (
+      original_sha256, creator_address, frames_json, tx_hashes_json, annotation_count, payload_bytes,
+      on_chain, confirmed_frames, annotations_json, created_at, updated_at
+    ) VALUES (
+      @originalSha256, @creatorAddress, @framesJson, @txHashesJson, @annotationCount, @payloadBytes,
+      @onChain, @confirmedFrames, @annotationsJson, @createdAt, @updatedAt
+    )
+    ON CONFLICT(original_sha256) DO UPDATE SET
+      creator_address = excluded.creator_address,
+      frames_json = excluded.frames_json,
+      tx_hashes_json = excluded.tx_hashes_json,
+      annotation_count = excluded.annotation_count,
+      payload_bytes = excluded.payload_bytes,
+      on_chain = excluded.on_chain,
+      confirmed_frames = excluded.confirmed_frames,
+      annotations_json = excluded.annotations_json,
+      updated_at = excluded.updated_at
+  `).run({
+    originalSha256: rec.originalSha256,
+    creatorAddress: rec.creatorAddress,
+    framesJson: JSON.stringify(rec.framesHex),
+    txHashesJson: JSON.stringify(rec.txHashes),
+    annotationCount: rec.annotationCount,
+    payloadBytes: rec.payloadBytes,
+    onChain: rec.onChain ? 1 : 0,
+    confirmedFrames: rec.confirmedFrames,
+    annotationsJson: rec.annotationsJson,
+    createdAt: rec.createdAt,
+    updatedAt: rec.updatedAt,
+  })
+}
+
+export function getAnnotationStream(originalSha256: string): AnnotationStreamRecord | null {
+  const row = db
+    .prepare('SELECT * FROM annotation_streams WHERE original_sha256 = ?')
+    .get(originalSha256.toLowerCase()) as Record<string, unknown> | undefined
+  return row ? rowToAnnotationStream(row) : null
 }
 
 // ── Credits (ledger-first prepaid seals) ───────────────────────────────────

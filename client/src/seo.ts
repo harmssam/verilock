@@ -73,6 +73,13 @@ export const PAGE_META = {
     noindex: true,
     path: '/',
   },
+  pdf: {
+    title: `PDF annotations (experiment)${TITLE_SUFFIX}`,
+    description:
+      'Place signatures and text on a local PDF, store only the hash and overlay data. Experiment — not the main product flow.',
+    path: '/pdf',
+    noindex: true,
+  },
 } satisfies Record<string, PageMeta>
 
 function siteOrigin(): string {

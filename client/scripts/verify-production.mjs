@@ -101,12 +101,22 @@ check('product modules live under src/journey and shell under App', () => {
   assert.ok(existsSync(join(clientDir, 'src/journey/DocumentJourney.tsx')))
   assert.ok(existsSync(join(clientDir, 'src/App.tsx')))
   assert.ok(existsSync(join(clientDir, 'src/landing/LandingHome.tsx')))
-  assert.ok(!existsSync(join(clientDir, 'src/experiment')), 'src/experiment should be renamed')
   assert.ok(!existsSync(join(clientDir, 'src/landing-redesign')), 'src/landing-redesign should be removed')
   const app = readFileSync(join(clientDir, 'src/App.tsx'), 'utf8')
   assert.match(app, /DocumentJourney/)
   assert.ok(!app.includes('BlogPage'), 'production shell must not mount BlogPage')
   assert.ok(!app.includes('lr-preview-banner'), 'preview banner must not ship')
+  // PDF annotation experiment may be mounted at /pdf via App (not a parallel shell entry).
+  // Forbidden: separate vite/html experiment product entrypoints.
+  const main = readFileSync(join(clientDir, 'src/main.tsx'), 'utf8')
+  assert.ok(!main.includes('ExperimentApp'), 'production main must not mount ExperimentApp')
+  assert.ok(
+    !existsSync(join(clientDir, 'vite.experiment.config.ts')),
+    'vite.experiment.config.ts must stay removed',
+  )
+  if (app.includes("from './experiment") || app.includes('from "./experiment')) {
+    assert.match(app, /isPdfPath|\/pdf/, 'experiment import must be routed (e.g. /pdf)')
+  }
 })
 
 check('archives and blog are excluded from GitHub / production wiring', () => {

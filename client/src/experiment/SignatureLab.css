@@ -1,0 +1,187 @@
+.sig-lab {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 1rem 2.5rem;
+}
+
+.sig-lab h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+  font-weight: 650;
+  color: #0f172a;
+}
+
+.sig-lab-lead {
+  margin: 0 0 1.25rem;
+  font-size: 0.9rem;
+  color: #4b5c6b;
+  line-height: 1.45;
+  max-width: 52rem;
+}
+
+.sig-lab-lead code {
+  font-size: 0.84em;
+  background: rgba(13, 148, 136, 0.08);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+.sig-lab-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .sig-lab-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sig-lab-card {
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.85rem 1rem 1rem;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+}
+
+.sig-lab-card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: #0f172a;
+}
+
+.sig-lab-card-meta {
+  margin: 0 0 0.65rem;
+  font-size: 0.78rem;
+  color: #6b7c8d;
+}
+
+.sig-lab-pad-wrap {
+  border: 1px dashed rgba(15, 23, 42, 0.18);
+  border-radius: 10px;
+  background: #fafdfc;
+  overflow: hidden;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.sig-lab-pad-wrap canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  vertical-align: top;
+}
+
+.sig-lab-preview {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.sig-lab-preview canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sig-lab-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  align-items: center;
+  margin: 0.85rem 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  background: rgba(13, 148, 136, 0.04);
+}
+
+.sig-lab-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #334155;
+  min-width: 160px;
+  flex: 1;
+}
+
+.sig-lab-controls input[type='range'] {
+  width: 100%;
+}
+
+.sig-lab-controls .sig-lab-val {
+  font-weight: 500;
+  color: #0f766e;
+  font-variant-numeric: tabular-nums;
+}
+
+.sig-lab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.sig-lab-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+
+.sig-lab-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.sig-lab-table th,
+.sig-lab-table td {
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  vertical-align: top;
+}
+
+.sig-lab-table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  font-weight: 650;
+}
+
+.sig-lab-table td.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sig-lab-table tr.is-best td {
+  background: rgba(13, 148, 136, 0.07);
+}
+
+.sig-lab-table .muted {
+  color: #6b7c8d;
+  font-size: 0.75rem;
+}
+
+.sig-lab-note {
+  margin: 1rem 0 0;
+  font-size: 0.8rem;
+  color: #4b5c6b;
+  line-height: 1.45;
+}
+
+.sig-lab-links {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+}
+
+.sig-lab-links a {
+  color: #0f766e;
+}
