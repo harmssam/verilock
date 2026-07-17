@@ -1,5 +1,6 @@
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
-import { Copy, Download, Mail, Paperclip, Share2 } from 'lucide-react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { Check, Copy, Download, Mail, Paperclip, Share2, X } from 'lucide-react'
 import { sha256Hex } from './pdf/hashPdf'
 import { ShareEmailPreview } from './ShareEmailPreview'
 import {
@@ -31,7 +32,11 @@ interface ShareInviteCardProps {
   document: SealDocument
   shareUrl: string
   linkCopied: boolean
-  onCopyLink: () => void
+  /**
+   * Copy the signing link. Return `false` if copy failed (modal stays closed).
+   * `void` / `true` / `undefined` opens the “link copied” reminder modal.
+   */
+  onCopyLink: () => void | boolean | Promise<void | boolean>
   /**
    * Local PDF still in memory (create/share session).
    * When set, user can share or package the file — never uploaded.
@@ -157,11 +162,15 @@ export function ShareInviteCard({
 }: ShareInviteCardProps) {
   const pickId = useId()
   const moreId = useId()
+  const copyModalTitleId = useId()
+  const copyModalRef = useRef<HTMLDivElement>(null)
   /** Extra local pick when parent did not pass a File (e.g. after reload). */
   const [pickedPdf, setPickedPdf] = useState<File | null>(null)
   const [pickBusy, setPickBusy] = useState(false)
   const [pickError, setPickError] = useState<string | null>(null)
   const [recipientError, setRecipientError] = useState<string | null>(null)
+  const [copyModalOpen, setCopyModalOpen] = useState(false)
+  const [copyBusy, setCopyBusy] = useState(false)
 
   const localPdf = pdfFile ?? pickedPdf
   const canPackEml = Boolean(localPdf)
@@ -356,7 +365,47 @@ export function ShareInviteCard({
   }
 
   const actionError = shareError || emlError || pickError || recipientError
-  const anyBusy = shareBusy || mailBusy || emlBusy
+  const anyBusy = shareBusy || mailBusy || emlBusy || copyBusy
+
+  const closeCopyModal = () => setCopyModalOpen(false)
+
+  const handleCopyLink = async () => {
+    if (copyBusy) return
+    setCopyBusy(true)
+    setShareError(null)
+    try {
+      const result = await Promise.resolve(onCopyLink())
+      if (result === false) return
+      setCopyModalOpen(true)
+    } catch (err) {
+      setShareError(err instanceof Error ? err.message : 'Could not copy the link.')
+    } finally {
+      setCopyBusy(false)
+    }
+  }
+
+  const downloadPdfForShare = () => {
+    if (!localPdf) return
+    downloadBlob(localPdf, pdfName)
+  }
+
+  useEffect(() => {
+    if (!copyModalOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeCopyModal()
+    }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    // Focus primary action for keyboard users.
+    window.setTimeout(() => {
+      copyModalRef.current?.querySelector<HTMLButtonElement>('[data-copy-modal-primary]')?.focus()
+    }, 0)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [copyModalOpen])
 
   const renderAction = (id: ShareActionId, role: 'primary' | 'secondary' | 'more') => {
     const className = actionButtonClass(id, role)
@@ -417,13 +466,92 @@ export function ShareInviteCard({
         key={`${role}-${id}`}
         type="button"
         className={className}
-        onClick={onCopyLink}
+        disabled={anyBusy}
+        onClick={() => void handleCopyLink()}
       >
         <Copy size={15} strokeWidth={2.25} aria-hidden />
-        {linkCopied ? 'Link copied' : 'Copy link'}
+        {copyBusy ? 'Copying…' : linkCopied || copyModalOpen ? 'Link copied' : 'Copy link'}
       </button>
     )
   }
+
+  const copyModal =
+    copyModalOpen && typeof document !== 'undefined'
+      ? createPortal(
+          <div className="share-copy-modal-layer" role="presentation">
+            <button
+              type="button"
+              className="share-copy-modal-backdrop"
+              aria-label="Close"
+              onClick={closeCopyModal}
+            />
+            <div
+              ref={copyModalRef}
+              className="share-copy-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={copyModalTitleId}
+            >
+              <header className="share-copy-modal-head">
+                <div className="share-copy-modal-icon" aria-hidden>
+                  <Check size={22} strokeWidth={2.5} />
+                </div>
+                <button
+                  type="button"
+                  className="share-copy-modal-close"
+                  onClick={closeCopyModal}
+                  aria-label="Close"
+                >
+                  <X size={18} strokeWidth={2.25} />
+                </button>
+              </header>
+              <h3 id={copyModalTitleId} className="share-copy-modal-title">
+                Link copied
+              </h3>
+              <p className="share-copy-modal-body">
+                The signing link is on your clipboard. Paste it into Messages, email, or chat.
+              </p>
+              <p className="share-copy-modal-body share-copy-modal-body--emphasis">
+                You also need to send the agreement PDF
+                {canPackEml ? (
+                  <>
+                    {' '}
+                    (<span className="share-pdf-name">{pdfName}</span>)
+                  </>
+                ) : null}
+                . VeriLock never hosts the file — co-signers use that exact PDF to verify the
+                fingerprint matches.
+              </p>
+              <ul className="share-copy-modal-steps">
+                <li>Paste the link for your co-signer</li>
+                <li>Send the same PDF file with it (attachment or separate share)</li>
+                <li>They open the link, connect a Nimiq wallet, and choose that PDF</li>
+              </ul>
+              <div className="share-copy-modal-actions">
+                {canPackEml && localPdf && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={downloadPdfForShare}
+                  >
+                    <Download size={16} strokeWidth={2.25} aria-hidden />
+                    Download PDF to attach
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  data-copy-modal-primary
+                  onClick={closeCopyModal}
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null
 
   return (
     <div className={embedded ? 'share-card share-card--embedded' : 'card share-card'}>
@@ -506,12 +634,19 @@ export function ShareInviteCard({
             <Mail size={16} strokeWidth={2.25} aria-hidden />
             Mail draft (no PDF)
           </a>
-          <button type="button" className="btn btn-secondary share-copy-btn" onClick={onCopyLink}>
+          <button
+            type="button"
+            className="btn btn-secondary share-copy-btn"
+            disabled={anyBusy}
+            onClick={() => void handleCopyLink()}
+          >
             <Copy size={15} strokeWidth={2.25} aria-hidden />
-            {linkCopied ? 'Link copied' : 'Copy link'}
+            {copyBusy ? 'Copying…' : linkCopied || copyModalOpen ? 'Link copied' : 'Copy link'}
           </button>
         </div>
       )}
+
+      {copyModal}
 
       {actionError && (
         <p className="share-eml-error" role="alert">

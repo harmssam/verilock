@@ -817,15 +817,18 @@ export function DocumentJourney({
     }
   }
 
-  const copyLink = async () => {
-    if (!doc) return
+  /** Returns false when clipboard failed so ShareInviteCard can skip the reminder modal. */
+  const copyLink = async (): Promise<boolean> => {
+    if (!doc) return false
     try {
       await navigator.clipboard.writeText(doc.shareUrl)
       setLinkCopied(true)
       // Copy alone stays on share — co-signers sign via the invite path.
-      window.setTimeout(() => setLinkCopied(false), 1800)
+      window.setTimeout(() => setLinkCopied(false), 4000)
+      return true
     } catch {
       setLocalError('Could not copy link — select and copy it manually if needed.')
+      return false
     }
   }
 
@@ -1690,7 +1693,7 @@ export function DocumentJourney({
                         document={doc.source}
                         shareUrl={doc.shareUrl}
                         linkCopied={linkCopied}
-                        onCopyLink={() => void copyLink()}
+                        onCopyLink={() => copyLink()}
                         pdfFile={pdfFile ?? signFile}
                         inviteRecipients={coSignerEmails
                           .slice(0, Math.max(0, requiredSigners - 1))
