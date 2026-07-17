@@ -17,7 +17,7 @@ import {
   warmNimiqProvider,
   shouldUseHubRedirect,
 } from '../nimiq'
-import { hasPendingHubRedirect } from '../hubRedirectParse'
+import { clearStaleHubRpcStateIfIdle, hasPendingHubRedirect } from '../hubRedirectParse'
 import { clearSession, loadSession, saveSession } from '../session'
 import { createServerBroadcastFallback } from './journeySeal'
 import { toJourneyAccount, type JourneyAccount } from './types'
@@ -80,11 +80,14 @@ export function useJourneyWallet(): UseJourneyWalletResult {
   const [showOpenInPay, setShowOpenInPay] = useState(false)
 
   const hubConnectInFlightRef = useRef(false)
+  const walletStatusRef = useRef<string | null>(null)
   const lockCompleteRef = useRef<
     ((result: { txHash: string; token: string; docId: string }) => Promise<void>) | null
   >(null)
   const lockErrorRef = useRef<((err: Error) => Promise<void> | void) | null>(null)
   const deeplinkFallbackTimerRef = useRef<number | null>(null)
+
+  walletStatusRef.current = walletStatus
 
   const clearDeeplinkFallbackTimer = useCallback(() => {
     if (deeplinkFallbackTimerRef.current != null) {
@@ -125,6 +128,31 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     },
     [],
   )
+
+  /**
+   * Hub login uses a full-page redirect. If the user hits Back (or the tab is
+   * restored from bfcache) without Hub return params, React state can still
+   * say “Logging in…”. Clear only abandoned Hub redirect UI — not in-Pay
+   * approve dialogs (those also use `connecting`).
+   */
+  const resetAbandonedHubRedirect = useCallback(() => {
+    if (typeof window === 'undefined') return
+    if (peekHubRedirectInUrl() || hasPendingHubRedirect()) return
+    if (loadSession()?.token) return
+
+    const status = walletStatusRef.current
+    const midHubRedirect =
+      hubConnectInFlightRef.current ||
+      status === HUB_REDIRECT_MESSAGE ||
+      status === 'Connecting via Nimiq Hub…'
+    if (!midHubRedirect) return
+
+    hubConnectInFlightRef.current = false
+    setConnecting(false)
+    setWalletStatus(null)
+    // Drop stale Hub RPC entries so the next Login is not blocked as “in flight”.
+    clearStaleHubRpcStateIfIdle()
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -202,6 +230,8 @@ export function useJourneyWallet(): UseJourneyWalletResult {
       if (!cancelled) {
         setHubLockCompletion(hubSetup.lockCompletion)
         setBootReady(true)
+        // History Back can restore after boot without a full remount.
+        resetAbandonedHubRedirect()
       }
     }
 
@@ -210,7 +240,23 @@ export function useJourneyWallet(): UseJourneyWalletResult {
       cancelled = true
       clearDeeplinkFallbackTimer()
     }
-  }, [applySession, clearDeeplinkFallbackTimer])
+  }, [applySession, clearDeeplinkFallbackTimer, resetAbandonedHubRedirect])
+
+  useEffect(() => {
+    const onPageShow = () => {
+      resetAbandonedHubRedirect()
+    }
+    // Focus covers some mobile browsers that restore the tab without a full pageshow.
+    const onFocus = () => {
+      resetAbandonedHubRedirect()
+    }
+    window.addEventListener('pageshow', onPageShow)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.removeEventListener('pageshow', onPageShow)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [resetAbandonedHubRedirect])
 
   const scheduleDeeplinkFallback = useCallback(() => {
     clearDeeplinkFallbackTimer()

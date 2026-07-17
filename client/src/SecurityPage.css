@@ -1,8 +1,10 @@
 /* Security & integrity page — light SaaS layout (works on redesign shell tokens) */
 
 .security-page {
-  max-width: 42rem;
-  margin: 0 auto 1.5rem;
+  /* Fill the shell (same width as Pricing: .lr-app--pricing ≈ 960px). */
+  max-width: none;
+  width: 100%;
+  margin: 0 0 1.5rem;
   padding: 0.25rem 0 1rem;
   color: var(--lr-text, var(--text, #0f172a));
 }

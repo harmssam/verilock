@@ -197,19 +197,39 @@
 
 .exp-login {
   position: relative;
-  /* Keep sheet above the full-page backdrop (both stack inside .exp-app) */
   z-index: 50;
+}
+
+/*
+ * Full-viewport layer (portaled to body). Centers the dialog on screen so
+ * sticky header + backdrop-filter cannot trap fixed descendants off-screen.
+ */
+.login-sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding:
+    max(0.75rem, env(safe-area-inset-top, 0px))
+    max(0.75rem, env(safe-area-inset-right, 0px))
+    max(0.75rem, env(safe-area-inset-bottom, 0px))
+    max(0.75rem, env(safe-area-inset-left, 0px));
+  pointer-events: none;
 }
 
 /* Soften the page behind the login popover for readability */
 .login-sheet-backdrop {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 40;
+  z-index: 0;
   margin: 0;
   padding: 0;
   border: none;
   cursor: default;
+  pointer-events: auto;
   background: rgba(7, 10, 24, 0.42);
   backdrop-filter: blur(7px) saturate(0.45);
   -webkit-backdrop-filter: blur(7px) saturate(0.45);
@@ -234,11 +254,14 @@
 }
 
 .login-sheet--popover {
-  position: absolute;
-  top: calc(100% + 0.45rem);
-  right: 0;
-  z-index: 51;
-  width: min(20.5rem, calc(100vw - 1.5rem));
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  width: min(22rem, 100%);
+  max-height: min(85dvh, 36rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: rgba(16, 22, 48, 0.97);
   box-shadow:
     0 18px 48px rgba(0, 0, 0, 0.45),
@@ -406,20 +429,7 @@
   font-size: 0.78rem;
 }
 
-@media (max-width: 640px) {
-  .login-sheet--popover {
-    position: fixed;
-    top: auto;
-    right: max(0.75rem, env(safe-area-inset-right));
-    bottom: max(0.75rem, env(safe-area-inset-bottom));
-    left: max(0.75rem, env(safe-area-inset-left));
-    width: auto;
-    max-height: min(78dvh, 32rem);
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    z-index: 51;
-  }
-}
+/* Popover is always viewport-centered via .login-sheet-layer (portaled). */
 
 @media (prefers-reduced-motion: reduce) {
   .login-sheet-backdrop {

@@ -80,7 +80,16 @@ body[data-verilock-surface='journey'] #root::after {
   --lr-shell-pad-r: max(1rem, env(safe-area-inset-right));
 }
 
-/* Shared shell width: landing home, tracks, agreements, pricing (desktop).
+/*
+ * .exp-app adds top padding for the old in-flow header. Light shell uses a
+ * full-bleed sticky nav — kill top padding so the bar sits at the page edge.
+ * Notch/status safe-area moves onto .lr-header instead.
+ */
+.lr-app.exp-app {
+  padding-top: 0;
+}
+
+/* Shared shell width: landing home, tracks, agreements, pricing, security (desktop).
    Header .lr-header-inner uses the same max so nav aligns with modules. */
 .lr-app--landing,
 .lr-app--pricing {
@@ -127,7 +136,8 @@ body[data-verilock-surface='journey'] #root::after {
   margin: 0 0 1.5rem;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
-  padding: 0;
+  /* Extend under the status bar; keep brand/actions below the notch. */
+  padding: env(safe-area-inset-top, 0px) 0 0;
   border-bottom: 1px solid var(--lr-line);
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
