@@ -5,7 +5,6 @@
 import {
   Check,
   Lock,
-  MousePointer2,
   PenLine,
   Trash2,
   Type,
@@ -250,20 +249,26 @@ export function PlacementEditor({
     [locked, patchPlan, selectedId],
   )
 
-  // Delete selected with keyboard
+  // Delete selected / cancel place tool with keyboard
   useEffect(() => {
     if (editDisabled) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Backspace' && e.key !== 'Delete') return
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      if (e.key === 'Escape' && tool !== 'select') {
+        e.preventDefault()
+        setTool('select')
+        setPlacing(null)
+        return
+      }
+      if (e.key !== 'Backspace' && e.key !== 'Delete') return
       if (!selectedId) return
       e.preventDefault()
       removeSlot(selectedId)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [editDisabled, selectedId, removeSlot])
+  }, [editDisabled, selectedId, removeSlot, tool])
 
   const updateSlot = useCallback(
     (id: string, patch: Partial<PlacementSlot>) => {
@@ -655,15 +660,6 @@ export function PlacementEditor({
       <div className="pdf-annotator-toolbar">
         <button
           type="button"
-          className={`btn btn-ghost${tool === 'select' ? ' is-active' : ''}`}
-          onClick={() => setTool('select')}
-          disabled={editDisabled}
-        >
-          <MousePointer2 size={14} strokeWidth={2.25} aria-hidden />
-          Select
-        </button>
-        <button
-          type="button"
           className={`btn btn-ghost${tool === 'signature' ? ' is-active' : ''}`}
           onClick={() => {
             selectPerson(activePerson)
@@ -771,8 +767,8 @@ export function PlacementEditor({
       {!locked && (
         <p className="placement-editor-hint muted">
           Click a person card so it is <strong>Active</strong>, then place signature / name / text
-          boxes for them (color-coded). Wrong spot? Select, drag, or delete. Lock when the layout
-          is right — boxes cannot move after that.
+          boxes (color-coded). Click a box to drag or delete it; Esc cancels place mode. Lock when
+          the layout is right — boxes cannot move after that.
         </p>
       )}
       {locked && (

@@ -343,6 +343,10 @@ export function createDocument(input: {
   const annotations = sanitizeAnnotations(input.annotations)
 
   const isDirectSeal = requiredSignatures === 0
+  const organizerLabel = sanitizeDisplayName(
+    input.creatorDisplayName?.trim() || shortAddress(input.creatorAddress),
+    shortAddress(input.creatorAddress),
+  )
   const doc: DocumentRecord = {
     id,
     slug,
@@ -361,6 +365,8 @@ export function createDocument(input: {
     lockedAt: null,
     creatorNotifyEmail: input.creatorNotifyEmail ?? null,
     readyToSealEmailSentAt: null,
+    // Survives roster rebuild — invite emails always know who organized.
+    creatorDisplayName: isDirectSeal ? null : organizerLabel,
   }
   insertDocument(doc)
 
@@ -370,10 +376,7 @@ export function createDocument(input: {
       id: uuid(),
       documentId: id,
       role: creatorRole,
-      displayName: sanitizeDisplayName(
-        input.creatorDisplayName?.trim() || shortAddress(input.creatorAddress),
-        shortAddress(input.creatorAddress),
-      ),
+      displayName: organizerLabel,
       walletAddress: normalizeAddress(input.creatorAddress),
       sortOrder: 0,
       required: true,

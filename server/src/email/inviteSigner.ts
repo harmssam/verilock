@@ -2,7 +2,8 @@
  * Per-person signing invite (Resend). No PDF attachment — link + copy only.
  */
 import { assertDocumentCreator } from '../documents.js'
-import { getPartyById } from '../db.js'
+import { getPartiesForDocument, getPartyById } from '../db.js'
+import { normalizeAddress } from '../addresses.js'
 import { sanitizeNotifyEmail } from '../security.js'
 import { appPublicUrl, isResendSendEnabled } from './config.js'
 import { documentDeepLink, sendTransactionalEmail } from './resend.js'
@@ -13,6 +14,35 @@ function escapeHtml(value: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+}
+
+/** True when the label is a truncated Nimiq address, not a human name. */
+function looksLikeAddressLabel(name: string): boolean {
+  return /^NQ[0-9A-Z…]{4,}/i.test(name.replace(/\s/g, '')) || /…/.test(name)
+}
+
+/**
+ * Prefer the step-1 organizer name stored on the document (survives roster rebuild).
+ * Fall back to the creator's party slot, then a generic label.
+ */
+function resolveOrganizerName(doc: {
+  creatorAddress: string
+  creatorDisplayName?: string | null
+  id: string
+}): string {
+  const stored = doc.creatorDisplayName?.trim()
+  if (stored && !looksLikeAddressLabel(stored)) return stored
+
+  const parties = getPartiesForDocument(doc.id)
+  const creatorAddr = normalizeAddress(doc.creatorAddress)
+  const creatorParty = parties.find(
+    p => p.walletAddress && normalizeAddress(p.walletAddress) === creatorAddr,
+  )
+  const partyName = creatorParty?.displayName?.trim()
+  if (partyName && !looksLikeAddressLabel(partyName)) return partyName
+
+  if (stored) return stored
+  return 'The organizer'
 }
 
 export type InviteSignerResult =
@@ -79,20 +109,23 @@ export async function sendPartyInviteEmail(input: {
   const base = documentDeepLink(doc.slug)
   const link = `${base}${base.includes('?') ? '&' : '?'}party=${encodeURIComponent(party.id)}`
   const personName = party.displayName?.trim() || 'there'
+  const organizerName = resolveOrganizerName(doc)
   const safePerson = escapeHtml(personName)
+  const safeOrganizer = escapeHtml(organizerName)
   const safeTitle = escapeHtml(doc.title)
-  const logoUrl = `${appPublicUrl()}/verilock-logo-96.png`
+  // Header + footer use verilock-mark (tracked/deployed). Legacy verilock-logo* is gitignored → 404 on prod.
+  const logoUrl = `${appPublicUrl()}/verilock-mark-180.png`
   const markUrl = `${appPublicUrl()}/verilock-mark-96.png`
 
   const walletNote = party.walletAddress
     ? `Sign with the Nimiq wallet ${party.walletAddress} (the address reserved for you on this agreement).`
     : 'Connect any Nimiq wallet you control, confirm you are the person named in the invite, and sign your fields on the PDF.'
 
-  const subject = `Please sign “${doc.title}” on VeriLock`
+  const subject = `${organizerName} has requested you sign “${doc.title}” on VeriLock`
   const text = [
     `Hi ${personName},`,
     '',
-    `You have been invited to sign “${doc.title}” on VeriLock.`,
+    `${organizerName} has requested you sign “${doc.title}” on VeriLock.`,
     '',
     'Open your personal signing link (keeps you on the correct person):',
     link,
@@ -124,7 +157,7 @@ export async function sendPartyInviteEmail(input: {
             <td style="padding:8px 28px 8px;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#0f172a;line-height:1.55;">
               <p style="margin:0 0 12px;font-size:16px;">Hi ${safePerson},</p>
               <p style="margin:0 0 16px;font-size:16px;">
-                You have been invited to sign <strong>${safeTitle}</strong> on VeriLock.
+                <strong>${safeOrganizer}</strong> has requested you sign <strong>${safeTitle}</strong> on VeriLock.
               </p>
               <p style="margin:0 0 20px;text-align:center;">
                 <a href="${link}"
@@ -174,6 +207,7 @@ export async function sendPartyInviteEmail(input: {
       partyId: party.id,
       to,
       id: result.id,
+      organizer: organizerName,
     })
     return { ok: true, id: result.id, to, partyId: party.id }
   }
