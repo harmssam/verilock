@@ -891,6 +891,149 @@ export function getAnnotationStream(originalSha256: string): AnnotationStreamRec
   return row ? rowToAnnotationStream(row) : null
 }
 
+// ── Placement construction plans (structure + roots only; no PDF / no ink) ─
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS placement_plans (
+    original_sha256 TEXT PRIMARY KEY,
+    document_id TEXT,
+    creator_address TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'draft',
+    plan_json TEXT NOT NULL,
+    plan_root TEXT,
+    batch0_frames_json TEXT,
+    batch0_root TEXT,
+    slot_count INTEGER NOT NULL DEFAULT 0,
+    person_count INTEGER NOT NULL DEFAULT 0,
+    locked_at INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+`)
+
+export interface PlacementFillBatchRecord {
+  batchIndex: number
+  batchRoot: string
+  prevRoot: string
+  personSlotIndex: number
+  signerAddress: string
+  framesHex: string[]
+  blobIds: string[]
+  fills: Array<{ slotId: string; blobId: string; personSlotIndex: number }>
+  createdAt: number
+}
+
+export interface PlacementPlanRecord {
+  originalSha256: string
+  documentId: string | null
+  creatorAddress: string
+  status: 'draft' | 'locked'
+  planJson: string
+  planRoot: string | null
+  batch0FramesHex: string[]
+  batch0Root: string | null
+  fillBatches: PlacementFillBatchRecord[]
+  slotCount: number
+  personCount: number
+  lockedAt: number | null
+  createdAt: number
+  updatedAt: number
+}
+
+const placementPlanColumns = db
+  .prepare('PRAGMA table_info(placement_plans)')
+  .all() as Array<{ name: string }>
+if (!placementPlanColumns.some(col => col.name === 'fill_batches_json')) {
+  db.exec(`ALTER TABLE placement_plans ADD COLUMN fill_batches_json TEXT NOT NULL DEFAULT '[]'`)
+}
+
+function rowToPlacementPlan(row: Record<string, unknown>): PlacementPlanRecord {
+  let frames: string[] = []
+  try {
+    frames = JSON.parse(String(row.batch0_frames_json ?? '[]')) as string[]
+  } catch {
+    frames = []
+  }
+  let fillBatches: PlacementFillBatchRecord[] = []
+  try {
+    const parsed = JSON.parse(String(row.fill_batches_json ?? '[]')) as PlacementFillBatchRecord[]
+    fillBatches = Array.isArray(parsed) ? parsed : []
+  } catch {
+    fillBatches = []
+  }
+  const status = row.status === 'locked' ? 'locked' : 'draft'
+  return {
+    originalSha256: String(row.original_sha256),
+    documentId: row.document_id != null ? String(row.document_id) : null,
+    creatorAddress: String(row.creator_address ?? ''),
+    status,
+    planJson: String(row.plan_json ?? '{}'),
+    planRoot: row.plan_root != null ? String(row.plan_root) : null,
+    batch0FramesHex: Array.isArray(frames) ? frames : [],
+    batch0Root: row.batch0_root != null ? String(row.batch0_root) : null,
+    fillBatches,
+    slotCount: Number(row.slot_count ?? 0),
+    personCount: Number(row.person_count ?? 0),
+    lockedAt: row.locked_at != null ? Number(row.locked_at) : null,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+  }
+}
+
+export function upsertPlacementPlan(rec: PlacementPlanRecord): void {
+  db.prepare(`
+    INSERT INTO placement_plans (
+      original_sha256, document_id, creator_address, status, plan_json, plan_root,
+      batch0_frames_json, batch0_root, fill_batches_json, slot_count, person_count, locked_at, created_at, updated_at
+    ) VALUES (
+      @originalSha256, @documentId, @creatorAddress, @status, @planJson, @planRoot,
+      @batch0FramesJson, @batch0Root, @fillBatchesJson, @slotCount, @personCount, @lockedAt, @createdAt, @updatedAt
+    )
+    ON CONFLICT(original_sha256) DO UPDATE SET
+      document_id = COALESCE(excluded.document_id, placement_plans.document_id),
+      creator_address = excluded.creator_address,
+      status = excluded.status,
+      plan_json = excluded.plan_json,
+      plan_root = excluded.plan_root,
+      batch0_frames_json = excluded.batch0_frames_json,
+      batch0_root = excluded.batch0_root,
+      fill_batches_json = excluded.fill_batches_json,
+      slot_count = excluded.slot_count,
+      person_count = excluded.person_count,
+      locked_at = excluded.locked_at,
+      updated_at = excluded.updated_at
+  `).run({
+    originalSha256: rec.originalSha256.toLowerCase(),
+    documentId: rec.documentId,
+    creatorAddress: rec.creatorAddress,
+    status: rec.status,
+    planJson: rec.planJson,
+    planRoot: rec.planRoot,
+    batch0FramesJson: JSON.stringify(rec.batch0FramesHex),
+    batch0Root: rec.batch0Root,
+    fillBatchesJson: JSON.stringify(rec.fillBatches ?? []),
+    slotCount: rec.slotCount,
+    personCount: rec.personCount,
+    lockedAt: rec.lockedAt,
+    createdAt: rec.createdAt,
+    updatedAt: rec.updatedAt,
+  })
+}
+
+export function getPlacementPlan(originalSha256: string): PlacementPlanRecord | null {
+  const row = db
+    .prepare('SELECT * FROM placement_plans WHERE original_sha256 = ?')
+    .get(originalSha256.toLowerCase()) as Record<string, unknown> | undefined
+  return row ? rowToPlacementPlan(row) : null
+}
+
+export function getPlacementPlanByDocumentId(documentId: string): PlacementPlanRecord | null {
+  const row = db
+    .prepare('SELECT * FROM placement_plans WHERE document_id = ? ORDER BY updated_at DESC LIMIT 1')
+    .get(documentId) as Record<string, unknown> | undefined
+  return row ? rowToPlacementPlan(row) : null
+}
+
 // ── Credits (ledger-first prepaid seals) ───────────────────────────────────
 
 db.exec(`

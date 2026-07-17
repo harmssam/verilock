@@ -46,12 +46,13 @@ Copy seal-critical vars to staging; use a **separate** funded service wallet if 
 
 ## Product integration (creator path)
 
-On the creator rail, **step 3 (Mark & share)** embeds `PdfAnnotator` in production `DocumentJourney` when `PDF_ANNOTATION_UI` / `FEATURES.pdfAnnotationUi` is on:
+On the creator rail, **Arrange** embeds `PlacementEditor` in production `DocumentJourney` when `PDF_ANNOTATION_UI` / `FEATURES.pdfAnnotationUi` is on:
 
 1. Fingerprint → create  
-2. Sign (wallet)  
-3. **Mark PDF** (page overlays) + invite co-signers / continue to seal  
-4. Seal  
-5. Verify  
+2. **Arrange** — name people, place empty signature/name boxes, lock placements (`POST /api/placement-plans`)  
+3. Sign (wallet + fill slots later in Phase 3)  
+4. Invite / wait for co-signers  
+5. Seal  
+6. Verify  
 
-`/pdf` remains the standalone lab for stream pack/on-chain experiments.
+`/pdf` remains the standalone lab for v1 stream pack + v2 placement packer demos. See `docs/placement-construction.md`.

@@ -371,7 +371,7 @@ export function createDocument(input: {
       documentId: id,
       role: creatorRole,
       displayName: sanitizeDisplayName(
-        input.creatorDisplayName,
+        input.creatorDisplayName?.trim() || shortAddress(input.creatorAddress),
         shortAddress(input.creatorAddress),
       ),
       walletAddress: normalizeAddress(input.creatorAddress),
@@ -417,6 +417,117 @@ export function createDocument(input: {
     document: publicDocument(doc, { viewerAddress: input.creatorAddress }),
     hashWarning,
   }
+}
+
+/**
+ * Replace the signing roster from construction (named people).
+ * Creator may claim one person slot or none (organizer-only).
+ * Requires no signatures yet.
+ */
+function isValidNimiqAddressShape(address: string): boolean {
+  const clean = normalizeAddress(address)
+  return /^NQ[0-9A-Z]{34}$/.test(clean)
+}
+
+export function configureSigningRoster(
+  documentId: string,
+  requesterAddress: string,
+  input: {
+    parties: Array<{ displayName: string; role?: string; walletAddress?: string | null }>
+    /** 0-based index into parties the creator wallet claims; null = creator does not sign */
+    creatorSignsAsIndex: number | null
+  },
+): ReturnType<typeof publicDocument> {
+  return runInTransaction(() => {
+    const doc = getDocumentById(documentId)
+    if (!doc) throw new Error('Document not found')
+    if (normalizeAddress(doc.creatorAddress) !== normalizeAddress(requesterAddress)) {
+      throw new Error('Only the creator can modify this agreement')
+    }
+    if (doc.status === 'locked' || doc.status === 'locking') {
+      throw new Error('Cannot change signers after sealing has started')
+    }
+
+    const signatures = getSignaturesForDocument(documentId)
+    if (signatures.length > 0) {
+      throw new Error('Cannot rebuild signing roster after someone has signed')
+    }
+
+    const list = Array.isArray(input.parties) ? input.parties : []
+    if (list.length < 1 || list.length > 4) {
+      throw new Error('Parties must be between 1 and 4')
+    }
+    const creatorIdx = input.creatorSignsAsIndex
+    if (creatorIdx != null) {
+      if (!Number.isInteger(creatorIdx) || creatorIdx < 0 || creatorIdx >= list.length) {
+        throw new Error('creatorSignsAsIndex out of range')
+      }
+    }
+
+    // Drop all existing parties (unsigned — already checked)
+    for (const p of getPartiesForDocument(documentId)) {
+      deletePartyById(p.id)
+    }
+
+    const type = sanitizeDocumentType(doc.type)
+    const creatorAddr = normalizeAddress(doc.creatorAddress)
+    const seenWallets = new Set<string>()
+
+    for (let i = 0; i < list.length; i++) {
+      const entry = list[i]!
+      const role =
+        entry.role && entry.role.trim()
+          ? entry.role.trim().slice(0, 40)
+          : type === 'rental'
+            ? i === 0
+              ? 'landlord'
+              : i === 1
+                ? 'tenant'
+                : 'signer'
+            : 'signer'
+      const fallback = `Person ${i + 1}`
+      const name = entry.displayName?.trim()
+        ? sanitizeDisplayName(entry.displayName, fallback)
+        : fallback
+      const isCreatorSlot = creatorIdx === i
+
+      let wallet: string | null = null
+      if (isCreatorSlot) {
+        wallet = creatorAddr
+      } else if (entry.walletAddress && String(entry.walletAddress).trim()) {
+        if (!isValidNimiqAddressShape(String(entry.walletAddress))) {
+          throw new Error(`Invalid Nimiq address for ${name}`)
+        }
+        wallet = normalizeAddress(String(entry.walletAddress))
+      }
+
+      if (wallet) {
+        if (seenWallets.has(wallet)) {
+          throw new Error('Each person must have a unique wallet address when addresses are set')
+        }
+        seenWallets.add(wallet)
+      }
+
+      insertParty({
+        id: uuid(),
+        documentId,
+        role,
+        displayName: name,
+        walletAddress: wallet,
+        sortOrder: i,
+        required: true,
+        status: 'pending',
+        signedAt: null,
+      })
+    }
+
+    updateDocumentRequiredSignatures(documentId, list.length)
+    updateDocumentStatus(documentId, 'collecting_signatures')
+
+    return publicDocument(getDocumentById(documentId)!, {
+      viewerAddress: requesterAddress,
+    })
+  })
 }
 
 /**

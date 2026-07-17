@@ -2421,3 +2421,33 @@ body[data-verilock-surface='journey'] .lr-track .trust-bar-sub {
 .lr-app .price-page .muted {
   color: var(--lr-muted, #4b5c6b);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   404 / missing agreement — light shell card
+   ═══════════════════════════════════════════════════════════ */
+
+.lr-app .not-found-page.card {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  border-radius: 14px;
+  box-shadow: 0 10px 36px rgba(15, 23, 42, 0.05);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.lr-app .not-found-kicker {
+  color: var(--lr-accent, #0d9488);
+}
+
+.lr-app .not-found-page h2 {
+  color: var(--lr-text, #0f172a);
+}
+
+.lr-app .not-found-message,
+.lr-app .not-found-path {
+  color: var(--lr-muted, #4b5c6b);
+}
+
+.lr-app .not-found-path .mono {
+  color: var(--lr-dim, #6b7c8d);
+}

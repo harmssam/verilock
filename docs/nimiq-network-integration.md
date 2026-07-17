@@ -183,7 +183,7 @@ Separate from seals. Multi-tx overlay frames for PDF annotations (path/text/chec
 | Byte | Meaning |
 |------|---------|
 | 0 | Magic **`0xA1`** (never `0x01` — seal verifier will reject stream txs as seals) |
-| 1 | Stream version (`1`) |
+| 1 | Stream version (`1` free-form annotations, **`2` placement construction batches**) |
 | 2 | Frame type: HEAD / DATA / END |
 | 3–4 | seq / total frames |
 | 5–8 | PDF hash prefix |
@@ -194,6 +194,8 @@ Separate from seals. Multi-tx overlay frames for PDF annotations (path/text/chec
 - Broadcast: service wallet → attestation sink; feature flag `ANNOTATION_STREAM_BROADCAST` (prod requires explicit enable).
 - Ownership: stream row bound to publisher wallet; overwrite only by same address.
 - Reconstruct: re-read `recipientData` from each tx hash; require `executionResult !== false` and exact 64 B; optional `?fallback=index` vs `?fallback=none`.
+
+**Version 2 (placement construction):** each multi-tx sequence is one **append batch** (plan lock or fill). Payload JSON carries `people`/`places` (geometry only), content-addressed `blobs` (ink/text), and `fills` (slot → blob_id). Identical ink is emitted once (`blob_id = sha256(payload)[0:16]`); batches chain via `prevRoot`. See `docs/placement-construction.md`, `client/src/pdf/placements.ts`, `client/src/pdf/placementStream.ts`.
 
 Seal verification still requires exact 37-byte `0x01` payload — stream txs cannot satisfy `verifyAttestationPayload`.
 

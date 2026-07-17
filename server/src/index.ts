@@ -27,6 +27,7 @@ import {
   assertSealBroadcastAllowed,
   beginLock,
   configureDocumentCosigners,
+  configureSigningRoster,
   createDocument,
   deleteDocument,
   getDocumentPublic,
@@ -36,6 +37,7 @@ import {
   viewerMayAccessSignatureImage,
 } from './documents.js'
 import { emailFeaturesPublic } from './email/config.js'
+import { sendPartyInviteEmail } from './email/inviteSigner.js'
 import { verifyHubSignedMessage } from './hub-signature.js'
 import { rateLimit } from './rate-limit.js'
 import {
@@ -53,6 +55,12 @@ import {
   publishAnnotationStream,
   reconstructFromStoredOrChain,
 } from './annotationStream.js'
+import {
+  appendFillBatch,
+  getPlanPublic,
+  lockPlan as lockPlacementPlan,
+  saveDraftPlan,
+} from './placementPlans.js'
 import {
   isPdfAnnotationUiEnabled,
   pdfAnnotationFeaturesPublic,
@@ -135,6 +143,8 @@ const annotationStreamLimit = rateLimit(6, 60_000)
 const verifyHashLimit = rateLimit(60, 60_000)
 /** Public contact form — tight limit against spam floods. */
 const supportContactLimit = rateLimit(5, 15 * 60_000)
+/** Per-person invite emails via Resend. */
+const inviteEmailLimit = rateLimit(12, 60_000)
 
 function lockErrorStatus(message: string): number {
   if (message === 'Only the creator can seal this agreement') return 403
@@ -619,6 +629,58 @@ app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req
   }
 })
 
+/**
+ * Creator-only: rebuild parties from construction people.
+ * Body: { parties: [{ displayName, role? }], creatorSignsAsIndex: number | null }
+ */
+app.put(
+  '/api/documents/:id/signing-roster',
+  docLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  (req, res) => {
+    const body = req.body as {
+      parties?: Array<{ displayName?: string; role?: string; walletAddress?: string | null }>
+      creatorSignsAsIndex?: number | null
+    }
+    const address = res.locals.address as string
+    try {
+      const parties = Array.isArray(body.parties)
+        ? body.parties.map(p => ({
+            displayName: typeof p?.displayName === 'string' ? p.displayName : '',
+            role: typeof p?.role === 'string' ? p.role : undefined,
+            walletAddress:
+              typeof p?.walletAddress === 'string'
+                ? p.walletAddress
+                : p?.walletAddress === null
+                  ? null
+                  : undefined,
+          }))
+        : []
+      const creatorSignsAsIndex =
+        body.creatorSignsAsIndex === null || body.creatorSignsAsIndex === undefined
+          ? null
+          : Number(body.creatorSignsAsIndex)
+      const document = configureSigningRoster(routeParam(req.params.id), address, {
+        parties,
+        creatorSignsAsIndex: Number.isFinite(creatorSignsAsIndex as number)
+          ? (creatorSignsAsIndex as number)
+          : null,
+      })
+      res.json({ document })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Update failed'
+      const status =
+        message === 'Document not found'
+          ? 404
+          : message.includes('Only the creator')
+            ? 403
+            : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
+
 /** Creator-only: set total required signatures + optional co-signer names (share step). */
 app.patch(
   '/api/documents/:id/cosigners',
@@ -685,6 +747,41 @@ app.patch(
             : 400
       res.status(status).json({ error: message })
     }
+  },
+)
+
+/**
+ * Creator-only: email one party a branded invite with their personal ?party= link.
+ * Never attaches the PDF.
+ */
+app.post(
+  '/api/documents/:id/invite-email',
+  inviteEmailLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  async (req, res) => {
+    const body = req.body as { partyId?: string; to?: string }
+    const address = res.locals.address as string
+    if (!body.partyId || typeof body.partyId !== 'string') {
+      res.status(400).json({ error: 'partyId required' })
+      return
+    }
+    const result = await sendPartyInviteEmail({
+      documentId: routeParam(req.params.id),
+      creatorAddress: address,
+      partyId: body.partyId.trim(),
+      to: typeof body.to === 'string' ? body.to : '',
+    })
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error })
+      return
+    }
+    res.status(201).json({
+      ok: true,
+      id: result.id,
+      to: result.to,
+      partyId: result.partyId,
+    })
   },
 )
 
@@ -910,6 +1007,123 @@ function pdfLabDisabled(res: express.Response): boolean {
   res.status(404).json({ error: 'PDF annotation lab is disabled on this environment' })
   return true
 }
+
+/**
+ * Placement construction plan (structure + planRoot hashes only).
+ * POST body: { originalSha256, plan, documentId?, lock?, planRoot?, batch0FramesHex?, batch0Root? }
+ * lock=true freezes geometry; draft allowed until lock.
+ */
+app.post(
+  '/api/placement-plans',
+  annotationStreamLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  (req, res) => {
+    if (pdfLabDisabled(res)) return
+    const body = req.body as {
+      originalSha256?: string
+      plan?: unknown
+      documentId?: string
+      lock?: boolean
+      planRoot?: string
+      batch0FramesHex?: string[]
+      batch0Root?: string
+    }
+    if (!body.originalSha256 || !/^[a-f0-9]{64}$/i.test(body.originalSha256)) {
+      res.status(400).json({ error: 'Valid originalSha256 required' })
+      return
+    }
+    const address = res.locals.address as string
+    try {
+      const result = body.lock
+        ? lockPlacementPlan({
+            originalSha256: body.originalSha256,
+            creatorAddress: address,
+            plan: body.plan,
+            planRoot: body.planRoot,
+            batch0FramesHex: body.batch0FramesHex,
+            batch0Root: body.batch0Root,
+            documentId: body.documentId ?? null,
+          })
+        : saveDraftPlan({
+            originalSha256: body.originalSha256,
+            creatorAddress: address,
+            plan: body.plan,
+            documentId: body.documentId ?? null,
+          })
+      res.status(body.lock ? 201 : 200).json(result)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Placement plan save failed'
+      const status =
+        message.includes('Only the plan owner') || message.includes('already locked')
+          ? 403
+          : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
+
+/** Public read of placement plan structure (no frames body — hashes + geometry only). */
+app.get('/api/placement-plans/:sha256', publicReadLimit, (req, res) => {
+  if (pdfLabDisabled(res)) return
+  const sha = routeParam(req.params.sha256).toLowerCase()
+  if (!/^[a-f0-9]{64}$/.test(sha)) {
+    res.status(400).json({ error: 'Valid sha256 required' })
+    return
+  }
+  const plan = getPlanPublic(sha)
+  if (!plan) {
+    res.status(404).json({ error: 'No placement plan for this PDF hash' })
+    return
+  }
+  res.json(plan)
+})
+
+/**
+ * Append fill batch (content-addressed blob ids + optional wire frames).
+ * Plan must be locked. Rejects double-fill of the same slot.
+ */
+app.post(
+  '/api/placement-plans/:sha256/fills',
+  annotationStreamLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  (req, res) => {
+    if (pdfLabDisabled(res)) return
+    const sha = routeParam(req.params.sha256).toLowerCase()
+    if (!/^[a-f0-9]{64}$/.test(sha)) {
+      res.status(400).json({ error: 'Valid sha256 required' })
+      return
+    }
+    const body = req.body as {
+      personSlotIndex?: number
+      prevRoot?: string
+      batchRoot?: string
+      batchIndex?: number
+      framesHex?: string[]
+      fills?: Array<{ slotId: string; blobId: string; personSlotIndex: number }>
+      blobIds?: string[]
+    }
+    const address = res.locals.address as string
+    try {
+      const result = appendFillBatch({
+        originalSha256: sha,
+        signerAddress: address,
+        personSlotIndex: Number(body.personSlotIndex),
+        prevRoot: String(body.prevRoot ?? ''),
+        batchRoot: String(body.batchRoot ?? ''),
+        batchIndex: Number(body.batchIndex),
+        framesHex: body.framesHex,
+        fills: Array.isArray(body.fills) ? body.fills : [],
+        blobIds: Array.isArray(body.blobIds) ? body.blobIds : [],
+      })
+      res.status(201).json(result)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Fill append failed'
+      res.status(400).json({ error: message })
+    }
+  },
+)
 
 /**
  * Experiment: pack annotations into 64-byte frames, index by PDF hash,

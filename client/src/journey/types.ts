@@ -29,25 +29,27 @@ export interface JourneyStage {
 export const CREATOR_STAGES: JourneyStage[] = [
   {
     id: 'fingerprint',
-    label: 'Fingerprint',
-    verb: 'Create a fingerprint from your file',
-    blurb: 'Drop your agreement. We create its fingerprint on your device directly.',
+    label: 'Add PDF',
+    verb: 'Add the PDF and fingerprint it locally',
+    blurb:
+      'Drop the agreement file. We only register its fingerprint — no signing yet. Next you arrange who signs where.',
     privacyNote: 'The file never uploads. Only the fingerprint is registered.',
+  },
+  {
+    id: 'share',
+    label: 'Arrange',
+    verb: 'Name people, place fields, choose if you sign',
+    blurb:
+      'Name each signer, place their boxes on the PDF, and choose whether you are one of them (or only organizing). Lock when the layout is right.',
+    privacyNote: 'Only placement geometry is stored — not the PDF bytes.',
   },
   {
     id: 'sign',
     label: 'Sign',
-    verb: 'Add your signature',
-    blurb: 'Draw your signature on this fingerprint. Co-signers come next if you need them.',
-    privacyNote: 'You prove you hold these bytes - still no upload.',
-  },
-  {
-    id: 'share',
-    label: 'Mark & share',
-    verb: 'Mark the PDF & invite',
+    verb: 'Sign your fields on the PDF',
     blurb:
-      'Place signatures, checkmarks, and notes on your local PDF. Then seal alone or invite co-signers with the same file — we never upload the document.',
-    privacyNote: 'Marks stay with the hash stream; the PDF bytes never leave this device.',
+      'If you are a signer, fill only your highlighted fields on the document, then bind with your wallet. Organizers skip this step.',
+    privacyNote: 'You prove you hold these bytes - still no upload.',
   },
   {
     id: 'seal',

@@ -1,0 +1,264 @@
+.signer-fill-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.signer-fill-head {
+  border-left: 3px solid var(--person-color, #0f766e);
+  padding-left: 0.65rem;
+}
+
+.signer-fill-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.signer-fill-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.signer-fill-help {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.signer-fill-remaining {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fdba74;
+}
+
+.signer-fill-remaining.is-done {
+  background: #ecfdf5;
+  color: #0f766e;
+  border-color: #99f6e4;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.signer-fill-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.signer-fill-page-label {
+  font-size: 0.8125rem;
+  color: var(--muted, #64748b);
+  min-width: 5.5rem;
+  text-align: center;
+}
+
+.signer-fill-stage-wrap {
+  border-radius: 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.signer-fill-stage {
+  max-height: min(72vh, 820px);
+  padding: 1rem;
+  background: #cbd5e1;
+}
+
+.signer-fill-layer {
+  pointer-events: none;
+}
+
+.signer-fill-field {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 2px dashed #94a3b8;
+  border-radius: 3px;
+  background: rgb(148 163 184 / 12%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font: inherit;
+  color: inherit;
+  pointer-events: none;
+  cursor: default;
+}
+
+.signer-fill-field.is-theirs {
+  opacity: 0.45;
+  border-style: dotted;
+  background: rgb(100 116 139 / 8%);
+}
+
+.signer-fill-field.is-mine {
+  pointer-events: auto;
+  border-color: var(--person-color, #0f766e);
+  border-style: solid;
+  background: color-mix(in srgb, var(--person-color, #0f766e) 14%, #fff);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--person-color, #0f766e) 30%, transparent),
+    0 2px 8px rgb(15 23 42 / 8%);
+  animation: signer-fill-pulse 2.2s ease-in-out infinite;
+}
+
+.signer-fill-field.is-mine.is-complete {
+  animation: none;
+  background: color-mix(in srgb, var(--person-color, #0f766e) 8%, #fff);
+  border-style: solid;
+}
+
+.signer-fill-field.is-mine.is-active {
+  animation: none;
+  outline: 2px solid var(--person-color, #0f766e);
+  outline-offset: 2px;
+  z-index: 3;
+}
+
+.signer-fill-field.is-clickable {
+  cursor: pointer;
+}
+
+.signer-fill-field.is-clickable:hover {
+  filter: brightness(0.98);
+}
+
+.signer-fill-field.is-clickable:focus-visible {
+  outline: 2px solid var(--person-color, #0f766e);
+  outline-offset: 2px;
+}
+
+@keyframes signer-fill-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--person-color, #0f766e) 30%, transparent),
+      0 2px 8px rgb(15 23 42 / 8%);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--person-color, #0f766e) 35%, transparent),
+      0 2px 12px rgb(15 23 42 / 12%);
+  }
+}
+
+.signer-fill-field-cta {
+  font-size: clamp(10px, 1.8vw, 13px);
+  font-weight: 700;
+  color: var(--person-color, #0f766e);
+  text-align: center;
+  padding: 2px 4px;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.signer-fill-field-cta.is-theirs-label {
+  font-weight: 500;
+  color: #64748b;
+  font-size: clamp(8px, 1.4vw, 11px);
+}
+
+.signer-fill-field-cta.is-saved {
+  color: #0f766e;
+  opacity: 0.85;
+}
+
+.signer-fill-field-value {
+  font-size: clamp(10px, 1.9vw, 14px);
+  font-weight: 600;
+  color: #0f172a;
+  padding: 2px 6px;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  pointer-events: none;
+}
+
+.signer-fill-ink-preview,
+.signer-fill-mark {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.signer-fill-popover {
+  border: 1px solid color-mix(in srgb, var(--person-color, #0f766e) 40%, #e2e8f0);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.75rem 0.9rem;
+  box-shadow: 0 8px 28px rgb(15 23 42 / 12%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.signer-fill-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.signer-fill-inline-input {
+  width: 100%;
+  max-width: 100%;
+  font-size: 1rem;
+  padding: 0.55rem 0.65rem;
+}
+
+.signer-fill-popover-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.signer-fill-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  padding-top: 0.25rem;
+}
+
+.signer-fill-footer .btn-lg {
+  width: 100%;
+}
+
+.signer-fill-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.8125rem;
+}
+
+.signer-fill-done {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: #0f766e;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+@media (min-width: 720px) {
+  .signer-fill-footer .btn-lg {
+    width: auto;
+    align-self: flex-start;
+    min-width: 16rem;
+  }
+}

@@ -8,6 +8,7 @@ Local-only PDF overlays stored as JSON on the document record.
 2. User draws a signature / places text → **normalized coordinates** + image/text payload.
 3. `POST /api/documents` with `originalSha256` + `annotations` only (no PDF bytes).
 4. On verify: re-open the original file locally, fetch annotations from the API, reconstruct via canvas overlay.
+5. **Placement v2 (lab):** client packer for construction plan + fill batches with content-addressed blob dedup (`placements.ts` / `placementStream.ts`). See `docs/placement-construction.md`.
 
 ## Modules
 
