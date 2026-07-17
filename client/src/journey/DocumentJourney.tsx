@@ -71,6 +71,8 @@ import {
 import { formatFileSize } from './PdfDropZone'
 import { SignaturePad } from './SignaturePad'
 import { StageRail } from './StageRail'
+import { PdfAnnotator } from '../pdf/PdfAnnotator'
+import type { PdfAnnotation } from '../pdf/annotations'
 import { saveHubReturnPath } from '../hubReturnPath'
 import { journeyPathMeta, type PageMeta } from '../seo'
 import {
@@ -187,6 +189,10 @@ export function DocumentJourney({
   const [signerName, setSignerName] = useState('')
   const [sigBlob, setSigBlob] = useState<Blob | null>(null)
   const [sigPadKey, setSigPadKey] = useState(0)
+  /** PDF page overlays (step 3 Mark & share) — local + optional stream pack. */
+  const [annotations, setAnnotations] = useState<PdfAnnotation[]>([])
+  const [marksBusy, setMarksBusy] = useState(false)
+  const [marksStatus, setMarksStatus] = useState<string | null>(null)
   const [verifyFile, setVerifyFile] = useState<File | null>(null)
   const [verifyOutcome, setVerifyOutcome] = useState<VerifyOutcome>({ kind: 'idle' })
   const [howOpen, setHowOpen] = useState(false)
@@ -801,6 +807,7 @@ export function DocumentJourney({
         pageCount,
         requiredSignatures: 1,
         ...(metadata ? { metadata } : {}),
+        ...(annotations.length > 0 ? { annotations } : {}),
       })
 
       if (hashWarning) setLocalError(hashWarning)
@@ -1498,11 +1505,123 @@ export function DocumentJourney({
 
               {step === 'share' && doc && (
                 <div className="action-stack">
-                  <DocumentStage step={step} doc={doc} file={pdfFile} accepting={false} />
+                  {/* Step 3 primary: mark the local PDF (same editor as /pdf lab). */}
+                  {FEATURES.pdfAnnotationUi && (pdfFile || signFile) && (
+                    <section className="journey-pdf-editor" aria-labelledby="mark-pdf-title">
+                      <header className="signatures-config-head">
+                        <h3 id="mark-pdf-title">Mark this PDF</h3>
+                        <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
+                          Place your ink, checkmarks, X marks, or short text on the document. The
+                          file stays on this device — only the hash and mark data can be stored.
+                        </p>
+                      </header>
+                      <PdfAnnotator
+                        file={(pdfFile ?? signFile)!}
+                        annotations={annotations}
+                        onChange={setAnnotations}
+                        disabled={busy || marksBusy}
+                      />
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <button
+                          type="button"
+                          className={`btn btn-secondary${marksBusy ? ' btn--busy' : ''}`}
+                          disabled={
+                            busy ||
+                            marksBusy ||
+                            !token ||
+                            annotations.length === 0 ||
+                            !(pdfHash || signHash || doc.fingerprint)
+                          }
+                          onClick={() => {
+                            const hash = (pdfHash || signHash || doc.fingerprint || '').toLowerCase()
+                            if (!token || !hash || annotations.length === 0) return
+                            setMarksBusy(true)
+                            setMarksStatus(null)
+                            setLocalError(null)
+                            void api
+                              .publishAnnotationStream(token, {
+                                originalSha256: hash,
+                                annotations,
+                                broadcast: false,
+                              })
+                              .then(r => {
+                                setMarksStatus(
+                                  `Saved ${r.frameCount} mark frames for this fingerprint (index).`,
+                                )
+                              })
+                              .catch(err => {
+                                setLocalError(
+                                  err instanceof Error ? err.message : 'Could not save marks',
+                                )
+                              })
+                              .finally(() => setMarksBusy(false))
+                          }}
+                        >
+                          {marksBusy ? (
+                            <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
+                          ) : null}
+                          Save marks to fingerprint
+                        </button>
+                        {marksStatus && (
+                          <p className="muted" style={{ margin: 0, fontSize: '0.8rem', flex: '1 1 100%' }}>
+                            {marksStatus}
+                          </p>
+                        )}
+                      </div>
+                    </section>
+                  )}
+
+                  {FEATURES.pdfAnnotationUi && !pdfFile && !signFile && (
+                    <section className="journey-pdf-editor">
+                      <p className="muted" style={{ margin: 0 }}>
+                        Re-open the same PDF to place marks on the page (bytes stay local).
+                      </p>
+                      <DocumentStage
+                        step={step}
+                        doc={doc}
+                        file={null}
+                        onFileChange={file => {
+                          if (!file || !doc) return
+                          void (async () => {
+                            setBusy(true)
+                            try {
+                              const buf = await file.arrayBuffer()
+                              const h = await sha256Hex(buf)
+                              if (h !== doc.fingerprint) {
+                                setLocalError(
+                                  'That file does not match this agreement fingerprint. Use the same PDF you created with.',
+                                )
+                                return
+                              }
+                              setLocalError(null)
+                              setPdfFile(file)
+                              setPdfHash(h)
+                              setSignFile(file)
+                              setSignHash(h)
+                            } catch (err) {
+                              setLocalError(
+                                err instanceof Error ? err.message : 'Could not read PDF',
+                              )
+                            } finally {
+                              setBusy(false)
+                            }
+                          })()
+                        }}
+                        accepting
+                        disabled={busy}
+                        localCopyRequired
+                        localCopyMatches={null}
+                      />
+                    </section>
+                  )}
+
+                  {!FEATURES.pdfAnnotationUi && (
+                    <DocumentStage step={step} doc={doc} file={pdfFile} accepting={false} />
+                  )}
 
                   <section className="signatures-config" aria-labelledby="signatures-config-title">
                     <header className="signatures-config-head">
-                      <h3 id="signatures-config-title">Signatures</h3>
+                      <h3 id="signatures-config-title">Invite &amp; seal options</h3>
                       <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
                         You signed. Seal alone, or add co-signers and share the invite before sealing.
                       </p>
