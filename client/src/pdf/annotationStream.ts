@@ -10,7 +10,7 @@ export const FRAME_SIZE = 64
 export const FRAME_HEADER = 9
 export const FRAME_BODY = FRAME_SIZE - FRAME_HEADER // 55
 /** Keep in sync with server MAX_STREAM_FRAMES. */
-export const MAX_STREAM_FRAMES = 32
+export const MAX_STREAM_FRAMES = 128
 
 export const FRAME_HEAD = 1
 export const FRAME_DATA = 2
@@ -48,6 +48,23 @@ export type StreamAnnotation =
       color?: string
     }
 
+/** Shorten floats in wire JSON (big win for long signature paths). */
+function q(n: number, digits = 4): number {
+  if (!Number.isFinite(n)) return 0
+  const p = 10 ** digits
+  return Math.round(n * p) / p
+}
+
+function slimPath(path: SignaturePathData): SignaturePathData {
+  return {
+    epsilon: q(path.epsilon, 2),
+    lineWidthRatio: q(path.lineWidthRatio, 4),
+    strokes: path.strokes.map(s => ({
+      points: s.points.map(p => ({ x: q(p.x), y: q(p.y) })),
+    })),
+  }
+}
+
 export function slimAnnotations(annotations: PdfAnnotation[]): StreamAnnotation[] {
   const out: StreamAnnotation[] = []
   for (const a of annotations) {
@@ -55,11 +72,11 @@ export function slimAnnotations(annotations: PdfAnnotation[]): StreamAnnotation[
       out.push({
         t: 's',
         page: a.pageIndex,
-        x: a.x,
-        y: a.y,
-        w: a.width,
-        h: a.height,
-        ...(a.path ? { path: a.path } : {}),
+        x: q(a.x),
+        y: q(a.y),
+        w: q(a.width),
+        h: q(a.height),
+        ...(a.path ? { path: slimPath(a.path) } : {}),
       })
       continue
     }
@@ -67,13 +84,13 @@ export function slimAnnotations(annotations: PdfAnnotation[]): StreamAnnotation[
       out.push({
         t: 'x',
         page: a.pageIndex,
-        x: a.x,
-        y: a.y,
-        w: a.width,
-        h: a.height,
+        x: q(a.x),
+        y: q(a.y),
+        w: q(a.width),
+        h: q(a.height),
         text: a.text,
-        ...(a.fontSizeRatio != null ? { font: a.fontSizeRatio } : {}),
-        ...(a.color ? { color: a.color } : {}),
+        ...(a.fontSizeRatio != null ? { font: q(a.fontSizeRatio, 4) } : {}),
+        color: a.color ?? '#0f172a',
       })
       continue
     }
@@ -81,10 +98,10 @@ export function slimAnnotations(annotations: PdfAnnotation[]): StreamAnnotation[
       out.push({
         t: a.type === 'checkmark' ? 'c' : 'k',
         page: a.pageIndex,
-        x: a.x,
-        y: a.y,
-        w: a.width,
-        h: a.height,
+        x: q(a.x),
+        y: q(a.y),
+        w: q(a.width),
+        h: q(a.height),
         color: a.color ?? (a.type === 'checkmark' ? '#0f766e' : '#b91c1c'),
       })
     }
