@@ -449,11 +449,30 @@ function isUserShareCancel(err: unknown): boolean {
   return name === 'AbortError'
 }
 
+/**
+ * Desktop Safari on macOS reports canShare({ files }) but many targets (especially
+ * Messages) open with an empty compose — no text, no PDF. Treat as unsupported so
+ * the UI does not offer “Share PDF + invite” there. iOS/iPadOS keep file share.
+ */
+export function isDesktopMacWebShareUnreliable(
+  nav: Pick<Navigator, 'userAgent' | 'platform' | 'maxTouchPoints'> = navigator,
+): boolean {
+  if (typeof nav === 'undefined' || !nav.userAgent) return false
+  const ua = nav.userAgent
+  const isIpad =
+    /iPad/i.test(ua) ||
+    (nav.platform === 'MacIntel' && typeof nav.maxTouchPoints === 'number' && nav.maxTouchPoints > 1)
+  if (/iPhone|iPod/i.test(ua) || isIpad) return false
+  return /Mac/i.test(nav.platform) || /Macintosh/i.test(ua)
+}
+
 /** True when the browser can share the given files via the OS share sheet. */
 export function canShareFiles(files: File[]): boolean {
   if (typeof navigator === 'undefined') return false
   if (typeof navigator.share !== 'function') return false
   if (files.length === 0) return false
+  // macOS desktop: share sheet targets (Messages) often receive empty payload.
+  if (isDesktopMacWebShareUnreliable()) return false
   if (typeof navigator.canShare !== 'function') {
     // Older Safari: share exists but canShare may be missing — try files optimistically
     // only when we know Level 2 is common; without canShare, avoid claiming support.
@@ -475,42 +494,48 @@ export async function shareInviteWithPdf(
   shareUrl: string,
   pdfFile: File,
 ): Promise<WebShareInviteResult> {
+  // Hard-block desktop Mac even if a caller bypasses canShareFiles.
+  if (isDesktopMacWebShareUnreliable()) return 'unsupported'
+
   const pdfName = pdfFile.name || doc.originalFilename || 'agreement.pdf'
-  const file =
-    pdfFile.name && pdfFile.type
-      ? pdfFile
-      : new File([pdfFile], pdfName, {
-          type: pdfFile.type || 'application/pdf',
-          lastModified: pdfFile.lastModified,
-        })
+  // Always materialize a named application/pdf File — some share targets ignore
+  // File/Blob objects without an explicit type or with empty names.
+  const file = new File([pdfFile], pdfName, {
+    type: 'application/pdf',
+    lastModified: pdfFile.lastModified || Date.now(),
+  })
 
   if (!canShareFiles([file])) return 'unsupported'
 
   const content = buildShareInviteContent(doc, shareUrl, { pdfAttached: true })
   const text = buildShareSheetText(doc, shareUrl, { pdfAttached: true })
 
-  try {
-    await navigator.share({
-      title: content.subject,
-      text,
-      files: [file],
-    })
-    return 'shared'
-  } catch (err) {
-    if (isUserShareCancel(err)) return 'cancelled'
-    // Some platforms reject files+text; retry files-only then text-only is not useful
-    // without the PDF. Surface as unsupported so UI can fall back to .eml.
+  // Prefer files + text + url (mobile Safari/Chrome). Fall back in stages.
+  const attempts: ShareData[] = [
+    { title: content.subject, text, url: shareUrl, files: [file] },
+    { title: content.subject, text, files: [file] },
+    { title: content.subject, files: [file] },
+    // Last resort: link only — better empty failure on mobile than silent miss.
+    { title: content.subject, text, url: shareUrl },
+  ]
+
+  for (const data of attempts) {
     try {
-      await navigator.share({
-        title: content.subject,
-        files: [file],
-      })
+      if (typeof navigator.canShare === 'function') {
+        try {
+          if (!navigator.canShare(data)) continue
+        } catch {
+          continue
+        }
+      }
+      await navigator.share(data)
       return 'shared'
-    } catch (retryErr) {
-      if (isUserShareCancel(retryErr)) return 'cancelled'
-      return 'unsupported'
+    } catch (err) {
+      if (isUserShareCancel(err)) return 'cancelled'
+      // Try next payload shape.
     }
   }
+  return 'unsupported'
 }
 
 /**
