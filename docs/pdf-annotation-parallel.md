@@ -44,6 +44,14 @@ railway environment new staging --duplicate production
 
 Copy seal-critical vars to staging; use a **separate** funded service wallet if you do not want staging to share production service-wallet balance.
 
-## Promote lab → product later
+## Product integration (creator path)
 
-Only when ready: wire optional overlays into creator flow, keep stream publish post-seal, still behind flags.
+On the creator rail, **step 3 (Mark & share)** embeds `PdfAnnotator` in production `DocumentJourney` when `PDF_ANNOTATION_UI` / `FEATURES.pdfAnnotationUi` is on:
+
+1. Fingerprint → create  
+2. Sign (wallet)  
+3. **Mark PDF** (page overlays) + invite co-signers / continue to seal  
+4. Seal  
+5. Verify  
+
+`/pdf` remains the standalone lab for stream pack/on-chain experiments.

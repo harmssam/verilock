@@ -43,11 +43,11 @@ export const CREATOR_STAGES: JourneyStage[] = [
   },
   {
     id: 'share',
-    label: 'Share',
-    verb: 'Signatures & invites',
+    label: 'Mark & share',
+    verb: 'Mark the PDF & invite',
     blurb:
-      'Seal alone, or add co-signers under Signatures and send the invite link with the PDF. We never upload the document.',
-    privacyNote: 'You send the file yourself. We only host the agreement record and link.',
+      'Place signatures, checkmarks, and notes on your local PDF. Then seal alone or invite co-signers with the same file — we never upload the document.',
+    privacyNote: 'Marks stay with the hash stream; the PDF bytes never leave this device.',
   },
   {
     id: 'seal',
