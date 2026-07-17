@@ -394,16 +394,18 @@ export function ShareInviteCard({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeCopyModal()
     }
-    document.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    // Prop is named `document` (SealDocument) — use globalThis for DOM.
+    const dom = globalThis.document
+    dom.addEventListener('keydown', onKey)
+    const prev = dom.body.style.overflow
+    dom.body.style.overflow = 'hidden'
     // Focus primary action for keyboard users.
     window.setTimeout(() => {
       copyModalRef.current?.querySelector<HTMLButtonElement>('[data-copy-modal-primary]')?.focus()
     }, 0)
     return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prev
+      dom.removeEventListener('keydown', onKey)
+      dom.body.style.overflow = prev
     }
   }, [copyModalOpen])
 
@@ -476,7 +478,7 @@ export function ShareInviteCard({
   }
 
   const copyModal =
-    copyModalOpen && typeof document !== 'undefined'
+    copyModalOpen && typeof globalThis.document !== 'undefined'
       ? createPortal(
           <div className="share-copy-modal-layer" role="presentation">
             <button
@@ -549,7 +551,7 @@ export function ShareInviteCard({
               </div>
             </div>
           </div>,
-          document.body,
+          globalThis.document.body,
         )
       : null
 
