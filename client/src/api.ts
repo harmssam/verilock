@@ -1,4 +1,10 @@
-import type { AttestationStatus, DocumentMetadata, SealDocument, VerifyResult } from './types'
+import type {
+  AttestationStatus,
+  DocumentAnnotation,
+  DocumentMetadata,
+  SealDocument,
+  VerifyResult,
+} from './types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -46,6 +52,11 @@ export interface CreateDocumentBody {
   metadata?: DocumentMetadata
   /** Optional ready-to-seal notification email (UI hidden until domain ready). */
   creatorNotifyEmail?: string
+  /**
+   * Optional PDF overlays (signature/text). Never include PDF file bytes —
+   * only hash + annotations are accepted by the API.
+   */
+  annotations?: DocumentAnnotation[]
 }
 
 export interface SignDocumentBody {
@@ -87,6 +98,61 @@ export const api = {
       headers: { ...withAuth(token), 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }),
+
+  /** Experiment: pack annotations into 64B frames, index by PDF hash, optional on-chain broadcast. */
+  publishAnnotationStream: (
+    token: string,
+    body: { originalSha256: string; annotations: unknown[]; broadcast?: boolean },
+  ) =>
+    request<{
+      originalSha256: string
+      frameCount: number
+      payloadBytes: number
+      framesHex: string[]
+      txHashes: string[]
+      onChain: boolean
+      confirmedFrames: number
+      annotations: unknown[]
+      creatorAddress: string
+      broadcastError?: string
+      partialBroadcast?: boolean
+      serviceWalletConfigured?: boolean
+      broadcastEnabled?: boolean
+    }>('/api/annotation-streams', {
+      method: 'POST',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+
+  getAnnotationStream: (sha256: string) =>
+    request<{
+      originalSha256: string
+      creatorAddress?: string
+      frameCount: number
+      payloadBytes: number
+      annotationCount: number
+      txHashes: string[]
+      onChain: boolean
+      confirmedFrames?: number
+      annotations: unknown[]
+      serviceWalletConfigured?: boolean
+      broadcastEnabled?: boolean
+    }>(`/api/annotation-streams/${sha256.toLowerCase()}`),
+
+  reconstructAnnotationStream: (sha256: string, opts?: { fallback?: 'index' | 'none' }) => {
+    const q = opts?.fallback === 'none' ? '?fallback=none' : ''
+    return request<{
+      originalSha256: string
+      annotations: unknown[]
+      source: 'index' | 'chain'
+      frameCount: number
+      txHashes: string[]
+      onChain: boolean
+      confirmedFrames?: number
+      chainError?: string
+      integrityOk?: boolean
+    }>(`/api/annotation-streams/${sha256.toLowerCase()}/reconstruct${q}`)
+  },
 
   features: () =>
     request<{

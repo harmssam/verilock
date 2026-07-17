@@ -7,6 +7,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   isAgreementsPath,
   isKnownAppPath,
+  isPdfLabPath,
+  isPdfPath,
   isPricingPath,
   isPrivacyPath,
   isSecurityPath,
@@ -22,6 +24,8 @@ import { SupportPage } from './SupportPage'
 import { AccountMenu } from './journey/AccountMenu'
 import { AgreementsPage } from './journey/AgreementsPage'
 import { DocumentJourney } from './journey/DocumentJourney'
+import { DocumentJourney as PdfAnnotationJourney } from './experiment/DocumentJourney'
+import { SignatureLab } from './experiment/SignatureLab'
 import { NotFoundPage } from './journey/NotFoundPage'
 import { useCreditBalance } from './journey/useCreditBalance'
 import {
@@ -88,6 +92,8 @@ type ShellScreen =
   | 'security'
   | 'support'
   | 'agreements'
+  | 'pdf'
+  | 'pdf-lab'
   | 'not-found'
 
 function screenFromPath(pathname: string): ShellScreen {
@@ -96,6 +102,8 @@ function screenFromPath(pathname: string): ShellScreen {
   if (isSecurityPath(pathname)) return 'security'
   if (isSupportPath(pathname)) return 'support'
   if (isAgreementsPath(pathname)) return 'agreements'
+  if (isPdfLabPath(pathname)) return 'pdf-lab'
+  if (isPdfPath(pathname)) return 'pdf'
   if (!isKnownAppPath(pathname)) return 'not-found'
   return 'journey'
 }
@@ -225,7 +233,9 @@ export function App() {
       !isPrivacyPath(window.location.pathname) &&
       !isSecurityPath(window.location.pathname) &&
       !isSupportPath(window.location.pathname) &&
-      !isAgreementsPath(window.location.pathname)
+      !isAgreementsPath(window.location.pathname) &&
+      !isPdfPath(window.location.pathname) &&
+      !isPdfLabPath(window.location.pathname)
     ) {
       journeyReturnPathRef.current = path || '/'
     }
@@ -435,6 +445,20 @@ export function App() {
       applyPageMeta({ ...PAGE_META.agreements })
       return
     }
+    if (screen === 'pdf' || screen === 'pdf-lab') {
+      applyPageMeta({
+        ...PAGE_META.pdf,
+        ...(screen === 'pdf-lab'
+          ? {
+              title: 'Signature encoding lab · VeriLock',
+              path: '/pdf/lab',
+              description:
+                'Compare signature PNG vs simplified vector paths and estimated Nimiq frame counts.',
+            }
+          : {}),
+      })
+      return
+    }
     if (screen === 'not-found') {
       applyPageMeta({ ...PAGE_META.notFound, path })
       return
@@ -458,6 +482,8 @@ export function App() {
     screen === 'privacy' ||
     screen === 'security' ||
     screen === 'support' ||
+    screen === 'pdf' ||
+    screen === 'pdf-lab' ||
     screen === 'not-found'
 
   return (
@@ -555,6 +581,8 @@ export function App() {
         screen === 'security' ||
         screen === 'support' ||
         screen === 'agreements' ||
+        screen === 'pdf' ||
+        screen === 'pdf-lab' ||
         screen === 'not-found') && (
         <button type="button" className="lr-back" onClick={goJourney}>
           ← Back to home
@@ -595,6 +623,8 @@ export function App() {
           onCreate={startCreate}
         />
       )}
+      {screen === 'pdf' && <PdfAnnotationJourney wallet={wallet} />}
+      {screen === 'pdf-lab' && <SignatureLab />}
       {screen === 'not-found' && (
         <NotFoundPage
           path={typeof window !== 'undefined' ? window.location.pathname : null}

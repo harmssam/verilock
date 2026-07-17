@@ -58,6 +58,16 @@ export function isSupportPath(path: string): boolean {
   return /^\/support\/?$/.test(path)
 }
 
+/** PDF annotation experiment (local overlays, no pdf-lib). */
+export function isPdfPath(path: string): boolean {
+  return /^\/pdf\/?$/.test(path) || isPdfLabPath(path)
+}
+
+/** Signature encoding lab under /pdf/lab */
+export function isPdfLabPath(path: string): boolean {
+  return /^\/pdf\/lab\/?$/.test(path)
+}
+
 export function isKnownAppPath(path: string): boolean {
   if (path === '/' || path === '') return true
   if (isAgreementsPath(path)) return true
@@ -65,6 +75,7 @@ export function isKnownAppPath(path: string): boolean {
   if (isPrivacyPath(path)) return true
   if (isSecurityPath(path)) return true
   if (isSupportPath(path)) return true
+  if (isPdfPath(path)) return true
   if (documentSlugFromPath(path)) return true
   if (verifySlugFromPath(path)) return true
   return false

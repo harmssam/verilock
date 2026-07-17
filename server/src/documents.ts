@@ -32,6 +32,7 @@ import { buildNimiqExplorerUrl } from './explorer.js'
 import { buildAttestationPayload } from './nimiq-rpc.js'
 import { normalizeAddress, shortAddress } from './addresses.js'
 import {
+  sanitizeAnnotations,
   sanitizeDisplayName,
   sanitizeDocumentMetadata,
   sanitizeDocumentType,
@@ -215,6 +216,8 @@ export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOpti
     finalSha256: freshDoc.finalSha256,
     pageCount: freshDoc.pageCount,
     metadata: freshDoc.metadata,
+    /** PDF overlay annotations (null when none / legacy documents). */
+    annotations: freshDoc.annotations,
     createdAt: freshDoc.createdAt,
     lockedAt: freshDoc.lockedAt,
     requiredSignatures: requiredCount,
@@ -323,6 +326,11 @@ export function createDocument(input: {
   parties?: Array<{ role: string; displayName: string; walletAddress?: string; required?: boolean }>
   /** Optional; stored for ready-to-seal email (never returned in public document). */
   creatorNotifyEmail?: string | null
+  /**
+   * Optional client PDF annotations (normalized geometry + signature/text).
+   * Never includes PDF file bytes — only overlay data for reconstruction.
+   */
+  annotations?: unknown
 }) {
   const id = uuid()
   const slug = slugFromId(id)
@@ -332,6 +340,7 @@ export function createDocument(input: {
   const otherRole = resolveOtherRole(type, creatorRole)
   const requiredSignatures = clampRequiredSignatures(input.requiredSignatures, 2)
   const metadata = sanitizeDocumentMetadata(type, input.metadata)
+  const annotations = sanitizeAnnotations(input.annotations)
 
   const isDirectSeal = requiredSignatures === 0
   const doc: DocumentRecord = {
@@ -346,6 +355,7 @@ export function createDocument(input: {
     finalSha256: null,
     pageCount: Math.max(1, input.pageCount),
     metadata,
+    annotations,
     requiredSignatures,
     createdAt: now,
     lockedAt: null,

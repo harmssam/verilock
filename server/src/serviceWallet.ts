@@ -61,6 +61,11 @@ function getServiceKeyPair(): KeyPair {
   return cachedKeyPair
 }
 
+/** For annotation-stream multi-tx broadcast (experiment). */
+export function getServiceKeyPairForBroadcast(): KeyPair {
+  return getServiceKeyPair()
+}
+
 function normalizeTxHashFromCore(hash: string): string {
   return hash.replace(/^0x/i, '').toLowerCase()
 }

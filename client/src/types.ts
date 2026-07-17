@@ -64,6 +64,53 @@ export function documentTypeLabel(type: string): string {
   return type.charAt(0).toUpperCase() + type.slice(1)
 }
 
+/** PDF overlay annotation stored with the document (no PDF bytes). */
+export type DocumentAnnotation =
+  | {
+      id: string
+      type: 'signature'
+      pageIndex: number
+      x: number
+      y: number
+      width: number
+      height: number
+      imageDataUrl: string
+      /** RDP-simplified vector ink (preferred for reconstruction / future chain). */
+      path?: {
+        epsilon: number
+        lineWidthRatio: number
+        strokes: Array<{ points: Array<{ x: number; y: number }> }>
+      }
+      pageWidthPts?: number
+      pageHeightPts?: number
+    }
+  | {
+      id: string
+      type: 'text'
+      pageIndex: number
+      x: number
+      y: number
+      width: number
+      height: number
+      text: string
+      fontSizeRatio?: number
+      color?: string
+      pageWidthPts?: number
+      pageHeightPts?: number
+    }
+  | {
+      id: string
+      type: 'checkmark' | 'cross'
+      pageIndex: number
+      x: number
+      y: number
+      width: number
+      height: number
+      color?: string
+      pageWidthPts?: number
+      pageHeightPts?: number
+    }
+
 export interface SealDocument {
   id: string
   slug: string
@@ -76,6 +123,11 @@ export interface SealDocument {
   finalSha256: string | null
   pageCount: number
   metadata: Record<string, unknown> | null
+  /**
+   * Client PDF annotations for reconstruction (null/omitted when none).
+   * Server never stores the PDF file — only hash + these overlays.
+   */
+  annotations?: DocumentAnnotation[] | null
   createdAt: number
   lockedAt: number | null
   requiredSignatures: number
