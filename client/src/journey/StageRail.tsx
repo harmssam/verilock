@@ -41,8 +41,9 @@ function isStepDone(
   // Sign is done once the creator has signed (or direct seal / everyone done)
   if (doc && stageId === 'sign' && (signedCount(doc) > 0 || doc.directSeal || allSigned(doc)))
     return true
-  // Share is done once everyone signed (moved on to seal) or direct seal
-  if (doc && stageId === 'share' && (allSigned(doc) || doc.directSeal)) return true
+  // Share is done once everyone signed and we've moved on to seal (or direct seal)
+  if (doc && stageId === 'share' && (doc.directSeal || (allSigned(doc) && step === 'seal')))
+    return true
   if (doc?.sealed && stageId === 'seal') return true
   return false
 }

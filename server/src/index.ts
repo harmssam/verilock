@@ -26,6 +26,7 @@ import {
   addSignature,
   assertSealBroadcastAllowed,
   beginLock,
+  configureDocumentCosigners,
   createDocument,
   deleteDocument,
   getDocumentPublic,
@@ -585,6 +586,48 @@ app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req
 
   res.status(201).json({ document: doc, ...(hashWarning ? { hashWarning } : {}) })
 })
+
+/** Creator-only: set total required signatures + optional co-signer names (share step). */
+app.patch(
+  '/api/documents/:id/cosigners',
+  docLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  (req, res) => {
+    const body = req.body as {
+      requiredSignatures?: number
+      coSignerNames?: string[]
+    }
+    const address = res.locals.address as string
+    if (
+      body.requiredSignatures == null ||
+      !Number.isFinite(body.requiredSignatures) ||
+      body.requiredSignatures < 1 ||
+      body.requiredSignatures > 4
+    ) {
+      res.status(400).json({ error: 'requiredSignatures must be between 1 and 4' })
+      return
+    }
+    try {
+      const document = configureDocumentCosigners(routeParam(req.params.id), address, {
+        requiredSignatures: Math.floor(body.requiredSignatures),
+        coSignerNames: Array.isArray(body.coSignerNames)
+          ? body.coSignerNames.map(n => (typeof n === 'string' ? n : ''))
+          : undefined,
+      })
+      res.json({ document })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Update failed'
+      const status =
+        message === 'Document not found'
+          ? 404
+          : message.includes('Only the creator')
+            ? 403
+            : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
 
 /** Creator-only: set/clear optional ready-to-seal notification email. */
 app.patch(

@@ -656,6 +656,7 @@ export function App() {
               navEpoch={navEpoch}
               onPageMeta={handleJourneyPageMeta}
               onHome={goJourney}
+              onStartCreate={startCreate}
               /* Shell LandingHome owns the path picker — never double it under keep-alive. */
             />
           </div>
