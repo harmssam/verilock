@@ -168,7 +168,10 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
         serviceWalletConfigured: result.serviceWalletConfigured,
         broadcastEnabled: result.broadcastEnabled,
       })
-      setPhase('chain')
+      // Stay on annotate so pack/publish/edit remain available; "chain" is a status panel.
+      if (phase === 'created' || phase === 'chain' || phase === 'verify') {
+        setPhase(pdfFile ? 'annotate' : 'chain')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Stream publish failed')
     } finally {
@@ -349,6 +352,51 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
             </div>
           )}
 
+          {streamResult && pdfHash && (
+            <div
+              style={{
+                marginTop: '1rem',
+                padding: '0.75rem 1rem',
+                background: streamResult.onChain ? '#ecfdf5' : '#fff7ed',
+                border: '1px solid rgba(15, 23, 42, 0.08)',
+                borderRadius: 10,
+                fontSize: '0.875rem',
+              }}
+            >
+              <strong>Last stream result</strong>
+              <p style={{ margin: '0.35rem 0 0' }}>
+                Hash <code>{shortHash(pdfHash)}</code> · {streamResult.frameCount} frames ·{' '}
+                {streamResult.payloadBytes} B
+              </p>
+              <p style={{ margin: '0.25rem 0 0' }}>
+                On-chain:{' '}
+                {streamResult.onChain
+                  ? 'yes (all frames confirmed)'
+                  : streamResult.txHashes.length > 0
+                    ? 'partial / incomplete'
+                    : 'no (index only — safe to publish next)'}
+                {streamResult.confirmedFrames != null && streamResult.txHashes.length > 0
+                  ? ` · confirmed ${streamResult.confirmedFrames}/${streamResult.frameCount}`
+                  : ''}
+              </p>
+              {streamResult.broadcastError && (
+                <p style={{ color: '#b45309', margin: '0.35rem 0 0' }}>{streamResult.broadcastError}</p>
+              )}
+              {streamResult.txHashes.length > 0 && (
+                <details style={{ marginTop: '0.5rem' }}>
+                  <summary>Tx hashes ({streamResult.txHashes.length})</summary>
+                  <ul style={{ fontSize: '0.75rem', margin: '0.35rem 0 0' }}>
+                    {streamResult.txHashes.map(h => (
+                      <li key={h}>
+                        <code>{h}</code>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+
           <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button
               type="button"
@@ -369,10 +417,20 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
             </button>
             <button
               type="button"
-              className="btn btn-secondary"
-              disabled={busy || !token || !pdfHash || annotations.length === 0}
+              className="btn btn-primary"
+              disabled={
+                busy ||
+                !token ||
+                !pdfHash ||
+                annotations.length === 0 ||
+                Boolean(streamResult?.onChain)
+              }
               onClick={() => void publishStream(true)}
-              title="Requires SERVICE_WALLET_PRIVATE_KEY on the server"
+              title={
+                streamResult?.onChain
+                  ? 'Already fully on-chain'
+                  : 'Broadcast packed frames via service wallet (1 luna each)'
+              }
             >
               Publish stream on-chain
             </button>
@@ -478,9 +536,38 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
               </ul>
             </div>
           )}
-          <button type="button" className="btn btn-primary" onClick={startVerify}>
-            Reconstruct: re-open PDF + pull by hash
-          </button>
+          <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={busy || !token || annotations.length === 0 || streamResult.onChain}
+              onClick={() => void publishStream(true)}
+            >
+              {busy ? <LoaderCircle className="spin" size={16} /> : null}
+              {streamResult.onChain ? 'Already on-chain' : 'Publish stream on-chain'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={busy || !token || annotations.length === 0}
+              onClick={() => void publishStream(false)}
+            >
+              Re-pack (index)
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setError(null)
+                setPhase('annotate')
+              }}
+            >
+              ← Back to editor
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={startVerify}>
+              Reconstruct by hash
+            </button>
+          </div>
         </section>
       )}
 
