@@ -1222,6 +1222,78 @@ body[data-verilock-surface='journey'] .exp-account-menu {
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.05);
 }
 
+/* How-it-works accordion: kill dark navy leftovers inside open card */
+body[data-verilock-surface='journey'] .how-block--open {
+  border-color: rgba(13, 148, 136, 0.28);
+  box-shadow:
+    0 8px 28px rgba(15, 23, 42, 0.05),
+    0 0 0 1px rgba(13, 148, 136, 0.06);
+}
+
+body[data-verilock-surface='journey'] .how-toggle:hover {
+  background: rgba(13, 148, 136, 0.04);
+}
+
+body[data-verilock-surface='journey'] .how-toggle svg:first-child {
+  color: var(--lr-accent);
+}
+
+body[data-verilock-surface='journey'] .how-story-lead,
+body[data-verilock-surface='journey'] .how-beat-privacy,
+body[data-verilock-surface='journey'] .how-beat-step {
+  color: var(--lr-muted);
+}
+
+body[data-verilock-surface='journey'] .how-beat-title,
+body[data-verilock-surface='journey'] .how-beat-blurb {
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .how-beat-verb {
+  color: var(--lr-accent);
+}
+
+body[data-verilock-surface='journey'] .how-visual,
+body[data-verilock-surface='journey'] .how-visual--seal {
+  background:
+    radial-gradient(circle at 30% 25%, rgba(13, 148, 136, 0.1), transparent 55%),
+    #f0fdfa;
+  border-color: rgba(13, 148, 136, 0.16);
+  box-shadow: none;
+}
+
+body[data-verilock-surface='journey'] .how-beat--visible .how-visual {
+  border-color: rgba(13, 148, 136, 0.28);
+  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.1);
+}
+
+body[data-verilock-surface='journey'] .how-beat-dot {
+  color: var(--mint-deep, #0f766e);
+  background: rgba(13, 148, 136, 0.08);
+  border-color: rgba(13, 148, 136, 0.22);
+}
+
+body[data-verilock-surface='journey'] .how-beat--visible .how-beat-dot {
+  background: rgba(13, 148, 136, 0.12);
+  border-color: rgba(13, 148, 136, 0.4);
+  color: var(--lr-accent);
+  box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.08);
+}
+
+body[data-verilock-surface='journey'] .how-beat-line {
+  background: linear-gradient(
+    180deg,
+    rgba(13, 148, 136, 0.4),
+    rgba(13, 148, 136, 0.12) 70%,
+    transparent
+  );
+}
+
+body[data-verilock-surface='journey'] .how-visual-main-icon,
+body[data-verilock-surface='journey'] .how-visual-match {
+  color: var(--lr-accent);
+}
+
 /* Nested login sheet inside dock: no second grey slab.
    .login-sheet--inline hardcodes dark glass gradient — beat it. */
 body[data-verilock-surface='journey'] .action-dock .login-sheet,
