@@ -195,36 +195,203 @@
   pointer-events: none;
 }
 
-.signer-fill-popover {
-  border: 1px solid color-mix(in srgb, var(--person-color, #0f766e) 40%, #e2e8f0);
-  border-radius: 12px;
-  background: #fff;
-  padding: 0.75rem 0.9rem;
-  box-shadow: 0 8px 28px rgb(15 23 42 / 12%);
+.signer-fill-inline-input {
+  width: 100%;
+  max-width: 100%;
+  font-size: 1rem;
+  padding: 0.65rem 0.75rem;
+}
+
+/* Full-screen dimmed modal so the PDF stays in view (no scroll to pad) */
+.signer-fill-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    max(1rem, env(safe-area-inset-top))
+    max(0.85rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom))
+    max(0.85rem, env(safe-area-inset-left));
+  background: rgb(15 23 42 / 52%);
+  animation: signer-modal-fade 0.2s ease both;
+}
+
+.signer-fill-modal-panel {
+  width: min(28rem, 100%);
+  max-height: min(92vh, 40rem);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.05rem 1.05rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--person-color, #0f766e) 28%, #e2e8f0);
+  background: #ffffff;
+  box-shadow:
+    0 24px 64px rgb(15 23 42 / 28%),
+    0 4px 16px rgb(15 23 42 / 10%);
+  outline: none;
+  animation: signer-modal-rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.signer-fill-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.signer-fill-modal-eyebrow {
+  margin: 0 0 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--person-color, #0f766e);
+}
+
+.signer-fill-modal-head h4 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.signer-fill-modal-close {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin: -0.2rem -0.15rem 0 0;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.signer-fill-modal-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.signer-fill-modal-close:focus-visible {
+  outline: 2px solid var(--person-color, #0d9488);
+  outline-offset: 1px;
+}
+
+.signer-fill-modal-body {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
 }
 
-.signer-fill-popover-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.9rem;
+.signer-fill-modal-body .sig-pad-canvas {
+  min-height: 9.5rem;
+  border-radius: 12px;
+  border: 1.5px dashed color-mix(in srgb, var(--person-color, #0f766e) 35%, #cbd5e1);
+  background:
+    linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
 }
 
-.signer-fill-inline-input {
-  width: 100%;
+/* Shorter pad for initials (matches smaller page boxes) */
+.signer-fill-modal-body.is-initial .sig-pad-canvas {
+  min-height: 5.25rem;
+  max-width: 14rem;
+  margin-inline: auto;
+}
+
+.signer-fill-modal-panel:has(.signer-fill-modal-body.is-initial) {
+  width: min(22rem, 100%);
+}
+
+.signer-fill-reuse {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem;
+}
+
+.signer-fill-reuse-preview {
+  display: grid;
+  place-items: center;
+  min-height: 7.5rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background:
+    linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.signer-fill-reuse-preview.is-initial {
+  min-height: 5rem;
+  max-width: 12rem;
+  margin-inline: auto;
+}
+
+.signer-fill-reuse-img {
+  display: block;
   max-width: 100%;
-  font-size: 1rem;
-  padding: 0.55rem 0.65rem;
+  max-height: 6.5rem;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
-.signer-fill-popover-actions {
+.signer-fill-reuse-note {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.signer-fill-modal-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: flex-end;
+  padding-top: 0.15rem;
+}
+
+.signer-fill-modal-actions .btn-primary {
+  min-width: 9rem;
+}
+
+@keyframes signer-modal-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes signer-modal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.65rem) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signer-fill-modal,
+  .signer-fill-modal-panel {
+    animation: none;
+  }
 }
 
 .signer-fill-footer {

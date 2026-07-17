@@ -35,6 +35,9 @@ function kindToWire(kind: string): string {
     case 'signature':
     case 's':
       return 's'
+    case 'initial':
+    case 'i':
+      return 'i'
     case 'name':
     case 'n':
       return 'n'
@@ -56,6 +59,9 @@ function kindFromWire(k: string): string {
   switch (k) {
     case 's':
       return 'signature'
+    case 'i':
+    case 'initial':
+      return 'initial'
     case 'n':
       return 'name'
     case 'x':
@@ -417,10 +423,14 @@ export function lockPlan(input: {
   }
   if (
     !sanitized.plan.slots.some(
-      s => s.kind === 'signature' || s.kind === 'name' || s.kind === 'text',
+      s =>
+        s.kind === 'signature' ||
+        s.kind === 'initial' ||
+        s.kind === 'name' ||
+        s.kind === 'text',
     )
   ) {
-    throw new Error('Add at least one signature, name, or text field before locking')
+    throw new Error('Add at least one signature, initial, name, or text field before locking')
   }
 
   const existing = getPlacementPlan(input.originalSha256)

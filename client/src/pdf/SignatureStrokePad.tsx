@@ -25,6 +25,10 @@ interface SignatureStrokePadProps {
   disabled?: boolean
   /** Override lab default (1.5). */
   epsilon?: number
+  /** Hide RDP / lab instrumentation copy (product signing UI). */
+  productMode?: boolean
+  /** Optional label override (default: Draw your signature). */
+  label?: string
 }
 
 const LINE_WIDTH = 2.25
@@ -37,6 +41,8 @@ export function SignatureStrokePad({
   onChange,
   disabled = false,
   epsilon = SIGNATURE_RDP_EPSILON_PX,
+  productMode = false,
+  label = 'Draw your signature',
 }: SignatureStrokePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawing = useRef(false)
@@ -181,9 +187,9 @@ export function SignatureStrokePad({
   }
 
   return (
-    <div className={`sig-pad${disabled ? ' sig-pad--disabled' : ''}`}>
+    <div className={`sig-pad${disabled ? ' sig-pad--disabled' : ''}${productMode ? ' sig-pad--product' : ''}`}>
       <div className="sig-pad-label-row">
-        <span className="field-label">Draw your signature</span>
+        <span className="field-label">{label}</span>
         <button type="button" className="btn btn-ghost sig-pad-clear" onClick={clear} disabled={disabled}>
           <Eraser size={14} strokeWidth={2.25} aria-hidden />
           Clear
@@ -197,9 +203,13 @@ export function SignatureStrokePad({
         onPointerUp={end}
         onPointerCancel={end}
       />
-      <p className="sig-pad-hint muted">
-        Vector ink with RDP ε={epsilon}px (lab default). PNG is preview only — path is what we keep.
-      </p>
+      {productMode ? (
+        <p className="sig-pad-hint muted">Draw with your finger or mouse. Clear to start over.</p>
+      ) : (
+        <p className="sig-pad-hint muted">
+          Vector ink with RDP ε={epsilon}px (lab default). PNG is preview only — path is what we keep.
+        </p>
+      )}
     </div>
   )
 }

@@ -34,7 +34,7 @@ import './PlacementEditor.css'
 
 const PERSON_COLORS = ['#0f766e', '#b45309', '#1d4ed8', '#7c3aed'] as const
 
-type Tool = 'select' | 'signature' | 'name' | 'text' | 'checkmark' | 'cross'
+type Tool = 'select' | 'signature' | 'initial' | 'name' | 'text' | 'checkmark' | 'cross'
 
 export interface PlacementEditorProps {
   file: File
@@ -55,6 +55,8 @@ function kindLabel(kind: PlacementKind): string {
   switch (kind) {
     case 'signature':
       return 'signature'
+    case 'initial':
+      return 'initial'
     case 'name':
       return 'name'
     case 'text':
@@ -170,6 +172,8 @@ export function PlacementEditor({
 
   const defaultSize = useCallback((kind: PlacementKind) => {
     if (kind === 'signature') return { width: 0.28, height: 0.08 }
+    // Initials: short box (about 1/3 signature width)
+    if (kind === 'initial') return { width: 0.1, height: 0.055 }
     if (kind === 'name') return { width: 0.28, height: 0.045 }
     if (kind === 'text') return { width: 0.28, height: 0.045 }
     return { width: 0.045, height: 0.045 }
@@ -303,26 +307,33 @@ export function PlacementEditor({
     const kind: PlacementKind =
       tool === 'signature'
         ? 'signature'
-        : tool === 'name'
-          ? 'name'
-          : tool === 'text'
-            ? 'text'
-            : tool === 'checkmark'
-              ? 'checkmark'
-              : 'cross'
+        : tool === 'initial'
+          ? 'initial'
+          : tool === 'name'
+            ? 'name'
+            : tool === 'text'
+              ? 'text'
+              : tool === 'checkmark'
+                ? 'checkmark'
+                : 'cross'
 
-    if (kind === 'signature' || kind === 'name') {
+    if (kind === 'signature' || kind === 'initial' || kind === 'name') {
       const personSlots = slots.filter(
         s => s.personSlotIndex === activePerson && s.kind === kind,
       )
-      if (personSlots.length >= 2) {
+      const perPersonMax = kind === 'initial' ? 4 : 2
+      if (personSlots.length >= perPersonMax) {
         setPlaceError(
-          `${activeName} already has ${personSlots.length} ${kind} boxes (max 2).`,
+          `${activeName} already has ${personSlots.length} ${kind} boxes (max ${perPersonMax}).`,
         )
         return
       }
       if (kind === 'signature' && slots.filter(s => s.kind === 'signature').length >= 8) {
         setPlaceError('At most 8 signature lines on one agreement.')
+        return
+      }
+      if (kind === 'initial' && slots.filter(s => s.kind === 'initial').length >= 12) {
+        setPlaceError('At most 12 initial boxes on one agreement.')
         return
       }
       if (kind === 'name' && slots.filter(s => s.kind === 'name').length >= 8) {
@@ -396,7 +407,9 @@ export function PlacementEditor({
 
     patchPlan(p => ({ ...p, slots: [...p.slots, slot] }))
     setSelectedId(slot.id)
-    if (kind === 'signature' || kind === 'name' || kind === 'text') setTool('select')
+    if (kind === 'signature' || kind === 'initial' || kind === 'name' || kind === 'text') {
+      setTool('select')
+    }
     setPlacing(null)
   }
 
@@ -455,7 +468,13 @@ export function PlacementEditor({
 
   const canLock =
     !locked &&
-    slots.some(s => s.kind === 'signature' || s.kind === 'name' || s.kind === 'text') &&
+    slots.some(
+      s =>
+        s.kind === 'signature' ||
+        s.kind === 'initial' ||
+        s.kind === 'name' ||
+        s.kind === 'text',
+    ) &&
     people.length >= 1 &&
     Boolean(onLockRequest)
 
@@ -464,13 +483,15 @@ export function PlacementEditor({
     const kind: PlacementKind =
       placing.type === 'signature'
         ? 'signature'
-        : placing.type === 'name'
-          ? 'name'
-          : placing.type === 'text'
-            ? 'text'
-            : placing.type === 'checkmark'
-              ? 'checkmark'
-              : 'cross'
+        : placing.type === 'initial'
+          ? 'initial'
+          : placing.type === 'name'
+            ? 'name'
+            : placing.type === 'text'
+              ? 'text'
+              : placing.type === 'checkmark'
+                ? 'checkmark'
+                : 'cross'
     const size = defaultSize(kind)
     const w = size.width * cssSize.width
     const h = size.height * cssSize.height
@@ -561,6 +582,9 @@ export function PlacementEditor({
             const nSig = slots.filter(
               s => s.personSlotIndex === p.slotIndex && s.kind === 'signature',
             ).length
+            const nInit = slots.filter(
+              s => s.personSlotIndex === p.slotIndex && s.kind === 'initial',
+            ).length
             const nName = slots.filter(
               s => s.personSlotIndex === p.slotIndex && s.kind === 'name',
             ).length
@@ -646,7 +670,7 @@ export function PlacementEditor({
                       </>
                     )}
                     <span className="muted placement-person-counts">
-                      {nSig} sig · {nName} name · {nText} text
+                      {nSig} sig · {nInit} init · {nName} name · {nText} text
                     </span>
                   </span>
                   {active && <span className="placement-person-active-tag">Active</span>}
@@ -670,6 +694,19 @@ export function PlacementEditor({
         >
           <PenLine size={14} strokeWidth={2.25} aria-hidden />
           Signature
+        </button>
+        <button
+          type="button"
+          className={`btn btn-ghost${tool === 'initial' ? ' is-active' : ''}`}
+          onClick={() => {
+            selectPerson(activePerson)
+            setTool('initial')
+          }}
+          disabled={editDisabled}
+          title={`Place short initials box for ${activeName}`}
+        >
+          <PenLine size={14} strokeWidth={2.25} aria-hidden />
+          Initial
         </button>
         <button
           type="button"
@@ -766,7 +803,7 @@ export function PlacementEditor({
 
       {!locked && (
         <p className="placement-editor-hint muted">
-          Click a person card so it is <strong>Active</strong>, then place signature / name / text
+          Click a person card so it is <strong>Active</strong>, then place signature / initial / name / text
           boxes (color-coded). Click a box to drag or delete it; Esc cancels place mode. Lock when
           the layout is right — boxes cannot move after that.
         </p>
@@ -860,13 +897,15 @@ export function PlacementEditor({
                         : kindLabel(
                             tool === 'signature'
                               ? 'signature'
-                              : tool === 'name'
-                                ? 'name'
-                                : tool === 'text'
-                                  ? 'text'
-                                  : tool === 'checkmark'
-                                    ? 'checkmark'
-                                    : 'cross',
+                              : tool === 'initial'
+                                ? 'initial'
+                                : tool === 'name'
+                                  ? 'name'
+                                  : tool === 'text'
+                                    ? 'text'
+                                    : tool === 'checkmark'
+                                      ? 'checkmark'
+                                      : 'cross',
                           )}
                     </span>
                   </div>
@@ -925,8 +964,9 @@ export function PlacementEditor({
           )}
           <p className="pdf-annotator-hint">
             Total: {slots.length} box{slots.length === 1 ? '' : 'es'} ·{' '}
-            {slots.filter(s => s.kind === 'signature').length} signature line
-            {slots.filter(s => s.kind === 'signature').length === 1 ? '' : 's'}
+            {slots.filter(s => s.kind === 'signature').length} sig ·{' '}
+            {slots.filter(s => s.kind === 'initial').length} initial
+            {slots.filter(s => s.kind === 'initial').length === 1 ? '' : 's'}
           </p>
         </aside>
       </div>

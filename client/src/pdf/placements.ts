@@ -36,7 +36,18 @@ export interface ConstructionPerson {
   walletAddress?: string | null
 }
 
-export type PlacementKind = 'signature' | 'name' | 'text' | 'checkmark' | 'cross'
+export type PlacementKind =
+  | 'signature'
+  | 'initial'
+  | 'name'
+  | 'text'
+  | 'checkmark'
+  | 'cross'
+
+/** Signature and initials are drawn ink; both reuse one stroke across same-kind slots. */
+export function isInkPlacementKind(kind: PlacementKind | string): boolean {
+  return kind === 'signature' || kind === 'initial'
+}
 
 /** Empty template on the page — no ink/text payload until a fill. */
 export interface PlacementSlot {
@@ -234,6 +245,8 @@ export function kindToWire(kind: PlacementKind): string {
   switch (kind) {
     case 'signature':
       return 's'
+    case 'initial':
+      return 'i'
     case 'name':
       return 'n'
     case 'text':
@@ -251,6 +264,9 @@ export function kindFromWire(k: string): PlacementKind {
   switch (k) {
     case 's':
       return 'signature'
+    case 'i':
+    case 'initial':
+      return 'initial'
     case 'n':
       return 'name'
     case 'x':

@@ -2816,6 +2816,7 @@ export function DocumentJourney({
                                         s =>
                                           s.personSlotIndex === personSlot &&
                                           (s.kind === 'signature' ||
+                                            s.kind === 'initial' ||
                                             s.kind === 'name' ||
                                             s.kind === 'text'),
                                       )
