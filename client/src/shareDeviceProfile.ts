@@ -111,15 +111,15 @@ export function buildShareActionPlan(options: {
 /** Short intro under the share card title (PDF in session). */
 export function shareIntroForPlan(plan: ShareActionPlan, pdfName: string): string {
   if (plan.isMobile && plan.webShareFiles) {
-    return `Add the co-signer email if you want Mail pre-filled, then share ${pdfName} with the invite via the system share sheet. VeriLock never hosts the file.`
+    return `Use the invite email above if you want Mail pre-filled, then share ${pdfName} via the system share sheet. VeriLock never hosts the file.`
   }
   if (plan.platform === 'windows') {
-    return `Add the co-signer email, then download the .eml package — Outlook opens a draft with ${pdfName} attached. VeriLock never hosts the file.`
+    return `Use the invite email above, then download the .eml package — Outlook opens a draft with ${pdfName} attached. VeriLock never hosts the file.`
   }
   if (plan.platform === 'mac') {
-    return `Add the co-signer email, then open Mail with To filled and download ${pdfName} to attach. VeriLock never hosts the file.`
+    return `Use the invite email above, then open Mail with To filled and download ${pdfName} to attach. VeriLock never hosts the file.`
   }
-  return `Add the co-signer email, then open your mail app with To filled and download ${pdfName} to attach. VeriLock never hosts the file.`
+  return `Use the invite email above, then open your mail app with To filled and download ${pdfName} to attach. VeriLock never hosts the file.`
 }
 
 /** Hint under the action buttons (PDF in session). */
@@ -154,24 +154,7 @@ export function shareInstructionKinds(plan: ShareActionPlan): ShareInstructionKi
   return ['generic-link-pdf']
 }
 
-/** Label for recipients field when Mail / .eml is relevant. */
-export function shareRecipientsHint(plan: ShareActionPlan): string {
-  if (plan.platform === 'mac') {
-    return 'Apple Mail fills To via compose. Synced from co-signer invite emails above when set.'
-  }
-  if (plan.primary[0] === 'open-mail') {
-    return 'Most desktop clients fill To via compose. Synced from co-signer invite emails above when set.'
-  }
-  if (plan.platform === 'windows' || plan.primary[0] === 'eml') {
-    return 'Used for the .eml To header and for Open in Mail. Synced from co-signer invite emails above when set.'
-  }
-  if (plan.isMobile && plan.webShareFiles) {
-    return 'Optional for the share sheet; required if you use Open in Mail under More. Synced from co-signer invite emails above when set.'
-  }
-  return 'Required for Mail compose. Synced from co-signer invite emails above when set.'
-}
-
-/** Whether the To field is required before the primary action. */
+/** Whether Mail / .eml need invite emails from the Signatures fields above. */
 export function primaryActionRequiresRecipients(plan: ShareActionPlan): boolean {
   const lead = plan.primary[0]
   return lead === 'open-mail' || lead === 'eml'

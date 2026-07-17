@@ -11,13 +11,9 @@
   line-height: 1.45;
 }
 
-.share-recipients {
-  margin-bottom: 0.85rem;
-}
-
-.share-recipients-hint {
-  margin: 0.3rem 0 0;
-  font-size: 0.78rem;
+.share-recipients-summary {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
   line-height: 1.4;
 }
 

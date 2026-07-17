@@ -834,22 +834,34 @@ export function DocumentJourney({
     setSharedAck(true)
   }
 
-  /** Apply cosigner count + optional names from the share-step Signatures UI. */
-  const applyCosigners = async () => {
+  /**
+   * Persist cosigner count + optional names from the share-step Signatures UI.
+   * Called automatically when party count changes or names blur — no Save button.
+   */
+  const applyCosigners = async (overrides?: {
+    requiredSignatures?: number
+    coSignerNames?: string[]
+    notifyEmail?: string
+  }) => {
     if (!token || !doc) return
-    const total = Math.max(1, Math.min(4, requiredSigners))
+    const total = Math.max(
+      1,
+      Math.min(4, overrides?.requiredSignatures ?? requiredSigners),
+    )
+    const names = overrides?.coSignerNames ?? coSignerNames
+    const notifyRaw =
+      overrides?.notifyEmail !== undefined ? overrides.notifyEmail : creatorNotifyEmail
     setBusy(true)
     setLocalError(null)
     try {
       const others = Math.max(0, total - 1)
       const { document } = await api.configureCosigners(token, doc.id, {
         requiredSignatures: total,
-        coSignerNames: coSignerNames.slice(0, others).map(n => n.trim()),
+        coSignerNames: names.slice(0, others).map(n => n.trim()),
       })
       setActiveFromSeal(document, doc.fileSize)
       if (FEATURES.emailNotifyUi) {
-        const email =
-          total > 1 && creatorNotifyEmail.trim() ? creatorNotifyEmail.trim() : null
+        const email = total > 1 && notifyRaw.trim() ? notifyRaw.trim() : null
         try {
           await api.setDocumentNotifyEmail(token, doc.id, email)
         } catch {
@@ -1520,19 +1532,21 @@ export function DocumentJourney({
                             value={Math.max(requiredSigners, signedCount(doc))}
                             onChange={e => {
                               const n = Number(e.target.value)
-                              setRequiredSigners(n)
                               const others = Math.max(0, n - 1)
-                              setCoSignerNames(prev => {
-                                const next = prev.slice(0, others)
-                                while (next.length < others) next.push('')
-                                return next
-                              })
-                              setCoSignerEmails(prev => {
-                                const next = prev.slice(0, others)
-                                while (next.length < others) next.push('')
-                                return next
-                              })
+                              const nextNames = coSignerNames.slice(0, others)
+                              while (nextNames.length < others) nextNames.push('')
+                              const nextEmails = coSignerEmails.slice(0, others)
+                              while (nextEmails.length < others) nextEmails.push('')
+                              setRequiredSigners(n)
+                              setCoSignerNames(nextNames)
+                              setCoSignerEmails(nextEmails)
                               if (n <= 1) setCreatorNotifyEmail('')
+                              // Persist immediately so invite actions appear without a Save step.
+                              void applyCosigners({
+                                requiredSignatures: n,
+                                coSignerNames: nextNames,
+                                notifyEmail: n <= 1 ? '' : creatorNotifyEmail,
+                              })
                             }}
                             disabled={busy}
                           >
@@ -1554,8 +1568,9 @@ export function DocumentJourney({
                               Co-signer detail{requiredSigners - 1 > 1 ? 's' : ''} (optional)
                             </span>
                             <p className="muted" style={{ margin: '0 0 0.45rem', fontSize: '0.8rem' }}>
-                              Name is for your party list. Invite email pre-fills the email package
-                              To field — it stays on this device (not uploaded with the PDF).
+                              Name is for your party list. Invite email is used when you open Mail
+                              or build an email package — it stays on this device (not uploaded with
+                              the PDF).
                             </p>
                             {Array.from({ length: requiredSigners - 1 }, (_, index) => {
                               const rentalOther =
@@ -1589,6 +1604,7 @@ export function DocumentJourney({
                                           return next
                                         })
                                       }}
+                                      onBlur={() => void applyCosigners()}
                                       maxLength={MAX_DISPLAY_NAME_LENGTH}
                                       placeholder={
                                         rentalOther
@@ -1637,6 +1653,11 @@ export function DocumentJourney({
                               type="email"
                               value={creatorNotifyEmail}
                               onChange={e => setCreatorNotifyEmail(e.target.value)}
+                              onBlur={() => {
+                                if (requiredCount(doc) > 1) {
+                                  void applyCosigners({ notifyEmail: creatorNotifyEmail })
+                                }
+                              }}
                               placeholder="you@example.com"
                               autoComplete="email"
                               disabled={busy}
@@ -1648,29 +1669,17 @@ export function DocumentJourney({
                           </label>
                         )}
 
-                        <button
-                          type="button"
-                          className={`btn btn-secondary${busy ? ' btn--busy' : ''}`}
-                          disabled={busy}
-                          onClick={() => void applyCosigners()}
-                        >
-                          {busy ? (
-                            <>
-                              <LoaderCircle
-                                className="btn-spinner"
-                                size={16}
-                                strokeWidth={2.5}
-                              />
-                              Saving…
-                            </>
-                          ) : requiredSigners > requiredCount(doc) ? (
-                            'Add co-signers'
-                          ) : requiredSigners < requiredCount(doc) ? (
-                            'Update signatures'
-                          ) : (
-                            'Save signature settings'
-                          )}
-                        </button>
+                        {busy && (
+                          <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                            <LoaderCircle
+                              className="btn-spinner"
+                              size={14}
+                              strokeWidth={2.5}
+                              style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6 }}
+                            />
+                            Updating signatures…
+                          </p>
+                        )}
                       </div>
                     )}
                   </section>
@@ -1715,10 +1724,10 @@ export function DocumentJourney({
                     <button
                       type="button"
                       className="btn btn-primary btn-lg"
-                      disabled={requiredSigners !== requiredCount(doc)}
+                      disabled={busy || requiredSigners !== requiredCount(doc)}
                       title={
                         requiredSigners !== requiredCount(doc)
-                          ? 'Save signature settings (or set parties back to 1) before sealing'
+                          ? 'Wait for signature settings to update, or set parties back to 1'
                           : undefined
                       }
                       onClick={acknowledgeShare}
