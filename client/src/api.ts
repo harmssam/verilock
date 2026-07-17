@@ -99,6 +99,118 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  /** Construction placement plan (structure + roots). lock freezes geometry. */
+  savePlacementPlan: (
+    token: string,
+    body: {
+      originalSha256: string
+      plan: unknown
+      documentId?: string
+      lock?: boolean
+      planRoot?: string
+      batch0FramesHex?: string[]
+      batch0Root?: string
+    },
+  ) =>
+    request<{
+      originalSha256: string
+      documentId: string | null
+      creatorAddress: string
+      status: 'draft' | 'locked'
+      planRoot: string | null
+      batch0Root: string | null
+      slotCount: number
+      personCount: number
+      lockedAt: number | null
+      plan: {
+        pdfSha256: string
+        people: Array<{ slotIndex: number; displayName: string; role?: string }>
+        slots: unknown[]
+        status: 'draft' | 'locked'
+        planRoot?: string
+        lockedAt?: number
+      } | null
+      hasBatch0Frames: boolean
+      batch0FrameCount: number
+    }>('/api/placement-plans', {
+      method: 'POST',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+
+  getPlacementPlan: (sha256: string) =>
+    request<{
+      originalSha256: string
+      status: 'draft' | 'locked'
+      planRoot: string | null
+      batch0Root: string | null
+      slotCount: number
+      personCount: number
+      lockedAt: number | null
+      plan: {
+        pdfSha256: string
+        people: Array<{
+          slotIndex: number
+          displayName: string
+          role?: string
+          walletAddress?: string | null
+        }>
+        slots: Array<{
+          id: string
+          personSlotIndex: number
+          kind: string
+          pageIndex: number
+          x: number
+          y: number
+          width: number
+          height: number
+          lockedContent?: {
+            text?: string
+            mark?: 'checkmark' | 'cross'
+            fontSizeRatio?: number
+            color?: string
+          }
+        }>
+        status: 'draft' | 'locked'
+        planRoot?: string
+        lockedAt?: number
+        creatorSigningAs?: number | null
+      } | null
+      hasBatch0Frames: boolean
+      batch0FrameCount: number
+      fillBatchCount?: number
+      lastBatchRoot?: string | null
+      filledSlotIds?: string[]
+      knownBlobIds?: string[]
+    }>(`/api/placement-plans/${sha256.toLowerCase()}`),
+
+  appendPlacementFill: (
+    token: string,
+    sha256: string,
+    body: {
+      personSlotIndex: number
+      prevRoot: string
+      batchRoot: string
+      batchIndex: number
+      framesHex?: string[]
+      fills: Array<{ slotId: string; blobId: string; personSlotIndex: number }>
+      blobIds: string[]
+    },
+  ) =>
+    request<{
+      originalSha256: string
+      status: 'draft' | 'locked'
+      planRoot: string | null
+      lastBatchRoot?: string | null
+      filledSlotIds?: string[]
+      knownBlobIds?: string[]
+      fillBatchCount?: number
+    }>(`/api/placement-plans/${sha256.toLowerCase()}/fills`, {
+      method: 'POST',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+
   /** Experiment: pack annotations into 64B frames, index by PDF hash, optional on-chain broadcast. */
   publishAnnotationStream: (
     token: string,
@@ -193,6 +305,21 @@ export const api = {
       body: JSON.stringify({ email }),
     }),
 
+  /** Creator: send branded invite email (personal link, no PDF). Requires Resend enabled. */
+  sendPartyInviteEmail: (
+    token: string,
+    docId: string,
+    body: { partyId: string; to: string },
+  ) =>
+    request<{ ok: boolean; id: string; to: string; partyId: string }>(
+      `/api/documents/${docId}/invite-email`,
+      {
+        method: 'POST',
+        headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    ),
+
   /** Creator share step: set total required signatures (1–4) and optional co-signer names. */
   configureCosigners: (
     token: string,
@@ -201,6 +328,21 @@ export const api = {
   ) =>
     request<{ document: SealDocument }>(`/api/documents/${docId}/cosigners`, {
       method: 'PATCH',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+
+  /** Rebuild parties from construction people; creator may claim one slot or none. */
+  configureSigningRoster: (
+    token: string,
+    docId: string,
+    body: {
+      parties: Array<{ displayName: string; role?: string; walletAddress?: string | null }>
+      creatorSignsAsIndex: number | null
+    },
+  ) =>
+    request<{ document: SealDocument }>(`/api/documents/${docId}/signing-roster`, {
+      method: 'PUT',
       headers: { ...withAuth(token), 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }),

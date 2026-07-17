@@ -1,5 +1,3 @@
-import { FileQuestion } from 'lucide-react'
-
 interface NotFoundPageProps {
   title?: string
   message?: string
@@ -19,9 +17,15 @@ export function NotFoundPage({
 }: NotFoundPageProps) {
   return (
     <section className="not-found-page card" aria-labelledby="not-found-title">
-      <div className="not-found-icon" aria-hidden>
-        <FileQuestion size={28} strokeWidth={1.75} />
-      </div>
+      <img
+        className="not-found-logo"
+        src="/verilock-mark.png"
+        alt=""
+        width={72}
+        height={72}
+        decoding="async"
+      />
+      <p className="not-found-kicker">Page not found</p>
       <h2 id="not-found-title">{title}</h2>
       <p className="muted not-found-message">{message}</p>
       {path ? (

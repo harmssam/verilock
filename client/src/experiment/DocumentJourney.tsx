@@ -12,6 +12,22 @@ import {
   type PdfAnnotation,
 } from '../pdf/annotations'
 import { estimateStreamStats } from '../pdf/annotationStream'
+import {
+  buildFillBatch,
+  collectKnownBlobIds,
+  computePlanRoot,
+  emptyPlan,
+  lockPlan,
+  newSlotId,
+} from '../pdf/placements'
+import {
+  computeBatchRoot,
+  expandMergedToAnnotations,
+  mergePlacementBatches,
+  packLockedPlan,
+  packPlacementBatch,
+  unpackPlacementBatch,
+} from '../pdf/placementStream'
 import { PdfAnnotator } from '../pdf/PdfAnnotator'
 import { PdfReconstructor } from '../pdf/PdfReconstructor'
 import { getPdfPageCount, sha256Hex, shortHash } from '../pdf/hashPdf'
@@ -66,6 +82,18 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
     chainError?: string
     chainSampleOk?: boolean
     integrityOk?: boolean
+  } | null>(null)
+  /** Local-only v2 placement packer demo (plan lock + fill dedup). */
+  const [placementDemo, setPlacementDemo] = useState<{
+    planRoot: string
+    planFrames: number
+    fillFrames: number
+    blobCount: number
+    fillCount: number
+    dedupSavedBlobs: number
+    reconstructed: number
+    batchRoot0: string
+    batchRoot1: string
   } | null>(null)
 
   const streamPreview = useMemo(() => {
@@ -273,6 +301,131 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
     }
   }, [lastPostBody])
 
+  /**
+   * Lab: lock a synthetic two-person plan and pack a fill where two signature
+   * slots share one ink blob (dedup). Client-only — no server publish yet.
+   */
+  const runPlacementDemo = useCallback(async () => {
+    if (!pdfHash) {
+      setError('Select a PDF first (hash required for packer).')
+      return
+    }
+    setError(null)
+    setBusy(true)
+    setBusyLabel('Packing placement plan + fill (v2)…')
+    try {
+      let plan = emptyPlan(pdfHash, 2)
+      plan = {
+        ...plan,
+        people: [
+          { slotIndex: 1, displayName: 'Tom' },
+          { slotIndex: 2, displayName: 'Alex' },
+        ],
+        slots: [
+          {
+            id: newSlotId(),
+            personSlotIndex: 1,
+            kind: 'signature',
+            pageIndex: 0,
+            x: 0.1,
+            y: 0.72,
+            width: 0.35,
+            height: 0.08,
+          },
+          {
+            id: newSlotId(),
+            personSlotIndex: 1,
+            kind: 'name',
+            pageIndex: 0,
+            x: 0.1,
+            y: 0.82,
+            width: 0.35,
+            height: 0.04,
+          },
+          {
+            id: newSlotId(),
+            personSlotIndex: 2,
+            kind: 'signature',
+            pageIndex: 0,
+            x: 0.55,
+            y: 0.72,
+            width: 0.35,
+            height: 0.08,
+          },
+        ],
+      }
+      const planRoot = await computePlanRoot(plan)
+      const locked = lockPlan(plan, planRoot)
+      const packed0 = await packLockedPlan(locked)
+      const known = collectKnownBlobIds([packed0.batch])
+
+      const inkPath = {
+        epsilon: 1.5,
+        lineWidthRatio: 0.02,
+        strokes: [
+          {
+            points: Array.from({ length: 16 }, (_, i) => ({
+              x: i / 15,
+              y: 0.45 + 0.1 * Math.sin(i / 2),
+            })),
+          },
+        ],
+      }
+      const sigSlots = locked.slots.filter(s => s.kind === 'signature')
+      const nameSlot = locked.slots.find(s => s.kind === 'name')
+      const fillBatch = await buildFillBatch({
+        batchIndex: 1,
+        prevRoot: packed0.batchRoot,
+        pdfSha256: pdfHash,
+        planRoot,
+        knownBlobIds: known,
+        fills: [
+          ...sigSlots.map(s => ({
+            slotId: s.id,
+            personSlotIndex: s.personSlotIndex,
+            payload: { kind: 'ink' as const, path: inkPath },
+          })),
+          ...(nameSlot
+            ? [
+                {
+                  slotId: nameSlot.id,
+                  personSlotIndex: nameSlot.personSlotIndex,
+                  payload: { kind: 'text' as const, text: 'Tom Demo' },
+                },
+              ]
+            : []),
+        ],
+      })
+      const fillRoot = await computeBatchRoot(fillBatch)
+      const fillWithRoot = { ...fillBatch, batchRoot: fillRoot }
+      const fillFrames = packPlacementBatch(fillWithRoot)
+      await unpackPlacementBatch(fillFrames)
+      const merged = await mergePlacementBatches([
+        { ...packed0.batch, batchRoot: packed0.batchRoot },
+        fillWithRoot,
+      ])
+      const anns = expandMergedToAnnotations(merged)
+      const withoutDedup = sigSlots.length + (nameSlot ? 1 : 0)
+      setPlacementDemo({
+        planRoot,
+        planFrames: packed0.frames.length,
+        fillFrames: fillFrames.length,
+        blobCount: fillBatch.blobs.length,
+        fillCount: fillBatch.fills.length,
+        dedupSavedBlobs: withoutDedup - fillBatch.blobs.length,
+        reconstructed: anns.length,
+        batchRoot0: packed0.batchRoot,
+        batchRoot1: fillRoot,
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Placement demo failed')
+      setPlacementDemo(null)
+    } finally {
+      setBusy(false)
+      setBusyLabel(null)
+    }
+  }, [pdfHash])
+
   return (
     <div className="journey experiment-journey" style={{ padding: '1rem', maxWidth: 1100, margin: '0 auto' }}>
       <header style={{ marginBottom: '1rem' }}>
@@ -286,6 +439,8 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
           <a href="/pdf/lab" style={{ color: '#0f766e' }}>
             Signature encoding lab →
           </a>
+          {' · '}
+          <span className="muted">v2 placement: BLOB/PLACE/FILL + dedup (client packer)</span>
         </p>
       </header>
 
@@ -382,6 +537,49 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
               </ul>
             </div>
           )}
+
+          <div
+            style={{
+              marginTop: '1rem',
+              padding: '0.75rem',
+              background: '#f8fafc',
+              borderRadius: 8,
+              fontSize: '0.8125rem',
+              border: '1px solid rgba(15, 23, 42, 0.08)',
+            }}
+          >
+            <strong>Placement construction v2 (local packer)</strong>
+            <p className="muted" style={{ margin: '0.35rem 0' }}>
+              Locks a Tom/Alex plan (sig+name slots), then packs a fill where both signature lines share one
+              ink blob. No server call — validates BLOB/PLACE/FILL + dedup before journey UI.
+            </p>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={busy || !pdfHash}
+              onClick={() => void runPlacementDemo()}
+            >
+              Pack plan + fill (dedup demo)
+            </button>
+            {placementDemo && (
+              <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
+                <li>
+                  planRoot <code>{shortHash(placementDemo.planRoot)}</code> · batch0{' '}
+                  <code>{shortHash(placementDemo.batchRoot0)}</code> · batch1{' '}
+                  <code>{shortHash(placementDemo.batchRoot1)}</code>
+                </li>
+                <li>
+                  Frames: plan {placementDemo.planFrames} + fill {placementDemo.fillFrames} (v2, 64 B each)
+                </li>
+                <li>
+                  Blobs on wire: <strong>{placementDemo.blobCount}</strong> · fills:{' '}
+                  {placementDemo.fillCount} · dedup saved {placementDemo.dedupSavedBlobs} blob
+                  {placementDemo.dedupSavedBlobs === 1 ? '' : 's'}
+                </li>
+                <li>Reconstructed paint ops: {placementDemo.reconstructed}</li>
+              </ul>
+            )}
+          </div>
 
           {streamResult && pdfHash && (
             <div

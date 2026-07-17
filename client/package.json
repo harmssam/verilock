@@ -8,6 +8,7 @@
     "build": "node scripts/package.mjs",
     "build:app": "tsc -b && vite build",
     "test:production": "node scripts/verify-production.mjs",
+    "test:placement": "node scripts/test-placement-stream.mjs",
     "package:service-b": "node scripts/package.mjs",
     "test:service-b": "node scripts/verify-production.mjs",
     "preview": "vite preview"

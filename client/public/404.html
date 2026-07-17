@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" href="/verilock-mark-96.png" />
     <style>
       :root {
-        color-scheme: dark;
+        color-scheme: light;
       }
 
       * {
@@ -22,52 +22,86 @@
         display: grid;
         place-items: center;
         padding: 2rem;
-        font-family: 'Figtree', system-ui, sans-serif;
-        background: #0d112e;
-        color: #eef3ff;
+        font-family: 'Figtree', system-ui, -apple-system, sans-serif;
+        background:
+          radial-gradient(ellipse 70% 45% at 10% -5%, rgba(13, 148, 136, 0.07), transparent 55%),
+          radial-gradient(ellipse 50% 40% at 100% 0%, rgba(15, 118, 110, 0.05), transparent 50%),
+          linear-gradient(180deg, #ffffff 0%, #fafdfc 40%, #f7fcfb 100%);
+        color: #0f172a;
       }
 
       main {
         max-width: 28rem;
         text-align: center;
+        padding: 1.75rem 1.5rem;
+        border: 1px solid rgba(15, 23, 42, 0.09);
+        border-radius: 14px;
+        background: #ffffff;
+        box-shadow: 0 10px 36px rgba(15, 23, 42, 0.05);
       }
 
       img {
-        width: 4rem;
-        height: 4rem;
-        margin-bottom: 1.25rem;
+        width: 3.5rem;
+        height: 3.5rem;
+        margin-bottom: 1rem;
+        object-fit: contain;
+        filter: drop-shadow(0 2px 6px rgba(13, 148, 136, 0.2));
+      }
+
+      .kicker {
+        margin: 0 0 0.45rem;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #0d9488;
       }
 
       h1 {
-        margin: 0 0 0.5rem;
+        margin: 0 0 0.55rem;
         font-family: 'Bricolage Grotesque', system-ui, sans-serif;
-        font-size: 1.75rem;
+        font-size: 1.5rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
       }
 
       p {
         margin: 0;
-        color: #8fa3c4;
+        color: #4b5c6b;
         line-height: 1.6;
+        font-size: 0.95rem;
       }
 
       a {
         display: inline-block;
-        margin-top: 1.5rem;
-        color: #5eead4;
+        margin-top: 1.35rem;
+        padding: 0.65rem 1.15rem;
+        border-radius: 12px;
+        background: #0d9488;
+        color: #ffffff;
         text-decoration: none;
         font-weight: 600;
+        font-size: 0.95rem;
+        box-shadow: 0 6px 16px rgba(13, 148, 136, 0.2);
       }
 
       a:hover {
-        text-decoration: underline;
+        background: #0f766e;
+      }
+
+      a:focus-visible {
+        outline: 2px solid rgba(13, 148, 136, 0.45);
+        outline-offset: 2px;
       }
     </style>
   </head>
   <body>
     <main>
-      <img src="/verilock-mark-96.png" alt="" width="64" height="64" decoding="async" />
-      <h1>Page not found</h1>
-      <p>That link doesn&apos;t exist. Redirecting you to VeriLock&hellip;</p>
+      <img src="/verilock-mark.png" alt="" width="56" height="56" decoding="async" />
+      <p class="kicker">Page not found</p>
+      <h1>This link is not valid</h1>
+      <p>That page doesn&apos;t exist on VeriLock. Redirecting you home&hellip;</p>
       <a href="/">Go home now</a>
     </main>
     <script>

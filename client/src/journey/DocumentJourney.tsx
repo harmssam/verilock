@@ -11,7 +11,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { normalizeAddress } from '../addresses'
+import { isValidNimiqAddress, normalizeAddress, shortAddress } from '../addresses'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
 import {
   canDeleteDocument,
@@ -71,13 +71,26 @@ import {
 import { formatFileSize } from './PdfDropZone'
 import { SignaturePad } from './SignaturePad'
 import { StageRail } from './StageRail'
-import { PdfAnnotator } from '../pdf/PdfAnnotator'
-import type { PdfAnnotation } from '../pdf/annotations'
+import { PlacementEditor } from '../pdf/PlacementEditor'
+import { SignerFillView, type SignerFillResult } from '../pdf/SignerFillView'
+import {
+  buildFillBatch,
+  computePlanRoot,
+  emptyPlan,
+  lockPlan as lockConstructionPlanLocal,
+  type ConstructionPlan,
+  type PlacementSlot,
+} from '../pdf/placements'
+import {
+  computeBatchRoot,
+  framesToHex,
+  packLockedPlan,
+  packPlacementBatch,
+} from '../pdf/placementStream'
 import { saveHubReturnPath } from '../hubReturnPath'
 import { journeyPathMeta, type PageMeta } from '../seo'
 import {
   allSigned,
-  nextUnsignedParty,
   requiredCount,
   signedCount,
   stagesForRole,
@@ -171,8 +184,6 @@ export function DocumentJourney({
   /** Optional ready-to-seal email — collected only when FEATURES.emailNotifyUi is on. */
   const [creatorNotifyEmail, setCreatorNotifyEmail] = useState('')
   const [docType, setDocType] = useState<DocumentType>('contract')
-  /** Rental only: creator’s party role. */
-  const [creatorRole, setCreatorRole] = useState<'landlord' | 'tenant'>('landlord')
   /** Optional display names for other parties (index 0 = first co-signer). */
   const [coSignerNames, setCoSignerNames] = useState<string[]>([''])
   /** Client-only invite emails for co-signers — prefill Share .eml To; never uploaded with the PDF. */
@@ -189,10 +200,23 @@ export function DocumentJourney({
   const [signerName, setSignerName] = useState('')
   const [sigBlob, setSigBlob] = useState<Blob | null>(null)
   const [sigPadKey, setSigPadKey] = useState(0)
-  /** PDF page overlays (step 3 Mark & share) — local + optional stream pack. */
-  const [annotations, setAnnotations] = useState<PdfAnnotation[]>([])
-  const [marksBusy, setMarksBusy] = useState(false)
-  const [marksStatus, setMarksStatus] = useState<string | null>(null)
+  /** Construction placements (Arrange step) — empty slots until lock; then immutable. */
+  const [constructionPlan, setConstructionPlan] = useState<ConstructionPlan | null>(null)
+  /** idle → loading → ready (has plan) | none (404 / no plan). Avoids draft-seed race. */
+  const [planLoadState, setPlanLoadState] = useState<'idle' | 'loading' | 'ready' | 'none'>('idle')
+  const [placementLockBusy, setPlacementLockBusy] = useState(false)
+  const [placementStatus, setPlacementStatus] = useState<string | null>(null)
+  const [filledSlotIds, setFilledSlotIds] = useState<Set<string>>(() => new Set())
+  const [knownBlobIds, setKnownBlobIds] = useState<Set<string>>(() => new Set())
+  const [lastBatchRoot, setLastBatchRoot] = useState<string | null>(null)
+  const [pageFieldsConfirmed, setPageFieldsConfirmed] = useState(false)
+  const [fillBusy, setFillBusy] = useState(false)
+  /** Invitee chose a name-only party (or from ?party= link). */
+  const [pickedPartyId, setPickedPartyId] = useState<string | null>(null)
+  /** partyId → last invite send status for UI feedback */
+  const [inviteSendBusyId, setInviteSendBusyId] = useState<string | null>(null)
+  const [inviteSendNote, setInviteSendNote] = useState<Record<string, string>>({})
+  const [emailSendEnabled, setEmailSendEnabled] = useState(false)
   const [verifyFile, setVerifyFile] = useState<File | null>(null)
   const [verifyOutcome, setVerifyOutcome] = useState<VerifyOutcome>({ kind: 'idle' })
   const [howOpen, setHowOpen] = useState(false)
@@ -432,24 +456,60 @@ export function DocumentJourney({
       if (doc.sealed || meSigned || allSigned(doc)) return 'done'
       return 'sign'
     }
-    // Creator path: fingerprint → sign (you) → share (signatures / co-signers) → seal → done
+    // Creator path: add PDF → arrange → sign (if organizer is a party) → invite → seal
     if (!doc) return 'fingerprint'
     if (doc.sealed) return 'done'
     if (doc.directSeal) return 'seal'
-    // Sign first while this wallet can still take a party slot
+    // Construction first (when UI on): lock placements before any wallet signature.
+    // Wait for plan GET before treating as unlocked draft (avoids flash / wrong step).
+    if (FEATURES.pdfAnnotationUi && planLoadState === 'loading' && signedCount(doc) === 0) {
+      return 'share'
+    }
+    const needsArrange =
+      FEATURES.pdfAnnotationUi &&
+      planLoadState !== 'loading' &&
+      constructionPlan?.status !== 'locked' &&
+      signedCount(doc) === 0
+    if (needsArrange) return 'share'
+
+    // Only the *document creator* who chose “not signing” is blocked from open-slot claim.
+    // Invitees must still claim open parties.
+    const creatorBlocksOpenClaim =
+      FEATURES.pdfAnnotationUi &&
+      constructionPlan?.status === 'locked' &&
+      (constructionPlan.creatorSigningAs == null ||
+        constructionPlan.creatorSigningAs === 0) &&
+      Boolean(address && isDocumentCreator(doc.source, address))
+
     if (address) {
-      const resolution = resolveSigningParty(doc.source, address)
+      const resolution = resolveSigningParty(doc.source, address, {
+        allowOpenClaim: !creatorBlocksOpenClaim,
+      })
       if (resolution.ok) return 'sign'
-    } else if (signedCount(doc) === 0) {
+    } else if (
+      signedCount(doc) === 0 &&
+      !(
+        FEATURES.pdfAnnotationUi &&
+        constructionPlan?.status === 'locked' &&
+        (constructionPlan.creatorSigningAs == null ||
+          constructionPlan.creatorSigningAs === 0)
+      )
+    ) {
       return 'sign'
     }
-    // Waiting on co-signers
+    // Waiting on invitees / progress (organizer lands here after lock if not signing)
     if (!allSigned(doc)) return 'share'
-    // Solo after your signature: land on share once so you can add co-signers or continue to seal.
-    // multi complete → seal. sharedAck / preferSeal skip the solo stop.
     if (requiredCount(doc) <= 1 && !sharedAck) return 'share'
     return 'seal'
-  }, [role, doc, address, sharedAck])
+  }, [
+    role,
+    doc,
+    address,
+    sharedAck,
+    constructionPlan?.status,
+    constructionPlan?.creatorSigningAs,
+    planLoadState,
+  ])
 
   const pathStages = useMemo(() => stagesForRole(role), [role])
 
@@ -508,14 +568,67 @@ export function DocumentJourney({
 
   const stepIndex = activeStage ? pathStages.findIndex(s => s.id === activeStage.id) : -1
 
+  /** Creator opted out of signing — only blocks *this* wallet, never invitees. */
+  const creatorIsOrganizerOnly =
+    FEATURES.pdfAnnotationUi &&
+    constructionPlan?.status === 'locked' &&
+    (constructionPlan.creatorSigningAs == null || constructionPlan.creatorSigningAs === 0) &&
+    Boolean(doc && address && isDocumentCreator(doc.source, address))
+
+  /** Per-person invite: /d/:slug?party=<partyId> */
+  const preferredPartyFromUrl = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const q = new URLSearchParams(window.location.search).get('party')
+      return q?.trim() || null
+    } catch {
+      return null
+    }
+  }, [doc?.id, navEpoch])
+
+  const effectivePreferredPartyId = pickedPartyId || preferredPartyFromUrl
+
   const signingResolution =
-    doc && address ? resolveSigningParty(doc.source, address) : null
+    doc && address
+      ? resolveSigningParty(doc.source, address, {
+          allowOpenClaim: !creatorIsOrganizerOnly,
+          preferredPartyId: effectivePreferredPartyId,
+        })
+      : null
   const pendingParty =
     signingResolution?.ok
-      ? doc!.parties.find(p => p.id === signingResolution.party.id) ?? nextUnsignedParty(doc!)
-      : doc && !doc.directSeal
-        ? nextUnsignedParty(doc)
-        : null
+      ? doc!.parties.find(p => p.id === signingResolution.party.id) ?? null
+      : null
+
+  /** Invite targets: all parties when organizer does not sign; else everyone except the creator slot. */
+  const inviteeSlotCount = useMemo(() => {
+    if (!doc) return 0
+    const need = requiredCount(doc)
+    if (
+      FEATURES.pdfAnnotationUi &&
+      constructionPlan?.status === 'locked' &&
+      (constructionPlan.creatorSigningAs == null || constructionPlan.creatorSigningAs === 0)
+    ) {
+      return Math.max(0, need)
+    }
+    return Math.max(0, need - 1)
+  }, [doc, constructionPlan?.status, constructionPlan?.creatorSigningAs])
+
+  // Resend invite capability (server RESEND_ENABLED)
+  useEffect(() => {
+    let cancelled = false
+    void api
+      .features()
+      .then(f => {
+        if (!cancelled) setEmailSendEnabled(Boolean(f.emailNotifySendEnabled))
+      })
+      .catch(() => {
+        if (!cancelled) setEmailSendEnabled(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Hash PDF on select (create path)
   useEffect(() => {
@@ -712,8 +825,8 @@ export function DocumentJourney({
     setCreatorName('')
     setCreatorNotifyEmail('')
     setDocType('contract')
-    setCreatorRole('landlord')
     setCoSignerNames([''])
+    setCoSignerEmails([''])
     setDocNotes('')
     setRequiredSigners(1)
     setDoc(null)
@@ -723,6 +836,14 @@ export function DocumentJourney({
     setSignerName('')
     setSigBlob(null)
     setSigPadKey(k => k + 1)
+    setConstructionPlan(null)
+    setPlanLoadState('idle')
+    setFilledSlotIds(new Set())
+    setKnownBlobIds(new Set())
+    setLastBatchRoot(null)
+    setPageFieldsConfirmed(false)
+    setPlacementStatus(null)
+    setPickedPartyId(null)
     setVerifyFile(null)
     setVerifyOutcome({ kind: 'idle' })
     verifyCacheRef.current = null
@@ -784,14 +905,10 @@ export function DocumentJourney({
 
   const createDoc = async () => {
     if (!token || !pdfFile || !pdfHash) return
-    if (!creatorName.trim()) {
-      setLocalError('Enter your full name before creating the agreement')
-      return
-    }
     setBusy(true)
     setLocalError(null)
     try {
-      // Always start solo. Co-signers are configured on the share step (Signatures).
+      // Fingerprint only — parties / who signs are set when placements lock.
       const metadata =
         documentTypeUsesNotes(docType) && docNotes.trim()
           ? { notes: clampField(docNotes.trim(), MAX_DOCUMENT_NOTES_LENGTH) }
@@ -801,21 +918,25 @@ export function DocumentJourney({
         title: clampField(title || pdfFile.name.replace(/\.pdf$/i, ''), MAX_TITLE_LENGTH),
         originalFileName: pdfFile.name,
         type: docType,
-        creatorRole: docType === 'rental' ? creatorRole : 'creator',
-        creatorDisplayName: clampField(creatorName.trim(), MAX_DISPLAY_NAME_LENGTH),
+        creatorRole: 'creator',
+        // Optional organizer label only — not assumed to be Person 1 / a signer.
+        creatorDisplayName: clampField(
+          creatorName.trim() || 'Organizer',
+          MAX_DISPLAY_NAME_LENGTH,
+        ),
         originalSha256: pdfHash,
         pageCount,
         requiredSignatures: 1,
         ...(metadata ? { metadata } : {}),
-        ...(annotations.length > 0 ? { annotations } : {}),
       })
 
       if (hashWarning) setLocalError(hashWarning)
       setActiveFromSeal(document, pdfFile.size)
       setSharedAck(false)
-      // Keep create-time PDF available for the creator’s own sign step
       setSignFile(pdfFile)
       setSignHash(pdfHash)
+      setConstructionPlan(emptyPlan(pdfHash, 2))
+      setPageFieldsConfirmed(false)
       window.history.pushState({}, '', `/d/${document.slug}`)
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Create failed')
@@ -838,6 +959,328 @@ export function DocumentJourney({
       return false
     }
   }
+
+  /** Load placement plan for this PDF fingerprint (structure only). */
+  useEffect(() => {
+    if (!FEATURES.pdfAnnotationUi || !doc?.fingerprint) {
+      setPlanLoadState('idle')
+      return
+    }
+    let cancelled = false
+    setPlanLoadState('loading')
+    void api
+      .getPlacementPlan(doc.fingerprint)
+      .then(r => {
+        if (cancelled) return
+        if (!r.plan) {
+          setPlanLoadState('none')
+          return
+        }
+        const slots: PlacementSlot[] = (r.plan.slots ?? []).map(s => ({
+          id: s.id,
+          personSlotIndex: s.personSlotIndex,
+          kind: (s.kind as PlacementSlot['kind']) || 'signature',
+          pageIndex: s.pageIndex,
+          x: s.x,
+          y: s.y,
+          width: s.width,
+          height: s.height,
+          ...(s.lockedContent ? { lockedContent: s.lockedContent } : {}),
+        }))
+        const planPeople =
+          r.plan.people?.length > 0
+            ? r.plan.people.map(p => ({
+                slotIndex: p.slotIndex,
+                displayName: p.displayName,
+                ...(p.role ? { role: p.role } : {}),
+                ...(p.walletAddress
+                  ? { walletAddress: normalizeAddress(p.walletAddress) }
+                  : { walletAddress: null }),
+              }))
+            : emptyPlan(doc.fingerprint, 2).people
+        setConstructionPlan({
+          pdfSha256: r.plan.pdfSha256 || doc.fingerprint,
+          people: planPeople,
+          slots,
+          status: r.status === 'locked' ? 'locked' : 'draft',
+          creatorSigningAs: r.plan.creatorSigningAs ?? null,
+          ...(r.lockedAt != null ? { lockedAt: r.lockedAt } : {}),
+          ...(r.planRoot ? { planRoot: r.planRoot } : {}),
+        })
+        if (planPeople.length) {
+          setRequiredSigners(Math.max(1, Math.min(4, planPeople.length)))
+        }
+        setFilledSlotIds(new Set(r.filledSlotIds ?? []))
+        setKnownBlobIds(new Set(r.knownBlobIds ?? []))
+        setLastBatchRoot(r.lastBatchRoot ?? r.batch0Root ?? r.planRoot ?? null)
+        setPlanLoadState('ready')
+      })
+      .catch(() => {
+        if (cancelled) return
+        /* 404 / no plan yet */
+        setPlanLoadState('none')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [doc?.id, doc?.fingerprint])
+
+  /**
+   * Seed a draft plan only after we know the server has none (create / arrange path).
+   * Never overwrite while loading — that forced invitees into “unlocked arrange” flash.
+   */
+  useEffect(() => {
+    if (!FEATURES.pdfAnnotationUi || !doc) return
+    if (constructionPlan) return
+    if (planLoadState !== 'none') return
+    if (role !== 'creator') return
+    const hash = (pdfHash || signHash || doc.fingerprint || '').toLowerCase()
+    if (!/^[a-f0-9]{64}$/.test(hash)) return
+    setConstructionPlan(emptyPlan(hash, Math.max(2, requiredSigners)))
+  }, [doc, constructionPlan, pdfHash, signHash, requiredSigners, planLoadState, role])
+
+  /** Map signing party → construction person (1-based). */
+  const personSlotForParty = useCallback(
+    (partyId: string | undefined | null): number => {
+      if (!doc || !partyId) return 1
+      // Creator explicitly chose a person slot on Arrange
+      if (
+        constructionPlan?.creatorSigningAs != null &&
+        constructionPlan.creatorSigningAs > 0 &&
+        address &&
+        isDocumentCreator(doc.source, address)
+      ) {
+        const party = doc.parties.find(p => p.id === partyId)
+        if (
+          party?.walletAddress &&
+          normalizeAddress(party.walletAddress) === normalizeAddress(address)
+        ) {
+          return constructionPlan.creatorSigningAs
+        }
+      }
+      if (constructionPlan?.people?.length) {
+        const party = doc.parties.find(p => p.id === partyId)
+        const name = party?.displayName?.trim().toLowerCase()
+        if (name) {
+          const byName = constructionPlan.people.find(
+            p => p.displayName.trim().toLowerCase() === name,
+          )
+          if (byName) return byName.slotIndex
+        }
+        // Match by party order among required parties
+        const required = doc.parties.filter(p => p.required)
+        const idx = required.findIndex(p => p.id === partyId)
+        if (idx >= 0 && constructionPlan.people[idx]) {
+          return constructionPlan.people[idx]!.slotIndex
+        }
+      }
+      const required = doc.parties.filter(p => p.required)
+      const idx = required.findIndex(p => p.id === partyId)
+      return idx >= 0 ? idx + 1 : 1
+    },
+    [doc, constructionPlan, address],
+  )
+
+  const submitPageFields = useCallback(
+    async (result: SignerFillResult) => {
+      if (!token || !doc || !constructionPlan?.planRoot) {
+        throw new Error('Missing session or locked plan')
+      }
+      const hash = (pdfHash || signHash || doc.fingerprint || '').toLowerCase()
+      if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error('PDF fingerprint missing')
+
+      setFillBusy(true)
+      try {
+        // Use drawn ink for the wallet signature image (no second pad).
+        if (result.signatureImageDataUrl) {
+          try {
+            const blob = await (await fetch(result.signatureImageDataUrl)).blob()
+            setSigBlob(blob)
+          } catch {
+            /* pad still available as fallback */
+          }
+        }
+        if (result.printedName && !signerName.trim()) {
+          setSignerName(result.printedName)
+        }
+
+        if (result.fills.length === 0) {
+          setPageFieldsConfirmed(true)
+          return
+        }
+
+        const planRoot = constructionPlan.planRoot
+        let lastErr: Error | null = null
+        // Concurrent signers may race on prevRoot — refresh tip and retry.
+        for (let attempt = 0; attempt < 4; attempt++) {
+          try {
+            let known = knownBlobIds
+            let batchIndex = 1
+            let prev =
+              lastBatchRoot ||
+              planRoot ||
+              '0000000000000000000000000000000000000000000000000000000000000000'
+            const live = await api.getPlacementPlan(hash)
+            batchIndex = (live.fillBatchCount ?? 0) + 1
+            prev = live.lastBatchRoot || live.batch0Root || live.planRoot || prev
+            known = new Set(live.knownBlobIds ?? [])
+            setFilledSlotIds(new Set(live.filledSlotIds ?? []))
+            setKnownBlobIds(known)
+            setLastBatchRoot(prev)
+
+            const batch = await buildFillBatch({
+              batchIndex,
+              prevRoot: prev,
+              pdfSha256: hash,
+              planRoot,
+              knownBlobIds: known,
+              fills: result.fills,
+            })
+            const batchRoot = await computeBatchRoot(batch)
+            const frames = packPlacementBatch({ ...batch, batchRoot })
+            const saved = await api.appendPlacementFill(token, hash, {
+              personSlotIndex: result.personSlotIndex,
+              prevRoot: prev,
+              batchRoot,
+              batchIndex,
+              framesHex: framesToHex(frames),
+              fills: batch.fills.map(f => ({
+                slotId: f.slotId,
+                blobId: f.blobId,
+                personSlotIndex: f.personSlotIndex,
+              })),
+              blobIds: batch.blobs.map(b => b.blobId),
+            })
+            setFilledSlotIds(
+              new Set([
+                ...(saved.filledSlotIds ?? []),
+                ...result.fills.map(f => f.slotId),
+              ]),
+            )
+            setKnownBlobIds(
+              new Set([
+                ...(saved.knownBlobIds ?? [...known]),
+                ...batch.blobs.map(b => b.blobId),
+              ]),
+            )
+            setLastBatchRoot(saved.lastBatchRoot ?? batchRoot)
+            setPageFieldsConfirmed(true)
+            return
+          } catch (err) {
+            lastErr = err instanceof Error ? err : new Error(String(err))
+            const msg = lastErr.message
+            const retryable =
+              /prevRoot|batchIndex|refresh and retry|Expected batchIndex/i.test(msg)
+            if (!retryable || attempt === 3) break
+          }
+        }
+        throw lastErr ?? new Error('Could not save page fields')
+      } finally {
+        setFillBusy(false)
+      }
+    },
+    [token, doc, constructionPlan, pdfHash, signHash, lastBatchRoot, knownBlobIds, signerName],
+  )
+
+  const lockPlacements = useCallback(async () => {
+    if (!token || !doc || !constructionPlan) return
+    const hash = (pdfHash || signHash || doc.fingerprint || constructionPlan.pdfSha256).toLowerCase()
+    if (!/^[a-f0-9]{64}$/.test(hash)) {
+      setLocalError('PDF fingerprint missing — re-open the PDF.')
+      return
+    }
+    if (constructionPlan.slots.length === 0) {
+      setLocalError('Place at least one signature or name box before locking.')
+      return
+    }
+    for (const p of constructionPlan.people) {
+      if (p.walletAddress && !isValidNimiqAddress(p.walletAddress)) {
+        setLocalError(
+          `Person ${p.slotIndex}${p.displayName ? ` (${p.displayName})` : ''}: Nimiq address looks invalid.`,
+        )
+        return
+      }
+    }
+    setPlacementLockBusy(true)
+    setPlacementStatus(null)
+    setLocalError(null)
+    try {
+      const planForHash = { ...constructionPlan, pdfSha256: hash }
+      const planRoot = await computePlanRoot(planForHash)
+      const lockedLocal = lockConstructionPlanLocal(planForHash, planRoot)
+      const packed = await packLockedPlan(lockedLocal)
+      const saved = await api.savePlacementPlan(token, {
+        originalSha256: hash,
+        documentId: doc.id,
+        plan: lockedLocal,
+        lock: true,
+        planRoot,
+        batch0FramesHex: framesToHex(packed.frames),
+        batch0Root: packed.batchRoot,
+      })
+      // Explicit null = organizer-only (do not default to Person 1).
+      const cs =
+        lockedLocal.creatorSigningAs == null || lockedLocal.creatorSigningAs === 0
+          ? null
+          : lockedLocal.creatorSigningAs
+      setConstructionPlan({
+        ...lockedLocal,
+        status: 'locked',
+        planRoot: saved.planRoot ?? planRoot,
+        lockedAt: saved.lockedAt ?? lockedLocal.lockedAt,
+        creatorSigningAs: cs,
+      })
+      setLastBatchRoot(saved.batch0Root ?? saved.planRoot ?? planRoot)
+      setFilledSlotIds(new Set())
+      setKnownBlobIds(new Set())
+      setPageFieldsConfirmed(false)
+
+      // Rebuild parties from people; creator may claim one slot or none.
+      const sortedPeople = [...lockedLocal.people].sort((a, b) => a.slotIndex - b.slotIndex)
+      let rosterIdx: number | null = null
+      if (cs != null) {
+        const found = sortedPeople.findIndex(p => p.slotIndex === cs)
+        rosterIdx = found >= 0 ? found : null
+      }
+
+      const { document: rosterDoc } = await api.configureSigningRoster(token, doc.id, {
+        parties: sortedPeople.map(p => ({
+          displayName: p.displayName?.trim() || `Person ${p.slotIndex}`,
+          role: p.role,
+          walletAddress: p.walletAddress?.trim()
+            ? normalizeAddress(p.walletAddress)
+            : null,
+        })),
+        creatorSignsAsIndex: rosterIdx,
+      })
+      setActiveFromSeal(rosterDoc, fileSizeByDocIdRef.current[doc.id] ?? doc.fileSize)
+      setRequiredSigners(sortedPeople.length)
+      setCoSignerNames(
+        sortedPeople
+          .filter((_, i) => i !== rosterIdx)
+          .map(p => p.displayName?.trim() || ''),
+      )
+
+      const asLabel =
+        rosterIdx == null
+          ? 'you are organizing only (not signing)'
+          : `you sign as ${sortedPeople[rosterIdx]?.displayName || `Person ${cs}`}`
+      setPlacementStatus(
+        `Placements locked · ${saved.slotCount} boxes · ${asLabel} · root ${shortHash(saved.planRoot ?? planRoot)}`,
+      )
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Could not lock placements')
+    } finally {
+      setPlacementLockBusy(false)
+    }
+  }, [
+    token,
+    doc,
+    constructionPlan,
+    pdfHash,
+    signHash,
+    creatorNotifyEmail,
+  ])
 
   /** Mark invite as sent, or solo “continue to seal” (share is after creator sign). */
   const acknowledgeShare = () => {
@@ -931,7 +1374,15 @@ export function DocumentJourney({
       return
     }
 
-    const resolution = resolveSigningParty(doc.source, address)
+    const creatorOnlyBlock =
+      FEATURES.pdfAnnotationUi &&
+      constructionPlan?.status === 'locked' &&
+      (constructionPlan.creatorSigningAs == null || constructionPlan.creatorSigningAs === 0) &&
+      isDocumentCreator(doc.source, address)
+    const resolution = resolveSigningParty(doc.source, address, {
+      allowOpenClaim: !creatorOnlyBlock,
+      preferredPartyId: effectivePreferredPartyId,
+    })
     if (!resolution.ok) {
       setLocalError(resolution.message)
       return
@@ -1333,6 +1784,14 @@ export function DocumentJourney({
             <div className="action-dock-body">
               {step === 'fingerprint' && (
                 <div className="action-stack">
+                  <header className="signatures-config-head">
+                    <h3>Add the PDF</h3>
+                    <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
+                      No signing on this step. Fingerprint the file locally, then name people and
+                      place their fields on the next screen. You can organize without being a
+                      signer.
+                    </p>
+                  </header>
                   <DocumentStage
                     step={step}
                     doc={doc}
@@ -1355,7 +1814,7 @@ export function DocumentJourney({
                       </>
                     ) : (
                       <>
-                        <strong>Drop a PDF</strong> or <strong>Browse files</strong>. Hashing
+                        <strong>Drop a PDF</strong> or <strong>Browse files</strong>. The file
                         stays on this device.
                       </>
                     )}
@@ -1367,7 +1826,6 @@ export function DocumentJourney({
                       onChange={e => {
                         const next = e.target.value as DocumentType
                         setDocType(next)
-                        if (next === 'rental') setCreatorRole('landlord')
                         if (!documentTypeUsesNotes(next)) setDocNotes('')
                       }}
                     >
@@ -1376,32 +1834,6 @@ export function DocumentJourney({
                       <option value="nda">NDA</option>
                       <option value="other">Other</option>
                     </select>
-                  </label>
-                  {docType === 'rental' && (
-                    <label className="field">
-                      <span className="field-label">You are the</span>
-                      <select
-                        value={creatorRole}
-                        onChange={e =>
-                          setCreatorRole(e.target.value as 'landlord' | 'tenant')
-                        }
-                      >
-                        <option value="landlord">Landlord</option>
-                        <option value="tenant">Tenant</option>
-                      </select>
-                    </label>
-                  )}
-                  <label className="field">
-                    <span className="field-label">Your full name</span>
-                    <input
-                      value={creatorName}
-                      onChange={e =>
-                        setCreatorName(clampField(e.target.value, MAX_DISPLAY_NAME_LENGTH))
-                      }
-                      placeholder="Alex Rivera"
-                      autoComplete="name"
-                      maxLength={MAX_DISPLAY_NAME_LENGTH}
-                    />
                   </label>
                   <label className="field">
                     <span className="field-label">Title (optional)</span>
@@ -1419,6 +1851,22 @@ export function DocumentJourney({
                               : 'Agreement title'
                       }
                     />
+                  </label>
+                  <label className="field">
+                    <span className="field-label">Your name (optional)</span>
+                    <input
+                      value={creatorName}
+                      onChange={e =>
+                        setCreatorName(clampField(e.target.value, MAX_DISPLAY_NAME_LENGTH))
+                      }
+                      placeholder="Organizer name — not assumed to be a signer"
+                      autoComplete="name"
+                      maxLength={MAX_DISPLAY_NAME_LENGTH}
+                    />
+                    <span className="muted" style={{ fontSize: '0.78rem' }}>
+                      For your records only. On Arrange you choose whether you sign as one of the
+                      people (or none).
+                    </span>
                   </label>
                   {documentTypeUsesNotes(docType) && (
                     <label className="field">
@@ -1445,11 +1893,7 @@ export function DocumentJourney({
                     type="button"
                     className={`btn btn-primary btn-lg${busy || connecting ? ' btn--busy' : ''}`}
                     disabled={
-                      !pdfFile ||
-                      !pdfHash ||
-                      !creatorName.trim() ||
-                      busy ||
-                      (!account && connecting)
+                      !pdfFile || !pdfHash || busy || (!account && connecting)
                     }
                     onClick={() => {
                       if (!account) {
@@ -1479,7 +1923,7 @@ export function DocumentJourney({
                     ) : (
                       <>
                         <Fingerprint size={18} strokeWidth={2.25} />
-                        Fingerprint &amp; continue
+                        Fingerprint &amp; arrange fields
                       </>
                     )}
                   </button>
@@ -1505,76 +1949,49 @@ export function DocumentJourney({
 
               {step === 'share' && doc && (
                 <div className="action-stack">
-                  {/* Step 3 primary: mark the local PDF (same editor as /pdf lab). */}
-                  {FEATURES.pdfAnnotationUi && (pdfFile || signFile) && (
-                    <section className="journey-pdf-editor" aria-labelledby="mark-pdf-title">
+                  {/* Arrange: name people + empty placement slots (before or after first sign). */}
+                  {FEATURES.pdfAnnotationUi && (pdfFile || signFile) && constructionPlan && (
+                    <section className="journey-pdf-editor" aria-labelledby="arrange-pdf-title">
                       <header className="signatures-config-head">
-                        <h3 id="mark-pdf-title">Mark this PDF</h3>
+                        <h3 id="arrange-pdf-title">
+                          {constructionPlan.status === 'locked'
+                            ? 'Placements locked'
+                            : 'Arrange signers on the PDF'}
+                        </h3>
                         <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-                          Place your ink, checkmarks, X marks, or short text on the document. The
-                          file stays on this device — only the hash and mark data can be stored.
+                          {constructionPlan.status === 'locked'
+                            ? constructionPlan.creatorSigningAs == null ||
+                              constructionPlan.creatorSigningAs === 0
+                              ? 'Layout is fixed. You are organizing only — share the invite so each person can sign their own fields. You will not be asked to sign as Person 1.'
+                              : 'Layout is fixed. Sign your fields on the document next, then invite anyone else who still needs to sign.'
+                            : 'Name each person, place their fields, and choose whether you sign as one of them (or none). The PDF never uploads.'}
                         </p>
                       </header>
-                      <PdfAnnotator
+                      <PlacementEditor
                         file={(pdfFile ?? signFile)!}
-                        annotations={annotations}
-                        onChange={setAnnotations}
-                        disabled={busy || marksBusy}
+                        plan={constructionPlan}
+                        onChange={next => {
+                          setConstructionPlan(next)
+                          setRequiredSigners(Math.max(1, Math.min(4, next.people.length)))
+                        }}
+                        onLockRequest={
+                          constructionPlan.status === 'locked' ? undefined : () => lockPlacements()
+                        }
+                        disabled={busy || !token}
+                        lockBusy={placementLockBusy}
                       />
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <button
-                          type="button"
-                          className={`btn btn-secondary${marksBusy ? ' btn--busy' : ''}`}
-                          disabled={
-                            busy ||
-                            marksBusy ||
-                            !token ||
-                            annotations.length === 0 ||
-                            !(pdfHash || signHash || doc.fingerprint)
-                          }
-                          onClick={() => {
-                            const hash = (pdfHash || signHash || doc.fingerprint || '').toLowerCase()
-                            if (!token || !hash || annotations.length === 0) return
-                            setMarksBusy(true)
-                            setMarksStatus(null)
-                            setLocalError(null)
-                            void api
-                              .publishAnnotationStream(token, {
-                                originalSha256: hash,
-                                annotations,
-                                broadcast: false,
-                              })
-                              .then(r => {
-                                setMarksStatus(
-                                  `Saved ${r.frameCount} mark frames for this fingerprint (index).`,
-                                )
-                              })
-                              .catch(err => {
-                                setLocalError(
-                                  err instanceof Error ? err.message : 'Could not save marks',
-                                )
-                              })
-                              .finally(() => setMarksBusy(false))
-                          }}
-                        >
-                          {marksBusy ? (
-                            <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
-                          ) : null}
-                          Save marks to fingerprint
-                        </button>
-                        {marksStatus && (
-                          <p className="muted" style={{ margin: 0, fontSize: '0.8rem', flex: '1 1 100%' }}>
-                            {marksStatus}
-                          </p>
-                        )}
-                      </div>
+                      {placementStatus && (
+                        <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.8rem' }}>
+                          {placementStatus}
+                        </p>
+                      )}
                     </section>
                   )}
 
                   {FEATURES.pdfAnnotationUi && !pdfFile && !signFile && (
                     <section className="journey-pdf-editor">
                       <p className="muted" style={{ margin: 0 }}>
-                        Re-open the same PDF to place marks on the page (bytes stay local).
+                        Re-open the same PDF to arrange signature lines (bytes stay local).
                       </p>
                       <DocumentStage
                         step={step}
@@ -1598,6 +2015,9 @@ export function DocumentJourney({
                               setPdfHash(h)
                               setSignFile(file)
                               setSignHash(h)
+                              if (!constructionPlan) {
+                                setConstructionPlan(emptyPlan(h, Math.max(1, requiredSigners)))
+                              }
                             } catch (err) {
                               setLocalError(
                                 err instanceof Error ? err.message : 'Could not read PDF',
@@ -1619,11 +2039,23 @@ export function DocumentJourney({
                     <DocumentStage step={step} doc={doc} file={pdfFile} accepting={false} />
                   )}
 
+                  {/* Invite options after placements locked (or when placement UI off). */}
+                  {(!FEATURES.pdfAnnotationUi ||
+                    constructionPlan?.status === 'locked' ||
+                    signedCount(doc) > 0) && (
+                  <>
                   <section className="signatures-config" aria-labelledby="signatures-config-title">
                     <header className="signatures-config-head">
                       <h3 id="signatures-config-title">Invite &amp; seal options</h3>
                       <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-                        You signed. Seal alone, or add co-signers and share the invite before sealing.
+                        {constructionPlan?.status === 'locked'
+                          ? constructionPlan.creatorSigningAs == null ||
+                            constructionPlan.creatorSigningAs === 0
+                            ? 'People and placements are locked. Share the invite so each person can sign their fields. Party count cannot change after lock.'
+                            : 'People and placements are locked. Finish your fields if needed, then share the invite. Party count cannot change after lock.'
+                          : signedCount(doc) > 0
+                            ? 'Seal alone, or add co-signers and share the invite before sealing.'
+                            : 'Configure who must sign, then share the invite.'}
                       </p>
                     </header>
 
@@ -1648,6 +2080,10 @@ export function DocumentJourney({
 
                     {role === 'creator' && !doc.sealed && (
                       <div className="signatures-config-form">
+                        {/* After construction lock, roster is immutable — no configureDocumentCosigners. */}
+                        {!(
+                          FEATURES.pdfAnnotationUi && constructionPlan?.status === 'locked'
+                        ) && (
                         <label className="field">
                           <span className="field-label">How many parties must sign?</span>
                           <select
@@ -1683,31 +2119,224 @@ export function DocumentJourney({
                               ))}
                           </select>
                         </label>
+                        )}
 
-                        {requiredSigners > 1 && (
+                        {/* After lock: one clear card per party — names frozen, emails local-only, copy personal link. */}
+                        {FEATURES.pdfAnnotationUi &&
+                          constructionPlan?.status === 'locked' &&
+                          doc.parties.filter(p => p.required).length > 0 && (
+                          <div className="field-stack">
+                            <span className="field-label">Invite each person</span>
+                            <p className="muted" style={{ margin: '0 0 0.55rem', fontSize: '0.8rem' }}>
+                              <strong>Names</strong> were set on Arrange (frozen after lock). Enter an
+                              email and send a branded invite with their personal signing link —{' '}
+                              <strong>no PDF is attached</strong> (they use the file you shared
+                              separately). You can also copy the link.
+                            </p>
+                            {doc.parties
+                              .filter(p => p.required)
+                              .map((p, index) => {
+                                const base = doc.shareUrl.startsWith('http')
+                                  ? doc.shareUrl
+                                  : `${typeof window !== 'undefined' ? window.location.origin : ''}${doc.shareUrl.startsWith('/') ? '' : '/'}${doc.shareUrl}`
+                                const personLink = `${base}${base.includes('?') ? '&' : '?'}party=${encodeURIComponent(p.id)}`
+                                const label =
+                                  p.displayName?.trim() ||
+                                  p.roleLabel ||
+                                  `Person ${index + 1}`
+                                const emailVal = coSignerEmails[index] ?? ''
+                                const sending = inviteSendBusyId === p.id
+                                const note = inviteSendNote[p.id]
+                                return (
+                                  <div
+                                    key={p.id}
+                                    className="field-stack share-cosigner-fields"
+                                    style={{
+                                      padding: '0.65rem 0.75rem',
+                                      border: '1px solid var(--border, #e2e8f0)',
+                                      borderRadius: 10,
+                                      background: '#f8fafc',
+                                    }}
+                                  >
+                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                                      {label}
+                                      {p.signed ? (
+                                        <span className="muted" style={{ fontWeight: 500 }}>
+                                          {' '}
+                                          · signed
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    {p.walletAddress ? (
+                                      <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
+                                        Wallet required: {shortAddress(p.walletAddress)}
+                                      </p>
+                                    ) : (
+                                      <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
+                                        Name-only — personal link pre-selects this person
+                                      </p>
+                                    )}
+                                    <label className="field">
+                                      <span className="field-label">Email</span>
+                                      <input
+                                        type="email"
+                                        inputMode="email"
+                                        autoComplete="email"
+                                        value={emailVal}
+                                        onChange={e => {
+                                          const value = clampField(
+                                            e.target.value,
+                                            MAX_SUPPORT_EMAIL_LENGTH,
+                                          )
+                                          setCoSignerEmails(prev => {
+                                            const next = [...prev]
+                                            while (next.length <= index) next.push('')
+                                            next[index] = value
+                                            return next
+                                          })
+                                        }}
+                                        maxLength={MAX_SUPPORT_EMAIL_LENGTH}
+                                        placeholder="name@company.com"
+                                        disabled={busy || p.signed || sending}
+                                      />
+                                    </label>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                      <button
+                                        type="button"
+                                        className={`btn btn-primary${sending ? ' btn--busy' : ''}`}
+                                        disabled={
+                                          busy ||
+                                          p.signed ||
+                                          sending ||
+                                          !token ||
+                                          !emailVal.trim() ||
+                                          !emailSendEnabled
+                                        }
+                                        title={
+                                          !emailSendEnabled
+                                            ? 'Invite email is off until Resend is enabled on the server'
+                                            : undefined
+                                        }
+                                        onClick={() => {
+                                          if (!token || !doc) return
+                                          const to = emailVal.trim()
+                                          if (!to) return
+                                          setInviteSendBusyId(p.id)
+                                          setInviteSendNote(prev => {
+                                            const next = { ...prev }
+                                            delete next[p.id]
+                                            return next
+                                          })
+                                          setLocalError(null)
+                                          void api
+                                            .sendPartyInviteEmail(token, doc.id, {
+                                              partyId: p.id,
+                                              to,
+                                            })
+                                            .then(() => {
+                                              setInviteSendNote(prev => ({
+                                                ...prev,
+                                                [p.id]: `Invite sent to ${to}`,
+                                              }))
+                                            })
+                                            .catch(err => {
+                                              setLocalError(
+                                                err instanceof Error
+                                                  ? err.message
+                                                  : 'Could not send invite email',
+                                              )
+                                            })
+                                            .finally(() => setInviteSendBusyId(null))
+                                        }}
+                                      >
+                                        {sending ? (
+                                          <>
+                                            <LoaderCircle
+                                              className="btn-spinner"
+                                              size={16}
+                                              strokeWidth={2.5}
+                                            />
+                                            Sending…
+                                          </>
+                                        ) : (
+                                          'Send invite email'
+                                        )}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        disabled={busy || p.signed}
+                                        onClick={() => {
+                                          void navigator.clipboard
+                                            .writeText(personLink)
+                                            .then(() => {
+                                              setLinkCopied(true)
+                                              setInviteSendNote(prev => ({
+                                                ...prev,
+                                                [p.id]: 'Personal link copied',
+                                              }))
+                                              window.setTimeout(() => setLinkCopied(false), 3000)
+                                            })
+                                            .catch(() => {
+                                              setLocalError(
+                                                'Could not copy link — select it manually below.',
+                                              )
+                                            })
+                                        }}
+                                      >
+                                        Copy personal link
+                                      </button>
+                                    </div>
+                                    {!emailSendEnabled && (
+                                      <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>
+                                        Email send is disabled until Resend is configured (
+                                        RESEND_ENABLED). You can still copy the personal link.
+                                      </p>
+                                    )}
+                                    {note && (
+                                      <p
+                                        style={{
+                                          margin: 0,
+                                          fontSize: '0.8rem',
+                                          color: '#0f766e',
+                                          fontWeight: 500,
+                                        }}
+                                      >
+                                        {note}
+                                      </p>
+                                    )}
+                                    <code
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        wordBreak: 'break-all',
+                                        display: 'block',
+                                        color: '#475569',
+                                      }}
+                                    >
+                                      {personLink}
+                                    </code>
+                                  </div>
+                                )
+                              })}
+                          </div>
+                        )}
+
+                        {/* Pre-lock / legacy: optional co-signer names + emails */}
+                        {inviteeSlotCount > 0 &&
+                          !(
+                            FEATURES.pdfAnnotationUi && constructionPlan?.status === 'locked'
+                          ) && (
                           <div className="field-stack">
                             <span className="field-label">
-                              Co-signer detail{requiredSigners - 1 > 1 ? 's' : ''} (optional)
+                              Invite detail{inviteeSlotCount > 1 ? 's' : ''} (optional)
                             </span>
                             <p className="muted" style={{ margin: '0 0 0.45rem', fontSize: '0.8rem' }}>
-                              Name is for your party list. Invite email is used when you open Mail
-                              or build an email package — it stays on this device (not uploaded with
-                              the PDF).
+                              Prefer naming people on <strong>Arrange</strong> before you lock.
+                              Invite emails only prefill Mail / .eml on this device — VeriLock does
+                              not send email.
                             </p>
-                            {Array.from({ length: requiredSigners - 1 }, (_, index) => {
-                              const rentalOther =
-                                doc.source.type === 'rental' && index === 0
-                                  ? doc.source.parties.find(
-                                      p =>
-                                        p.walletAddress &&
-                                        address &&
-                                        normalizeAddress(p.walletAddress) ===
-                                          normalizeAddress(address),
-                                    )?.role === 'landlord'
-                                    ? 'Tenant'
-                                    : 'Landlord'
-                                  : null
-                              const partyLabel = rentalOther ?? `Party ${index + 2}`
+                            {Array.from({ length: inviteeSlotCount }, (_, index) => {
+                              const partyLabel = `Invitee ${index + 1}`
                               return (
                                 <div key={index} className="field-stack share-cosigner-fields">
                                   <label className="field">
@@ -1728,16 +2357,14 @@ export function DocumentJourney({
                                       }}
                                       onBlur={() => void applyCosigners()}
                                       maxLength={MAX_DISPLAY_NAME_LENGTH}
-                                      placeholder={
-                                        rentalOther
-                                          ? `${rentalOther} full name`
-                                          : 'Name (optional)'
-                                      }
+                                      placeholder="Name (optional)"
                                       disabled={busy}
                                     />
                                   </label>
                                   <label className="field">
-                                    <span className="field-label">{partyLabel} invite email</span>
+                                    <span className="field-label">
+                                      {partyLabel} invite email (Mail app only)
+                                    </span>
                                     <input
                                       type="email"
                                       inputMode="email"
@@ -1756,7 +2383,7 @@ export function DocumentJourney({
                                         })
                                       }}
                                       maxLength={MAX_SUPPORT_EMAIL_LENGTH}
-                                      placeholder="signer@example.com"
+                                      placeholder="name@company.com"
                                       disabled={busy}
                                     />
                                   </label>
@@ -1806,7 +2433,7 @@ export function DocumentJourney({
                     )}
                   </section>
 
-                  {requiredCount(doc) > 1 && (
+                  {(requiredCount(doc) > 1 || inviteeSlotCount > 0) && (
                     <>
                       <ShareInviteCard
                         document={doc.source}
@@ -1815,7 +2442,7 @@ export function DocumentJourney({
                         onCopyLink={() => copyLink()}
                         pdfFile={pdfFile ?? signFile}
                         inviteRecipients={coSignerEmails
-                          .slice(0, Math.max(0, requiredSigners - 1))
+                          .slice(0, Math.max(0, inviteeSlotCount))
                           .map(e => e.trim())
                           .filter(Boolean)}
                         embedded
@@ -1836,8 +2463,8 @@ export function DocumentJourney({
                         </button>
                       )}
                       <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                        Send the invite link and the same PDF to co-signers. This view updates when
-                        they sign.
+                        Send each personal link (above) or the main share link, plus the same PDF.
+                        VeriLock never emails for you. This view updates when they sign.
                       </p>
                     </>
                   )}
@@ -1856,6 +2483,8 @@ export function DocumentJourney({
                     >
                       Continue to seal
                     </button>
+                  )}
+                  </>
                   )}
 
                   {canCancelCurrent && (
@@ -1987,7 +2616,55 @@ export function DocumentJourney({
                             </>
                           )}
 
-                          {account && signingResolution && !signingResolution.ok && (
+                          {account &&
+                            signingResolution &&
+                            !signingResolution.ok &&
+                            signingResolution.hint === 'pick_person' &&
+                            signingResolution.openParties &&
+                            signingResolution.openParties.length > 0 && (
+                              <section
+                                className="signatures-config"
+                                aria-labelledby="pick-person-title"
+                              >
+                                <header className="signatures-config-head">
+                                  <h3 id="pick-person-title">Who are you?</h3>
+                                  <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
+                                    Select your name on this agreement. Your wallet will be bound
+                                    to that person when you sign. (Or open a personal invite link
+                                    that already names you.)
+                                  </p>
+                                </header>
+                                <ul className="field-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                                  {signingResolution.openParties.map(p => (
+                                    <li key={p.id} style={{ marginBottom: '0.45rem' }}>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        style={{ width: '100%', justifyContent: 'flex-start' }}
+                                        onClick={() => {
+                                          setPickedPartyId(p.id)
+                                          setLocalError(null)
+                                          try {
+                                            const url = new URL(window.location.href)
+                                            url.searchParams.set('party', p.id)
+                                            window.history.replaceState({}, '', url.toString())
+                                          } catch {
+                                            /* ignore */
+                                          }
+                                        }}
+                                      >
+                                        {p.displayName || formatPartyRole(p.role)}
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </section>
+                            )}
+
+                          {account &&
+                            signingResolution &&
+                            !signingResolution.ok &&
+                            signingResolution.hint !== 'pick_person' && (
                             <div className="result-banner result-banner--ok">
                               {signingResolution.message}
                             </div>
@@ -2007,6 +2684,9 @@ export function DocumentJourney({
                                   {' '}
                                   ({signedCount(doc) + 1} of {requiredCount(doc)}) with{' '}
                                   {account.shortAddress}
+                                  {pendingParty.walletAddress
+                                    ? ' · wallet required for this person'
+                                    : ''}
                                 </span>
                               </div>
 
@@ -2046,60 +2726,137 @@ export function DocumentJourney({
                                   <strong>{doc.fileName}</strong>). Drop the same document.
                                 </div>
                               )}
-                              {hasVerifiedLocalPdf && (
-                                <div className="result-banner result-banner--ok">
-                                  <ShieldCheck size={16} strokeWidth={2.5} />
-                                  Local match — same PDF as the fingerprint on this device
-                                </div>
-                              )}
 
-                              {partyNeedsSignerName(signingResolution.party) && (
-                                <label className="field">
-                                  <span className="field-label">Your name</span>
-                                  <input
-                                    value={signerName}
-                                    onChange={e => setSignerName(e.target.value)}
-                                    placeholder={`Name for ${formatPartyRole(signingResolution.party.role)}`}
-                                  />
-                                </label>
-                              )}
-
-                              <SignaturePad
-                                key={sigPadKey}
-                                onChange={setSigBlob}
-                                disabled={busy}
-                              />
-
-                              <button
-                                type="button"
-                                className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
-                                disabled={
-                                  !hasVerifiedLocalPdf ||
-                                  !sigBlob ||
-                                  (partyNeedsSignerName(signingResolution.party) &&
-                                    !signerName.trim()) ||
-                                  busy
-                                }
-                                onClick={() => void signAsCurrentUser()}
-                              >
-                                {busy ? (
-                                  <>
-                                    <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                                    Signing…
-                                  </>
-                                ) : (
-                                  'Sign'
+                              {hasVerifiedLocalPdf &&
+                                FEATURES.pdfAnnotationUi &&
+                                planLoadState === 'loading' && (
+                                  <div className="result-banner result-banner--ok">
+                                    <LoaderCircle
+                                      className="btn-spinner"
+                                      size={16}
+                                      strokeWidth={2.5}
+                                    />
+                                    Loading placement layout for this PDF…
+                                  </div>
                                 )}
-                              </button>
-                              <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                                {role === 'creator'
-                                  ? requiredCount(doc) <= 1
-                                    ? 'Confirm your drawn signature, then continue to seal on Nimiq.'
-                                    : 'Confirm your drawn signature, then share the invite link and PDF with co-signers.'
-                                  : requiredCount(doc) <= 1
-                                    ? 'Confirm your drawn signature to finish.'
-                                    : 'Confirm your drawn signature. The creator seals when everyone has signed.'}
-                              </p>
+
+                              {(() => {
+                                const personSlot = personSlotForParty(pendingParty.id)
+                                const myFillableSlots =
+                                  constructionPlan?.status === 'locked'
+                                    ? constructionPlan.slots.filter(
+                                        s =>
+                                          s.personSlotIndex === personSlot &&
+                                          (s.kind === 'signature' ||
+                                            s.kind === 'name' ||
+                                            s.kind === 'text'),
+                                      )
+                                    : []
+                                const pageFieldsRequired =
+                                  FEATURES.pdfAnnotationUi &&
+                                  constructionPlan?.status === 'locked' &&
+                                  myFillableSlots.length > 0
+                                const pageFieldsDone =
+                                  pageFieldsConfirmed ||
+                                  (myFillableSlots.length > 0 &&
+                                    myFillableSlots.every(s => filledSlotIds.has(s.id)))
+                                const canWalletBind =
+                                  hasVerifiedLocalPdf &&
+                                  planLoadState !== 'loading' &&
+                                  (!pageFieldsRequired || pageFieldsDone)
+
+                                return (
+                                  <>
+                              {hasVerifiedLocalPdf &&
+                                FEATURES.pdfAnnotationUi &&
+                                constructionPlan?.status === 'locked' &&
+                                (signFile || pdfFile) &&
+                                pageFieldsRequired &&
+                                !pageFieldsDone && (
+                                  <SignerFillView
+                                    file={(signFile ?? pdfFile)!}
+                                    plan={constructionPlan}
+                                    personSlotIndex={personSlot}
+                                    disabled={busy}
+                                    busy={fillBusy}
+                                    filledSlotIds={filledSlotIds}
+                                    onSubmit={submitPageFields}
+                                  />
+                                )}
+
+                              {/* Wallet bind: only after plan load + required page fields */}
+                              {canWalletBind && (
+                                <>
+                                  {pageFieldsDone && pageFieldsRequired && (
+                                    <div className="result-banner result-banner--ok">
+                                      <Check size={16} strokeWidth={2.5} />
+                                      Page fields saved on the document. Bind with your Nimiq wallet
+                                      to finish.
+                                    </div>
+                                  )}
+
+                                  {partyNeedsSignerName(signingResolution.party) && (
+                                    <label className="field">
+                                      <span className="field-label">Your name</span>
+                                      <input
+                                        value={signerName}
+                                        onChange={e => setSignerName(e.target.value)}
+                                        placeholder={`Name for ${formatPartyRole(signingResolution.party.role)}`}
+                                      />
+                                    </label>
+                                  )}
+
+                                  {/* Only show free pad if we didn't already capture ink on the PDF */}
+                                  {!sigBlob && (
+                                    <SignaturePad
+                                      key={sigPadKey}
+                                      onChange={setSigBlob}
+                                      disabled={busy}
+                                    />
+                                  )}
+                                  {sigBlob && pageFieldsDone && pageFieldsRequired && (
+                                    <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                                      Using the signature you drew on the PDF for wallet bind.
+                                    </p>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
+                                    disabled={
+                                      !hasVerifiedLocalPdf ||
+                                      !sigBlob ||
+                                      (partyNeedsSignerName(signingResolution.party) &&
+                                        !signerName.trim()) ||
+                                      busy
+                                    }
+                                    onClick={() => void signAsCurrentUser()}
+                                  >
+                                    {busy ? (
+                                      <>
+                                        <LoaderCircle
+                                          className="btn-spinner"
+                                          size={18}
+                                          strokeWidth={2.5}
+                                        />
+                                        Signing…
+                                      </>
+                                    ) : (
+                                      'Sign with wallet'
+                                    )}
+                                  </button>
+                                  <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                                    {role === 'creator'
+                                      ? requiredCount(doc) <= 1
+                                        ? 'Wallet sign anchors your identity, then you can seal on Nimiq.'
+                                        : 'Wallet sign, then share the invite so co-signers can fill their fields on the same PDF.'
+                                      : 'Wallet sign records you as this party on the agreement.'}
+                                  </p>
+                                </>
+                              )}
+                                  </>
+                                )
+                              })()}
                             </>
                           )}
                         </>
