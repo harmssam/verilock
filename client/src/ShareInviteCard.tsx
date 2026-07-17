@@ -1,13 +1,31 @@
-import { useId, useState } from 'react'
-import { Copy, Download, Mail, Paperclip } from 'lucide-react'
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
+import { Copy, Download, Mail, Paperclip, Share2 } from 'lucide-react'
 import { sha256Hex } from './pdf/hashPdf'
 import { ShareEmailPreview } from './ShareEmailPreview'
+import {
+  buildShareActionPlan,
+  primaryActionRequiresRecipients,
+  shareHintForPlan,
+  shareInstructionKinds,
+  shareIntroForPlan,
+  shareRecipientsHint,
+  type ShareActionId,
+  type ShareActionPlan,
+  type ShareInstructionKind,
+} from './shareDeviceProfile'
 import {
   buildShareEmlBlob,
   buildShareInviteContent,
   buildShareMailtoUrl,
+  canShareFiles,
   downloadBlob,
+  handoffShareEml,
+  invalidRecipientEmails,
+  mergeRecipientLists,
+  openMailtoCompose,
+  parseRecipientEmails,
   shareEmlDownloadName,
+  shareInviteWithPdf,
 } from './shareInvite'
 import { TextLink } from './TextLink'
 import type { SealDocument } from './types'
@@ -20,9 +38,14 @@ interface ShareInviteCardProps {
   onCopyLink: () => void
   /**
    * Local PDF still in memory (create/share session).
-   * When set, user can download an .eml with the file attached — never uploaded.
+   * When set, user can share or package the file — never uploaded.
    */
   pdfFile?: File | null
+  /**
+   * Co-signer invite emails from the Signatures UI (client-only).
+   * Prefills To when the user has not edited To yet.
+   */
+  inviteRecipients?: string[]
   embedded?: boolean
 }
 
@@ -32,32 +55,194 @@ function isPdfFile(file: File): boolean {
   return file.type === 'application/pdf' || file.type === 'application/x-pdf'
 }
 
+function isAbortError(err: unknown): boolean {
+  return Boolean(
+    err &&
+      typeof err === 'object' &&
+      'name' in err &&
+      String((err as { name?: unknown }).name) === 'AbortError',
+  )
+}
+
+function actionButtonClass(id: ShareActionId, role: 'primary' | 'secondary' | 'more'): string {
+  const tone = role === 'primary' ? 'btn-primary' : 'btn-secondary'
+  const byId: Record<ShareActionId, string> = {
+    'web-share': 'share-web-btn',
+    'open-mail': 'share-mail-btn',
+    eml: 'share-eml-btn',
+    'copy-link': 'share-copy-btn',
+  }
+  return `btn ${tone} ${byId[id]}`
+}
+
+/** Embed pdf filename spans inside profile copy strings. */
+function withPdfName(text: string, pdfName: string): ReactNode {
+  if (!pdfName || !text.includes(pdfName)) return text
+  const parts = text.split(pdfName)
+  return parts.map((part, i) =>
+    i < parts.length - 1 ? (
+      <span key={i}>
+        {part}
+        <span className="share-pdf-name">{pdfName}</span>
+      </span>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  )
+}
+
+function instructionItems(
+  kinds: ShareInstructionKind[],
+  pdfName: string,
+  plan: ShareActionPlan,
+): ReactNode[] {
+  const items: ReactNode[] = []
+  for (const kind of kinds) {
+    if (kind === 'web-share') {
+      items.push(
+        <li key="web-share">
+          {plan.isMobile ? 'Tap' : 'Use'} <strong>Share PDF + invite</strong> and pick Mail,
+          Messages, or another app
+        </li>,
+      )
+    } else if (kind === 'open-mail') {
+      items.push(
+        <li key="open-mail">
+          {kinds[0] === 'web-share' ? (
+            <>
+              Or use <strong>Open in Mail</strong> under More (fills To) and attach the downloaded
+              PDF
+            </>
+          ) : (
+            <>
+              Enter the co-signer email, then <strong>Open in Mail</strong> — To and the invite body
+              fill automatically
+            </>
+          )}
+        </li>,
+      )
+      if (kinds[0] === 'open-mail') {
+        items.push(
+          <li key="open-mail-attach">
+            Attach the downloaded <span className="share-pdf-name">{pdfName}</span> in Mail
+          </li>,
+        )
+      }
+    } else if (kind === 'eml') {
+      items.push(
+        <li key="eml">
+          Enter the co-signer email, then <strong>Download .eml package</strong> and open it in
+          Outlook (or your mail app)
+        </li>,
+      )
+    } else {
+      items.push(<li key="generic">Send the link and the PDF file together</li>)
+    }
+  }
+  items.push(
+    <li key="wallet">Signer opens the link and connects a Nimiq wallet</li>,
+    <li key="pdf-match">
+      {plan.isMobile
+        ? 'They use the same PDF to verify it matches'
+        : 'They use that PDF to verify it matches'}
+    </li>,
+  )
+  return items
+}
+
 export function ShareInviteCard({
   document,
   shareUrl,
   linkCopied,
   onCopyLink,
   pdfFile = null,
+  inviteRecipients = [],
   embedded,
 }: ShareInviteCardProps) {
   const pickId = useId()
+  const recipientsId = useId()
+  const moreId = useId()
   /** Extra local pick when parent did not pass a File (e.g. after reload). */
   const [pickedPdf, setPickedPdf] = useState<File | null>(null)
   const [pickBusy, setPickBusy] = useState(false)
   const [pickError, setPickError] = useState<string | null>(null)
+  const [recipientsRaw, setRecipientsRaw] = useState('')
+  /** Once the user edits To, stop overwriting from parent co-signer emails. */
+  const [recipientsDirty, setRecipientsDirty] = useState(false)
+  const [recipientError, setRecipientError] = useState<string | null>(null)
 
   const localPdf = pdfFile ?? pickedPdf
   const canPackEml = Boolean(localPdf)
-  const mailtoUrl = buildShareMailtoUrl(document, shareUrl)
-  const inviteContent = buildShareInviteContent(document, shareUrl, {
-    pdfAttached: canPackEml,
-  })
+
+  const inviteRecipientsKey = inviteRecipients
+    .map(e => e.trim())
+    .filter(Boolean)
+    .join(', ')
+
+  useEffect(() => {
+    if (recipientsDirty) return
+    setRecipientsRaw(inviteRecipientsKey)
+  }, [inviteRecipientsKey, recipientsDirty])
+
+  const [webShareOk, setWebShareOk] = useState(false)
+  useEffect(() => {
+    if (!localPdf) {
+      setWebShareOk(false)
+      return
+    }
+    setWebShareOk(canShareFiles([localPdf]))
+  }, [localPdf])
+
+  const plan = useMemo(
+    () => buildShareActionPlan({ webShareFiles: webShareOk }),
+    [webShareOk],
+  )
+
+  /** Field + parent co-signer emails — never drop parent values if sync lagged. */
+  const recipients = useMemo(
+    () =>
+      mergeRecipientLists(
+        parseRecipientEmails(recipientsRaw),
+        inviteRecipients.map(e => e.trim()).filter(Boolean),
+      ),
+    [recipientsRaw, inviteRecipients],
+  )
+
   const pdfName =
     localPdf?.name || document.originalFilename || 'your agreement PDF'
 
+  const mailtoUrl = buildShareMailtoUrl(document, shareUrl, recipients, {
+    pdfDownloadName: canPackEml ? pdfName : undefined,
+  })
+  const inviteContent = buildShareInviteContent(document, shareUrl, {
+    pdfAttached: canPackEml,
+  })
+
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareReady, setShareReady] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
+
+  const [mailBusy, setMailBusy] = useState(false)
+  const [mailReady, setMailReady] = useState(false)
+
   const [emlBusy, setEmlBusy] = useState(false)
+  const [emlReady, setEmlReady] = useState<'shared' | 'downloaded' | null>(null)
   const [emlError, setEmlError] = useState<string | null>(null)
-  const [emlReady, setEmlReady] = useState(false)
+
+  const resolveRecipients = (): string[] | null => {
+    const invalid = invalidRecipientEmails(recipientsRaw)
+    // Parent-only addresses may not be in recipientsRaw; only validate typed text.
+    if (invalid.length > 0) {
+      setRecipientError(
+        invalid.length === 1
+          ? `Not a valid email: ${invalid[0]}`
+          : `Not valid emails: ${invalid.join(', ')}`,
+      )
+      return null
+    }
+    setRecipientError(null)
+    return recipients
+  }
 
   const onPickPdf = async (fileList: FileList | null) => {
     const file = fileList?.[0]
@@ -86,23 +271,193 @@ export function ShareInviteCard({
     }
   }
 
-  const downloadEml = async () => {
+  const onWebShare = async () => {
+    if (!localPdf || shareBusy) return
+    setShareBusy(true)
+    setShareError(null)
+    try {
+      const result = await shareInviteWithPdf(document, shareUrl, localPdf)
+      if (result === 'shared') {
+        setShareReady(true)
+        window.setTimeout(() => setShareReady(false), 2200)
+      } else if (result === 'cancelled') {
+        // User dismissed the sheet — no error.
+      } else {
+        const fallback =
+          plan.platform === 'windows'
+            ? 'Download .eml package'
+            : 'Open in Mail'
+        setShareError(
+          `Sharing isn’t available here. Use “${fallback}” instead — the PDF never leaves this device for VeriLock.`,
+        )
+        setWebShareOk(false)
+      }
+    } catch (err) {
+      setShareError(err instanceof Error ? err.message : 'Could not open the share sheet.')
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
+  /**
+   * mailto fills To/subject/body; PDF downloads for attach.
+   * Browsers cannot open mailto: with an attachment.
+   */
+  const openInMail = async () => {
+    if (!localPdf || mailBusy) return
+    const to = resolveRecipients()
+    if (to === null) return
+    if (to.length === 0) {
+      setRecipientError(
+        plan.platform === 'mac' || plan.platform === 'ios'
+          ? 'Add the co-signer email in To first — Mail will open with that address filled in.'
+          : 'Add the co-signer email in To first so your mail app opens with that address filled in.',
+      )
+      return
+    }
+
+    setMailBusy(true)
+    setEmlError(null)
+    try {
+      // Download PDF first so it is in Downloads when Mail opens.
+      downloadBlob(localPdf, pdfName)
+      const url = buildShareMailtoUrl(document, shareUrl, to, {
+        pdfDownloadName: pdfName,
+      })
+      // Brief delay so the download starts before focus moves to Mail.
+      window.setTimeout(() => {
+        openMailtoCompose(url)
+      }, 150)
+      setMailReady(true)
+      window.setTimeout(() => setMailReady(false), 4000)
+    } catch (err) {
+      setEmlError(err instanceof Error ? err.message : 'Could not open Mail.')
+    } finally {
+      setMailBusy(false)
+    }
+  }
+
+  const openEmlPackage = async () => {
     if (!localPdf || emlBusy) return
+    const to = resolveRecipients()
+    if (to === null) return
+    if (to.length === 0) {
+      setRecipientError(
+        'Add the co-signer email in To first so the package includes a recipient.',
+      )
+      return
+    }
+
     setEmlBusy(true)
     setEmlError(null)
     try {
-      const blob = await buildShareEmlBlob(document, shareUrl, localPdf)
-      downloadBlob(blob, shareEmlDownloadName(document))
-      setEmlReady(true)
-      window.setTimeout(() => setEmlReady(false), 2200)
+      const blob = await buildShareEmlBlob(document, shareUrl, localPdf, {
+        recipients: to,
+      })
+      const result = await handoffShareEml(blob, shareEmlDownloadName(document))
+      setEmlReady(result)
+      window.setTimeout(() => setEmlReady(null), 2800)
     } catch (err) {
-      setEmlError(
-        err instanceof Error ? err.message : 'Could not build the email package.',
-      )
+      if (isAbortError(err)) {
+        // User cancelled share sheet for the .eml
+      } else {
+        setEmlError(
+          err instanceof Error ? err.message : 'Could not build the email package.',
+        )
+      }
     } finally {
       setEmlBusy(false)
     }
   }
+
+  const actionError = shareError || emlError || pickError || recipientError
+  const anyBusy = shareBusy || mailBusy || emlBusy
+
+  const renderAction = (id: ShareActionId, role: 'primary' | 'secondary' | 'more') => {
+    const className = actionButtonClass(id, role)
+    if (id === 'web-share') {
+      return (
+        <button
+          key={`${role}-${id}`}
+          type="button"
+          className={className}
+          disabled={anyBusy}
+          onClick={() => void onWebShare()}
+        >
+          <Share2 size={16} strokeWidth={2.25} aria-hidden />
+          {shareBusy ? 'Opening share…' : shareReady ? 'Shared' : 'Share PDF + invite'}
+        </button>
+      )
+    }
+    if (id === 'open-mail') {
+      return (
+        <button
+          key={`${role}-${id}`}
+          type="button"
+          className={className}
+          disabled={anyBusy}
+          onClick={() => void openInMail()}
+        >
+          <Mail size={16} strokeWidth={2.25} aria-hidden />
+          {mailBusy
+            ? 'Opening Mail…'
+            : mailReady
+              ? 'Mail opened — attach PDF'
+              : 'Open in Mail'}
+        </button>
+      )
+    }
+    if (id === 'eml') {
+      return (
+        <button
+          key={`${role}-${id}`}
+          type="button"
+          className={className}
+          disabled={anyBusy}
+          onClick={() => void openEmlPackage()}
+        >
+          <Download size={16} strokeWidth={2.25} aria-hidden />
+          {emlBusy
+            ? 'Building package…'
+            : emlReady === 'shared'
+              ? 'Opened share sheet'
+              : emlReady === 'downloaded'
+                ? 'Package downloaded'
+                : 'Download .eml package'}
+        </button>
+      )
+    }
+    return (
+      <button
+        key={`${role}-${id}`}
+        type="button"
+        className={className}
+        onClick={onCopyLink}
+      >
+        <Copy size={15} strokeWidth={2.25} aria-hidden />
+        {linkCopied ? 'Link copied' : 'Copy link'}
+      </button>
+    )
+  }
+
+  const recipientsRequired =
+    canPackEml &&
+    (primaryActionRequiresRecipients(plan) ||
+      plan.more.includes('open-mail') ||
+      plan.more.includes('eml') ||
+      plan.secondary.includes('open-mail') ||
+      plan.secondary.includes('eml'))
+
+  const toLabel = (() => {
+    if (!canPackEml) return 'To (co-signer email)'
+    if (plan.isMobile && plan.webShareFiles) {
+      return 'To (co-signer email) — optional for share sheet'
+    }
+    if (plan.primary[0] === 'eml') {
+      return 'To (co-signer email) — required for .eml'
+    }
+    return 'To (co-signer email) — required for Mail'
+  })()
 
   return (
     <div className={embedded ? 'share-card share-card--embedded' : 'card share-card'}>
@@ -112,41 +467,82 @@ export function ShareInviteCard({
           ? 'Direct seal mode — no signers to invite.'
           : `${document.signingProgress.signed}/${document.signingProgress.required} signed — share with the other party.`}{' '}
         {canPackEml ? (
-          <>
-            Download an email package with <span className="share-pdf-name">{pdfName}</span>{' '}
-            attached. The file never leaves your device for VeriLock — only your mail app sends it.
-          </>
+          withPdfName(shareIntroForPlan(plan, pdfName), pdfName)
         ) : (
           <>
-            Choose <span className="share-pdf-name">{pdfName}</span> to build an email package with
-            the attachment. VeriLock never hosts the file.
+            Choose <span className="share-pdf-name">{pdfName}</span> to share or open Mail with the
+            invite. VeriLock never hosts the file.
           </>
         )}
       </p>
 
-      <div className={`share-actions${canPackEml ? ' share-actions--with-eml' : ''}`}>
-        {canPackEml && (
-          <button
-            type="button"
-            className="btn btn-primary share-eml-btn"
-            disabled={emlBusy}
-            onClick={() => void downloadEml()}
+      {canPackEml && recipientsRequired && (
+        <div className="field share-recipients">
+          <label className="field-label" htmlFor={recipientsId}>
+            {toLabel}
+          </label>
+          <input
+            id={recipientsId}
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="signer@example.com"
+            value={recipientsRaw}
+            onChange={e => {
+              setRecipientsDirty(true)
+              setRecipientsRaw(e.target.value)
+              if (recipientError) setRecipientError(null)
+            }}
+            aria-invalid={Boolean(recipientError)}
+            aria-describedby={`${recipientsId}-hint`}
+          />
+          <p id={`${recipientsId}-hint`} className="muted share-recipients-hint">
+            {shareRecipientsHint(plan)}
+          </p>
+        </div>
+      )}
+
+      {canPackEml ? (
+        <div className="share-actions-layout">
+          <div
+            className={`share-actions share-actions--primary${
+              plan.primary.length > 1 ? ' share-actions--multi' : ''
+            }`}
           >
-            <Download size={16} strokeWidth={2.25} aria-hidden />
-            {emlBusy
-              ? 'Building package…'
-              : emlReady
-                ? 'Package downloaded'
-                : 'Download email package'}
-          </button>
-        )}
-        {!canPackEml && (
+            {plan.primary.map(id => renderAction(id, 'primary'))}
+          </div>
+          {plan.secondary.length > 0 && (
+            <div
+              className={`share-actions share-actions--secondary${
+                plan.secondary.length > 1 ? ' share-actions--multi' : ''
+              }`}
+            >
+              {plan.secondary.map(id => renderAction(id, 'secondary'))}
+            </div>
+          )}
+          {plan.more.length > 0 && (
+            <details className="share-more">
+              <summary id={moreId}>More ways to share</summary>
+              <div
+                className={`share-actions share-actions--more${
+                  plan.more.length > 1 ? ' share-actions--multi' : ''
+                }`}
+                role="group"
+                aria-labelledby={moreId}
+              >
+                {plan.more.map(id => renderAction(id, 'more'))}
+              </div>
+            </details>
+          )}
+        </div>
+      ) : (
+        <div className="share-actions share-actions--no-pdf">
           <label
             htmlFor={pickId}
             className={`btn btn-primary share-eml-btn share-eml-pick${pickBusy ? ' btn--busy' : ''}`}
           >
             <Paperclip size={16} strokeWidth={2.25} aria-hidden />
-            {pickBusy ? 'Checking PDF…' : 'Choose PDF for email package'}
+            {pickBusy ? 'Checking PDF…' : 'Choose PDF to share'}
             <input
               id={pickId}
               type="file"
@@ -159,20 +555,46 @@ export function ShareInviteCard({
               }}
             />
           </label>
-        )}
-        <a href={mailtoUrl} className="btn btn-secondary share-email-btn">
-          <Mail size={16} strokeWidth={2.25} aria-hidden />
-          {canPackEml ? 'Empty mail draft' : 'Mail draft (no PDF)'}
-        </a>
-        <button type="button" className="btn btn-secondary share-copy-btn" onClick={onCopyLink}>
-          <Copy size={15} strokeWidth={2.25} aria-hidden />
-          {linkCopied ? 'Link copied' : 'Copy link'}
-        </button>
-      </div>
+          <a href={mailtoUrl} className="btn btn-secondary share-email-btn">
+            <Mail size={16} strokeWidth={2.25} aria-hidden />
+            Mail draft (no PDF)
+          </a>
+          <button type="button" className="btn btn-secondary share-copy-btn" onClick={onCopyLink}>
+            <Copy size={15} strokeWidth={2.25} aria-hidden />
+            {linkCopied ? 'Link copied' : 'Copy link'}
+          </button>
+        </div>
+      )}
 
-      {(emlError || pickError) && (
+      {actionError && (
         <p className="share-eml-error" role="alert">
-          {emlError || pickError}
+          {actionError}
+        </p>
+      )}
+
+      {mailReady && (
+        <p className="muted share-eml-success" role="status">
+          Mail should open with <strong>To</strong> filled
+          {recipients.length > 0 ? ` (${recipients.join(', ')})` : ''}. Attach the downloaded{' '}
+          <code className="share-pdf-name">{pdfName}</code> (paperclip or drag from Downloads),
+          then Send. VeriLock never uploads the PDF.
+        </p>
+      )}
+
+      {emlReady === 'downloaded' && (
+        <p className="muted share-eml-success" role="status">
+          .eml package downloaded with To set to {recipients.join(', ') || '(none)'}.
+          {plan.platform === 'mac' || plan.platform === 'ios' ? (
+            <>
+              {' '}
+              On Apple Mail, prefer <strong>Open in Mail</strong> if To is blank — Mail often
+              ignores To on imported drafts.
+            </>
+          ) : plan.platform === 'windows' ? (
+            <> Open the file in Outlook to send the draft with the PDF attached.</>
+          ) : (
+            <> Open the file in your mail app to send the draft.</>
+          )}
         </p>
       )}
 
@@ -183,14 +605,7 @@ export function ShareInviteCard({
         </TextLink>
         <ul className="share-copy-instructions muted">
           {canPackEml ? (
-            <>
-              <li>
-                Download the email package, open the <code className="share-pdf-name">.eml</code>{' '}
-                file, add recipients, and send
-              </li>
-              <li>Signer opens the link and connects a Nimiq wallet</li>
-              <li>They use the attached PDF to verify it matches</li>
-            </>
+            instructionItems(shareInstructionKinds(plan), pdfName, plan)
           ) : (
             <>
               <li>Send the link and the PDF file together</li>
@@ -203,16 +618,11 @@ export function ShareInviteCard({
 
       <p className="muted share-option-detail share-email-hint">
         {canPackEml ? (
-          <>
-            <strong>Download email package</strong> builds a mail file with the signing link and{' '}
-            <span className="share-pdf-name">{pdfName}</span> attached on your device. Open it in
-            Apple Mail, Outlook, or another client to send. VeriLock never uploads the PDF.
-          </>
+          withPdfName(shareHintForPlan(plan, pdfName), pdfName)
         ) : (
           <>
-            Choose <span className="share-pdf-name">{pdfName}</span> on this device to build an
-            email package with the file attached, or use a mail draft / copy link and attach the
-            PDF yourself. VeriLock never hosts the file.
+            Choose <span className="share-pdf-name">{pdfName}</span> on this device to share or
+            open Mail with the invite. VeriLock never hosts the file.
           </>
         )}
       </p>

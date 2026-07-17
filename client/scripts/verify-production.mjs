@@ -131,6 +131,29 @@ check('production packaging docs use plain names', () => {
   assert.ok(!existsSync(join(rootDir, 'docs/service-b-journey.md')), 'service-b-journey.md should be renamed')
 })
 
+check('Share step supports Web Share + .eml handoff without server PDF upload', () => {
+  const share = readFileSync(join(clientDir, 'src/shareInvite.ts'), 'utf8')
+  assert.match(share, /export function canShareFiles/)
+  assert.match(share, /export async function shareInviteWithPdf/)
+  assert.match(share, /export async function handoffShareEml/)
+  assert.match(share, /export function parseRecipientEmails/)
+  assert.match(share, /X-Unsent: 1/)
+  assert.match(share, /formatToHeader/)
+  const card = readFileSync(join(clientDir, 'src/ShareInviteCard.tsx'), 'utf8')
+  assert.match(card, /Share PDF \+ invite/)
+  assert.match(card, /Open in Mail/)
+  assert.match(card, /openMailtoCompose/)
+  assert.match(card, /shareInviteWithPdf/)
+  assert.match(card, /handoffShareEml/)
+  assert.match(card, /To \(co-signer email\)/)
+  assert.match(card, /inviteRecipients/)
+  assert.match(card, /mergeRecipientLists/)
+  const journey = readFileSync(join(clientDir, 'src/journey/DocumentJourney.tsx'), 'utf8')
+  assert.match(journey, /ShareInviteCard/)
+  assert.match(journey, /coSignerEmails/)
+  assert.match(journey, /invite email/)
+})
+
 if (process.env.VERIFY_DIST === '1') {
   check('client/dist after production build is indexable journey shell', () => {
     const index = join(clientDir, 'dist', 'index.html')
