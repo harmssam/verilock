@@ -584,14 +584,14 @@ export function ShareInviteCard({
       {emlReady === 'downloaded' && (
         <p className="muted share-eml-success" role="status">
           .eml package downloaded with To set to {recipients.join(', ') || '(none)'}.
-          {plan.platform === 'mac' || plan.platform === 'ios' ? (
+          {plan.platform === 'windows' ? (
+            <> Open the file in Outlook to send the draft with the PDF attached.</>
+          ) : plan.platform === 'ios' ? (
             <>
               {' '}
-              On Apple Mail, prefer <strong>Open in Mail</strong> if To is blank — Mail often
+              If To is blank in Mail, prefer <strong>Open in Mail</strong> instead — Mail often
               ignores To on imported drafts.
             </>
-          ) : plan.platform === 'windows' ? (
-            <> Open the file in Outlook to send the draft with the PDF attached.</>
           ) : (
             <> Open the file in your mail app to send the draft.</>
           )}
