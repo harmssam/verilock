@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { Express } from 'express'
 import express from 'express'
 import { getClientDistDir } from './paths.js'
+import { isPdfAnnotationUiEnabled } from './pdfAnnotationConfig.js'
 
 function isKnownAppPath(path: string): boolean {
   if (path === '/' || path === '') return true
@@ -11,9 +12,11 @@ function isKnownAppPath(path: string): boolean {
   if (/^\/privacy\/?$/.test(path)) return true
   if (/^\/security\/?$/.test(path)) return true
   if (/^\/support\/?$/.test(path)) return true
-  // PDF annotation experiment (must match client hubReturnPath isPdfPath / isPdfLabPath)
-  if (/^\/pdf\/?$/.test(path)) return true
-  if (/^\/pdf\/lab\/?$/.test(path)) return true
+  // PDF lab (parallel to seal) — kill-switch via PDF_ANNOTATION_UI=false
+  if (isPdfAnnotationUiEnabled()) {
+    if (/^\/pdf\/?$/.test(path)) return true
+    if (/^\/pdf\/lab\/?$/.test(path)) return true
+  }
   if (/^\/d\/[^/]+\/?$/.test(path)) return true
   if (/^\/v\/[^/]+\/?$/.test(path)) return true
   return false

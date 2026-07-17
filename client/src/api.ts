@@ -164,6 +164,10 @@ export const api = {
       turnstileRequired?: boolean
       turnstileSiteKey?: string | null
       supportSendEnabled?: boolean
+      /** PDF lab (/pdf) — parallel to seal product path */
+      pdfAnnotationUi?: boolean
+      annotationStreamBroadcast?: boolean
+      annotationStreamServiceWallet?: boolean
     }>('/api/features'),
 
   submitSupportContact: (body: {

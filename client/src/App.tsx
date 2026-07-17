@@ -48,6 +48,8 @@ import {
 import type { PathRole } from './journey/types'
 import { LandingHome } from './landing/LandingHome'
 import { PATH_PLACEMENTS, PATH_STILLS, placementImageStyle } from './landing/pathMedia'
+import { api } from './api'
+import { FEATURES } from './features'
 
 /** Path card labels — stills + placement from pathMedia. */
 const TRACK_META: Record<
@@ -96,15 +98,18 @@ type ShellScreen =
   | 'pdf-lab'
   | 'not-found'
 
-function screenFromPath(pathname: string): ShellScreen {
+function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotationUi): ShellScreen {
   if (isPricingPath(pathname)) return 'pricing'
   if (isPrivacyPath(pathname)) return 'privacy'
   if (isSecurityPath(pathname)) return 'security'
   if (isSupportPath(pathname)) return 'support'
   if (isAgreementsPath(pathname)) return 'agreements'
-  if (isPdfLabPath(pathname)) return 'pdf-lab'
-  if (isPdfPath(pathname)) return 'pdf'
+  // PDF lab is parallel to seal — only mount when flag allows
+  if (pdfLabEnabled && isPdfLabPath(pathname)) return 'pdf-lab'
+  if (pdfLabEnabled && isPdfPath(pathname)) return 'pdf'
   if (!isKnownAppPath(pathname)) return 'not-found'
+  // /pdf with lab disabled → 404 shell
+  if (isPdfPath(pathname) || isPdfLabPath(pathname)) return 'not-found'
   return 'journey'
 }
 
@@ -145,9 +150,33 @@ function pushShellUrl(next: string): void {
 export function App() {
   const wallet = useJourneyWallet()
   const { balance: creditBalance, refresh: refreshCredits } = useCreditBalance(wallet.token)
+  /** Runtime kill-switch from /api/features (PDF lab parallel to seal). */
+  const [pdfLabEnabled, setPdfLabEnabled] = useState(FEATURES.pdfAnnotationUi)
   const [screen, setScreen] = useState<ShellScreen>(() =>
     typeof window !== 'undefined' ? screenFromPath(window.location.pathname) : 'journey',
   )
+
+  useEffect(() => {
+    let cancelled = false
+    void api
+      .features()
+      .then(f => {
+        if (cancelled) return
+        if (typeof f.pdfAnnotationUi === 'boolean') {
+          setPdfLabEnabled(f.pdfAnnotationUi)
+          // Re-resolve screen if user is on /pdf while flag flips
+          if (typeof window !== 'undefined') {
+            setScreen(screenFromPath(window.location.pathname, f.pdfAnnotationUi))
+          }
+        }
+      })
+      .catch(() => {
+        /* keep build-time FEATURES default */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
   const journeyReturnPathRef = useRef('/')
   const [journeyEpoch, setJourneyEpoch] = useState(0)
   const [navEpoch, setNavEpoch] = useState(0)
@@ -349,7 +378,7 @@ export function App() {
   useEffect(() => {
     const onPopState = () => {
       const path = window.location.pathname
-      const nextScreen = screenFromPath(path)
+      const nextScreen = screenFromPath(path, pdfLabEnabled)
       setScreen(nextScreen)
       setNavEpoch(n => n + 1)
       if (nextScreen === 'journey') {
@@ -368,7 +397,7 @@ export function App() {
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [blendToSurface])
+  }, [blendToSurface, pdfLabEnabled])
 
   const walletToken = wallet.token
   const walletBootReady = wallet.bootReady
@@ -623,8 +652,8 @@ export function App() {
           onCreate={startCreate}
         />
       )}
-      {screen === 'pdf' && <PdfAnnotationJourney wallet={wallet} />}
-      {screen === 'pdf-lab' && <SignatureLab />}
+      {pdfLabEnabled && screen === 'pdf' && <PdfAnnotationJourney wallet={wallet} />}
+      {pdfLabEnabled && screen === 'pdf-lab' && <SignatureLab />}
       {screen === 'not-found' && (
         <NotFoundPage
           path={typeof window !== 'undefined' ? window.location.pathname : null}

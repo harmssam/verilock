@@ -53,6 +53,10 @@ import {
   publishAnnotationStream,
   reconstructFromStoredOrChain,
 } from './annotationStream.js'
+import {
+  isPdfAnnotationUiEnabled,
+  pdfAnnotationFeaturesPublic,
+} from './pdfAnnotationConfig.js'
 import { isServiceWalletConfigured } from './serviceWallet.js'
 import { broadcastRawTransaction, normalizeRawTransactionHex, verifySignature } from './nimiq-rpc.js'
 import {
@@ -500,6 +504,7 @@ app.get('/api/features', (_req, res) => {
   res.json({
     ...emailFeaturesPublic(),
     ...supportContactPublicFeatures(),
+    ...pdfAnnotationFeaturesPublic(),
   })
 })
 
@@ -900,10 +905,17 @@ app.get('/api/documents/:id/certificate', publicReadLimit, (req, res) => {
   res.json(cert)
 })
 
+function pdfLabDisabled(res: express.Response): boolean {
+  if (isPdfAnnotationUiEnabled()) return false
+  res.status(404).json({ error: 'PDF annotation lab is disabled on this environment' })
+  return true
+}
+
 /**
  * Experiment: pack annotations into 64-byte frames, index by PDF hash,
  * optionally broadcast each frame via service wallet (on-chain).
  * Owner-scoped: only the publishing wallet may overwrite a hash.
+ * Parallel to seal — not used by DocumentJourney seal flow.
  */
 app.post(
   '/api/annotation-streams',
@@ -911,6 +923,7 @@ app.post(
   authMiddleware,
   requireVerifiedWallet,
   async (req, res) => {
+    if (pdfLabDisabled(res)) return
     const body = req.body as {
       originalSha256?: string
       annotations?: unknown
@@ -943,6 +956,7 @@ app.post(
 
 /** Look up packed stream by PDF fingerprint (no PDF upload). Slim annotations only. */
 app.get('/api/annotation-streams/:sha256', publicReadLimit, (req, res) => {
+  if (pdfLabDisabled(res)) return
   const sha = routeParam(req.params.sha256).toLowerCase()
   if (!/^[a-f0-9]{64}$/.test(sha)) {
     res.status(400).json({ error: 'Valid sha256 required' })
@@ -978,11 +992,11 @@ app.get('/api/annotation-streams/:sha256', publicReadLimit, (req, res) => {
 })
 
 /**
- * Reconstruct annotations for a PDF hash — prefers re-reading frame payloads
- * from Nimiq when tx hashes are stored.
+ * Reconstruct annotations for a PDF hash — prefers stored wire frames, optional chain sample.
  * Query: ?fallback=index (default) | ?fallback=none (fail closed on chain errors)
  */
 app.get('/api/annotation-streams/:sha256/reconstruct', publicReadLimit, async (req, res) => {
+  if (pdfLabDisabled(res)) return
   const sha = routeParam(req.params.sha256).toLowerCase()
   if (!/^[a-f0-9]{64}$/.test(sha)) {
     res.status(400).json({ error: 'Valid sha256 required' })
