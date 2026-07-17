@@ -170,7 +170,6 @@ export function DocumentJourney({
   /** Optional display names for other parties (index 0 = first co-signer). */
   const [coSignerNames, setCoSignerNames] = useState<string[]>([''])
   const [docNotes, setDocNotes] = useState('')
-  const [directSeal, setDirectSeal] = useState(false)
   const [requiredSigners, setRequiredSigners] = useState(2)
   const [busy, setBusy] = useState(false)
   const [doc, setDoc] = useState<JourneyDoc | null>(null)
@@ -676,7 +675,6 @@ export function DocumentJourney({
     setCreatorRole('landlord')
     setCoSignerNames([''])
     setDocNotes('')
-    setDirectSeal(false)
     setRequiredSigners(2)
     setDoc(null)
     setSharedAck(false)
@@ -710,29 +708,28 @@ export function DocumentJourney({
     setBusy(true)
     setLocalError(null)
     try {
-      const effectiveRequired = directSeal ? 0 : requiredSigners
+      const effectiveRequired = requiredSigners
       const extraSigners = Math.max(0, effectiveRequired - 1)
       // Creator is always a required party; remaining slots are co-signers.
-      const parties = directSeal
-        ? []
-        : Array.from({ length: extraSigners }, (_, index) => {
-            const named = coSignerNames[index]?.trim()
-            const fallback =
-              extraSigners === 1 ? 'Invited signer' : `Invited signer ${index + 1}`
-            // Rental: first co-signer is the other role; further parties are generic signers.
-            let role = 'signer'
-            if (docType === 'rental' && index === 0) {
-              role = creatorRole === 'landlord' ? 'tenant' : 'landlord'
-            }
-            return {
-              role,
-              displayName: clampField(named || fallback, MAX_DISPLAY_NAME_LENGTH),
-              required: true,
-            }
-          })
+      // "1 signature" = you only (no co-signers). Direct hash-only (0) is not offered here.
+      const parties = Array.from({ length: extraSigners }, (_, index) => {
+        const named = coSignerNames[index]?.trim()
+        const fallback =
+          extraSigners === 1 ? 'Invited signer' : `Invited signer ${index + 1}`
+        // Rental: first co-signer is the other role; further parties are generic signers.
+        let role = 'signer'
+        if (docType === 'rental' && index === 0) {
+          role = creatorRole === 'landlord' ? 'tenant' : 'landlord'
+        }
+        return {
+          role,
+          displayName: clampField(named || fallback, MAX_DISPLAY_NAME_LENGTH),
+          required: true,
+        }
+      })
 
       const notifyEmail =
-        FEATURES.emailNotifyUi && creatorNotifyEmail.trim()
+        FEATURES.emailNotifyUi && requiredSigners > 1 && creatorNotifyEmail.trim()
           ? creatorNotifyEmail.trim()
           : undefined
 
@@ -1267,21 +1264,6 @@ export function DocumentJourney({
                       maxLength={MAX_DISPLAY_NAME_LENGTH}
                     />
                   </label>
-                  {FEATURES.emailNotifyUi && !directSeal && (
-                    <label className="field">
-                      <span className="field-label">Email when everyone has signed (optional)</span>
-                      <input
-                        type="email"
-                        value={creatorNotifyEmail}
-                        onChange={e => setCreatorNotifyEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        autoComplete="email"
-                      />
-                      <span className="muted" style={{ fontSize: '0.78rem' }}>
-                        We only use this to tell you the agreement is ready to seal. Never required.
-                      </span>
-                    </label>
-                  )}
                   <label className="field">
                     <span className="field-label">Title (optional)</span>
                     <input
@@ -1299,91 +1281,92 @@ export function DocumentJourney({
                       }
                     />
                   </label>
-                  <label className="check-row">
-                    <input
-                      type="checkbox"
-                      checked={directSeal}
+                  <label className="field">
+                    <span className="field-label">How many parties must sign?</span>
+                    <select
+                      value={requiredSigners}
                       onChange={e => {
-                        const checked = e.target.checked
-                        setDirectSeal(checked)
-                        if (checked) setRequiredSigners(1)
-                        else if (requiredSigners < 1) setRequiredSigners(2)
+                        const n = Number(e.target.value)
+                        setRequiredSigners(n)
+                        const others = Math.max(0, n - 1)
+                        setCoSignerNames(prev => {
+                          const next = prev.slice(0, others)
+                          while (next.length < others) next.push('')
+                          return next
+                        })
+                        // Solo path has no co-signers — drop notify email if switching to 1.
+                        if (n <= 1) setCreatorNotifyEmail('')
                       }}
-                    />
-                    <span>Seal directly — no co-signers (hash only)</span>
+                    >
+                      {[1, 2, 3, 4].map(n => (
+                        <option key={n} value={n}>
+                          {n === 1
+                            ? '1 signature (you only — no co-signers)'
+                            : `${n} signatures (you + ${n - 1} other${n - 1 === 1 ? '' : 's'})`}
+                        </option>
+                      ))}
+                    </select>
                   </label>
-                  {!directSeal && (
-                    <>
-                      <label className="field">
-                        <span className="field-label">How many parties must sign?</span>
-                        <select
-                          value={requiredSigners}
-                          onChange={e => {
-                            const n = Number(e.target.value)
-                            setRequiredSigners(n)
-                            const others = Math.max(0, n - 1)
-                            setCoSignerNames(prev => {
-                              const next = prev.slice(0, others)
-                              while (next.length < others) next.push('')
-                              return next
-                            })
-                          }}
-                        >
-                          {[1, 2, 3, 4].map(n => (
-                            <option key={n} value={n}>
-                              {n} {n === 1 ? 'signature' : 'signatures'} (you
-                              {n > 1 ? ` + ${n - 1} other${n - 1 === 1 ? '' : 's'}` : ''})
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {Math.max(0, requiredSigners - 1) > 0 && (
-                        <div className="field-stack">
-                          <span className="field-label">
-                            Co-signer name{requiredSigners - 1 > 1 ? 's' : ''} (optional)
-                          </span>
-                          <p className="muted" style={{ margin: '0 0 0.45rem', fontSize: '0.8rem' }}>
-                            Leave blank if they will enter their name when they sign.
-                          </p>
-                          {Array.from({ length: Math.max(0, requiredSigners - 1) }, (_, index) => {
-                            const rentalOther =
-                              docType === 'rental' && index === 0
-                                ? creatorRole === 'landlord'
-                                  ? 'Tenant'
-                                  : 'Landlord'
-                                : null
-                            return (
-                              <label key={index} className="field">
-                                <span className="field-label">
-                                  {rentalOther ?? `Party ${index + 2}`} name
-                                </span>
-                                <input
-                                  value={coSignerNames[index] ?? ''}
-                                  onChange={e => {
-                                    const value = clampField(
-                                      e.target.value,
-                                      MAX_DISPLAY_NAME_LENGTH,
-                                    )
-                                    setCoSignerNames(prev => {
-                                      const next = [...prev]
-                                      while (next.length <= index) next.push('')
-                                      next[index] = value
-                                      return next
-                                    })
-                                  }}
-                                  maxLength={MAX_DISPLAY_NAME_LENGTH}
-                                  placeholder={
-                                    rentalOther
-                                      ? `${rentalOther} full name`
-                                      : 'Name (optional)'
-                                  }
-                                />
-                              </label>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </>
+                  {FEATURES.emailNotifyUi && requiredSigners > 1 && (
+                    <label className="field">
+                      <span className="field-label">Email when everyone has signed (optional)</span>
+                      <input
+                        type="email"
+                        value={creatorNotifyEmail}
+                        onChange={e => setCreatorNotifyEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        autoComplete="email"
+                      />
+                      <span className="muted" style={{ fontSize: '0.78rem' }}>
+                        We only use this to tell you the agreement is ready to seal. Never required.
+                      </span>
+                    </label>
+                  )}
+                  {Math.max(0, requiredSigners - 1) > 0 && (
+                    <div className="field-stack">
+                      <span className="field-label">
+                        Co-signer name{requiredSigners - 1 > 1 ? 's' : ''} (optional)
+                      </span>
+                      <p className="muted" style={{ margin: '0 0 0.45rem', fontSize: '0.8rem' }}>
+                        Leave blank if they will enter their name when they sign.
+                      </p>
+                      {Array.from({ length: Math.max(0, requiredSigners - 1) }, (_, index) => {
+                        const rentalOther =
+                          docType === 'rental' && index === 0
+                            ? creatorRole === 'landlord'
+                              ? 'Tenant'
+                              : 'Landlord'
+                            : null
+                        return (
+                          <label key={index} className="field">
+                            <span className="field-label">
+                              {rentalOther ?? `Party ${index + 2}`} name
+                            </span>
+                            <input
+                              value={coSignerNames[index] ?? ''}
+                              onChange={e => {
+                                const value = clampField(
+                                  e.target.value,
+                                  MAX_DISPLAY_NAME_LENGTH,
+                                )
+                                setCoSignerNames(prev => {
+                                  const next = [...prev]
+                                  while (next.length <= index) next.push('')
+                                  next[index] = value
+                                  return next
+                                })
+                              }}
+                              maxLength={MAX_DISPLAY_NAME_LENGTH}
+                              placeholder={
+                                rentalOther
+                                  ? `${rentalOther} full name`
+                                  : 'Name (optional)'
+                              }
+                            />
+                          </label>
+                        )
+                      })}
+                    </div>
                   )}
                   {documentTypeUsesNotes(docType) && (
                     <label className="field">
