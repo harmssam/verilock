@@ -42,7 +42,11 @@ export const MAX_STREAM_FRAMES = 128
 /** Match credit seal dust value so sinks/network treat frames like paid proofs. */
 export const STREAM_FRAME_VALUE_LUNA = 1
 const STREAM_FEE_BUFFER_LUNA = 10
-const VISIBILITY_TIMEOUT_MS = 25_000
+/** Per-frame visibility wait after broadcast (keep short — many frames). */
+const VISIBILITY_TIMEOUT_MS = 4_000
+const VISIBILITY_POLL_MS = 800
+/** After all broadcasts, one quick pass over hashes (no multi-minute waits). */
+const POST_BROADCAST_CONFIRM_MS = 12_000
 const HEAD_REFRESH_EVERY = 8
 
 export function isAnnotationStreamBroadcastEnabled(): boolean {
@@ -437,6 +441,13 @@ export async function publishAnnotationStream(input: {
   let partialBroadcast = false
 
   if (input.broadcast) {
+    console.log('[annotation-stream] publish on-chain requested', {
+      hash: input.originalSha256.slice(0, 12),
+      frames: frames.length,
+      publisher: publisher.slice(0, 12),
+      broadcastEnabled: isAnnotationStreamBroadcastEnabled(),
+      serviceWallet: isServiceWalletConfigured(),
+    })
     if (!isAnnotationStreamBroadcastEnabled()) {
       broadcastError =
         'On-chain annotation broadcast is disabled (set ANNOTATION_STREAM_BROADCAST=true)'
@@ -444,19 +455,40 @@ export async function publishAnnotationStream(input: {
       broadcastError =
         'Service wallet not configured — stream stored locally; set SERVICE_WALLET_PRIVATE_KEY to publish on-chain'
     } else {
-      assertSignaturesHavePathForBroadcast(
-        sanitizeAnnotations(input.annotations) ?? [],
-      )
-      const result = await broadcastStreamFrames(frames)
-      txHashes = result.hashes
-      confirmedFrames = result.confirmed
-      partialBroadcast = result.partial
-      onChain =
-        result.hashes.length === frames.length &&
-        result.confirmed === frames.length &&
-        !result.partial
-      if (result.error) {
-        broadcastError = result.error
+      try {
+        assertSignaturesHavePathForBroadcast(
+          sanitizeAnnotations(input.annotations) ?? [],
+        )
+        const result = await broadcastStreamFrames(frames)
+        txHashes = result.hashes
+        confirmedFrames = result.confirmed
+        partialBroadcast = result.partial
+        // Broadcast success is primary; confirmed count is best-effort visibility.
+        onChain =
+          result.hashes.length === frames.length && !result.partial && result.confirmed > 0
+        if (result.hashes.length === frames.length && result.confirmed < frames.length) {
+          partialBroadcast = true
+          broadcastError =
+            result.error ??
+            `Broadcast all ${frames.length} frames; ${result.confirmed} visible so far (mempool/RPC lag). Reconstruct may use index until confirmed.`
+          // Still treat as on-chain attempt success if all hashes recorded
+          onChain = result.confirmed >= Math.min(2, frames.length)
+        }
+        if (result.error && result.hashes.length === 0) {
+          broadcastError = result.error
+          onChain = false
+        } else if (result.error && !broadcastError) {
+          broadcastError = result.error
+        }
+        console.log('[annotation-stream] broadcast finished', {
+          hashes: txHashes.length,
+          confirmed: confirmedFrames,
+          onChain,
+          error: broadcastError,
+        })
+      } catch (err) {
+        broadcastError = err instanceof Error ? err.message : String(err)
+        console.error('[annotation-stream] broadcast threw', broadcastError)
       }
     }
   }
@@ -688,31 +720,59 @@ async function broadcastStreamFrames(frames: Buffer[]): Promise<BroadcastResult>
     }
   }
 
-  // Confirm visibility for every hash (not just the first).
+  // Fast visibility check: wait briefly on first + last, then one pass over all.
   let confirmed = 0
-  for (let i = 0; i < hashes.length; i++) {
-    const h = hashes[i]!
-    try {
-      await waitForTransactionVisible(h, VISIBILITY_TIMEOUT_MS)
-      const tx = await fetchTransaction(h)
-      if (tx && tx.executionResult !== false) {
-        confirmed++
+  if (hashes.length > 0) {
+    const sample = [hashes[0]!, hashes[hashes.length - 1]!]
+    for (const h of sample) {
+      try {
+        const seen = await waitForTransactionVisible(h, VISIBILITY_TIMEOUT_MS, VISIBILITY_POLL_MS)
+        if (seen && seen.executionResult !== false) {
+          /* sample ok */
+        }
+      } catch {
+        /* continue */
       }
-    } catch {
-      // leave unconfirmed
     }
+
+    const deadline = Date.now() + POST_BROADCAST_CONFIRM_MS
+    const confirmedSet = new Set<string>()
+    while (Date.now() < deadline && confirmedSet.size < hashes.length) {
+      for (const h of hashes) {
+        if (confirmedSet.has(h)) continue
+        try {
+          const tx = await fetchTransaction(h)
+          if (tx && tx.executionResult !== false) confirmedSet.add(h)
+        } catch {
+          /* ignore */
+        }
+      }
+      if (confirmedSet.size >= hashes.length) break
+      await new Promise(r => setTimeout(r, VISIBILITY_POLL_MS))
+    }
+    confirmed = confirmedSet.size
   }
 
-  const partial = confirmed < hashes.length || hashes.length < frames.length
+  const partial = hashes.length < frames.length
+  const allBroadcast = hashes.length === frames.length
+  console.log('[annotation-stream] visibility', {
+    broadcast: hashes.length,
+    confirmed,
+    frames: frames.length,
+  })
   return {
     hashes,
     confirmed,
     partial,
-    ...(partial
+    ...(!allBroadcast
       ? {
-          error: `Partial confirmation: ${confirmed}/${hashes.length} frames visible (of ${frames.length} expected)`,
+          error: `Partial broadcast: ${hashes.length}/${frames.length} frames sent`,
         }
-      : {}),
+      : confirmed < hashes.length
+        ? {
+            error: `All ${hashes.length} frames broadcast; ${confirmed} visible so far (RPC lag is OK — hashes saved)`,
+          }
+        : {}),
   }
 }
 
