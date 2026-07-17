@@ -74,6 +74,7 @@ export function buildShareActionPlan(options: {
     }
   }
 
+  // macOS: no .eml — Apple Mail often ignores To on import; mailto + PDF download is reliable.
   if (platform === 'mac') {
     return {
       platform,
@@ -81,7 +82,7 @@ export function buildShareActionPlan(options: {
       webShareFiles,
       primary: ['open-mail'],
       secondary: ['copy-link'],
-      more: [...(webShareFiles ? (['web-share'] as const) : []), 'eml'],
+      more: webShareFiles ? ['web-share'] : [],
     }
   }
 
@@ -133,7 +134,7 @@ export function shareHintForPlan(plan: ShareActionPlan, pdfName: string): string
     return `The .eml package is a single draft with To set and ${pdfName} inside — best for Outlook. Open in Mail uses your default client without an attachment (attach the PDF yourself). VeriLock never uploads the PDF.`
   }
   if (plan.platform === 'mac') {
-    return `Open in Mail is the reliable path on Apple Mail: a real compose window with To filled, and ${pdfName} downloads for you to attach (browsers cannot put attachments on mailto). The optional .eml package is useful for Outlook, but Apple Mail often leaves To blank on import. VeriLock never uploads the PDF.`
+    return `Open in Mail is the reliable path on Apple Mail: a real compose window with To filled, and ${pdfName} downloads for you to attach (browsers cannot put attachments on mailto). VeriLock never uploads the PDF.`
   }
   return `Open in Mail opens your default client with To filled and downloads ${pdfName} for you to attach. The .eml package includes the PDF in one file for clients that open drafts well. VeriLock never uploads the PDF.`
 }
@@ -155,8 +156,11 @@ export function shareInstructionKinds(plan: ShareActionPlan): ShareInstructionKi
 
 /** Label for recipients field when Mail / .eml is relevant. */
 export function shareRecipientsHint(plan: ShareActionPlan): string {
-  if (plan.platform === 'mac' || plan.primary[0] === 'open-mail') {
-    return 'Apple Mail and most desktop clients fill To via compose (not .eml import). Synced from co-signer invite emails above when set.'
+  if (plan.platform === 'mac') {
+    return 'Apple Mail fills To via compose. Synced from co-signer invite emails above when set.'
+  }
+  if (plan.primary[0] === 'open-mail') {
+    return 'Most desktop clients fill To via compose. Synced from co-signer invite emails above when set.'
   }
   if (plan.platform === 'windows' || plan.primary[0] === 'eml') {
     return 'Used for the .eml To header and for Open in Mail. Synced from co-signer invite emails above when set.'
