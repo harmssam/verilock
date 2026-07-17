@@ -11,6 +11,9 @@ function isKnownAppPath(path: string): boolean {
   if (/^\/privacy\/?$/.test(path)) return true
   if (/^\/security\/?$/.test(path)) return true
   if (/^\/support\/?$/.test(path)) return true
+  // PDF annotation experiment (must match client hubReturnPath isPdfPath / isPdfLabPath)
+  if (/^\/pdf\/?$/.test(path)) return true
+  if (/^\/pdf\/lab\/?$/.test(path)) return true
   if (/^\/d\/[^/]+\/?$/.test(path)) return true
   if (/^\/v\/[^/]+\/?$/.test(path)) return true
   return false
