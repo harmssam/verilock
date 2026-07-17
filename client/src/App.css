@@ -162,7 +162,7 @@ body[data-verilock-surface='journey'] #root::after {
 
 /*
  * Path card lives in .lr-track (page surface), not sticky header.
- * White card + light mint wash so the still keeps color (no slate fog).
+ * Solid white under copy; path still is a right-side panel only — never under text.
  */
 .lr-header-track {
   position: relative;
@@ -175,9 +175,14 @@ body[data-verilock-surface='journey'] #root::after {
   min-height: 7.25rem;
 }
 
+/* Decorative still: right third only. Copy sits on pure white, not on the photo. */
 .lr-header-track-media {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: auto;
+  width: min(42%, 18.5rem);
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
@@ -188,60 +193,54 @@ body[data-verilock-surface='journey'] #root::after {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* Full color + slight contrast so the still isn't a grey slab */
   filter: saturate(1.05) brightness(1.01) contrast(1.06);
   /* Zoom via placementImageStyle --lr-path-zoom / transform */
   --lr-path-zoom: 1;
-  opacity: 0.88;
+  opacity: 1;
   pointer-events: none;
 }
 
-/* Text-side veil only — right side keeps the still (was full-card grey fog) */
+/* Soft blend at the media’s left edge into the white card — not a full-card fog. */
 .lr-header-track-wash {
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(
-      100deg,
-      rgba(255, 255, 255, 0.96) 0%,
-      rgba(255, 255, 255, 0.82) 28%,
-      rgba(255, 255, 255, 0.28) 52%,
-      rgba(255, 255, 255, 0.04) 78%,
-      transparent 100%
-    );
+  background: linear-gradient(
+    90deg,
+    #ffffff 0%,
+    rgba(255, 255, 255, 0.92) 14%,
+    rgba(255, 255, 255, 0.35) 42%,
+    transparent 72%
+  );
 }
 
 .lr-header-track--creator .lr-header-track-wash {
-  background:
-    linear-gradient(
-      100deg,
-      rgba(255, 255, 255, 0.97) 0%,
-      rgba(240, 253, 250, 0.78) 26%,
-      rgba(255, 255, 255, 0.22) 50%,
-      transparent 78%
-    );
+  background: linear-gradient(
+    90deg,
+    #ffffff 0%,
+    rgba(240, 253, 250, 0.95) 12%,
+    rgba(255, 255, 255, 0.28) 40%,
+    transparent 70%
+  );
 }
 
 .lr-header-track--signer .lr-header-track-wash {
-  background:
-    linear-gradient(
-      100deg,
-      rgba(255, 255, 255, 0.97) 0%,
-      rgba(236, 254, 255, 0.78) 26%,
-      rgba(255, 255, 255, 0.22) 50%,
-      transparent 78%
-    );
+  background: linear-gradient(
+    90deg,
+    #ffffff 0%,
+    rgba(236, 254, 255, 0.95) 12%,
+    rgba(255, 255, 255, 0.28) 40%,
+    transparent 70%
+  );
 }
 
 .lr-header-track--verifier .lr-header-track-wash {
-  background:
-    linear-gradient(
-      100deg,
-      rgba(255, 255, 255, 0.97) 0%,
-      rgba(247, 254, 231, 0.76) 26%,
-      rgba(255, 255, 255, 0.22) 50%,
-      transparent 78%
-    );
+  background: linear-gradient(
+    90deg,
+    #ffffff 0%,
+    rgba(247, 254, 231, 0.95) 12%,
+    rgba(255, 255, 255, 0.28) 40%,
+    transparent 70%
+  );
 }
 
 .lr-header-track-inner {
@@ -260,7 +259,8 @@ body[data-verilock-surface='journey'] #root::after {
   flex-direction: column;
   gap: 0.25rem;
   min-width: 0;
-  max-width: 36rem;
+  /* Stay clear of the right-side still */
+  max-width: min(36rem, calc(100% - min(42%, 18.5rem) + 0.5rem));
 }
 
 .lr-header-track .lr-track-title-row {
@@ -309,23 +309,27 @@ body[data-verilock-surface='journey'] #root::after {
     padding: 1.05rem 1rem;
   }
 
-  /* Narrow: still is under the title — keep a stronger left veil for contrast */
-  .lr-header-track-bg {
-    opacity: 0.72;
+  /* Narrow: smaller right still, more white under the title */
+  .lr-header-track-media {
+    width: min(36%, 9.5rem);
+  }
+
+  .lr-header-track-copy {
+    max-width: min(100%, calc(100% - 7.5rem));
+    padding-right: 0.25rem;
   }
 
   .lr-header-track-wash,
   .lr-header-track--creator .lr-header-track-wash,
   .lr-header-track--signer .lr-header-track-wash,
   .lr-header-track--verifier .lr-header-track-wash {
-    background:
-      linear-gradient(
-        100deg,
-        rgba(255, 255, 255, 0.97) 0%,
-        rgba(255, 255, 255, 0.9) 42%,
-        rgba(255, 255, 255, 0.45) 68%,
-        rgba(255, 255, 255, 0.12) 100%
-      );
+    background: linear-gradient(
+      90deg,
+      #ffffff 0%,
+      rgba(255, 255, 255, 0.96) 22%,
+      rgba(255, 255, 255, 0.4) 55%,
+      transparent 85%
+    );
   }
 }
 
