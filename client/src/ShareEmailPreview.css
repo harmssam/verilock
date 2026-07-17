@@ -1,9 +1,11 @@
+/* Invite email preview — light shell (matches journey share card). */
+
 .share-email-preview-card {
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(59, 130, 246, 0.26);
-  background: linear-gradient(160deg, rgba(20, 13, 46, 0.95), rgba(10, 6, 24, 0.98));
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(15, 23, 42, 0.1));
+  background: #ffffff;
   overflow: hidden;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.05);
 }
 
 .share-email-preview-header {
@@ -11,9 +13,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: var(--gradient-brand);
-  color: #0d112e;
+  padding: 0.7rem 1rem;
+  background: var(--gradient-brand, linear-gradient(135deg, #14b8a6 0%, #0d9488 50%, #0f766e 100%));
+  color: #ffffff;
 }
 
 .share-email-preview-brand {
@@ -29,8 +31,9 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   padding: 0.2rem 0.5rem;
-  border-radius: var(--radius-pill);
-  background: rgba(10, 6, 24, 0.18);
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
 }
 
 .share-email-preview-greeting,
@@ -44,14 +47,14 @@
 
 .share-email-preview-greeting {
   margin-top: 0.9rem;
-  color: var(--text-muted);
+  color: var(--text-muted, #4b5c6b);
   font-size: 0.86rem;
 }
 
 .share-email-preview-lead {
   margin-top: 0.35rem;
   margin-bottom: 0.85rem;
-  color: var(--text);
+  color: var(--text, #0f172a);
   line-height: 1.45;
   font-size: 0.9rem;
 }
@@ -60,7 +63,7 @@
   margin-bottom: 0.85rem;
   padding-top: 0.75rem;
   padding-bottom: 0.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border, rgba(15, 23, 42, 0.08));
 }
 
 .share-email-preview-section h4 {
@@ -69,19 +72,19 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--blue);
+  color: var(--mint-deep, #0f766e);
 }
 
 .share-email-preview-section--link {
-  background: rgba(94, 234, 212, 0.06);
+  background: rgba(13, 148, 136, 0.05);
 }
 
 .share-email-preview-section--pdf {
-  background: rgba(251, 113, 133, 0.06);
+  background: rgba(202, 138, 4, 0.06);
 }
 
 .share-email-preview-section--pdf h4 {
-  color: var(--coral);
+  color: #a16207;
 }
 
 .share-email-preview-url {
@@ -89,34 +92,35 @@
   word-break: break-all;
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 0.8rem;
-  color: var(--mint);
+  color: var(--mint-deep, #0f766e);
   text-decoration: none;
 }
 
 .share-email-preview-url:hover {
   text-decoration: underline;
+  text-underline-offset: 0.12em;
 }
 
 .share-email-preview-pdf {
   padding: 0.12rem 0.4rem;
-  border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(13, 148, 136, 0.08);
+  border: 1px solid rgba(13, 148, 136, 0.18);
   font-size: 0.82em;
-  color: var(--text);
+  color: var(--text, #0f172a);
 }
 
 .share-email-preview-note {
   margin: 0.45rem 0 0;
   font-size: 0.8rem;
   line-height: 1.4;
-  color: var(--text-dim);
+  color: var(--text-dim, #6b7c8d);
 }
 
 .share-email-preview-steps {
   margin: 0;
   padding-left: 1.15rem;
-  color: var(--text-muted);
+  color: var(--text-muted, #4b5c6b);
   font-size: 0.84rem;
   line-height: 1.45;
 }
@@ -139,20 +143,20 @@
 }
 
 .share-email-preview-details span {
-  color: var(--text-dim);
+  color: var(--text-dim, #6b7c8d);
 }
 
 .share-email-preview-details strong {
-  color: var(--text);
+  color: var(--text, #0f172a);
   font-weight: 600;
 }
 
 .share-email-preview-footer {
   padding-top: 0.55rem;
   padding-bottom: 0.9rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border, rgba(15, 23, 42, 0.08));
   font-size: 0.76rem;
-  color: var(--text-dim);
+  color: var(--text-dim, #6b7c8d);
 }
 
 .share-email-preview-card--compact .share-email-preview-lead,

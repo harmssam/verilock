@@ -1,5 +1,19 @@
+/* Share invite card — light shell first (journey remaps --text/--mint/--border). */
+
+.share-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-sizing: border-box;
+}
+
 .share-card--embedded {
-  margin-top: 1rem;
+  margin-top: 0;
+  padding: 1rem 1.05rem;
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(15, 23, 42, 0.09));
+  background: var(--surface-raised, #ffffff);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
 }
 
 .share-card--embedded .share-card-intro {
@@ -7,7 +21,7 @@
 }
 
 .share-card-intro {
-  margin-bottom: 0.85rem;
+  margin: 0 0 0.85rem;
   line-height: 1.45;
 }
 
@@ -15,6 +29,7 @@
   margin: 0 0 0.75rem;
   font-size: 0.82rem;
   line-height: 1.4;
+  color: var(--text-muted, #4b5c6b);
 }
 
 .share-actions-layout {
@@ -30,10 +45,7 @@
   gap: 0.55rem;
 }
 
-.share-actions--primary {
-  margin: 0;
-}
-
+.share-actions--primary,
 .share-actions--secondary,
 .share-actions--more {
   margin: 0;
@@ -58,20 +70,20 @@
 }
 
 .share-more {
-  border-radius: var(--radius-sm, 8px);
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(0, 0, 0, 0.06);
-  padding: 0.15rem 0.65rem 0.15rem;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(15, 23, 42, 0.09));
+  background: rgba(13, 148, 136, 0.04);
+  padding: 0.1rem 0.7rem;
 }
 
 .share-more summary {
   cursor: pointer;
   user-select: none;
   list-style: none;
-  padding: 0.55rem 0.15rem;
+  padding: 0.55rem 0.1rem;
   font-size: 0.84rem;
   font-weight: 600;
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted, #4b5c6b);
 }
 
 .share-more summary::-webkit-details-marker {
@@ -83,7 +95,7 @@
   display: inline-block;
   margin-right: 0.4rem;
   transition: transform 0.12s ease;
-  color: var(--text-dim, #64748b);
+  color: var(--text-dim, #6b7c8d);
 }
 
 .share-more[open] summary::before {
@@ -91,11 +103,11 @@
 }
 
 .share-more summary:hover {
-  color: var(--mint, #5eead4);
+  color: var(--mint, #0d9488);
 }
 
 .share-more .share-actions {
-  padding: 0 0.15rem 0.65rem;
+  padding: 0 0.1rem 0.65rem;
 }
 
 .share-eml-pick {
@@ -130,7 +142,7 @@
 .share-eml-error {
   margin: 0 0 0.75rem;
   font-size: 0.84rem;
-  color: var(--danger, #f87171);
+  color: #b91c1c;
   line-height: 1.4;
 }
 
@@ -138,22 +150,23 @@
   margin: 0 0 0.75rem;
   font-size: 0.84rem;
   line-height: 1.45;
+  color: var(--text-muted, #4b5c6b);
 }
 
 .share-link-block {
   padding: 0.85rem 0.95rem;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(94, 234, 212, 0.28);
-  background: linear-gradient(145deg, rgba(94, 234, 212, 0.06), rgba(0, 0, 0, 0.18));
+  border-radius: 12px;
+  border: 1px solid rgba(13, 148, 136, 0.2);
+  background: rgba(13, 148, 136, 0.05);
 }
 
 .share-option-label {
   margin: 0 0 0.4rem;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-dim);
+  color: var(--text-dim, #6b7c8d);
 }
 
 .share-option-detail {
@@ -164,6 +177,7 @@
 
 .share-email-hint {
   margin-top: 0.75rem;
+  color: var(--text-muted, #4b5c6b);
 }
 
 .share-link-chip {
@@ -172,13 +186,46 @@
   margin-bottom: 0.65rem;
   word-break: break-all;
   text-align: left;
+  box-sizing: border-box;
+}
+
+/* Link chip: readable on light surfaces (overrides dark navy hash-chip base). */
+.share-card .hash-chip,
+.share-card .share-link-chip {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(13, 148, 136, 0.22);
+  background: #ffffff;
+  color: var(--mint-deep, #0f766e);
+  box-shadow: none;
+}
+
+.share-card a.hash-chip.share-link-chip:hover,
+.share-card a.hash-chip.share-link-chip:focus-visible {
+  color: var(--mint-deep, #0f766e);
+  border-color: rgba(13, 148, 136, 0.4);
+  background: rgba(13, 148, 136, 0.06);
+  text-decoration: none;
 }
 
 .share-copy-instructions {
   margin: 0.65rem 0 0;
-  padding-left: 1.1rem;
+  padding-left: 1.15rem;
   font-size: 0.82rem;
-  line-height: 1.45;
+  line-height: 1.5;
+  color: var(--text-muted, #4b5c6b);
+}
+
+.share-copy-instructions li + li {
+  margin-top: 0.25rem;
+}
+
+.share-copy-instructions strong {
+  color: var(--text, #0f172a);
+  font-weight: 650;
 }
 
 @media (max-width: 420px) {
@@ -186,32 +233,40 @@
   .share-actions--no-pdf {
     grid-template-columns: 1fr;
   }
+
+  .share-card--embedded {
+    padding: 0.9rem 0.85rem;
+  }
 }
 
 .share-pdf-name {
-  color: var(--text);
+  color: var(--text, #0f172a);
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 0.86em;
+  font-weight: 600;
 }
 
 .share-email-preview {
   margin-top: 0.85rem;
+  border-top: 1px solid var(--border, rgba(15, 23, 42, 0.09));
+  padding-top: 0.65rem;
 }
 
 .share-email-preview summary {
   cursor: pointer;
-  color: var(--text-muted);
+  color: var(--text-muted, #4b5c6b);
   font-size: 0.84rem;
+  font-weight: 600;
   user-select: none;
 }
 
 .share-email-preview summary:hover {
-  color: var(--mint);
+  color: var(--mint, #0d9488);
 }
 
 .share-email-preview-wrap {
   margin-top: 0.65rem;
   max-height: 18rem;
   overflow: auto;
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
 }
