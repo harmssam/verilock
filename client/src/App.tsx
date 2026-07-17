@@ -468,7 +468,8 @@ export function App() {
         wideShell ? 'exp-app--wide' : '',
         // Home, tracks, and agreements share one desktop content width.
         screen === 'journey' || screen === 'agreements' ? 'lr-app--landing' : '',
-        screen === 'pricing' ? 'lr-app--pricing' : '',
+        // Pricing + Security: 960px shell (not the wider exp-app--wide content pages).
+        screen === 'pricing' || screen === 'security' ? 'lr-app--pricing' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -496,7 +497,8 @@ export function App() {
               <button
                 type="button"
                 className={`lr-nav${screen === 'agreements' ? ' lr-nav--active' : ''}`}
-                onClick={screen === 'agreements' ? goJourney : goAgreements}
+                onClick={goAgreements}
+                aria-current={screen === 'agreements' ? 'page' : undefined}
               >
                 Agreements
               </button>
@@ -509,7 +511,8 @@ export function App() {
               <button
                 type="button"
                 className={`lr-nav${screen === 'pricing' ? ' lr-nav--active' : ''}`}
-                onClick={screen === 'pricing' ? goJourney : goPricing}
+                onClick={goPricing}
+                aria-current={screen === 'pricing' ? 'page' : undefined}
               >
                 Pricing
               </button>
@@ -518,7 +521,8 @@ export function App() {
             <button
               type="button"
               className={`lr-nav lr-nav--security${screen === 'security' ? ' lr-nav--active' : ''}`}
-              onClick={screen === 'security' ? goJourney : goSecurity}
+              onClick={goSecurity}
+              aria-current={screen === 'security' ? 'page' : undefined}
             >
               Security
             </button>
