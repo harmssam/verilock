@@ -189,7 +189,7 @@ Separate from seals. Multi-tx overlay frames for PDF annotations (path/text/chec
 | 5–8 | PDF hash prefix |
 | 9–63 | Body (55 B) |
 
-- Cap: **32 frames** per stream (`MAX_STREAM_FRAMES`).
+- Cap: **128 frames** per stream (`MAX_STREAM_FRAMES`); wire JSON floats quantized to cut path size.
 - Value: **1 luna** per frame (aligned with credit seal dust), fee 0.
 - Broadcast: service wallet → attestation sink; feature flag `ANNOTATION_STREAM_BROADCAST` (prod requires explicit enable).
 - Ownership: stream row bound to publisher wallet; overwrite only by same address.

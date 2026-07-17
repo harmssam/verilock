@@ -33,8 +33,12 @@ export const FRAME_HEAD = 1
 export const FRAME_DATA = 2
 export const FRAME_END = 3
 
-/** Experiment cap — keeps service-wallet cost and validity window sane. */
-export const MAX_STREAM_FRAMES = 32
+/**
+ * Experiment cap (frames = HEAD + DATA* + END).
+ * ~55 B payload per DATA frame; free fees make 128 practical for multi-sig paths.
+ * Abuse still limited by rate limit + service-wallet balance.
+ */
+export const MAX_STREAM_FRAMES = 128
 /** Match credit seal dust value so sinks/network treat frames like paid proofs. */
 export const STREAM_FRAME_VALUE_LUNA = 1
 const STREAM_FEE_BUFFER_LUNA = 10
@@ -83,6 +87,34 @@ function writeHeader(
   hashPrefix.copy(frame, 5, 0, 4)
 }
 
+/** Shorten floats in wire JSON (big win for long signature paths). */
+function q(n: unknown, digits = 4): number {
+  const v = typeof n === 'number' ? n : Number(n)
+  if (!Number.isFinite(v)) return 0
+  const p = 10 ** digits
+  return Math.round(v * p) / p
+}
+
+function slimPath(path: unknown): unknown {
+  if (!path || typeof path !== 'object') return path
+  const p = path as {
+    epsilon?: number
+    lineWidthRatio?: number
+    strokes?: Array<{ points?: Array<{ x?: number; y?: number }> }>
+  }
+  return {
+    epsilon: q(p.epsilon, 2),
+    lineWidthRatio: q(p.lineWidthRatio, 4),
+    strokes: Array.isArray(p.strokes)
+      ? p.strokes.map(s => ({
+          points: Array.isArray(s.points)
+            ? s.points.map(pt => ({ x: q(pt.x), y: q(pt.y) }))
+            : [],
+        }))
+      : [],
+  }
+}
+
 /** Strip PNG; keep path / text / marks for wire JSON. Always emit mark colors. */
 export function slimAnnotations(annotations: unknown[]): unknown[] {
   const out: unknown[] = []
@@ -93,22 +125,22 @@ export function slimAnnotations(annotations: unknown[]): unknown[] {
       out.push({
         t: 's',
         page: a.pageIndex,
-        x: a.x,
-        y: a.y,
-        w: a.width,
-        h: a.height,
-        ...(a.path ? { path: a.path } : {}),
+        x: q(a.x),
+        y: q(a.y),
+        w: q(a.width),
+        h: q(a.height),
+        ...(a.path ? { path: slimPath(a.path) } : {}),
       })
     } else if (a.type === 'text') {
       out.push({
         t: 'x',
         page: a.pageIndex,
-        x: a.x,
-        y: a.y,
-        w: a.width,
-        h: a.height,
+        x: q(a.x),
+        y: q(a.y),
+        w: q(a.width),
+        h: q(a.height),
         text: a.text,
-        ...(a.fontSizeRatio != null ? { font: a.fontSizeRatio } : {}),
+        ...(a.fontSizeRatio != null ? { font: q(a.fontSizeRatio, 4) } : {}),
         color: typeof a.color === 'string' ? a.color : '#0f172a',
       })
     } else if (a.type === 'checkmark' || a.type === 'cross') {
@@ -116,10 +148,10 @@ export function slimAnnotations(annotations: unknown[]): unknown[] {
       out.push({
         t: a.type === 'checkmark' ? 'c' : 'k',
         page: a.pageIndex,
-        x: a.x,
-        y: a.y,
-        w: a.width,
-        h: a.height,
+        x: q(a.x),
+        y: q(a.y),
+        w: q(a.width),
+        h: q(a.height),
         color: typeof a.color === 'string' ? a.color : defaultColor,
       })
     }
