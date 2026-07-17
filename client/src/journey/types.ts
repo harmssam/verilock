@@ -37,8 +37,8 @@ export const CREATOR_STAGES: JourneyStage[] = [
   {
     id: 'sign',
     label: 'Sign',
-    verb: 'Sign as creator',
-    blurb: 'Confirm the fingerprint with your wallet first, then invite co-signers.',
+    verb: 'Add your signature',
+    blurb: 'Draw your signature on this fingerprint. Invite co-signers only when the agreement needs more than one party.',
     privacyNote: 'You prove you hold these bytes - still no upload.',
   },
   {

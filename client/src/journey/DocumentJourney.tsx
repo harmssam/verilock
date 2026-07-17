@@ -1718,13 +1718,17 @@ export function DocumentJourney({
                                     Signing…
                                   </>
                                 ) : (
-                                  `Sign as ${pendingParty.roleLabel}`
+                                  'Sign'
                                 )}
                               </button>
                               <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
                                 {role === 'creator'
-                                  ? 'Sign first with your wallet. Next you will share the invite link and PDF with co-signers.'
-                                  : 'Each co-signer uses their own wallet. After you sign, the creator can seal when everyone is done.'}
+                                  ? requiredCount(doc) <= 1
+                                    ? 'Confirm your drawn signature, then continue to seal on Nimiq.'
+                                    : 'Confirm your drawn signature, then share the invite link and PDF with co-signers.'
+                                  : requiredCount(doc) <= 1
+                                    ? 'Confirm your drawn signature to finish.'
+                                    : 'Confirm your drawn signature. The creator seals when everyone has signed.'}
                               </p>
                             </>
                           )}
