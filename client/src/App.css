@@ -1462,16 +1462,62 @@ body[data-verilock-surface='journey'] .action-stack .share-card--embedded {
   background: #ffffff;
   border: 1px solid var(--lr-line);
   border-radius: 12px;
-  box-shadow: none;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  padding: 1rem 1.05rem;
 }
 
 body[data-verilock-surface='journey'] .share-link-block {
   background: rgba(13, 148, 136, 0.05);
-  border-color: rgba(13, 148, 136, 0.22);
+  border-color: rgba(13, 148, 136, 0.2);
 }
 
 body[data-verilock-surface='journey'] .share-option-label {
   color: var(--lr-muted);
+}
+
+body[data-verilock-surface='journey'] .share-more {
+  background: rgba(13, 148, 136, 0.04);
+  border-color: var(--lr-line);
+}
+
+body[data-verilock-surface='journey'] .share-more summary {
+  color: var(--lr-muted);
+}
+
+body[data-verilock-surface='journey'] .share-more summary:hover {
+  color: var(--lr-accent);
+}
+
+body[data-verilock-surface='journey'] .share-card .hash-chip,
+body[data-verilock-surface='journey'] .share-card .share-link-chip {
+  background: #ffffff;
+  border-color: rgba(13, 148, 136, 0.22);
+  color: var(--mint-deep, #0f766e);
+}
+
+body[data-verilock-surface='journey'] .share-email-preview-card {
+  background: #ffffff;
+  border-color: var(--lr-line);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.05);
+}
+
+body[data-verilock-surface='journey'] .share-email-preview-header {
+  color: #ffffff;
+}
+
+body[data-verilock-surface='journey'] .share-email-preview-lead,
+body[data-verilock-surface='journey'] .share-email-preview-details strong {
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .share-email-preview-greeting,
+body[data-verilock-surface='journey'] .share-email-preview-steps,
+body[data-verilock-surface='journey'] .share-copy-instructions {
+  color: var(--lr-muted);
+}
+
+body[data-verilock-surface='journey'] .share-email-preview-url {
+  color: var(--mint-deep, #0f766e);
 }
 
 /* Ghost / secondary actions inside dock: not slate grey fills */
