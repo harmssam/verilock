@@ -145,13 +145,15 @@ check('Share step supports Web Share + .eml handoff without server PDF upload', 
   assert.match(card, /openMailtoCompose/)
   assert.match(card, /shareInviteWithPdf/)
   assert.match(card, /handoffShareEml/)
-  assert.match(card, /To \(co-signer email\)/)
   assert.match(card, /inviteRecipients/)
-  assert.match(card, /mergeRecipientLists/)
+  assert.match(card, /invite email above/)
+  assert.doesNotMatch(card, /To \(co-signer email\)/)
   const journey = readFileSync(join(clientDir, 'src/journey/DocumentJourney.tsx'), 'utf8')
   assert.match(journey, /ShareInviteCard/)
   assert.match(journey, /coSignerEmails/)
   assert.match(journey, /invite email/)
+  assert.doesNotMatch(journey, /Add co-signers/)
+  assert.match(journey, /applyCosigners\(\{/)
 })
 
 if (process.env.VERIFY_DIST === '1') {

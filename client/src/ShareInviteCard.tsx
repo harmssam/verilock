@@ -4,11 +4,9 @@ import { sha256Hex } from './pdf/hashPdf'
 import { ShareEmailPreview } from './ShareEmailPreview'
 import {
   buildShareActionPlan,
-  primaryActionRequiresRecipients,
   shareHintForPlan,
   shareInstructionKinds,
   shareIntroForPlan,
-  shareRecipientsHint,
   type ShareActionId,
   type ShareActionPlan,
   type ShareInstructionKind,
@@ -20,10 +18,8 @@ import {
   canShareFiles,
   downloadBlob,
   handoffShareEml,
-  invalidRecipientEmails,
-  mergeRecipientLists,
+  isValidEmailAddress,
   openMailtoCompose,
-  parseRecipientEmails,
   shareEmlDownloadName,
   shareInviteWithPdf,
 } from './shareInvite'
@@ -43,7 +39,7 @@ interface ShareInviteCardProps {
   pdfFile?: File | null
   /**
    * Co-signer invite emails from the Signatures UI (client-only).
-   * Prefills To when the user has not edited To yet.
+   * Used as Mail / .eml To — no separate field here.
    */
   inviteRecipients?: string[]
   embedded?: boolean
@@ -110,13 +106,13 @@ function instructionItems(
         <li key="open-mail">
           {kinds[0] === 'web-share' ? (
             <>
-              Or use <strong>Open in Mail</strong> under More (fills To) and attach the downloaded
-              PDF
+              Or use <strong>Open in Mail</strong> under More (fills To from invite email above)
+              and attach the downloaded PDF
             </>
           ) : (
             <>
-              Enter the co-signer email, then <strong>Open in Mail</strong> — To and the invite body
-              fill automatically
+              Enter the co-signer invite email above, then <strong>Open in Mail</strong> — To and
+              the invite body fill automatically
             </>
           )}
         </li>,
@@ -131,8 +127,8 @@ function instructionItems(
     } else if (kind === 'eml') {
       items.push(
         <li key="eml">
-          Enter the co-signer email, then <strong>Download .eml package</strong> and open it in
-          Outlook (or your mail app)
+          Enter the co-signer invite email above, then <strong>Download .eml package</strong> and
+          open it in Outlook (or your mail app)
         </li>,
       )
     } else {
@@ -160,29 +156,15 @@ export function ShareInviteCard({
   embedded,
 }: ShareInviteCardProps) {
   const pickId = useId()
-  const recipientsId = useId()
   const moreId = useId()
   /** Extra local pick when parent did not pass a File (e.g. after reload). */
   const [pickedPdf, setPickedPdf] = useState<File | null>(null)
   const [pickBusy, setPickBusy] = useState(false)
   const [pickError, setPickError] = useState<string | null>(null)
-  const [recipientsRaw, setRecipientsRaw] = useState('')
-  /** Once the user edits To, stop overwriting from parent co-signer emails. */
-  const [recipientsDirty, setRecipientsDirty] = useState(false)
   const [recipientError, setRecipientError] = useState<string | null>(null)
 
   const localPdf = pdfFile ?? pickedPdf
   const canPackEml = Boolean(localPdf)
-
-  const inviteRecipientsKey = inviteRecipients
-    .map(e => e.trim())
-    .filter(Boolean)
-    .join(', ')
-
-  useEffect(() => {
-    if (recipientsDirty) return
-    setRecipientsRaw(inviteRecipientsKey)
-  }, [inviteRecipientsKey, recipientsDirty])
 
   const [webShareOk, setWebShareOk] = useState(false)
   useEffect(() => {
@@ -198,14 +180,17 @@ export function ShareInviteCard({
     [webShareOk],
   )
 
-  /** Field + parent co-signer emails — never drop parent values if sync lagged. */
+  /** From Signatures UI only — no duplicate To field. */
   const recipients = useMemo(
     () =>
-      mergeRecipientLists(
-        parseRecipientEmails(recipientsRaw),
-        inviteRecipients.map(e => e.trim()).filter(Boolean),
-      ),
-    [recipientsRaw, inviteRecipients],
+      inviteRecipients
+        .map(e => e.trim())
+        .filter(Boolean)
+        .filter((email, index, all) => {
+          const key = email.toLowerCase()
+          return all.findIndex(x => x.toLowerCase() === key) === index
+        }),
+    [inviteRecipients],
   )
 
   const pdfName =
@@ -229,14 +214,18 @@ export function ShareInviteCard({
   const [emlReady, setEmlReady] = useState<'shared' | 'downloaded' | null>(null)
   const [emlError, setEmlError] = useState<string | null>(null)
 
+  // Clear recipient errors when parent emails change.
+  useEffect(() => {
+    setRecipientError(null)
+  }, [recipients.join('|')])
+
   const resolveRecipients = (): string[] | null => {
-    const invalid = invalidRecipientEmails(recipientsRaw)
-    // Parent-only addresses may not be in recipientsRaw; only validate typed text.
+    const invalid = recipients.filter(email => !isValidEmailAddress(email))
     if (invalid.length > 0) {
       setRecipientError(
         invalid.length === 1
-          ? `Not a valid email: ${invalid[0]}`
-          : `Not valid emails: ${invalid.join(', ')}`,
+          ? `Not a valid invite email: ${invalid[0]}`
+          : `Not valid invite emails: ${invalid.join(', ')}`,
       )
       return null
     }
@@ -300,7 +289,7 @@ export function ShareInviteCard({
   }
 
   /**
-   * mailto fills To/subject/body; PDF downloads for attach.
+   * mailto fills To/subject/body from invite emails above; PDF downloads for attach.
    * Browsers cannot open mailto: with an attachment.
    */
   const openInMail = async () => {
@@ -309,9 +298,7 @@ export function ShareInviteCard({
     if (to === null) return
     if (to.length === 0) {
       setRecipientError(
-        plan.platform === 'mac' || plan.platform === 'ios'
-          ? 'Add the co-signer email in To first — Mail will open with that address filled in.'
-          : 'Add the co-signer email in To first so your mail app opens with that address filled in.',
+        'Add the co-signer invite email above first — Mail will open with that address filled in.',
       )
       return
     }
@@ -319,12 +306,10 @@ export function ShareInviteCard({
     setMailBusy(true)
     setEmlError(null)
     try {
-      // Download PDF first so it is in Downloads when Mail opens.
       downloadBlob(localPdf, pdfName)
       const url = buildShareMailtoUrl(document, shareUrl, to, {
         pdfDownloadName: pdfName,
       })
-      // Brief delay so the download starts before focus moves to Mail.
       window.setTimeout(() => {
         openMailtoCompose(url)
       }, 150)
@@ -343,7 +328,7 @@ export function ShareInviteCard({
     if (to === null) return
     if (to.length === 0) {
       setRecipientError(
-        'Add the co-signer email in To first so the package includes a recipient.',
+        'Add the co-signer invite email above first so the package includes a recipient.',
       )
       return
     }
@@ -440,25 +425,6 @@ export function ShareInviteCard({
     )
   }
 
-  const recipientsRequired =
-    canPackEml &&
-    (primaryActionRequiresRecipients(plan) ||
-      plan.more.includes('open-mail') ||
-      plan.more.includes('eml') ||
-      plan.secondary.includes('open-mail') ||
-      plan.secondary.includes('eml'))
-
-  const toLabel = (() => {
-    if (!canPackEml) return 'To (co-signer email)'
-    if (plan.isMobile && plan.webShareFiles) {
-      return 'To (co-signer email) — optional for share sheet'
-    }
-    if (plan.primary[0] === 'eml') {
-      return 'To (co-signer email) — required for .eml'
-    }
-    return 'To (co-signer email) — required for Mail'
-  })()
-
   return (
     <div className={embedded ? 'share-card share-card--embedded' : 'card share-card'}>
       {!embedded && <h2>Invite signers</h2>}
@@ -476,30 +442,11 @@ export function ShareInviteCard({
         )}
       </p>
 
-      {canPackEml && recipientsRequired && (
-        <div className="field share-recipients">
-          <label className="field-label" htmlFor={recipientsId}>
-            {toLabel}
-          </label>
-          <input
-            id={recipientsId}
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            placeholder="signer@example.com"
-            value={recipientsRaw}
-            onChange={e => {
-              setRecipientsDirty(true)
-              setRecipientsRaw(e.target.value)
-              if (recipientError) setRecipientError(null)
-            }}
-            aria-invalid={Boolean(recipientError)}
-            aria-describedby={`${recipientsId}-hint`}
-          />
-          <p id={`${recipientsId}-hint`} className="muted share-recipients-hint">
-            {shareRecipientsHint(plan)}
-          </p>
-        </div>
+      {recipients.length > 0 && (
+        <p className="muted share-recipients-summary">
+          Invite To:{' '}
+          <span className="share-pdf-name">{recipients.join(', ')}</span>
+        </p>
       )}
 
       {canPackEml ? (
