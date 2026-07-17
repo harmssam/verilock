@@ -74,15 +74,17 @@ export function buildShareActionPlan(options: {
     }
   }
 
-  // macOS: no .eml — Apple Mail often ignores To on import; mailto + PDF download is reliable.
+  // macOS desktop: no .eml (Mail ignores To on import), no Web Share files
+  // (Messages opens empty). mailto + PDF download + copy link only.
   if (platform === 'mac') {
     return {
       platform,
       isMobile,
-      webShareFiles,
+      // Force false so UI never shows “Share PDF + invite” on desktop Mac.
+      webShareFiles: false,
       primary: ['open-mail'],
       secondary: ['copy-link'],
-      more: webShareFiles ? ['web-share'] : [],
+      more: [],
     }
   }
 
