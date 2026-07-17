@@ -38,6 +38,8 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
   const [annotations, setAnnotations] = useState<PdfAnnotation[]>([])
   const [doc, setDoc] = useState<SealDocument | null>(null)
   const [busy, setBusy] = useState(false)
+  /** Shown while packing / broadcasting so long multi-tx publishes feel active. */
+  const [busyLabel, setBusyLabel] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [lastPostBody, setLastPostBody] = useState<unknown>(null)
   const [verifyFile, setVerifyFile] = useState<File | null>(null)
@@ -149,7 +151,13 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
       setError('Need wallet, PDF hash, and at least one annotation')
       return
     }
+    const frameHint = streamPreview?.frameCount ?? '…'
     setBusy(true)
+    setBusyLabel(
+      broadcast
+        ? `Publishing on-chain (~${frameHint} txs via service wallet)…`
+        : `Packing stream (~${frameHint} frames)…`,
+    )
     setError(null)
     try {
       const result = await api.publishAnnotationStream(token, {
@@ -168,6 +176,14 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
         serviceWalletConfigured: result.serviceWalletConfigured,
         broadcastEnabled: result.broadcastEnabled,
       })
+      if (broadcast && !result.onChain && !result.broadcastError && result.txHashes.length === 0) {
+        setError(
+          'Publish returned without tx hashes. Check that ANNOTATION_STREAM_BROADCAST=true and SERVICE_WALLET_PRIVATE_KEY are set on the server.',
+        )
+      }
+      if (result.broadcastError) {
+        setError(result.broadcastError)
+      }
       // Stay on annotate so pack/publish/edit remain available; "chain" is a status panel.
       if (phase === 'created' || phase === 'chain' || phase === 'verify') {
         setPhase(pdfFile ? 'annotate' : 'chain')
@@ -176,6 +192,7 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
       setError(err instanceof Error ? err.message : 'Stream publish failed')
     } finally {
       setBusy(false)
+      setBusyLabel(null)
     }
   }
 
@@ -281,6 +298,12 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
       {error && (
         <p role="alert" style={{ color: '#b91c1c', fontSize: '0.875rem' }}>
           {error}
+        </p>
+      )}
+      {busy && busyLabel && (
+        <p role="status" style={{ color: '#0f766e', fontSize: '0.875rem', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <LoaderCircle className="spin" size={16} />
+          {busyLabel}
         </p>
       )}
 
@@ -432,6 +455,9 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
                   : 'Broadcast packed frames via service wallet (1 luna each)'
               }
             >
+              {busy && busyLabel?.includes('on-chain') ? (
+                <LoaderCircle className="spin" size={16} />
+              ) : null}
               Publish stream on-chain
             </button>
             <button type="button" className="btn btn-ghost" disabled={busy} onClick={startVerify}>
