@@ -11,37 +11,95 @@
   line-height: 1.45;
 }
 
-.share-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.share-recipients {
+  margin-bottom: 0.85rem;
+}
+
+.share-recipients-hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.share-actions-layout {
+  display: flex;
+  flex-direction: column;
   gap: 0.55rem;
   margin-bottom: 0.85rem;
 }
 
-.share-actions--with-eml {
+.share-actions {
+  display: grid;
   grid-template-columns: 1fr;
+  gap: 0.55rem;
 }
 
-.share-actions:not(.share-actions--with-eml) {
-  grid-template-columns: 1fr;
+.share-actions--primary {
+  margin: 0;
+}
+
+.share-actions--secondary,
+.share-actions--more {
+  margin: 0;
+}
+
+.share-actions--no-pdf {
+  margin-bottom: 0.85rem;
 }
 
 @media (min-width: 421px) {
-  .share-actions--with-eml {
+  .share-actions--multi {
     grid-template-columns: 1fr 1fr;
   }
 
-  .share-actions--with-eml .share-eml-btn {
-    grid-column: 1 / -1;
-  }
-
-  .share-actions:not(.share-actions--with-eml) {
+  .share-actions--no-pdf {
     grid-template-columns: 1fr 1fr;
   }
 
-  .share-actions:not(.share-actions--with-eml) .share-eml-btn {
+  .share-actions--no-pdf .share-eml-pick {
     grid-column: 1 / -1;
   }
+}
+
+.share-more {
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.15rem 0.65rem 0.15rem;
+}
+
+.share-more summary {
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  padding: 0.55rem 0.15rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-muted, #94a3b8);
+}
+
+.share-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.share-more summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 0.4rem;
+  transition: transform 0.12s ease;
+  color: var(--text-dim, #64748b);
+}
+
+.share-more[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.share-more summary:hover {
+  color: var(--mint, #5eead4);
+}
+
+.share-more .share-actions {
+  padding: 0 0.15rem 0.65rem;
 }
 
 .share-eml-pick {
@@ -63,7 +121,9 @@
 
 .share-email-btn,
 .share-copy-btn,
-.share-eml-btn {
+.share-eml-btn,
+.share-mail-btn,
+.share-web-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -76,6 +136,12 @@
   font-size: 0.84rem;
   color: var(--danger, #f87171);
   line-height: 1.4;
+}
+
+.share-eml-success {
+  margin: 0 0 0.75rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .share-link-block {
@@ -120,7 +186,8 @@
 }
 
 @media (max-width: 420px) {
-  .share-actions {
+  .share-actions--multi,
+  .share-actions--no-pdf {
     grid-template-columns: 1fr;
   }
 }

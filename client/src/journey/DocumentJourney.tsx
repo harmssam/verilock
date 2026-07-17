@@ -25,6 +25,7 @@ import {
   clampField,
   MAX_DISPLAY_NAME_LENGTH,
   MAX_DOCUMENT_NOTES_LENGTH,
+  MAX_SUPPORT_EMAIL_LENGTH,
   MAX_TITLE_LENGTH,
 } from '../fieldLimits'
 import { getPdfPageCount, sha256Hex, shortHash } from '../pdf/hashPdf'
@@ -172,6 +173,8 @@ export function DocumentJourney({
   const [creatorRole, setCreatorRole] = useState<'landlord' | 'tenant'>('landlord')
   /** Optional display names for other parties (index 0 = first co-signer). */
   const [coSignerNames, setCoSignerNames] = useState<string[]>([''])
+  /** Client-only invite emails for co-signers — prefill Share .eml To; never uploaded with the PDF. */
+  const [coSignerEmails, setCoSignerEmails] = useState<string[]>([''])
   const [docNotes, setDocNotes] = useState('')
   /** Draft total parties for share-step Signatures UI (applied via API). */
   const [requiredSigners, setRequiredSigners] = useState(1)
@@ -1524,6 +1527,11 @@ export function DocumentJourney({
                                 while (next.length < others) next.push('')
                                 return next
                               })
+                              setCoSignerEmails(prev => {
+                                const next = prev.slice(0, others)
+                                while (next.length < others) next.push('')
+                                return next
+                              })
                               if (n <= 1) setCreatorNotifyEmail('')
                             }}
                             disabled={busy}
@@ -1543,10 +1551,11 @@ export function DocumentJourney({
                         {requiredSigners > 1 && (
                           <div className="field-stack">
                             <span className="field-label">
-                              Co-signer name{requiredSigners - 1 > 1 ? 's' : ''} (optional)
+                              Co-signer detail{requiredSigners - 1 > 1 ? 's' : ''} (optional)
                             </span>
                             <p className="muted" style={{ margin: '0 0 0.45rem', fontSize: '0.8rem' }}>
-                              Leave blank if they will enter their name when they sign.
+                              Name is for your party list. Invite email pre-fills the email package
+                              To field — it stays on this device (not uploaded with the PDF).
                             </p>
                             {Array.from({ length: requiredSigners - 1 }, (_, index) => {
                               const rentalOther =
@@ -1561,34 +1570,59 @@ export function DocumentJourney({
                                     ? 'Tenant'
                                     : 'Landlord'
                                   : null
+                              const partyLabel = rentalOther ?? `Party ${index + 2}`
                               return (
-                                <label key={index} className="field">
-                                  <span className="field-label">
-                                    {rentalOther ?? `Party ${index + 2}`} name
-                                  </span>
-                                  <input
-                                    value={coSignerNames[index] ?? ''}
-                                    onChange={e => {
-                                      const value = clampField(
-                                        e.target.value,
-                                        MAX_DISPLAY_NAME_LENGTH,
-                                      )
-                                      setCoSignerNames(prev => {
-                                        const next = [...prev]
-                                        while (next.length <= index) next.push('')
-                                        next[index] = value
-                                        return next
-                                      })
-                                    }}
-                                    maxLength={MAX_DISPLAY_NAME_LENGTH}
-                                    placeholder={
-                                      rentalOther
-                                        ? `${rentalOther} full name`
-                                        : 'Name (optional)'
-                                    }
-                                    disabled={busy}
-                                  />
-                                </label>
+                                <div key={index} className="field-stack share-cosigner-fields">
+                                  <label className="field">
+                                    <span className="field-label">{partyLabel} name</span>
+                                    <input
+                                      value={coSignerNames[index] ?? ''}
+                                      onChange={e => {
+                                        const value = clampField(
+                                          e.target.value,
+                                          MAX_DISPLAY_NAME_LENGTH,
+                                        )
+                                        setCoSignerNames(prev => {
+                                          const next = [...prev]
+                                          while (next.length <= index) next.push('')
+                                          next[index] = value
+                                          return next
+                                        })
+                                      }}
+                                      maxLength={MAX_DISPLAY_NAME_LENGTH}
+                                      placeholder={
+                                        rentalOther
+                                          ? `${rentalOther} full name`
+                                          : 'Name (optional)'
+                                      }
+                                      disabled={busy}
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span className="field-label">{partyLabel} invite email</span>
+                                    <input
+                                      type="email"
+                                      inputMode="email"
+                                      autoComplete="email"
+                                      value={coSignerEmails[index] ?? ''}
+                                      onChange={e => {
+                                        const value = clampField(
+                                          e.target.value,
+                                          MAX_SUPPORT_EMAIL_LENGTH,
+                                        )
+                                        setCoSignerEmails(prev => {
+                                          const next = [...prev]
+                                          while (next.length <= index) next.push('')
+                                          next[index] = value
+                                          return next
+                                        })
+                                      }}
+                                      maxLength={MAX_SUPPORT_EMAIL_LENGTH}
+                                      placeholder="signer@example.com"
+                                      disabled={busy}
+                                    />
+                                  </label>
+                                </div>
                               )
                             })}
                           </div>
@@ -1649,6 +1683,10 @@ export function DocumentJourney({
                         linkCopied={linkCopied}
                         onCopyLink={() => void copyLink()}
                         pdfFile={pdfFile ?? signFile}
+                        inviteRecipients={coSignerEmails
+                          .slice(0, Math.max(0, requiredSigners - 1))
+                          .map(e => e.trim())
+                          .filter(Boolean)}
                         embedded
                       />
                       {sharedAck ? (
