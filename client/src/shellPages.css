@@ -1,0 +1,408 @@
+/* ═══════════════════════════════════════════════════════════
+   Shell page chrome — pricing, credits pack, 404.
+   Nested under .lr-app (import after App.css).
+   ═══════════════════════════════════════════════════════════ */
+
+.lr-app {
+  /* ═══════════════════════════════════════════════════════════
+     Pricing restyle (same PricePage DOM & promo data)
+     Scoped under .lr-app.
+     ═══════════════════════════════════════════════════════════ */
+
+  .price-page.card {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 0.25rem 0 1rem;
+  }
+
+  .price-page.card:hover {
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .price-page h2 {
+    margin: 0 0 0.55rem;
+    font-family: var(--font-display);
+    font-size: clamp(1.35rem, 3vw, 1.65rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--lr-text, #0f172a);
+  }
+
+  .price-page-lead {
+    margin: 0 0 1.25rem;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--lr-muted, #8fa3c4);
+    max-width: 40rem;
+  }
+
+  .price-page-lead strong {
+    color: var(--lr-text, #0f172a);
+    font-weight: 700;
+  }
+
+  .price-page-nimiq-link {
+    color: var(--lr-accent, #0d9488);
+    font-weight: 600;
+  }
+
+  .price-page-nimiq-link:hover,
+  .price-page-nimiq-link:focus-visible {
+    text-decoration-color: rgba(13, 148, 136, 0.5);
+  }
+
+  /* Seal model block — light cards */
+
+  .price-page-model {
+    gap: 1.1rem;
+    padding: 1.15rem 1.2rem;
+    border-radius: 14px;
+    border: 1px solid var(--lr-line);
+    background: #ffffff;
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+  }
+
+  .price-page-model-row + .price-page-model-row {
+    padding-top: 1rem;
+    border-top: 1px solid var(--lr-line);
+  }
+
+  .price-page-model-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--lr-dim);
+  }
+
+  .price-page-model-credits {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: var(--lr-accent);
+  }
+
+  .price-page-model-per {
+    color: var(--lr-muted);
+  }
+
+  .price-page-model-explain,
+  .price-page-model-hint {
+    color: var(--lr-muted);
+  }
+
+  .price-page-model-promo {
+    gap: 0.55rem 0.85rem;
+    margin-top: 0.25rem;
+  }
+
+  .price-page-model-promo-badge {
+    display: inline-block;
+    padding: 0.22rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    background: rgba(251, 191, 36, 0.14);
+    color: #b45309;
+    font-size: 0.72rem;
+    font-weight: 750;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .price-page-model-promo-note {
+    color: var(--lr-muted);
+    font-size: 0.8rem;
+  }
+
+  /* Seal fee amount + fiat picker */
+
+  .seal-fee-amount-nim {
+    color: var(--lr-accent);
+  }
+
+  .seal-fee-amount-fiat-value {
+    color: var(--lr-muted);
+  }
+
+  .seal-fee-amount-currency {
+    border: 1px solid var(--lr-line-strong);
+    border-radius: 8px;
+    background-color: var(--lr-surface-2);
+    color: var(--lr-text);
+  }
+
+  .seal-fee-amount-currency:hover {
+    border-color: rgba(13, 148, 136, 0.4);
+    color: var(--lr-text);
+  }
+
+  .seal-fee-amount-currency:focus {
+    border-color: var(--lr-accent);
+    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.18);
+  }
+
+  .seal-fee-amount-was {
+    color: var(--lr-dim);
+  }
+
+  /* Fallback SealPricingDisplay (credits off) */
+
+  .seal-pricing-display {
+    border: 1px solid var(--lr-line);
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+  }
+
+  .seal-pricing-display-promo-badge {
+    border-radius: 6px;
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    background: rgba(251, 191, 36, 0.14);
+    color: #b45309;
+  }
+
+  .seal-pricing-fiat-panel {
+    border-top-color: var(--lr-line);
+  }
+
+  /* Buy credits — same Stripe + NIM flow as production CreditsPanel */
+
+  .price-page-credits {
+    margin-top: 1.5rem;
+    gap: 0.95rem;
+    padding: 1.15rem 1.2rem 1.25rem;
+    border-radius: 14px;
+    border: 1px solid var(--lr-line);
+    background: #ffffff;
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+  }
+
+  .price-page-credits-title {
+    font-size: 1.02rem;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    color: var(--lr-text);
+  }
+
+  .price-page-credits-title svg {
+    color: var(--lr-accent);
+  }
+
+  .price-page-credits-lead {
+    color: var(--lr-muted);
+  }
+
+  .price-page-credits-connect {
+    padding: 1.05rem 1.1rem;
+    border-radius: 12px;
+    border: 1px solid var(--lr-line);
+    background: var(--lr-surface-2);
+  }
+
+  /* Credits pack panel (NIM + Stripe card) */
+
+  .journey-credits {
+    border-radius: 12px;
+    border: 1px solid var(--lr-line);
+    background: var(--lr-surface-2);
+    box-shadow: none;
+  }
+
+  .journey-credits-top-label {
+    color: var(--lr-dim);
+  }
+
+  .journey-credits-balance-n {
+    color: var(--lr-accent);
+  }
+
+  .journey-credits-balance-unit {
+    color: var(--lr-muted);
+  }
+
+  .journey-credits-pack {
+    border-radius: 10px;
+    border: 1px solid var(--lr-line);
+    background: #ffffff;
+    color: var(--lr-text);
+  }
+
+  .journey-credits-pack:hover:not(:disabled) {
+    border-color: rgba(13, 148, 136, 0.35);
+    background: var(--lr-accent-soft);
+  }
+
+  .journey-credits-pack--active {
+    border-color: rgba(13, 148, 136, 0.5);
+    background: var(--lr-accent-soft);
+    box-shadow: 0 0 0 1px rgba(13, 148, 136, 0.12);
+  }
+
+  .journey-credits-pack-n {
+    color: var(--lr-text);
+  }
+
+  .journey-credits-pack-price {
+    color: var(--lr-muted);
+  }
+
+  .journey-credits-pack--active .journey-credits-pack-price {
+    color: var(--lr-accent);
+  }
+
+  .journey-credits-msg {
+    color: var(--lr-muted);
+  }
+
+  .journey-credits-msg--error {
+    color: #b91c1c;
+  }
+
+  /* Pricing CTAs: NIM primary, card (Stripe) secondary — same APIs as production */
+
+  &--pricing .btn-primary {
+    background: var(--lr-accent);
+    color: #fff;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font-weight: 700;
+    box-shadow: 0 6px 16px rgba(13, 148, 136, 0.2);
+  }
+
+  &--pricing .btn-primary:hover:not(:disabled) {
+    background: var(--mint-deep, #0f766e);
+    filter: none;
+    box-shadow: 0 8px 20px rgba(13, 148, 136, 0.28);
+  }
+
+  &--pricing .btn-secondary {
+    border: 1px solid rgba(13, 148, 136, 0.4);
+    background: #ffffff;
+    color: var(--lr-accent);
+    border-radius: 10px;
+    font-weight: 700;
+  }
+
+  &--pricing .btn-secondary:hover:not(:disabled) {
+    border-color: var(--lr-accent);
+    background: var(--lr-accent-soft);
+    color: var(--mint-deep, #0f766e);
+  }
+
+  &--pricing .journey-credits-actions .btn {
+    min-height: 2.75rem;
+  }
+
+  /* Why Nimiq — scannable card grid on the light shell */
+
+  .price-page-why {
+    margin-top: 1.75rem;
+    padding: 1.35rem 1.3rem 1.4rem;
+    border-radius: 16px;
+    border: 1px solid var(--lr-line);
+    background: #ffffff;
+    box-shadow: 0 6px 22px rgba(15, 23, 42, 0.045);
+  }
+
+  .price-page-why-badge {
+    border-color: rgba(233, 178, 19, 0.32);
+    background:
+      radial-gradient(circle at 30% 25%, rgba(255, 220, 120, 0.35), transparent 55%),
+      #fffaf0;
+    box-shadow: 0 4px 12px rgba(233, 178, 19, 0.14);
+  }
+
+  .price-page-why-title {
+    font-size: 1.12rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: var(--lr-text, #0f172a);
+  }
+
+  .price-page-why-lead {
+    color: var(--lr-muted, #4b5c6b);
+    font-size: 0.92rem;
+    line-height: 1.58;
+  }
+
+  .price-page-why-item {
+    border-color: var(--lr-line);
+    background: #fafdfc;
+    box-shadow: none;
+    transition:
+      border-color 0.15s ease,
+      background 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  .price-page-why-item:hover {
+    border-color: rgba(13, 148, 136, 0.22);
+    background: #ffffff;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+  }
+
+  .price-page-why-item-title {
+    color: var(--lr-text, #0f172a);
+    font-size: 0.9rem;
+  }
+
+  .price-page-why-item-body {
+    color: var(--lr-muted, #4b5c6b);
+    font-size: 0.84rem;
+    line-height: 1.52;
+  }
+
+  .price-page-why-cta {
+    border-top-color: var(--lr-line);
+    color: var(--lr-muted, #4b5c6b);
+  }
+
+  .price-page-nimiq-link {
+    color: var(--lr-accent, #0d9488);
+  }
+
+  .price-page-nimiq-link:hover,
+  .price-page-nimiq-link:focus-visible {
+    text-decoration-color: rgba(13, 148, 136, 0.45);
+  }
+
+  .price-page .muted {
+    color: var(--lr-muted, #4b5c6b);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     404 / missing agreement — light shell card
+     ═══════════════════════════════════════════════════════════ */
+
+  .not-found-page.card {
+    background: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.09);
+    border-radius: 14px;
+    box-shadow: 0 10px 36px rgba(15, 23, 42, 0.05);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .not-found-kicker {
+    color: var(--lr-accent, #0d9488);
+  }
+
+  .not-found-page h2 {
+    color: var(--lr-text, #0f172a);
+  }
+
+  .not-found-message,
+  .not-found-path {
+    color: var(--lr-muted, #4b5c6b);
+  }
+
+  .not-found-path .mono {
+    color: var(--lr-dim, #6b7c8d);
+  }
+}
