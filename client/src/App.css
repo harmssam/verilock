@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════
-   Production light shell — layout, header, home, footer, pricing chrome.
-   Journey component light overrides live in journey/journeyLight.css
-   (imported from main.tsx after Journey.css).
+   Production light shell — layout, header, home, footer.
+   Journey components: journey/Journey.css (light-only theme).
+   Pricing / 404 chrome: shellPages.css.
    ═══════════════════════════════════════════════════════════ */
 
 /* ── App shell ── */
