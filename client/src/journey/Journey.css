@@ -3844,7 +3844,8 @@ a.hash-chip.text-link:focus-visible {
 }
 
 .journey-verify-details .verify-match-card {
-  background: rgba(0, 0, 0, 0.28);
+  /* Light shell overrides in App.css; dark glass kept for non-journey hosts only */
+  background: color-mix(in srgb, var(--surface-raised, #1e293b) 88%, transparent);
 }
 
 .journey-verify-details .verify-match-meta {

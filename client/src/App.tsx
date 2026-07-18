@@ -344,14 +344,19 @@ export function App() {
     scrollShellTop()
   }, [blendToSurface])
 
+  /**
+   * Enter a path track. Default remounts DocumentJourney (path picker).
+   * `remount: false` keeps in-memory PDF (e.g. sealed → verify handoff).
+   */
   const pickRole = useCallback(
-    (role: PathRole) => {
+    (role: PathRole, opts?: { remount?: boolean }) => {
+      const remount = opts?.remount !== false
       saveJourneyIntent(role)
       // Single push of ?intent= only. syncIntentToUrl uses replaceState and was
       // destroying the clean landing history entry, so Back skipped home.
       setTrackRole(role)
       setScreen('journey')
-      setJourneyEpoch(n => n + 1)
+      if (remount) setJourneyEpoch(n => n + 1)
       pushShellUrl(`/?intent=${role}`)
       setNavEpoch(n => n + 1)
       blendToSurface('track')
@@ -716,6 +721,7 @@ export function App() {
               onPageMeta={handleJourneyPageMeta}
               onHome={goJourney}
               onStartCreate={startCreate}
+              onSwitchPath={role => pickRole(role, { remount: false })}
               /* Shell LandingHome owns the path picker — never double it under keep-alive. */
             />
           </div>

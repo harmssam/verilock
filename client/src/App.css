@@ -1656,6 +1656,177 @@ body[data-verilock-surface='journey'] .doc-stage-browse--primary:hover:not(:disa
 body[data-verilock-surface='journey'] .verify-result-card {
   background: linear-gradient(135deg, rgba(13, 148, 136, 0.08), rgba(13, 148, 136, 0.03));
   border-color: rgba(13, 148, 136, 0.28);
+  color: var(--lr-text);
+}
+
+/* Post-seal / verify “review”: match cards were dark glass → muddy grey slabs */
+body[data-verilock-surface='journey'] .done-banner {
+  background: rgba(13, 148, 136, 0.08);
+  border-color: rgba(13, 148, 136, 0.28);
+  color: var(--mint-deep, #0f766e);
+}
+
+body[data-verilock-surface='journey'] .done-banner .muted {
+  color: var(--lr-muted);
+}
+
+body[data-verilock-surface='journey'] .result-banner--ok {
+  background: rgba(13, 148, 136, 0.08);
+  border-color: rgba(13, 148, 136, 0.28);
+  color: var(--mint-deep, #0f766e);
+}
+
+body[data-verilock-surface='journey'] .result-banner--bad {
+  background: rgba(225, 29, 72, 0.06);
+  border-color: rgba(225, 29, 72, 0.22);
+  color: #be123c;
+}
+
+body[data-verilock-surface='journey'] .journey-verify-details .verify-match-card,
+body[data-verilock-surface='journey'] .verify-match-card {
+  background: #ffffff;
+  border-color: var(--lr-line);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .verify-match-card--highlighted {
+  border-color: rgba(13, 148, 136, 0.4);
+  box-shadow: 0 0 0 1px rgba(13, 148, 136, 0.12), 0 4px 16px rgba(13, 148, 136, 0.08);
+}
+
+body[data-verilock-surface='journey'] .verify-match-title {
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .verify-match-status {
+  color: var(--lr-muted);
+  border-color: var(--lr-line);
+  background: #ffffff;
+}
+
+body[data-verilock-surface='journey'] .verify-match-status--locked {
+  color: var(--lr-accent);
+  border-color: rgba(13, 148, 136, 0.35);
+  background: rgba(13, 148, 136, 0.08);
+}
+
+body[data-verilock-surface='journey'] .verify-match-meta dt {
+  color: var(--lr-muted);
+}
+
+body[data-verilock-surface='journey'] .verify-match-meta dd {
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .verify-match-actions {
+  border-top-color: var(--lr-line);
+}
+
+body[data-verilock-surface='journey'] .verify-matches .document-filename {
+  background: rgba(13, 148, 136, 0.05);
+  border-color: rgba(13, 148, 136, 0.18);
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .verify-matches .document-filename-label {
+  color: var(--lr-muted);
+}
+
+body[data-verilock-surface='journey'] .verify-matches .document-filename-value {
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .verify-matches .hash-chip {
+  background: #ffffff;
+  border-color: rgba(13, 148, 136, 0.22);
+  color: var(--mint-deep, #0f766e);
+}
+
+body[data-verilock-surface='journey'] .verify-matches a.hash-chip:hover,
+body[data-verilock-surface='journey'] .verify-matches a.hash-chip:focus-visible {
+  color: var(--mint-deep, #0f766e);
+  border-color: rgba(13, 148, 136, 0.4);
+  background: rgba(13, 148, 136, 0.06);
+}
+
+/* Credit seal wait panel (seal step review) — not dark glass */
+body[data-verilock-surface='journey'] .credit-seal-progress {
+  border-color: rgba(13, 148, 136, 0.22);
+  background:
+    linear-gradient(
+      160deg,
+      rgba(13, 148, 136, 0.08),
+      #ffffff 55%,
+      rgba(251, 191, 36, 0.05)
+    );
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+}
+
+body[data-verilock-surface='journey'] .credit-seal-progress-core {
+  color: var(--lr-accent);
+  background: rgba(13, 148, 136, 0.1);
+  border-color: rgba(13, 148, 136, 0.35);
+  box-shadow: 0 0 20px rgba(13, 148, 136, 0.12);
+}
+
+body[data-verilock-surface='journey'] .credit-seal-progress-core--done {
+  color: #ffffff;
+  background: var(--lr-accent);
+  border-color: transparent;
+}
+
+body[data-verilock-surface='journey'] .credit-seal-progress-title {
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .credit-seal-progress-status {
+  color: var(--mint-deep, #0f766e);
+}
+
+body[data-verilock-surface='journey'] .credit-seal-progress-kicker {
+  color: #b45309;
+}
+
+body[data-verilock-surface='journey'] .credit-seal-progress-step {
+  border-color: var(--lr-line);
+  background: #ffffff;
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .credit-seal-progress-step--current {
+  border-color: rgba(13, 148, 136, 0.35);
+  background: rgba(13, 148, 136, 0.06);
+}
+
+body[data-verilock-surface='journey'] .credit-seal-progress-step--done {
+  border-color: rgba(13, 148, 136, 0.22);
+  background: rgba(13, 148, 136, 0.04);
+}
+
+body[data-verilock-surface='journey'] .credit-seal-progress-step-icon {
+  color: var(--lr-muted);
+  background: rgba(13, 148, 136, 0.06);
+}
+
+body[data-verilock-surface='journey'] .credit-seal-progress-step--current .credit-seal-progress-step-icon {
+  color: var(--lr-accent);
+  background: rgba(13, 148, 136, 0.12);
+}
+
+body[data-verilock-surface='journey'] .credit-seal-progress-step--done .credit-seal-progress-step-icon {
+  color: #ffffff;
+  background: var(--lr-accent);
+}
+
+body[data-verilock-surface='journey'] .credit-seal-progress-step-text strong {
+  color: var(--lr-text);
+}
+
+body[data-verilock-surface='journey'] .credit-seal-progress-leave {
+  border-color: rgba(202, 138, 4, 0.35);
+  background: rgba(251, 191, 36, 0.1);
+  color: #b45309;
 }
 
 /* Journey toolbar “Back home” etc. inside dock head */
