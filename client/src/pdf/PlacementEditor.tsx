@@ -603,6 +603,18 @@ export function PlacementEditor({
                   tabIndex={0}
                   onClick={() => selectPerson(p.slotIndex)}
                   onKeyDown={e => {
+                    // Space/Enter activate the person tab for a11y — but must not steal
+                    // keystrokes from nested name/wallet inputs (e.g. typing "Sam Harms").
+                    const t = e.target as HTMLElement | null
+                    if (
+                      t &&
+                      (t.tagName === 'INPUT' ||
+                        t.tagName === 'TEXTAREA' ||
+                        t.tagName === 'SELECT' ||
+                        t.isContentEditable)
+                    ) {
+                      return
+                    }
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
                       selectPerson(p.slotIndex)
@@ -853,7 +865,7 @@ export function PlacementEditor({
           {loadError && <p className="pdf-annotator-hint">{loadError}</p>}
           <div
             ref={wrapRef}
-            className="pdf-annotator-page-wrap"
+            className={`pdf-annotator-page-wrap${tool !== 'select' ? ' is-tool-active' : ''}`}
             style={{ width: cssSize.width }}
             onPointerDown={onStagePointerDown}
             onPointerMove={onStagePointerMove}

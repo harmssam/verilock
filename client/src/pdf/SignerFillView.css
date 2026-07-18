@@ -65,7 +65,8 @@
   border-radius: 12px;
   border: 1px solid var(--border, #e2e8f0);
   background: #e2e8f0;
-  overflow: hidden;
+  /* Let the stage's always-visible scrollbars paint outside the page box. */
+  overflow: visible;
 }
 
 .signer-fill-stage {
@@ -104,6 +105,7 @@
 
 .signer-fill-field.is-mine {
   pointer-events: auto;
+  touch-action: manipulation;
   border-color: var(--person-color, #0f766e);
   border-style: solid;
   background: color-mix(in srgb, var(--person-color, #0f766e) 14%, #fff);

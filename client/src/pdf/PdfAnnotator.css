@@ -34,9 +34,46 @@
   border: 1px solid var(--border, #e2e8f0);
   border-radius: 10px;
   background: #f1f5f9;
-  overflow: auto;
+  /* Always show vertical scroll rail; horizontal only when the page is wider. */
+  overflow-x: auto;
+  overflow-y: scroll;
   max-height: min(70vh, 720px);
   padding: 0.75rem;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto; /* Firefox: classic scrollbar, not overlay-thin */
+  scrollbar-color: #64748b #e2e8f0;
+}
+
+/* WebKit / Blink: force a permanent, grab-able track (macOS hides overlay bars). */
+.pdf-annotator-stage::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+  background: #e2e8f0;
+}
+
+.pdf-annotator-stage::-webkit-scrollbar-track {
+  background: #e2e8f0;
+  border-radius: 0 8px 8px 0;
+}
+
+.pdf-annotator-stage::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 8px;
+  border: 3px solid #e2e8f0;
+  background-clip: padding-box;
+  min-height: 2.5rem;
+}
+
+.pdf-annotator-stage::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+  border: 3px solid #e2e8f0;
+  background-clip: padding-box;
+}
+
+.pdf-annotator-stage::-webkit-scrollbar-corner {
+  background: #e2e8f0;
 }
 
 .pdf-annotator-page-wrap {
@@ -46,6 +83,12 @@
   box-shadow: 0 4px 24px rgb(15 23 42 / 12%);
   background: #fff;
   user-select: none;
+  /* Default: finger pan scrolls the stage (critical on iPad).
+     .is-tool-active locks pan while placing so taps don't scroll away. */
+  touch-action: pan-x pan-y;
+}
+
+.pdf-annotator-page-wrap.is-tool-active {
   touch-action: none;
 }
 
@@ -68,6 +111,8 @@
   cursor: grab;
   border: 1px dashed transparent;
   border-radius: 2px;
+  /* Drag slots without the stage interpreting the gesture as a scroll. */
+  touch-action: none;
 }
 
 .pdf-annotator-item:hover,

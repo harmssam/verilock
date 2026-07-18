@@ -461,7 +461,7 @@ export function PdfAnnotator({
           {loadError && <p className="pdf-annotator-hint">{loadError}</p>}
           <div
             ref={wrapRef}
-            className="pdf-annotator-page-wrap"
+            className={`pdf-annotator-page-wrap${tool !== 'select' ? ' is-tool-active' : ''}`}
             style={{ width: cssSize.width }}
             onPointerDown={onStagePointerDown}
             onPointerMove={onStagePointerMove}
