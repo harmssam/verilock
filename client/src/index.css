@@ -1,40 +1,62 @@
+/* ═══════════════════════════════════════════════════════════
+   VeriLock global tokens — light production shell (mint on white).
+   Dark navy defaults archived: archive/dark-journey-css-2026-07-17/
+   ═══════════════════════════════════════════════════════════ */
+
 :root {
   --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
   --font-body: 'Figtree', system-ui, sans-serif;
 
-  --bg-deep: #0d112e;
-  --bg-mid: #121a38;
-  --surface: rgba(255, 255, 255, 0.055);
-  --surface-hover: rgba(255, 255, 255, 0.09);
-  --surface-raised: rgba(255, 255, 255, 0.08);
-  --border: rgba(255, 255, 255, 0.1);
-  --border-bright: rgba(255, 255, 255, 0.18);
+  /* Journey / product surfaces */
+  --bg-deep: #fafdfc;
+  --bg-mid: #ffffff;
+  --surface: rgba(13, 148, 136, 0.05);
+  --surface-hover: rgba(13, 148, 136, 0.09);
+  --surface-raised: #ffffff;
+  --border: rgba(15, 23, 42, 0.09);
+  --border-bright: rgba(15, 23, 42, 0.14);
 
-  --text: #eef3ff;
-  --text-muted: #8fa3c4;
-  --text-dim: #5c7094;
+  --text: #0f172a;
+  --text-muted: #4b5c6b;
+  --text-dim: #6b7c8d;
 
-  --mint: #5eead4;
-  --mint-deep: #14b8a6;
-  --lime: #bef264;
+  --mint: #0d9488;
+  --mint-deep: #0f766e;
+  --lime: #65a30d;
   --coral: #fb7185;
-  --blue: #3b82f6;
-  --blue-deep: #2563eb;
+  --blue: #0d9488;
+  --blue-deep: #0f766e;
   --amber: #fbbf24;
-  --sky: #7dd3fc;
+  --sky: #0f766e;
 
-  --gradient-brand: linear-gradient(135deg, var(--mint) 0%, var(--sky) 48%, var(--blue) 100%);
+  --gradient-brand: linear-gradient(135deg, #14b8a6 0%, #0d9488 50%, #0f766e 100%);
   --gradient-warm: linear-gradient(135deg, var(--coral), var(--amber));
-  --gradient-card: linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+  --gradient-card: linear-gradient(145deg, rgba(13, 148, 136, 0.06), rgba(13, 148, 136, 0.02));
 
   --radius-sm: 12px;
   --radius-md: 18px;
   --radius-lg: 24px;
   --radius-pill: 999px;
 
-  --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.35);
-  --shadow-glow-mint: 0 0 48px rgba(94, 234, 212, 0.18);
-  --shadow-glow-blue: 0 0 48px rgba(59, 130, 246, 0.18);
+  --shadow-soft: 0 10px 36px rgba(15, 23, 42, 0.06);
+  --shadow-glow-mint: 0 0 40px rgba(13, 148, 136, 0.12);
+  --shadow-glow-blue: 0 0 40px rgba(13, 148, 136, 0.12);
+
+  /* Shell (lr-*) — same light system */
+  --lr-ink: #fafdfc;
+  --lr-ink-mid: #ffffff;
+  --lr-surface: #ffffff;
+  --lr-surface-2: #f0fdfa;
+  --lr-line: rgba(15, 23, 42, 0.08);
+  --lr-line-strong: rgba(15, 23, 42, 0.13);
+  --lr-text: #0f172a;
+  --lr-muted: #4b5c6b;
+  --lr-dim: #6b7c8d;
+  --lr-accent: #0d9488;
+  --lr-accent-soft: rgba(13, 148, 136, 0.1);
+  --lr-warn: #ca8a04;
+  --lr-verify: #65a30d;
+  --lr-scrim: 15, 23, 42;
 
   font-family: var(--font-body);
   line-height: 1.55;
@@ -54,18 +76,12 @@ body {
   margin: 0;
   min-height: 100dvh;
   background:
-    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(37, 99, 235, 0.2), transparent 55%),
-    radial-gradient(ellipse 60% 40% at 90% 10%, rgba(94, 234, 212, 0.16), transparent 50%),
-    radial-gradient(ellipse 50% 35% at 50% 100%, rgba(20, 184, 166, 0.1), transparent 55%),
-    linear-gradient(180deg, var(--bg-mid) 0%, var(--bg-deep) 100%);
-  /* fixed is fine on desktop; on mobile Safari it fights scrolled layers + blur blobs */
+    radial-gradient(ellipse 70% 45% at 10% -5%, rgba(13, 148, 136, 0.07), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 0%, rgba(15, 118, 110, 0.05), transparent 50%),
+    linear-gradient(180deg, #ffffff 0%, #fafdfc 40%, #f7fcfb 100%);
   background-attachment: scroll;
-}
-
-@media (min-width: 900px) {
-  body {
-    background-attachment: fixed;
-  }
+  color: var(--text);
+  overflow-x: clip;
 }
 
 button,
@@ -82,60 +98,11 @@ button {
 #root {
   min-height: 100dvh;
   position: relative;
+  background: transparent;
 }
 
+/* No dark atmospheric blobs on the light shell */
 #root::before,
 #root::after {
-  content: '';
-  position: fixed;
-  border-radius: 50%;
-  filter: blur(80px);
-  pointer-events: none;
-  z-index: 0;
-  /* Static on small screens — animated blurs + stacked body gradients flash on mobile GPUs */
-  opacity: 0.55;
-}
-
-#root::before {
-  width: 320px;
-  height: 320px;
-  top: -80px;
-  right: -60px;
-  background: rgba(37, 99, 235, 0.22);
-}
-
-#root::after {
-  width: 280px;
-  height: 280px;
-  bottom: 10%;
-  left: -80px;
-  background: rgba(94, 234, 212, 0.2);
-}
-
-@media (min-width: 900px) {
-  #root::before,
-  #root::after {
-    opacity: 1;
-    animation: blob-drift 18s ease-in-out infinite alternate;
-  }
-
-  #root::after {
-    animation-delay: -9s;
-  }
-}
-
-@keyframes blob-drift {
-  from {
-    transform: translate(0, 0) scale(1);
-  }
-  to {
-    transform: translate(24px, 16px) scale(1.08);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #root::before,
-  #root::after {
-    animation: none !important;
-  }
+  display: none;
 }

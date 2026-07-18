@@ -88,7 +88,7 @@ Interpret as **`client/src/App.tsx` + `client/src/journey/` + `client/src/landin
 
 - Full inventory + acceptance checklist: **`PRODUCT.md`** (section *Feature parity law*)
 - **Anti-slop design checklist:** **`docs/journey-anti-slop.md`**
-  - Production chrome: light shell tokens; dock may still use navy task styles until a full dock restyle
+  - Production chrome: light shell tokens throughout (dark journey CSS archived under `client/src/archive/dark-journey-css-2026-07-17/`)
   - Negative bans: purple SaaS gradients, glass-everywhere, generic feature cards, fake testimonials, crypto-neon gimmick
   - Pre-ship self-check + ugly-state tests + copy-paste agent prompt block
 - Impeccable skills (if installed): `.github/skills/impeccable/` — always load `PRODUCT.md` first, then `docs/journey-anti-slop.md`
