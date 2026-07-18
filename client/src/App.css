@@ -61,6 +61,7 @@
 /* ── Sticky top menu: full viewport width; content aligned to shell ── */
 
 .lr-header {
+  /* sticky + z-index forms the stacking context for the frost ::before */
   position: sticky;
   top: 0;
   z-index: 40;
@@ -72,20 +73,42 @@
   margin-right: calc(50% - 50vw);
   /* Extend under the status bar; keep brand/actions below the notch. */
   padding: env(safe-area-inset-top, 0px) 0 0;
-  border-bottom: 1px solid var(--lr-line);
-  /* Translucent fill so frosted blur reads when content scrolls under. */
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(16px) saturate(1.15);
-  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  /* Transparent shell — frost lives on ::before so scroll content blurs under. */
+  background: transparent;
+}
+
+/*
+ * Frost plate: blur samples page content scrolling underneath + white wash
+ * so dark type cannot fight the brand / nav labels.
+ * Do not put isolation:isolate on .lr-header — it can defeat backdrop-filter.
+ */
+.lr-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.9) 0%,
+      rgba(255, 255, 255, 0.78) 100%
+    );
+  backdrop-filter: blur(22px) saturate(1.25);
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
 }
 
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .lr-header {
-    background: rgba(255, 255, 255, 0.96);
+  .lr-header::before {
+    background: rgba(255, 255, 255, 0.97);
   }
 }
 
 .lr-header-inner {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
