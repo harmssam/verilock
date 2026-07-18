@@ -4553,15 +4553,12 @@ a.hash-chip.text-link:focus-visible {
   color: var(--lr-accent);
 }
 
-/* Nested login sheet inside dock: no second grey slab.
-  /* .login-sheet--inline hardcodes dark glass gradient — beat it. */
-
-*/
-  .action-dock .login-sheet,
-  .action-dock .login-sheet--inline {
+/* Nested login sheet inside dock: no second grey slab. */
+.action-dock .login-sheet,
+.action-dock .login-sheet--inline {
   background: #ffffff;
-    border-color: rgba(13, 148, 136, 0.18);
-    box-shadow: none;
+  border-color: rgba(13, 148, 136, 0.18);
+  box-shadow: none;
 }
 
 .login-sheet-about {
@@ -4593,42 +4590,32 @@ a.hash-chip.text-link:focus-visible {
   background: var(--lr-line);
 }
 
-/*
-  /* * Action stack + rental / fingerprint form chrome. */
-
-/* * Production .field input|select|textarea use rgba(0,0,0,0.25–0.28) dark glass — */
-
-/* * on the light shell that becomes muddy grey slabs. Make them white + mint focus. */
-
-/* */
-
-*/
-  .action-stack .field-label,
-  .field-label {
+/* Action stack form fields: white + mint focus (not dark glass). */
+.action-stack .field-label,
+.field-label {
   color: var(--lr-muted);
-    letter-spacing: 0.03em;
+  letter-spacing: 0.03em;
 }
 
 .field input,
-  .field select,
-  .field textarea {
+.field select,
+.field textarea {
   background: #ffffff;
-    border: 1px solid rgba(15, 23, 42, 0.12);
-    color: var(--lr-text);
-    box-shadow: none;
-    /* Native select dropdown text on some browsers */
-    color-scheme: light;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  color: var(--lr-text);
+  box-shadow: none;
+  color-scheme: light;
 }
 
 .field input::placeholder,
-  .field textarea::placeholder {
+.field textarea::placeholder {
   color: var(--lr-dim);
-    opacity: 1;
+  opacity: 1;
 }
 
 .field input:hover,
-  .field select:hover,
-  .field textarea:hover {
+.field select:hover,
+.field textarea:hover {
   border-color: rgba(13, 148, 136, 0.35);
 }
 
@@ -5107,23 +5094,14 @@ a.hash-chip.text-link:focus-visible {
   color: var(--lr-accent);
 }
 
-/*
-  /* * Account dropdown: production .exp-account-menu is a dark glass panel */
-
-/* * (hardcoded navy bg). On the light shell, --text is already slate, so */
-
-/* * without these overrides you get unreadable dark-on-dark. */
-
-/* */
-
-*/
-  .exp-account-menu {
+/* Account dropdown: light card (not dark glass). */
+.exp-account-menu {
   border: 1px solid var(--lr-line-strong, rgba(15, 23, 42, 0.14));
-    background: #ffffff;
-    box-shadow:
-      0 12px 36px rgba(15, 23, 42, 0.12),
-      0 0 0 1px rgba(15, 23, 42, 0.04);
-    color: var(--lr-text, #0f172a);
+  background: #ffffff;
+  box-shadow:
+    0 12px 36px rgba(15, 23, 42, 0.12),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+  color: var(--lr-text, #0f172a);
 }
 
 .exp-account-menu-head {
