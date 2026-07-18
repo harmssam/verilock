@@ -139,9 +139,16 @@ body[data-verilock-surface='journey'] #root::after {
   /* Extend under the status bar; keep brand/actions below the notch. */
   padding: env(safe-area-inset-top, 0px) 0 0;
   border-bottom: 1px solid var(--lr-line);
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  /* Translucent fill so frosted blur reads when content scrolls under. */
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px) saturate(1.15);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .lr-header {
+    background: rgba(255, 255, 255, 0.96);
+  }
 }
 
 .lr-header-inner {
