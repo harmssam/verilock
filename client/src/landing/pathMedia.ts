@@ -15,12 +15,13 @@ export type PathPlacements = {
 /** Locked focal crops (0–100%) + zoom for path cards and track banners. */
 export const PATH_PLACEMENTS: PathPlacements = {
   card: {
-    creator: { x: 39, y: 55, zoom: 1 },
+    /* Wax seal on papers — keep lock mark centered in the path thumb. */
+    creator: { x: 50, y: 48, zoom: 1 },
     signer: { x: 54.5, y: 51, zoom: 1 },
     verifier: { x: 46.5, y: 36, zoom: 1 },
   },
   track: {
-    creator: { x: 52, y: 40, zoom: 1 },
+    creator: { x: 50, y: 46, zoom: 1 },
     signer: { x: 44, y: 49, zoom: 1 },
     verifier: { x: 48.5, y: 73, zoom: 1 },
   },

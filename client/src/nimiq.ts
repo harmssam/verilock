@@ -847,7 +847,14 @@ export const NIMIQ_PAY_ANDROID_URL =
 
 export function isMobileDevice(): boolean {
   if (typeof navigator === 'undefined') return false
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return true
+  // iPadOS 13+ often reports as Macintosh (desktop UA) with multi-touch.
+  // Without this, Login skips the mobile sheet and jumps straight to Hub.
+  return (
+    navigator.platform === 'MacIntel' &&
+    typeof navigator.maxTouchPoints === 'number' &&
+    navigator.maxTouchPoints > 1
+  )
 }
 
 export function getMiniAppWebUrl(appUrl?: string): string {
