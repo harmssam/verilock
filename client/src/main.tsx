@@ -7,8 +7,12 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 /* Journey dock / stage / account styles (navy task UI until full restyle) */
 import './journey/Journey.css'
+/* Light-shell tokens + nested journey component overrides */
+import './journey/journeyLight.css'
 import { App } from './App'
+/* Shell layout (header/home/footer) then page chrome (pricing/404) */
 import './App.css'
+import './shellPages.css'
 import './landing/LandingHowItWorks.css'
 
 const CHUNK_RELOAD_KEY = 'verilock-chunk-reload'

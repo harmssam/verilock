@@ -1,0 +1,899 @@
+/* ═══════════════════════════════════════════════════════════
+   Light shell for journey surface — tokens + component overrides.
+   Nested under body[data-verilock-surface='journey'] (import after Journey.css).
+   ═══════════════════════════════════════════════════════════ */
+
+/* Root tokens: kill dark Journey chrome; mint-on-white (not slate grey fog). */
+html:has(body[data-verilock-surface='journey']),
+body[data-verilock-surface='journey'] {
+  /* Production token overrides (light) so DocumentJourney chrome stays legible */
+  --bg-deep: #fafdfc;
+  --bg-mid: #ffffff;
+  --surface: rgba(13, 148, 136, 0.05);
+  --surface-hover: rgba(13, 148, 136, 0.09);
+  --surface-raised: #ffffff;
+  --border: rgba(15, 23, 42, 0.09);
+  --border-bright: rgba(15, 23, 42, 0.14);
+  --text: #0f172a;
+  /* Slightly cooler slate for muted copy, but darker than pure grey fog */
+  --text-muted: #4b5c6b;
+  --text-dim: #6b7c8d;
+  --mint: #0d9488;
+  --mint-deep: #0f766e;
+  /* Sky/blue → teal family so step kickers, rails, and links match brand */
+  --sky: #0f766e;
+  --lime: #65a30d;
+  --blue: #0d9488;
+  --blue-deep: #0f766e;
+  --gradient-brand: linear-gradient(135deg, #14b8a6 0%, #0d9488 50%, #0f766e 100%);
+  --shadow-soft: 0 10px 36px rgba(15, 23, 42, 0.06);
+  --shadow-glow-mint: 0 0 40px rgba(13, 148, 136, 0.12);
+  --shadow-glow-blue: 0 0 40px rgba(13, 148, 136, 0.12);
+
+  /* Redesign shell tokens — white + mint, not slate grey */
+  --lr-ink: #fafdfc;
+  --lr-ink-mid: #ffffff;
+  --lr-surface: #ffffff;
+  --lr-surface-2: #f0fdfa;
+  --lr-line: rgba(15, 23, 42, 0.08);
+  --lr-line-strong: rgba(15, 23, 42, 0.13);
+  --lr-text: #0f172a;
+  --lr-muted: #4b5c6b;
+  --lr-dim: #6b7c8d;
+  --lr-accent: #0d9488;
+  --lr-accent-soft: rgba(13, 148, 136, 0.1);
+  /* Invite path: light golden amber (less red/orange than #d97706) */
+  --lr-warn: #ca8a04;
+  --lr-verify: #65a30d;
+  --lr-scrim: 15, 23, 42;
+
+  background:
+    radial-gradient(ellipse 70% 45% at 10% -5%, rgba(13, 148, 136, 0.07), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 0%, rgba(15, 118, 110, 0.05), transparent 50%),
+    linear-gradient(180deg, #ffffff 0%, #fafdfc 40%, #f7fcfb 100%);
+  background-attachment: scroll;
+  color: var(--lr-text);
+  overflow-x: clip;
+}
+
+body[data-verilock-surface='journey'] {
+  #root {
+    background: transparent;
+    min-height: 100dvh;
+  }
+
+  #root::before,
+  #root::after {
+    display: none;
+  }
+
+  /* Journey chrome that still used dark Journey tokens */
+  .pdf-drop {
+    border-color: rgba(13, 148, 136, 0.28);
+    background: #ffffff;
+  }
+
+  .pdf-drop:hover:not(.pdf-drop--disabled) {
+    border-color: rgba(13, 148, 136, 0.45);
+    background: rgba(13, 148, 136, 0.05);
+  }
+
+  .pdf-drop--dragging,
+  .pdf-drop--has-file {
+    border-color: rgba(13, 148, 136, 0.5);
+    background: rgba(13, 148, 136, 0.07);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  }
+
+  .pdf-drop-hint,
+  .pdf-drop-title,
+  .muted {
+    color: var(--lr-muted, #4b5c6b);
+  }
+
+  .journey-toolbar,
+  .document-stage,
+  .result-banner {
+    background: #ffffff;
+    border-color: var(--lr-line);
+    color: var(--lr-text);
+  }
+
+  .exp-status {
+    color: var(--lr-muted);
+    background: #ffffff;
+    border: 1px solid var(--lr-line);
+    border-radius: 10px;
+  }
+
+  .exp-status--error {
+    color: #b91c1c;
+    border-color: rgba(185, 28, 28, 0.25);
+    background: #fef2f2;
+  }
+
+  .btn-secondary {
+    border-color: rgba(13, 148, 136, 0.35);
+    background: #ffffff;
+    color: var(--lr-accent);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    border-color: var(--lr-accent);
+    background: var(--lr-accent-soft);
+    color: var(--mint-deep, #0f766e);
+  }
+
+  .btn-primary {
+    background: var(--lr-accent);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 6px 16px rgba(13, 148, 136, 0.2);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--mint-deep, #0f766e);
+    filter: none;
+  }
+
+  /* Journey panels on light shell: solid white cards */
+  .action-dock,
+  .login-sheet,
+  .how-block,
+  .journey-agreements,
+  .exp-account-menu {
+    background: #ffffff;
+    border-color: var(--lr-line);
+    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.05);
+  }
+
+  /* How-it-works accordion: kill dark navy leftovers inside open card */
+  .how-block--open {
+    border-color: rgba(13, 148, 136, 0.28);
+    box-shadow:
+      0 8px 28px rgba(15, 23, 42, 0.05),
+      0 0 0 1px rgba(13, 148, 136, 0.06);
+  }
+
+  .how-toggle:hover {
+    background: rgba(13, 148, 136, 0.04);
+  }
+
+  .how-toggle svg:first-child {
+    color: var(--lr-accent);
+  }
+
+  .how-story-lead,
+  .how-beat-privacy,
+  .how-beat-step {
+    color: var(--lr-muted);
+  }
+
+  .how-beat-title,
+  .how-beat-blurb {
+    color: var(--lr-text);
+  }
+
+  .how-beat-verb {
+    color: var(--lr-accent);
+  }
+
+  .how-visual,
+  .how-visual--seal {
+    background:
+      radial-gradient(circle at 30% 25%, rgba(13, 148, 136, 0.1), transparent 55%),
+      #f0fdfa;
+    border-color: rgba(13, 148, 136, 0.16);
+    box-shadow: none;
+  }
+
+  .how-beat--visible .how-visual {
+    border-color: rgba(13, 148, 136, 0.28);
+    box-shadow: 0 6px 16px rgba(13, 148, 136, 0.1);
+  }
+
+  .how-beat-dot {
+    color: var(--mint-deep, #0f766e);
+    background: rgba(13, 148, 136, 0.08);
+    border-color: rgba(13, 148, 136, 0.22);
+  }
+
+  .how-beat--visible .how-beat-dot {
+    background: rgba(13, 148, 136, 0.12);
+    border-color: rgba(13, 148, 136, 0.4);
+    color: var(--lr-accent);
+    box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.08);
+  }
+
+  .how-beat-line {
+    background: linear-gradient(
+      180deg,
+      rgba(13, 148, 136, 0.4),
+      rgba(13, 148, 136, 0.12) 70%,
+      transparent
+    );
+  }
+
+  .how-visual-main-icon,
+  .how-visual-match {
+    color: var(--lr-accent);
+  }
+
+  /* Nested login sheet inside dock: no second grey slab.
+  /* .login-sheet--inline hardcodes dark glass gradient — beat it. */ */
+  .action-dock .login-sheet,
+  .action-dock .login-sheet--inline {
+    background: #ffffff;
+    border-color: rgba(13, 148, 136, 0.18);
+    box-shadow: none;
+  }
+
+  .login-sheet-about {
+    color: var(--lr-muted);
+  }
+
+  .login-sheet-steps {
+    color: var(--lr-text);
+  }
+
+  .login-sheet-head h3 {
+    color: var(--lr-text);
+  }
+
+  .login-sheet-stores {
+    border-top-color: var(--lr-line);
+  }
+
+  .login-sheet-choice-hint {
+    color: var(--lr-muted);
+  }
+
+  .login-sheet-choice-divider {
+    color: var(--lr-muted);
+  }
+
+  .login-sheet-choice-divider::before,
+  .login-sheet-choice-divider::after {
+    background: var(--lr-line);
+  }
+
+  /*
+  /* * Action stack + rental / fingerprint form chrome. */
+  /* * Production .field input|select|textarea use rgba(0,0,0,0.25–0.28) dark glass — */
+  /* * on the light shell that becomes muddy grey slabs. Make them white + mint focus. */
+  /* */ */
+  .action-stack .field-label,
+  .field-label {
+    color: var(--lr-muted);
+    letter-spacing: 0.03em;
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    background: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    color: var(--lr-text);
+    box-shadow: none;
+    /* Native select dropdown text on some browsers */
+    color-scheme: light;
+  }
+
+  .field input::placeholder,
+  .field textarea::placeholder {
+    color: var(--lr-dim);
+    opacity: 1;
+  }
+
+  .field input:hover,
+  .field select:hover,
+  .field textarea:hover {
+    border-color: rgba(13, 148, 136, 0.35);
+  }
+
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    outline: none;
+    border-color: rgba(13, 148, 136, 0.55);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+    background: #ffffff;
+  }
+
+  .field select option {
+    background: #ffffff;
+    color: var(--lr-text);
+  }
+
+  .field-stack {
+    padding: 0.75rem 0.85rem;
+    border-radius: 10px;
+    border: 1px solid rgba(13, 148, 136, 0.14);
+    background: rgba(13, 148, 136, 0.04);
+  }
+
+  .check-row {
+    color: var(--lr-muted);
+    padding: 0.55rem 0.7rem;
+    border-radius: 10px;
+    border: 1px solid var(--lr-line);
+    background: #ffffff;
+  }
+
+  .check-row:hover {
+    border-color: rgba(13, 148, 136, 0.28);
+    background: rgba(13, 148, 136, 0.04);
+  }
+
+  /* Document stage (fingerprint drop zone) — was black glass */
+  .doc-stage,
+  .document-stage {
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 40%, rgba(13, 148, 136, 0.08), transparent 70%),
+      #ffffff;
+    border-color: var(--lr-line);
+  }
+
+  .doc-stage--accepting {
+    border-color: rgba(13, 148, 136, 0.4);
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 40%, rgba(13, 148, 136, 0.1), transparent 70%),
+      #ffffff;
+  }
+
+  .doc-stage--accepting:hover {
+    border-color: rgba(13, 148, 136, 0.6);
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 40%, rgba(13, 148, 136, 0.14), transparent 70%),
+      #f0fdfa;
+  }
+
+  /* Hash chips, party list, share-adjacent greys in the stack */
+  .hash-chip {
+    background: rgba(13, 148, 136, 0.07);
+    border-color: rgba(13, 148, 136, 0.22);
+    color: var(--mint-deep, #0f766e);
+  }
+
+  .party-list {
+    background: #ffffff;
+    border-color: var(--lr-line);
+  }
+
+  .party-list li,
+  .party-list-item {
+    background: rgba(13, 148, 136, 0.04);
+    border-color: rgba(13, 148, 136, 0.12);
+    color: var(--lr-text);
+  }
+
+  /* Share-step Signatures config card */
+  .signatures-config {
+    background: #ffffff;
+    border-color: var(--lr-line);
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  }
+
+  .signatures-config-head h3 {
+    color: var(--lr-text);
+  }
+
+  .signatures-config-form {
+    border-top-color: var(--lr-line);
+  }
+
+  /* Recorded signatures: light cards (base CSS used dark glass → muddy grey slabs). */
+  .signatures-panel {
+    border-top-color: var(--lr-line);
+  }
+
+  .signatures-panel-title {
+    color: var(--lr-text);
+  }
+
+  .signatures-panel-item {
+    background: #ffffff;
+    border-color: var(--lr-line);
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+    color: var(--lr-text);
+  }
+
+  .signatures-panel-meta strong {
+    color: var(--lr-text);
+  }
+
+  .signatures-panel-meta .muted,
+  .signatures-panel-privacy-note,
+  .signatures-panel-typed,
+  .signatures-panel-typed.muted {
+    color: var(--lr-muted);
+    background: none !important;
+  }
+
+  .signatures-panel-address:hover,
+  .signatures-panel-address:focus-visible {
+    color: var(--lr-accent);
+  }
+
+  .signatures-panel-image {
+    background: #ffffff;
+    border-color: rgba(15, 23, 42, 0.1);
+  }
+
+  .party-list-item--done {
+    background: rgba(13, 148, 136, 0.08);
+    border-color: rgba(13, 148, 136, 0.28);
+  }
+
+  .party-list-check {
+    background: #ffffff;
+    border-color: rgba(13, 148, 136, 0.22);
+  }
+
+  .party-list-item--done .party-list-check {
+    background: rgba(13, 148, 136, 0.14);
+    border-color: rgba(13, 148, 136, 0.4);
+    color: var(--lr-accent);
+  }
+
+  .party-status {
+    background: #ffffff;
+    border-color: var(--lr-line);
+    color: var(--lr-muted);
+  }
+
+  .party-list-item--done .party-status {
+    background: rgba(13, 148, 136, 0.12);
+    border-color: rgba(13, 148, 136, 0.35);
+    color: var(--lr-accent);
+  }
+
+  .sign-as-banner {
+    background: rgba(13, 148, 136, 0.06);
+    border-color: rgba(13, 148, 136, 0.22);
+    color: var(--lr-text);
+  }
+
+  .action-stack .share-card,
+  .action-stack .share-card--embedded {
+    background: #ffffff;
+    border: 1px solid var(--lr-line);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+    padding: 1rem 1.05rem;
+  }
+
+  .share-link-block {
+    background: rgba(13, 148, 136, 0.05);
+    border-color: rgba(13, 148, 136, 0.2);
+  }
+
+  .share-option-label {
+    color: var(--lr-muted);
+  }
+
+  .share-more {
+    background: rgba(13, 148, 136, 0.04);
+    border-color: var(--lr-line);
+  }
+
+  .share-more summary {
+    color: var(--lr-muted);
+  }
+
+  .share-more summary:hover {
+    color: var(--lr-accent);
+  }
+
+  .share-card .hash-chip,
+  .share-card .share-link-chip {
+    background: #ffffff;
+    border-color: rgba(13, 148, 136, 0.22);
+    color: var(--mint-deep, #0f766e);
+  }
+
+  .share-email-preview-card {
+    background: #ffffff;
+    border-color: var(--lr-line);
+    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.05);
+  }
+
+  .share-email-preview-header {
+    color: #ffffff;
+  }
+
+  .share-email-preview-lead,
+  .share-email-preview-details strong {
+    color: var(--lr-text);
+  }
+
+  .share-email-preview-greeting,
+  .share-email-preview-steps,
+  .share-copy-instructions {
+    color: var(--lr-muted);
+  }
+
+  .share-email-preview-url {
+    color: var(--mint-deep, #0f766e);
+  }
+
+  /* Ghost / secondary actions inside dock: not slate grey fills */
+  .action-dock .btn-ghost,
+  .action-stack .btn-ghost {
+    background: transparent;
+    border-color: rgba(13, 148, 136, 0.28);
+    color: var(--lr-accent);
+  }
+
+  .action-dock .btn-ghost:hover:not(:disabled),
+  .action-stack .btn-ghost:hover:not(:disabled) {
+    background: rgba(13, 148, 136, 0.06);
+    border-color: rgba(13, 148, 136, 0.4);
+    color: var(--mint-deep, #0f766e);
+  }
+
+  /* Later stack steps: seal summary, share URL, progress, signature pad, expect note */
+  .seal-summary,
+  .share-box-url,
+  .doc-stage-expect {
+    background: rgba(13, 148, 136, 0.05);
+    border-color: rgba(13, 148, 136, 0.18);
+    color: var(--lr-text);
+  }
+
+  .share-box-url {
+    color: var(--lr-accent);
+  }
+
+  .progress-bar-track {
+    background: rgba(13, 148, 136, 0.12);
+  }
+
+  .sig-pad-canvas {
+    background: #ffffff;
+    border-color: rgba(13, 148, 136, 0.28);
+    box-shadow: inset 0 1px 2px rgba(13, 148, 136, 0.04);
+  }
+
+  .sig-pad-canvas:active {
+    border-color: rgba(13, 148, 136, 0.55);
+  }
+
+  .doc-stage-browse--primary {
+    background: rgba(251, 191, 36, 0.14);
+    border-color: rgba(180, 83, 9, 0.35);
+    color: #b45309;
+  }
+
+  .doc-stage-browse--primary:hover:not(:disabled) {
+    background: rgba(251, 191, 36, 0.22);
+    border-color: rgba(180, 83, 9, 0.5);
+    color: #92400e;
+  }
+
+  .verify-result-card {
+    background: linear-gradient(135deg, rgba(13, 148, 136, 0.08), rgba(13, 148, 136, 0.03));
+    border-color: rgba(13, 148, 136, 0.28);
+    color: var(--lr-text);
+  }
+
+  /* Post-seal / verify “review”: match cards were dark glass → muddy grey slabs */
+  .done-banner {
+    background: rgba(13, 148, 136, 0.08);
+    border-color: rgba(13, 148, 136, 0.28);
+    color: var(--mint-deep, #0f766e);
+  }
+
+  .done-banner .muted {
+    color: var(--lr-muted);
+  }
+
+  .result-banner--ok {
+    background: rgba(13, 148, 136, 0.08);
+    border-color: rgba(13, 148, 136, 0.28);
+    color: var(--mint-deep, #0f766e);
+  }
+
+  .result-banner--bad {
+    background: rgba(225, 29, 72, 0.06);
+    border-color: rgba(225, 29, 72, 0.22);
+    color: #be123c;
+  }
+
+  .journey-verify-details .verify-match-card,
+  .verify-match-card {
+    background: #ffffff;
+    border-color: var(--lr-line);
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+    color: var(--lr-text);
+  }
+
+  .verify-match-card--highlighted {
+    border-color: rgba(13, 148, 136, 0.4);
+    box-shadow: 0 0 0 1px rgba(13, 148, 136, 0.12), 0 4px 16px rgba(13, 148, 136, 0.08);
+  }
+
+  .verify-match-title {
+    color: var(--lr-text);
+  }
+
+  .verify-match-status {
+    color: var(--lr-muted);
+    border-color: var(--lr-line);
+    background: #ffffff;
+  }
+
+  .verify-match-status--locked {
+    color: var(--lr-accent);
+    border-color: rgba(13, 148, 136, 0.35);
+    background: rgba(13, 148, 136, 0.08);
+  }
+
+  .verify-match-meta dt {
+    color: var(--lr-muted);
+  }
+
+  .verify-match-meta dd {
+    color: var(--lr-text);
+  }
+
+  .verify-match-actions {
+    border-top-color: var(--lr-line);
+  }
+
+  .verify-matches .document-filename {
+    background: rgba(13, 148, 136, 0.05);
+    border-color: rgba(13, 148, 136, 0.18);
+    color: var(--lr-text);
+  }
+
+  .verify-matches .document-filename-label {
+    color: var(--lr-muted);
+  }
+
+  .verify-matches .document-filename-value {
+    color: var(--lr-text);
+  }
+
+  .verify-matches .hash-chip {
+    background: #ffffff;
+    border-color: rgba(13, 148, 136, 0.22);
+    color: var(--mint-deep, #0f766e);
+  }
+
+  .verify-matches a.hash-chip:hover,
+  .verify-matches a.hash-chip:focus-visible {
+    color: var(--mint-deep, #0f766e);
+    border-color: rgba(13, 148, 136, 0.4);
+    background: rgba(13, 148, 136, 0.06);
+  }
+
+  /* Credit seal wait panel (seal step review) — not dark glass */
+  .credit-seal-progress {
+    border-color: rgba(13, 148, 136, 0.22);
+    background:
+      linear-gradient(
+        160deg,
+        rgba(13, 148, 136, 0.08),
+        #ffffff 55%,
+        rgba(251, 191, 36, 0.05)
+      );
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+  }
+
+  .credit-seal-progress-core {
+    color: var(--lr-accent);
+    background: rgba(13, 148, 136, 0.1);
+    border-color: rgba(13, 148, 136, 0.35);
+    box-shadow: 0 0 20px rgba(13, 148, 136, 0.12);
+  }
+
+  .credit-seal-progress-core--done {
+    color: #ffffff;
+    background: var(--lr-accent);
+    border-color: transparent;
+  }
+
+  .credit-seal-progress-title {
+    color: var(--lr-text);
+  }
+
+  .credit-seal-progress-status {
+    color: var(--mint-deep, #0f766e);
+  }
+
+  .credit-seal-progress-kicker {
+    color: #b45309;
+  }
+
+  .credit-seal-progress-step {
+    border-color: var(--lr-line);
+    background: #ffffff;
+    color: var(--lr-text);
+  }
+
+  .credit-seal-progress-step--current {
+    border-color: rgba(13, 148, 136, 0.35);
+    background: rgba(13, 148, 136, 0.06);
+  }
+
+  .credit-seal-progress-step--done {
+    border-color: rgba(13, 148, 136, 0.22);
+    background: rgba(13, 148, 136, 0.04);
+  }
+
+  .credit-seal-progress-step-icon {
+    color: var(--lr-muted);
+    background: rgba(13, 148, 136, 0.06);
+  }
+
+  .credit-seal-progress-step--current .credit-seal-progress-step-icon {
+    color: var(--lr-accent);
+    background: rgba(13, 148, 136, 0.12);
+  }
+
+  .credit-seal-progress-step--done .credit-seal-progress-step-icon {
+    color: #ffffff;
+    background: var(--lr-accent);
+  }
+
+  .credit-seal-progress-step-text strong {
+    color: var(--lr-text);
+  }
+
+  .credit-seal-progress-leave {
+    border-color: rgba(202, 138, 4, 0.35);
+    background: rgba(251, 191, 36, 0.1);
+    color: #b45309;
+  }
+
+  /* Journey toolbar “Back home” etc. inside dock head */
+  .journey-toolbar .btn-ghost,
+  .journey-toolbar .text-btn {
+    color: var(--lr-accent);
+  }
+
+  .action-kicker {
+    color: var(--lr-accent);
+  }
+
+  /*
+  /* * Account dropdown: production .exp-account-menu is a dark glass panel */
+  /* * (hardcoded navy bg). On the light shell, --text is already slate, so */
+  /* * without these overrides you get unreadable dark-on-dark. */
+  /* */ */
+  .exp-account-menu {
+    border: 1px solid var(--lr-line-strong, rgba(15, 23, 42, 0.14));
+    background: #ffffff;
+    box-shadow:
+      0 12px 36px rgba(15, 23, 42, 0.12),
+      0 0 0 1px rgba(15, 23, 42, 0.04);
+    color: var(--lr-text, #0f172a);
+  }
+
+  .exp-account-menu-head {
+    border-bottom-color: var(--lr-line, rgba(15, 23, 42, 0.08));
+  }
+
+  .exp-account-menu-label {
+    color: var(--lr-muted, #64748b);
+  }
+
+  .exp-account-menu-full {
+    color: var(--lr-accent, #0d9488);
+  }
+
+  a.exp-account-menu-full:hover,
+  a.exp-account-menu-full:focus-visible {
+    color: var(--mint-deep, #0f766e);
+    text-decoration-color: rgba(13, 148, 136, 0.45);
+  }
+
+  .exp-account-item {
+    color: var(--lr-text, #0f172a);
+  }
+
+  .exp-account-item:hover {
+    background: rgba(15, 23, 42, 0.05);
+  }
+
+  .exp-account-item--danger {
+    color: #e11d48;
+  }
+
+  .exp-account-item--danger:hover {
+    background: rgba(225, 29, 72, 0.08);
+    color: #be123c;
+  }
+
+  .stage-rail {
+    background: #ffffff;
+    border: 1px solid var(--lr-line);
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.03);
+  }
+
+  /* Inactive rail steps: less ghost-grey, clearer hierarchy */
+  .stage-rail-item {
+    opacity: 0.62;
+  }
+
+  .stage-rail-item--current,
+  .stage-rail-item--done {
+    opacity: 1;
+  }
+
+  .stage-rail-dot {
+    background: #ffffff;
+    border-color: rgba(13, 148, 136, 0.22);
+    color: var(--lr-muted);
+  }
+
+  .stage-rail-item--current .stage-rail-dot {
+    background: var(--gradient-brand);
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 2px 10px rgba(13, 148, 136, 0.28);
+  }
+
+  .stage-rail-item--done .stage-rail-dot {
+    background: rgba(13, 148, 136, 0.12);
+    color: var(--lr-accent);
+    border-color: rgba(13, 148, 136, 0.35);
+  }
+
+  .stage-rail-label {
+    color: var(--lr-muted);
+  }
+
+  .stage-rail-item--current .stage-rail-label {
+    color: var(--lr-accent);
+  }
+
+  .stage-rail-pill {
+    background: linear-gradient(
+      135deg,
+      rgba(13, 148, 136, 0.1) 0%,
+      rgba(13, 148, 136, 0.06) 100%
+    );
+    border-color: rgba(13, 148, 136, 0.22);
+    box-shadow: none;
+  }
+
+  /* Privacy note: mint-soft, not slate grey slab */
+  .action-privacy {
+    background: rgba(13, 148, 136, 0.06);
+    border: 1px solid rgba(13, 148, 136, 0.16);
+    color: var(--lr-muted);
+  }
+
+  .action-privacy svg {
+    color: var(--lr-accent);
+  }
+
+  .action-dock-head h3,
+  .action-blurb {
+    color: var(--lr-text);
+  }
+
+  .action-blurb.muted {
+    color: var(--lr-muted);
+  }
+
+  .stage-label,
+  .journey-mode-chip,
+  .role-chip {
+    background: var(--lr-accent-soft);
+    border-color: rgba(13, 148, 136, 0.28);
+    color: var(--lr-accent);
+  }
+
+  /* Trust bar idle: no grey float; expand to white card */
+  .lr-track .trust-bar {
+    color: var(--lr-text);
+  }
+
+  .lr-track .trust-bar-sub {
+    color: var(--lr-muted);
+  }
+}
