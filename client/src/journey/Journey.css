@@ -1194,13 +1194,31 @@ a.exp-account-menu-full:focus-visible {
   margin-top: 0.75rem;
 }
 
-.doc-stage-browse {
+/*
+ * Browse + Remove share one control height.
+ * .pdf-drop-browse later in the file sets margin-top: 0.45rem for the drop zone;
+ * that must not apply here or Remove sits higher than Browse.
+ */
+.doc-stage-actions .pdf-drop-browse,
+.doc-stage-actions .pdf-drop-change,
+.doc-stage-actions .doc-stage-browse {
   margin-top: 0;
+  margin-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 2.5rem;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.88rem;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+
+.doc-stage-browse {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.88rem;
-  padding: 0.55rem 1.1rem;
 }
 
 .doc-stage-error {

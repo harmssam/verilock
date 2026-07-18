@@ -81,7 +81,6 @@ body {
     linear-gradient(180deg, #ffffff 0%, #fafdfc 40%, #f7fcfb 100%);
   background-attachment: scroll;
   color: var(--text);
-  overflow-x: clip;
 }
 
 button,
