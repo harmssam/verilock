@@ -57,6 +57,8 @@ import {
   saveJourneyIntent,
   syncIntentToUrl,
 } from './journeyIntent'
+import { useCreatePdfDraft } from './useCreatePdfDraft'
+import { useRevealDocumentOnAuth } from './useRevealDocumentOnAuth'
 import {
   journeyConnectOptions,
   journeyLoginEntryLabels,
@@ -115,6 +117,11 @@ interface DocumentJourneyProps {
   onHome?: () => void
   /** Fresh create path after “Start another agreement” (shell remounts journey). */
   onStartCreate?: () => void
+  /**
+   * Switch shell path track without remounting (preserves in-memory PDF).
+   * Used after seal → verify with the same file preloaded.
+   */
+  onSwitchPath?: (role: PathRole) => void
 }
 
 type VerifyOutcome =
@@ -158,6 +165,7 @@ export function DocumentJourney({
   onPageMeta,
   onHome,
   onStartCreate,
+  onSwitchPath,
 }: DocumentJourneyProps) {
   const {
     account,
@@ -671,6 +679,58 @@ export function DocumentJourney({
     }
   }, [pdfFile])
 
+  const applyRestoredCreateMeta = useCallback(
+    (m: {
+      title: string
+      creatorName: string
+      creatorNotifyEmail: string
+      docType: DocumentType
+      docNotes: string
+      pdfHash: string | null
+      pageCount: number
+    }) => {
+      if (m.title) setTitle(m.title)
+      if (m.creatorName) setCreatorName(m.creatorName)
+      if (m.creatorNotifyEmail) setCreatorNotifyEmail(m.creatorNotifyEmail)
+      if (m.docType) setDocType(m.docType)
+      if (m.docNotes) setDocNotes(m.docNotes)
+      if (m.pdfHash) setPdfHash(m.pdfHash)
+      if (m.pageCount > 0) setPageCount(m.pageCount)
+    },
+    [],
+  )
+
+  const ensureCreatorRole = useCallback(() => {
+    setRole(prev => prev ?? 'creator')
+  }, [])
+
+  const {
+    onFileChange: onCreatePdfFileChange,
+    flush: flushCreatePdfDraft,
+    clear: clearCreatePdfDraftState,
+  } = useCreatePdfDraft({
+    enabled: !doc && (role === 'creator' || role == null),
+    bootReady,
+    canRestore: !doc && (role === 'creator' || role == null),
+    pdfFile,
+    setPdfFile,
+    meta: {
+      title,
+      creatorName,
+      creatorNotifyEmail,
+      docType,
+      docNotes,
+      pdfHash,
+      pageCount,
+      role: role === 'creator' || !role ? 'creator' : role,
+    },
+    applyRestoredMeta: applyRestoredCreateMeta,
+    ensureCreatorRole,
+    role,
+  })
+
+  useRevealDocumentOnAuth(doc, token, setActiveFromSeal)
+
   // Hash PDF on select (sign path) + match check
   useEffect(() => {
     if (!signFile || !doc) {
@@ -771,7 +831,7 @@ export function DocumentJourney({
 
         let details: VerifyResult[] = []
         try {
-          details = await loadVerifyDetails(matches.map(m => m.slug))
+          details = await loadVerifyDetails(matches.map(m => m.slug), token)
         } catch (detailErr) {
           // Hash matched - still show a usable result even if detail fetch fails
           console.warn('[journey] verify detail load failed', detailErr)
@@ -800,7 +860,8 @@ export function DocumentJourney({
           matches[0]?.slug
         if (openSlug) {
           try {
-            const { document } = await api.getDocument(openSlug)
+            // Prefer session when present so parties still get ink/names on the review UI.
+            const { document } = await api.getDocument(openSlug, token)
             if (runId === verifyRunIdRef.current) setActiveFromSeal(document)
           } catch {
             /* panel already has verify details when available */
@@ -825,7 +886,7 @@ export function DocumentJourney({
         }
       }
     })()
-  }, [verifyFile, setActiveFromSeal])
+  }, [verifyFile, setActiveFromSeal, token])
 
   const clearLocalJourneyState = () => {
     setPdfFile(null)
@@ -860,6 +921,7 @@ export function DocumentJourney({
     setLocalError(null)
     setLockMessage(null)
     setError(null)
+    void clearCreatePdfDraftState()
   }
 
   const resetAll = () => {
@@ -912,6 +974,29 @@ export function DocumentJourney({
     window.history.pushState({}, '', '/?intent=creator')
   }
 
+  /**
+   * After a successful seal: jump to the verifier path with the same PDF preloaded
+   * so the hash lookup runs without re-dropping the file.
+   */
+  const openVerifyWithLocalPdf = () => {
+    const local = pdfFile ?? signFile
+    if (local) {
+      setVerifyFile(local)
+    }
+    setLocalError(null)
+    setLockMessage(null)
+    setError(null)
+    setRole('verifier')
+    saveJourneyIntent('verifier')
+    if (onSwitchPath) {
+      onSwitchPath('verifier')
+    } else {
+      // Standalone fallback (no shell track title update)
+      window.history.pushState({}, '', '/?intent=verifier')
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const createDoc = async () => {
     if (!token || !pdfFile || !pdfHash) return
     setBusy(true)
@@ -947,6 +1032,7 @@ export function DocumentJourney({
       setConstructionPlan(emptyPlan(pdfHash, 2))
       setPageFieldsConfirmed(false)
       window.history.pushState({}, '', `/d/${document.slug}`)
+      void clearCreatePdfDraftState()
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Create failed')
     } finally {
@@ -1525,7 +1611,7 @@ export function DocumentJourney({
       // Slot races / already-signed: pull latest party assignment for a clean retry.
       if (/already signed|claimed this slot|refresh/i.test(message) && doc?.slug) {
         try {
-          const { document: latest } = await api.getDocument(doc.slug)
+          const { document: latest } = await api.getDocument(doc.slug, token)
           setActiveFromSeal(latest, doc.fileSize)
         } catch {
           /* keep prior doc state */
@@ -1618,13 +1704,17 @@ export function DocumentJourney({
       syncIntentToUrl(role)
     }
     saveHubReturnPath()
-    // Explicit options from mobile chooser; otherwise resolve from mode (desktop → Hub).
-    void connect(options !== undefined ? options : journeyConnectOptions(connectMode))
+    // Hub redirect remounts the SPA — commit PDF draft before navigate.
+    void (async () => {
+      if (pdfFile && !doc) await flushCreatePdfDraft()
+      await connect(options !== undefined ? options : journeyConnectOptions(connectMode))
+    })()
   }
 
   /** Header-style Login: sheet on mobile (Pay vs Hub), direct Hub/Pay-native on desktop. */
   const requestLogin = () => {
     if (loginNeedsSheet) {
+      if (pdfFile && !doc) void flushCreatePdfDraft()
       setLoginSheetOpen(true)
       return
     }
@@ -1666,7 +1756,7 @@ export function DocumentJourney({
       let openError: string | null = null
       for (const m of ranked) {
         try {
-          const { document } = await api.getDocument(m.slug)
+          const { document } = await api.getDocument(m.slug, token)
           if (document.status === 'locked') {
             openError = `"${document.title}" is already sealed. Use Verify a PDF to check integrity.`
             continue
@@ -1873,7 +1963,7 @@ export function DocumentJourney({
                     step={step}
                     doc={doc}
                     file={pdfFile}
-                    onFileChange={setPdfFile}
+                    onFileChange={onCreatePdfFileChange}
                     accepting
                   />
                   <p className="muted" style={{ margin: 0 }}>
@@ -3062,7 +3152,13 @@ export function DocumentJourney({
                         <p className="muted">
                           {doc.sealed ? (
                             <>
-                              Drop any copy of <em>{doc.fileName}</em> to check integrity
+                              {pdfFile || signFile ? (
+                                <>Use <strong>Verify this PDF</strong> to open the verify path with your file already loaded.</>
+                              ) : (
+                                <>
+                                  Drop any copy of <em>{doc.fileName}</em> to check integrity.
+                                </>
+                              )}
                               {doc.source.attestation?.explorerUrl ? (
                                 <>
                                   {' '}
@@ -3077,7 +3173,6 @@ export function DocumentJourney({
                                   </a>
                                 </>
                               ) : null}
-                              .
                             </>
                           ) : role === 'signer' ? (
                             <>
@@ -3094,6 +3189,17 @@ export function DocumentJourney({
                         </p>
                       </div>
                     </div>
+                  )}
+
+                  {step === 'done' && doc?.sealed && (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={openVerifyWithLocalPdf}
+                    >
+                      <ShieldCheck size={15} strokeWidth={2.25} />
+                      {pdfFile || signFile ? 'Verify this PDF' : 'Go to verify'}
+                    </button>
                   )}
 
                   {doc && !doc.directSeal && (step === 'done' || (step === 'verify' && doc.sealed)) && (
@@ -3217,7 +3323,7 @@ export function DocumentJourney({
                                   window.history.pushState({}, '', `/d/${m.slug}`)
                                   void (async () => {
                                     try {
-                                      const { document } = await api.getDocument(m.slug)
+                                      const { document } = await api.getDocument(m.slug, token)
                                       setActiveFromSeal(document)
                                       setSharedAck(true)
                                       setRole(

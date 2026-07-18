@@ -35,7 +35,9 @@ export function isDocumentCreator(
 
 /**
  * Creator or any party/signer wallet may see display names + signature images.
- * Prefer server `participantDetailsRevealed` when present.
+ * Prefer server `participantDetailsRevealed` when present (authoritative).
+ * When the flag is missing (older payloads), fall back to local wallet match.
+ * Re-fetch with a session token if the open doc is still redacted — see useRevealDocumentOnAuth.
  */
 export function canRevealParticipantDetails(
   doc: Pick<SealDocument, 'creatorAddress' | 'parties' | 'signatures' | 'participantDetailsRevealed'>,
