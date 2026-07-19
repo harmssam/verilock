@@ -2056,7 +2056,7 @@ export function DocumentJourney({
                 <p className="muted action-blurb">
                   {step === 'done' && role === 'signer'
                     ? (activeStage?.blurb ??
-                      'Your signature is recorded. When everyone has signed, the agreement is sealed on Nimiq.')
+                      'Your fields and wallet signature are recorded. The creator seals when everyone has finished.')
                     : step === 'done'
                       ? 'Keep your file. Drop a copy below anytime to verify the fingerprint.'
                       : activeStage?.blurb}
@@ -3365,8 +3365,8 @@ export function DocumentJourney({
                         <strong>Thanks — you&apos;re done!</strong>
                         <p className="muted">
                           {allSigned(doc) || doc.readyToLock
-                            ? 'Your signature is recorded. The creator will seal the fingerprint on Nimiq when ready.'
-                            : 'Your signature is recorded. Other parties still need to sign before the creator can seal.'}{' '}
+                            ? 'Your fields and wallet signature are recorded. The creator will seal the fingerprint on Nimiq when ready.'
+                            : 'Your fields and wallet signature are recorded. Other parties still need to finish before the creator can seal.'}{' '}
                           Keep your copy of <em>{doc.fileName}</em>. You can close this page.
                         </p>
                       </div>

@@ -73,17 +73,18 @@ export const CREATOR_STAGES: JourneyStage[] = [
 export const SIGNER_STAGES: JourneyStage[] = [
   {
     id: 'sign',
-    label: 'Sign',
-    verb: 'Match PDF & sign',
-    blurb: 'Drop the PDF the creator sent you, confirm it matches, then sign with your wallet.',
-    privacyNote: 'You prove you hold the same bytes - the file never uploads.',
+    label: 'Complete',
+    verb: 'Match PDF & complete your fields',
+    blurb:
+      'Drop the PDF the creator sent you, confirm it matches, fill your fields on the document, then bind with your wallet.',
+    privacyNote: 'You prove you hold the same file — it never uploads.',
   },
   {
     id: 'done',
     label: 'Done',
     verb: 'Thanks — you are done',
     blurb:
-      'Your signature is recorded. The creator seals the agreement on Nimiq when everyone has signed. You can close this page.',
+      'Your fields and wallet signature are recorded. The creator seals the agreement on Nimiq when everyone has finished. You can close this page.',
     privacyNote: 'Keep your PDF. Anyone can re-check the fingerprint later.',
   },
 ]

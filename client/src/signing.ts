@@ -87,7 +87,7 @@ export function resolveSigningParty(
         ? `You already signed as ${signedParty?.displayName ?? 'a party'}. Waiting for other signatures.`
         : isCreator
           ? 'You already signed. You can seal the agreement when you are ready.'
-          : 'Thanks — your signature is recorded. The creator will seal the agreement on Nimiq.',
+          : 'Thanks — your part is recorded. The creator will seal the agreement on Nimiq.',
     }
   }
 
