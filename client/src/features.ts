@@ -21,4 +21,9 @@ export const FEATURES = {
    * Build-time override: VITE_PDF_ANNOTATION_UI=false
    */
   pdfAnnotationUi: envFlag('VITE_PDF_ANNOTATION_UI', true),
+  /**
+   * Cross-device “Sign on mobile” QR handoff (WebRTC + encrypted deposit fallback).
+   * Build-time override: VITE_SIGN_ON_MOBILE=false
+   */
+  signOnMobile: envFlag('VITE_SIGN_ON_MOBILE', true),
 } as const

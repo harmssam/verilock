@@ -135,7 +135,7 @@ export function AgreementsPanel({
           </>
         ) : (
           <p className="muted">
-            No agreements yet — create one by fingerprinting a PDF on your computer and collecting signatures.
+            No agreements yet — create one by fingerprinting a file on your computer and collecting signatures.
           </p>
         )}
       </div>

@@ -12,6 +12,7 @@ import {
   isPricingPath,
   isPrivacyPath,
   isSecurityPath,
+  isSignMobilePath,
   isSupportPath,
   saveHubReturnPath,
 } from './hubReturnPath'
@@ -50,6 +51,8 @@ import { LandingHome } from './landing/LandingHome'
 import { PATH_PLACEMENTS, PATH_STILLS, placementImageStyle } from './landing/pathMedia'
 import { api } from './api'
 import { FEATURES } from './features'
+import { LOGIN_CANCELED_MESSAGE } from './nimiq'
+import { SignMobilePage } from './SignMobilePage'
 
 /** Path card labels — stills + placement from pathMedia. */
 const TRACK_META: Record<
@@ -74,7 +77,7 @@ const TRACK_META: Record<
     accent: 'signer',
   },
   verifier: {
-    title: 'Verify a PDF',
+    title: 'Verify a file',
     detail: 'Drop a file to check it still matches a sealed proof',
     icon: ScanSearch,
     accent: 'verifier',
@@ -96,9 +99,11 @@ type ShellScreen =
   | 'agreements'
   | 'pdf'
   | 'pdf-lab'
+  | 'sign-mobile'
   | 'not-found'
 
 function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotationUi): ShellScreen {
+  if (isSignMobilePath(pathname)) return 'sign-mobile'
   if (isPricingPath(pathname)) return 'pricing'
   if (isPrivacyPath(pathname)) return 'privacy'
   if (isSecurityPath(pathname)) return 'security'
@@ -520,6 +525,11 @@ export function App() {
     screen === 'pdf-lab' ||
     screen === 'not-found'
 
+  // Focused mobile ink capture — no shell chrome / wallet header.
+  if (screen === 'sign-mobile') {
+    return <SignMobilePage />
+  }
+
   return (
     <div
       className={[
@@ -603,7 +613,13 @@ export function App() {
 
       {(wallet.error || wallet.walletStatus) && (
         <p
-          className={`exp-status${wallet.error ? ' exp-status--error' : ''}`}
+          className={[
+            'exp-status',
+            wallet.error ? 'exp-status--error' : '',
+            wallet.error === LOGIN_CANCELED_MESSAGE ? 'exp-status--ephemeral' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
           role={wallet.error ? 'alert' : 'status'}
         >
           {wallet.error ?? wallet.walletStatus}

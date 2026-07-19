@@ -19,6 +19,7 @@ function isKnownAppPath(path: string): boolean {
   }
   if (/^\/d\/[^/]+\/?$/.test(path)) return true
   if (/^\/v\/[^/]+\/?$/.test(path)) return true
+  if (/^\/m\/sign\/[^/]+\/?$/.test(path)) return true
   return false
 }
 

@@ -40,7 +40,7 @@ const PHASE_META: Record<
 }
 
 const WAIT_TIPS = [
-  'Your PDF never leaves this device — only the fingerprint is sealed.',
+  'Your file never leaves this device — only the fingerprint is sealed.',
   'Closing this tab is fine. The server keeps working until the seal lands.',
   'Come back anytime: open this agreement to see when it is sealed.',
   'One credit = one permanent on-chain seal. No NIM wallet prompt needed.',

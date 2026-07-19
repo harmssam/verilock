@@ -73,7 +73,7 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 
 ### Acceptance checklist (redesign done only if all true)
 
-- [ ] Path picker still offers exactly: **Create & seal**, **I was invited**, **Verify a PDF**
+- [ ] Path picker still offers exactly: **Create & seal**, **I was invited**, **Verify a file**
 - [ ] Creator stages still: Fingerprint → Sign → Share → Seal → Verify (wallet login is a gate, not a rail step)
 - [ ] Signer stages still: Sign → Done (wallet login is a gate on submit, not a rail step)
 - [ ] Verifier stages still: Verify only (wallet optional)
@@ -86,6 +86,7 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 - [ ] Share invite (copy link, email package patterns) still present where creator can invite
 - [ ] Seal payment paths still: NIM fee / credits / progress UI as today
 - [ ] Signature pad + optional signature image still available on sign
+- [ ] **Sign on mobile** (desktop, when enabled): QR → `/m/sign/:id` ink handoff → wallet sign unchanged
 - [ ] Agreements list (`/agreements` full page) still open docs and prefer-seal CTA
 - [ ] No new primary CTA that invents a fourth path or skips an existing required gate
 
@@ -128,6 +129,7 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 | `/security` | Security & integrity (product-true claims only) |
 | `/support` | Support contact form (bot-protected) |
 | `/agreements` | Full agreements list |
+| `/m/sign/:sessionId` | Mobile-only ink capture for cross-device handoff (`#k=` encryption key in fragment) |
 | unknown | 404 page with home |
 
 ### Home / welcome
@@ -137,7 +139,7 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 | Hero status claims | Rotating trust / fee lines under CTAs |
 | Path: Create & seal | Role `creator` |
 | Path: I was invited | Role `signer` |
-| Path: Verify a PDF | Role `verifier` |
+| Path: Verify a file | Role `verifier` |
 | How VeriLock works | Collapsible multi-beat story, role-aware |
 | Privacy / trust copy | Expandable privacy framing |
 | Agreements | Full page `/agreements` via header / AccountMenu (no home strip) |
@@ -147,14 +149,14 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 Wallet login (LoginSheet / Hub / Pay) is a **gate** when creating, signing, or sealing — not a numbered stage.
 
 1. **Fingerprint** — PDF drop/browse, local SHA-256, agreement type (rental/contract/nda/other), rental landlord/tenant, full name, optional email notify (flag), optional title, **direct seal** checkbox, required signer count 1–4, optional co-signer names, optional notes (type-dependent), create CTA (prompts login if needed)
-2. **Sign** — Creator signs first: signature progress, party list, cancel (creator), match PDF, signature pad / image, sign CTA
+2. **Sign** — Creator signs first: signature progress, party list, cancel (creator), match PDF, signature pad / image, optional **Sign on mobile** (QR handoff), sign CTA
 3. **Share** — After creator signed: party list, ShareInviteCard (copy link / email package), wait for co-signers, cancel until first signature (if still allowed)
 4. **Seal** — Pricing display, credits panel / NIM pay / credit seal progress, lock on chain
 5. **Verify** — Re-drop PDF to confirm match after seal / done
 
 ### Signer path stages
 
-1. **Sign** — Drop PDF to lookup agreement **or** open `/d/:slug`; match fingerprint; login when ready to sign; name if needed; signature pad; sign
+1. **Sign** — Drop PDF to lookup agreement **or** open `/d/:slug`; match fingerprint; login when ready to sign; name if needed; signature pad (or Sign on mobile); sign
 2. **Done** — Confirmation; seal is creator’s job
 
 ### Verifier path stages
@@ -173,6 +175,7 @@ Wallet login (LoginSheet / Hub / Pay) is a **gate** when creating, signing, or s
 | Role pill | Creating / signing / verifying as… |
 | Per-step privacy note | Dock header |
 | Signatures panel patterns | Party list, signed counts |
+| Sign on mobile | `SignOnMobileModal` + `/m/sign/:sessionId` (`FEATURES.signOnMobile`) — ink only; wallet bind on desktop |
 | Delete/cancel agreement | When `canDeleteDocument` allows |
 | Credit seal progress | Non-blocking seal UX |
 | Hub return path + intent restore | `hubReturnPath`, `journeyIntent` |
@@ -209,7 +212,7 @@ Agreements open via header / AccountMenu → `/agreements` (no quiet home strip)
 ## Design principles (parity-safe)
 
 1. **Task first** — Path → rail → dock → stage; never bury the three intents.
-2. **Local file honesty** — UI must keep making “PDF never leaves device” obvious.
+2. **Local file honesty** — UI must keep making “file never leaves device” obvious.
 3. **One primary action** in the dock; secondary actions stay secondary.
 4. **Restrained product color** — accent for primary actions and state, not decoration soup.
 5. **Familiar controls** — selects, checkboxes, drop zones, and buttons stay recognizable.

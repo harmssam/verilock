@@ -9,6 +9,12 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from 'react'
+import {
+  DOCUMENT_ACCEPT,
+  DOCUMENT_FORMATS_LABEL,
+  isSupportedDocumentFile,
+  unsupportedDocumentMessage,
+} from '../pdf/documentKinds'
 
 export interface PdfDropZoneProps {
   file: File | null
@@ -21,13 +27,6 @@ export interface PdfDropZoneProps {
   onFiles?: (files: File[]) => void
   /** larger hero drop target */
   size?: 'default' | 'hero'
-}
-
-function isPdf(file: File): boolean {
-  const name = file.name.toLowerCase()
-  if (name.endsWith('.pdf')) return true
-  // Some browsers report empty type for dropped files
-  return file.type === 'application/pdf' || file.type === 'application/x-pdf'
 }
 
 export function formatFileSize(bytes: number): string {
@@ -55,9 +54,9 @@ export function PdfDropZone({
   file,
   onChange,
   disabled,
-  label = 'Drop PDF here',
-  hint = 'or click to browse - never leaves this device',
-  accept = 'application/pdf,.pdf',
+  label = 'Drop document here',
+  hint = `or click to browse (${DOCUMENT_FORMATS_LABEL}) — never leaves this device`,
+  accept = DOCUMENT_ACCEPT,
   multiple = false,
   onFiles,
   size = 'default',
@@ -73,17 +72,17 @@ export function PdfDropZone({
     (list: FileList | File[] | null) => {
       if (!list || list.length === 0) return
       const files = Array.from(list)
-      const pdfs = files.filter(isPdf)
-      if (pdfs.length === 0) {
-        setError('Please choose a PDF file')
+      const docs = files.filter(isSupportedDocumentFile)
+      if (docs.length === 0) {
+        setError(unsupportedDocumentMessage())
         return
       }
       setError(null)
       if (multiple && onFiles) {
-        onFiles(pdfs)
-        onChange(pdfs[0] ?? null)
+        onFiles(docs)
+        onChange(docs[0] ?? null)
       } else {
-        onChange(pdfs[0] ?? null)
+        onChange(docs[0] ?? null)
       }
     },
     [multiple, onChange, onFiles],
@@ -184,7 +183,11 @@ export function PdfDropZone({
         role="button"
         tabIndex={disabled ? -1 : 0}
         aria-disabled={disabled || undefined}
-        aria-label={file ? `Selected ${file.name}. Click to replace, or drop a new PDF.` : label}
+        aria-label={
+          file
+            ? `Selected ${file.name}. Click to replace, or drop a new file.`
+            : label
+        }
         className={[
           'pdf-drop',
           size === 'hero' ? 'pdf-drop--hero' : '',

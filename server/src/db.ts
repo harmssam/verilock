@@ -1468,3 +1468,254 @@ export function isTxHashUsedForCredits(txHash: string): boolean {
     .get(clean) as unknown
   return Boolean(row)
 }
+// ── Signature handoff rooms (cross-device ink capture; ciphertext only) ────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sig_handoff_rooms (
+    id TEXT PRIMARY KEY,
+    creator_address TEXT NOT NULL,
+    document_id TEXT,
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    deposit_iv BLOB,
+    deposit_ciphertext BLOB,
+    deposit_consumed INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS sig_handoff_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id TEXT NOT NULL,
+    from_role TEXT NOT NULL,
+    msg_type TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (room_id) REFERENCES sig_handoff_rooms(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_sig_handoff_expires ON sig_handoff_rooms(expires_at);
+  CREATE INDEX IF NOT EXISTS idx_sig_handoff_signals_room ON sig_handoff_signals(room_id, id);
+`)
+
+export type SigHandoffStatus = 'open' | 'connected' | 'completed' | 'expired'
+
+export interface SigHandoffRoom {
+  id: string
+  creatorAddress: string
+  documentId: string | null
+  status: SigHandoffStatus
+  createdAt: number
+  expiresAt: number
+  hasDeposit: boolean
+  depositConsumed: boolean
+}
+
+export interface SigHandoffSignal {
+  id: number
+  roomId: string
+  fromRole: 'host' | 'guest'
+  msgType: string
+  payload: string
+  createdAt: number
+}
+
+export const SIG_HANDOFF_TTL_MS = 5 * 60 * 1000
+export const SIG_HANDOFF_MAX_SIGNALS = 64
+export const SIG_HANDOFF_MAX_DEPOSIT_BYTES = 300 * 1024
+
+function mapSigHandoffRoom(row: Record<string, unknown>): SigHandoffRoom {
+  return {
+    id: row.id as string,
+    creatorAddress: row.creator_address as string,
+    documentId: (row.document_id as string | null) ?? null,
+    status: row.status as SigHandoffStatus,
+    createdAt: row.created_at as number,
+    expiresAt: row.expires_at as number,
+    hasDeposit: Boolean(row.deposit_ciphertext),
+    depositConsumed: Boolean(row.deposit_consumed),
+  }
+}
+
+export function createSigHandoffRoom(input: {
+  id: string
+  creatorAddress: string
+  documentId?: string | null
+  ttlMs?: number
+}): SigHandoffRoom {
+  const now = Date.now()
+  const ttl = input.ttlMs ?? SIG_HANDOFF_TTL_MS
+  const expiresAt = now + ttl
+  db.prepare(
+    `INSERT INTO sig_handoff_rooms
+      (id, creator_address, document_id, status, created_at, expires_at, deposit_consumed)
+     VALUES (?, ?, ?, 'open', ?, ?, 0)`,
+  ).run(
+    input.id,
+    normalizeAddress(input.creatorAddress),
+    input.documentId ?? null,
+    now,
+    expiresAt,
+  )
+  return {
+    id: input.id,
+    creatorAddress: normalizeAddress(input.creatorAddress),
+    documentId: input.documentId ?? null,
+    status: 'open',
+    createdAt: now,
+    expiresAt,
+    hasDeposit: false,
+    depositConsumed: false,
+  }
+}
+
+function expireRoomIfNeeded(room: SigHandoffRoom): SigHandoffRoom {
+  if (room.status === 'completed' || room.status === 'expired') return room
+  if (room.expiresAt < Date.now()) {
+    db.prepare(`UPDATE sig_handoff_rooms SET status = 'expired' WHERE id = ? AND status IN ('open', 'connected')`).run(
+      room.id,
+    )
+    return { ...room, status: 'expired' }
+  }
+  return room
+}
+
+export function getSigHandoffRoom(id: string): SigHandoffRoom | null {
+  const row = db.prepare('SELECT * FROM sig_handoff_rooms WHERE id = ?').get(id) as
+    | Record<string, unknown>
+    | undefined
+  if (!row) return null
+  return expireRoomIfNeeded(mapSigHandoffRoom(row))
+}
+
+export function setSigHandoffStatus(id: string, status: SigHandoffStatus): void {
+  db.prepare('UPDATE sig_handoff_rooms SET status = ? WHERE id = ?').run(status, id)
+}
+
+export function insertSigHandoffSignal(input: {
+  roomId: string
+  fromRole: 'host' | 'guest'
+  msgType: string
+  payload: string
+}): SigHandoffSignal {
+  const count = db
+    .prepare('SELECT COUNT(*) as c FROM sig_handoff_signals WHERE room_id = ?')
+    .get(input.roomId) as { c: number }
+  if (count.c >= SIG_HANDOFF_MAX_SIGNALS) {
+    throw new Error('Too many signaling messages for this session')
+  }
+  const createdAt = Date.now()
+  const result = db
+    .prepare(
+      `INSERT INTO sig_handoff_signals (room_id, from_role, msg_type, payload, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+    .run(input.roomId, input.fromRole, input.msgType, input.payload, createdAt)
+  return {
+    id: Number(result.lastInsertRowid),
+    roomId: input.roomId,
+    fromRole: input.fromRole,
+    msgType: input.msgType,
+    payload: input.payload,
+    createdAt,
+  }
+}
+
+export function listSigHandoffSignals(roomId: string, afterId = 0): SigHandoffSignal[] {
+  const rows = db
+    .prepare(
+      `SELECT * FROM sig_handoff_signals
+       WHERE room_id = ? AND id > ?
+       ORDER BY id ASC
+       LIMIT 100`,
+    )
+    .all(roomId, afterId) as Record<string, unknown>[]
+  return rows.map(row => ({
+    id: row.id as number,
+    roomId: row.room_id as string,
+    fromRole: row.from_role as 'host' | 'guest',
+    msgType: row.msg_type as string,
+    payload: row.payload as string,
+    createdAt: row.created_at as number,
+  }))
+}
+
+export function storeSigHandoffDeposit(
+  roomId: string,
+  iv: Buffer,
+  ciphertext: Buffer,
+): void {
+  if (ciphertext.length > SIG_HANDOFF_MAX_DEPOSIT_BYTES) {
+    throw new Error(`Deposit too large (max ${SIG_HANDOFF_MAX_DEPOSIT_BYTES} bytes)`)
+  }
+  if (iv.length < 8 || iv.length > 32) {
+    throw new Error('Invalid IV length')
+  }
+  const room = getSigHandoffRoom(roomId)
+  if (!room) throw new Error('Session not found')
+  if (room.status === 'expired' || room.status === 'completed') {
+    throw new Error('Session is no longer open')
+  }
+  if (room.depositConsumed) throw new Error('Deposit already consumed')
+  if (room.hasDeposit) throw new Error('Deposit already present')
+
+  db.prepare(
+    `UPDATE sig_handoff_rooms
+     SET deposit_iv = ?, deposit_ciphertext = ?, status = CASE WHEN status = 'open' THEN 'connected' ELSE status END
+     WHERE id = ?`,
+  ).run(iv, ciphertext, roomId)
+}
+
+export function consumeSigHandoffDeposit(
+  roomId: string,
+): { iv: Buffer; ciphertext: Buffer } | null {
+  const room = getSigHandoffRoom(roomId)
+  if (!room || room.depositConsumed) return null
+
+  const row = db
+    .prepare(
+      `SELECT deposit_iv, deposit_ciphertext FROM sig_handoff_rooms
+       WHERE id = ? AND deposit_ciphertext IS NOT NULL AND deposit_consumed = 0`,
+    )
+    .get(roomId) as { deposit_iv: Buffer; deposit_ciphertext: Buffer } | undefined
+  if (!row?.deposit_ciphertext) return null
+
+  db.prepare(
+    `UPDATE sig_handoff_rooms
+     SET deposit_consumed = 1, deposit_iv = NULL, deposit_ciphertext = NULL, status = 'completed'
+     WHERE id = ?`,
+  ).run(roomId)
+
+  return { iv: row.deposit_iv, ciphertext: row.deposit_ciphertext }
+}
+
+export function deleteSigHandoffRoom(id: string): boolean {
+  db.prepare('DELETE FROM sig_handoff_signals WHERE room_id = ?').run(id)
+  const result = db.prepare('DELETE FROM sig_handoff_rooms WHERE id = ?').run(id)
+  return result.changes > 0
+}
+
+export function purgeExpiredSigHandoffs(): number {
+  const now = Date.now()
+  db.prepare(
+    `UPDATE sig_handoff_rooms SET status = 'expired'
+     WHERE expires_at < ? AND status IN ('open', 'connected')`,
+  ).run(now)
+  // Drop finished/expired rooms older than 1 hour
+  const cutoff = now - 60 * 60 * 1000
+  const rooms = db
+    .prepare(
+      `SELECT id FROM sig_handoff_rooms
+       WHERE expires_at < ? OR (status IN ('completed', 'expired') AND created_at < ?)`,
+    )
+    .all(now, cutoff) as Array<{ id: string }>
+  for (const r of rooms) {
+    db.prepare('DELETE FROM sig_handoff_signals WHERE room_id = ?').run(r.id)
+  }
+  const result = db
+    .prepare(
+      `DELETE FROM sig_handoff_rooms
+       WHERE expires_at < ? OR (status IN ('completed', 'expired') AND created_at < ?)`,
+    )
+    .run(now, cutoff)
+  return result.changes
+}

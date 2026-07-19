@@ -82,13 +82,13 @@ const PATHS: {
   {
     role: 'signer',
     title: 'I was invited',
-    detail: 'Drop the shared PDF (or open your invite link), then sign',
+    detail: 'Drop the shared file (or open your invite link), then sign',
     icon: Users,
     imageAlt: '',
   },
   {
     role: 'verifier',
-    title: 'Verify a PDF',
+    title: 'Verify a file',
     detail: 'Drop a file to check it still matches a sealed proof',
     icon: ScanSearch,
     imageAlt: '',
@@ -188,7 +188,7 @@ export function LandingHome({ onPickRole }: LandingHomeProps) {
         >
           <Shield className="lr-trust-icon" size={18} strokeWidth={2.25} aria-hidden />
           <span className="lr-trust-copy">
-            <strong>Your PDF never leaves this device.</strong>
+            <strong>Your file never leaves this device.</strong>
             <span className="lr-trust-sub">
               We store a short integrity proof, not your document.
             </span>
@@ -198,8 +198,8 @@ export function LandingHome({ onPickRole }: LandingHomeProps) {
         {privacyOpen && (
           <div className="lr-trust-detail">
             <ul>
-              <li>The math that identifies your PDF runs in the browser. The file stays local.</li>
-              <li>Servers keep agreement metadata and that short proof string, never the PDF bytes.</li>
+              <li>The math that identifies your file runs in the browser. The file stays local.</li>
+              <li>Servers keep agreement metadata and that short proof string, never the file bytes.</li>
               <li>A permanent seal records only the proof on the Nimiq blockchain.</li>
               <li>Verification re-checks a local copy. No wallet required to verify.</li>
             </ul>

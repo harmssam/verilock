@@ -9,6 +9,11 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from 'react'
+import {
+  DOCUMENT_ACCEPT,
+  isSupportedDocumentFile,
+  unsupportedDocumentMessage,
+} from '../pdf/documentKinds'
 import { formatFileSize } from './PdfDropZone'
 import { signedCount, type JourneyDoc, type JourneyStepId } from './types'
 
@@ -23,18 +28,12 @@ interface DocumentStageProps {
   disabled?: boolean
   /**
    * Sign / verify-match mode: agreement metadata may exist, but the user must
-   * still drop their own local PDF. Do not show the agreement filename as if
+   * still drop their own local file. Do not show the agreement filename as if
    * a file is already loaded.
    */
   localCopyRequired?: boolean
   /** When localCopyRequired + file selected, whether hash matches the agreement */
   localCopyMatches?: boolean | null
-}
-
-function isPdf(file: File): boolean {
-  const name = file.name.toLowerCase()
-  if (name.endsWith('.pdf')) return true
-  return file.type === 'application/pdf' || file.type === 'application/x-pdf'
 }
 
 function filesFromDataTransfer(dt: DataTransfer): File[] {
@@ -72,7 +71,7 @@ export function DocumentStage({
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Only treat a local File as "loaded" when the user must re-prove the PDF
+  // Only treat a local File as "loaded" when the user must re-prove the document
   const hasLocalFile = Boolean(file)
   const displayName = localCopyRequired
     ? file?.name ?? null
@@ -91,13 +90,13 @@ export function DocumentStage({
   const applyFiles = useCallback(
     (list: FileList | File[] | null) => {
       if (!onFileChange || !list?.length) return
-      const pdfs = Array.from(list).filter(isPdf)
-      if (pdfs.length === 0) {
-        setError('Please choose a PDF file')
+      const docs = Array.from(list).filter(isSupportedDocumentFile)
+      if (docs.length === 0) {
+        setError(unsupportedDocumentMessage())
         return
       }
       setError(null)
-      onFileChange(pdfs[0]!)
+      onFileChange(docs[0]!)
     },
     [onFileChange],
   )
@@ -174,16 +173,17 @@ export function DocumentStage({
   else if (needsLocalCopy) {
     caption = doc?.fileName
       ? `Action required: drop your local copy of “${doc.fileName}”`
-      : 'Action required: drop your local copy of the PDF'
+      : 'Action required: drop your local copy of the file'
   } else if (localCopyRequired && hasLocalFile && localCopyMatches === false) {
-    caption = 'This file does not match the agreement fingerprint - try the original PDF'
+    caption = 'This file does not match the agreement fingerprint — try the original file'
   } else if (localCopyRequired && hasLocalFile && localCopyMatches === true) {
     caption = 'Local copy matches - fingerprint verified on this device'
   } else if (localCopyRequired && hasLocalFile) {
     caption = 'Checking fingerprint…'
-  } else if (step === 'fingerprint' && canInteract) caption = 'Step 2 - drop a PDF here, or browse'
+  } else if (step === 'fingerprint' && canInteract)
+    caption = 'Step 2 - drop a document here, or browse'
   else if (fingerprinted && !canInteract) caption = 'Fingerprint lives here - file stays on device'
-  else if (canInteract) caption = 'Drop a PDF here, or browse'
+  else if (canInteract) caption = 'Drop a document here, or browse'
   else caption = 'Your document will appear here'
 
   return (
@@ -207,10 +207,10 @@ export function DocumentStage({
       aria-label={
         canInteract
           ? hasFile
-            ? `Selected ${displayName}. Click to choose a different PDF, or drop a new one.`
+            ? `Selected ${displayName}. Click to choose a different file, or drop a new one.`
             : needsLocalCopy
-              ? `Upload required. Drop your local copy of ${doc?.fileName ?? 'the PDF'} or press Enter to browse.`
-              : 'Drop a PDF here or press Enter to browse'
+              ? `Upload required. Drop your local copy of ${doc?.fileName ?? 'the file'} or press Enter to browse.`
+              : 'Drop a document here or press Enter to browse'
           : undefined
       }
       onClick={() => {
@@ -228,7 +228,7 @@ export function DocumentStage({
           id={inputId}
           type="file"
           className="pdf-drop-input"
-          accept="application/pdf,.pdf"
+          accept={DOCUMENT_ACCEPT}
           disabled={disabled}
           onChange={onInputChange}
           tabIndex={-1}
@@ -241,10 +241,10 @@ export function DocumentStage({
           <span className="doc-stage-expect-label">Agreement on record</span>
           <strong className="doc-stage-expect-title">{doc.title}</strong>
           <span className="doc-stage-expect-file">
-            Expected PDF name: <code className="mono">{doc.fileName}</code>
+            Expected file name: <code className="mono">{doc.fileName}</code>
           </span>
           <span className="doc-stage-expect-hint">
-            The server never has your file - drop the same PDF from your device to prove the
+            The server never has your file — drop the same file from your device to prove the
             fingerprint.
           </span>
         </div>
@@ -266,7 +266,11 @@ export function DocumentStage({
                 <FileText size={36} strokeWidth={1.75} />
               )}
               <span>
-                {needsLocalCopy ? 'Drop your PDF copy here' : canInteract ? 'Drop PDF here' : 'Your PDF'}
+                {needsLocalCopy
+                  ? 'Drop your file copy here'
+                  : canInteract
+                    ? 'Drop document here'
+                    : 'Your document'}
               </span>
               {needsLocalCopy && (
                 <span className="doc-card-empty-sub">Not uploaded yet - required to sign</span>
@@ -337,7 +341,7 @@ export function DocumentStage({
             }}
           >
             <Upload size={15} strokeWidth={2.25} aria-hidden />
-            {needsLocalCopy ? 'Choose PDF on this device' : 'Browse files'}
+            {needsLocalCopy ? 'Choose file on this device' : 'Browse files'}
           </button>
           {file && (
             <button

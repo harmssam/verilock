@@ -142,10 +142,23 @@ export function isHubRedirectError(err: unknown): boolean {
   return message === HUB_REDIRECT_MESSAGE
 }
 
-/** Per Nimiq Hub integration guide: explicit cancel vs error. */
+/** Friendly copy when the user dismisses Hub / Pay login. */
+export const LOGIN_CANCELED_MESSAGE = 'Login Canceled'
+
+/**
+ * Per Nimiq Hub integration guide: explicit cancel vs error.
+ * Hub/Pay may surface "Request was cancelled", "CANCELED", or similar.
+ */
 export function isHubCancelError(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err)
-  return message === 'Request was cancelled' || /cancelled by user/i.test(message)
+  const message = (err instanceof Error ? err.message : String(err)).trim()
+  if (!message) return false
+  if (message === 'Request was cancelled') return true
+  // US/UK spelling; Hub often returns bare "CANCELED"
+  if (/^cancell?ed$/i.test(message)) return true
+  if (/cancell?ed by user/i.test(message)) return true
+  if (/request was cancell?ed/i.test(message)) return true
+  if (/user cancell?ed/i.test(message)) return true
+  return false
 }
 
 function normalizeTxHash(hash: string): string {

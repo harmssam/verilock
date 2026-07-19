@@ -1,6 +1,5 @@
 import { Check, Eraser, MousePointer2, PenLine, Type, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { PDFDocumentProxy } from 'pdfjs-dist'
 import {
   canAddMark,
   canAddSignature,
@@ -25,7 +24,7 @@ import {
   type SignaturePathData,
   type TextAnnotation,
 } from './annotations'
-import { loadPdfFromFile, renderPageToCanvas } from './pdfDocument'
+import { loadDocumentSurface, type DocumentSurface } from './documentSurface'
 import {
   SignatureStrokePad,
   type SignatureStrokeResult,
@@ -44,8 +43,8 @@ interface PdfAnnotatorProps {
 }
 
 /**
- * Local-only PDF annotator: render with pdf.js, place signature/text overlays.
- * Emits normalized annotations — no PDF bytes ever leave this component.
+ * Local-only document annotator: render PDF or image, place signature/text overlays.
+ * Emits normalized annotations — no file bytes ever leave this component.
  */
 export function PdfAnnotator({
   file,
@@ -56,7 +55,8 @@ export function PdfAnnotator({
 }: PdfAnnotatorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
-  const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
+  const surfaceRef = useRef<DocumentSurface | null>(null)
+  const [surface, setSurface] = useState<DocumentSurface | null>(null)
   const [pageCount, setPageCount] = useState(1)
   const [pageNumber, setPageNumber] = useState(1)
   const [cssSize, setCssSize] = useState({ width: pageWidth, height: pageWidth * 1.3 })
@@ -86,25 +86,26 @@ export function PdfAnnotator({
   const sigDataUrl = sigDraft?.imageDataUrl ?? null
   const sigPath: SignaturePathData | null = sigDraft?.path ?? null
 
-  // Load PDF when file changes
+  // Load document when file changes
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setLoadError(null)
-    setDoc(null)
     setPageNumber(1)
-    loadPdfFromFile(file)
-      .then(pdf => {
+    loadDocumentSurface(file)
+      .then(next => {
         if (cancelled) {
-          void pdf.destroy()
+          next.destroy()
           return
         }
-        setDoc(pdf)
-        setPageCount(pdf.numPages)
+        surfaceRef.current?.destroy()
+        surfaceRef.current = next
+        setSurface(next)
+        setPageCount(next.pageCount)
       })
       .catch(err => {
         if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : 'Could not open PDF')
+          setLoadError(err instanceof Error ? err.message : 'Could not open document')
         }
       })
       .finally(() => {
@@ -115,12 +116,20 @@ export function PdfAnnotator({
     }
   }, [file])
 
+  useEffect(() => {
+    return () => {
+      surfaceRef.current?.destroy()
+      surfaceRef.current = null
+    }
+  }, [])
+
   // Render current page
   useEffect(() => {
-    if (!doc || !canvasRef.current) return
+    if (!surface || !canvasRef.current) return
     let cancelled = false
     const canvas = canvasRef.current
-    renderPageToCanvas(doc, pageNumber, pageWidth, canvas)
+    surface
+      .renderPage(pageNumber, pageWidth, canvas)
       .then(rendered => {
         if (cancelled) return
         setCssSize({ width: rendered.cssWidth, height: rendered.cssHeight })
@@ -134,7 +143,7 @@ export function PdfAnnotator({
     return () => {
       cancelled = true
     }
-  }, [doc, pageNumber, pageWidth])
+  }, [surface, pageNumber, pageWidth])
 
   const pageAnnotations = useMemo(
     () => annotations.filter(a => a.pageIndex === pageNumber - 1),

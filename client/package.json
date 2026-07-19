@@ -8,6 +8,7 @@
     "build": "node scripts/package.mjs",
     "build:app": "tsc -b && vite build",
     "test:production": "node scripts/verify-production.mjs",
+    "test:document-kinds": "node scripts/test-document-kinds.mjs",
     "test:placement": "node scripts/test-placement-stream.mjs",
     "package:service-b": "node scripts/package.mjs",
     "test:service-b": "node scripts/verify-production.mjs",
@@ -18,11 +19,13 @@
     "@nimiq/mini-app-sdk": "^0.1.0",
     "lucide-react": "^1.23.0",
     "pdfjs-dist": "^4.10.38",
+    "qrcode": "^1.5.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",

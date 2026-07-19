@@ -389,7 +389,7 @@ export function LandingHowItWorks({ role, open, onToggle }: LandingHowItWorksPro
       {open && (
         <div className="lr-how-story">
           <p className="lr-how-lead">
-            Your PDF never leaves this device. Only its SHA-256 fingerprint is written to the Nimiq
+            Your file never leaves this device. Only its SHA-256 fingerprint is written to the Nimiq
             blockchain when you seal.
           </p>
           <ol className="lr-how-list">
