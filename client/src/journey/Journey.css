@@ -1607,6 +1607,47 @@ a.exp-account-menu-full:focus-visible {
   font-weight: 700;
 }
 
+.stage-rail-item--selectable {
+  opacity: 1;
+}
+
+.stage-rail-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.stage-rail-select:hover .stage-rail-dot {
+  border-color: color-mix(in srgb, var(--mint, #0d9488) 45%, var(--border));
+}
+
+.stage-rail-select:focus-visible {
+  outline: 2px solid var(--mint, #0d9488);
+  outline-offset: 2px;
+}
+
+.journey-arrange-continue {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.journey-arrange-continue .btn-lg {
+  width: 100%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .stage-rail-pill--ready {
     transition: opacity 0.15s ease;

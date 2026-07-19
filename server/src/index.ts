@@ -60,6 +60,7 @@ import {
   getPlanPublic,
   lockPlan as lockPlacementPlan,
   saveDraftPlan,
+  unlockPlan as unlockPlacementPlan,
 } from './placementPlans.js'
 import {
   isPdfAnnotationUiEnabled,
@@ -1011,8 +1012,8 @@ function pdfLabDisabled(res: express.Response): boolean {
 
 /**
  * Placement construction plan (structure + planRoot hashes only).
- * POST body: { originalSha256, plan, documentId?, lock?, planRoot?, batch0FramesHex?, batch0Root? }
- * lock=true freezes geometry; draft allowed until lock.
+ * POST body: { originalSha256, plan?, documentId?, lock?, unlock?, planRoot?, batch0FramesHex?, batch0Root? }
+ * lock=true freezes geometry for signing; unlock=true re-opens draft when no fills/signatures yet.
  */
 app.post(
   '/api/placement-plans',
@@ -1026,6 +1027,7 @@ app.post(
       plan?: unknown
       documentId?: string
       lock?: boolean
+      unlock?: boolean
       planRoot?: string
       batch0FramesHex?: string[]
       batch0Root?: string
@@ -1036,6 +1038,15 @@ app.post(
     }
     const address = res.locals.address as string
     try {
+      if (body.unlock) {
+        const result = unlockPlacementPlan({
+          originalSha256: body.originalSha256,
+          creatorAddress: address,
+          documentId: body.documentId ?? null,
+        })
+        res.status(200).json(result)
+        return
+      }
       const result = body.lock
         ? lockPlacementPlan({
             originalSha256: body.originalSha256,
@@ -1056,7 +1067,9 @@ app.post(
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Placement plan save failed'
       const status =
-        message.includes('Only the plan owner') || message.includes('already locked')
+        message.includes('Only the plan owner') ||
+        message.includes('already locked') ||
+        message.includes('Cannot edit placements')
           ? 403
           : 400
       res.status(status).json({ error: message })

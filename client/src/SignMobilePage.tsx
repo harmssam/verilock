@@ -1,14 +1,16 @@
 import { Check, LoaderCircle } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { SignaturePad } from './journey/SignaturePad'
 import {
-  blobToPayload,
+  SignatureStrokePad,
+  type SignatureStrokeResult,
+} from './pdf/SignatureStrokePad'
+import {
   encryptPayload,
   importKeyB64url,
   packEncrypted,
+  strokeResultToPayload,
 } from './signatureHandoff/crypto'
 import { depositEncrypted, getHandoffSession } from './signatureHandoff/signalingClient'
-import { resizeSignaturePng } from './signatureHandoff/resizePng'
 import {
   sendOnChannel,
   startGuestPeer,
@@ -26,7 +28,6 @@ function parseSessionId(pathname: string): string | null {
 function keyFromHash(): string | null {
   const hash = window.location.hash.replace(/^#/, '')
   const params = new URLSearchParams(hash)
-  // Support #k=... and #k...
   const k = params.get('k')
   if (k) return k
   if (hash.startsWith('k=')) return hash.slice(2)
@@ -35,14 +36,13 @@ function keyFromHash(): string | null {
 
 /**
  * Focused mobile signature capture — no wallet, no PDF.
- * Ink is E2E encrypted to the desktop host via WebRTC or short-lived deposit.
+ * Sends unit-square stroke vectors (primary) + optional PNG preview, E2E encrypted.
  */
 export function SignMobilePage() {
   const sessionId = parseSessionId(window.location.pathname)
   const [phase, setPhase] = useState<GuestPhase>('loading')
   const [error, setError] = useState<string | null>(null)
-  const [sigBlob, setSigBlob] = useState<Blob | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [stroke, setStroke] = useState<SignatureStrokeResult | null>(null)
   const [padKey, setPadKey] = useState(0)
 
   const keyRef = useRef<CryptoKey | null>(null)
@@ -84,7 +84,9 @@ export function SignMobilePage() {
             channelRef.current = ch
             ch.onopen = () => {
               channelOpenRef.current = true
-              if (!cancelled) setPhase(p => (p === 'sending' || p === 'sent' || p === 'preview' ? p : 'connected'))
+              if (!cancelled) {
+                setPhase(p => (p === 'sending' || p === 'sent' || p === 'preview' ? p : 'connected'))
+              }
             }
           },
           onStatus: s => {
@@ -112,26 +114,21 @@ export function SignMobilePage() {
     }
   }, [sessionId])
 
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl)
-    }
-  }, [previewUrl])
-
   const goPreview = useCallback(() => {
-    if (!sigBlob) return
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
-    setPreviewUrl(URL.createObjectURL(sigBlob))
+    if (!stroke?.path?.strokes?.length) return
     setPhase('preview')
-  }, [sigBlob, previewUrl])
+  }, [stroke])
 
   const send = useCallback(async () => {
-    if (!sigBlob || !sessionId || !keyRef.current) return
+    if (!stroke?.path?.strokes?.length || !sessionId || !keyRef.current) return
     setPhase('sending')
     setError(null)
     try {
-      const { blob, width, height } = await resizeSignaturePng(sigBlob)
-      const payload = await blobToPayload(blob, sessionId, width, height)
+      const payload = strokeResultToPayload(
+        sessionId,
+        stroke.path,
+        stroke.imageDataUrl || undefined,
+      )
       const pkg = await encryptPayload(keyRef.current, sessionId, payload)
       const packed = packEncrypted(pkg)
 
@@ -155,12 +152,10 @@ export function SignMobilePage() {
       setError(err instanceof Error ? err.message : 'Could not send signature')
       setPhase('error')
     }
-  }, [sigBlob, sessionId])
+  }, [stroke, sessionId])
 
   const redraw = () => {
-    setSigBlob(null)
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
-    setPreviewUrl(null)
+    setStroke(null)
     setPadKey(k => k + 1)
     setPhase(channelOpenRef.current ? 'connected' : 'ready')
     setError(null)
@@ -172,7 +167,8 @@ export function SignMobilePage() {
         <p className="sign-mobile-kicker">VeriLock</p>
         <h1 className="sign-mobile-title">Draw your signature</h1>
         <p className="sign-mobile-sub muted">
-          Confirm to send it privately to your computer. Wallet signing stays on the computer.
+          Strokes are sent as vectors to your computer (encrypted). Wallet signing stays on the
+          computer.
         </p>
       </header>
 
@@ -192,18 +188,17 @@ export function SignMobilePage() {
 
       {(phase === 'ready' || phase === 'connecting' || phase === 'connected') && (
         <>
-          <SignaturePad
+          <SignatureStrokePad
             key={padKey}
-            large
-            hideHint
+            productMode
             label="Sign here"
-            onChange={setSigBlob}
+            onChange={result => setStroke(result)}
           />
           <div className="sign-mobile-dock">
             <button
               type="button"
               className="btn btn-primary btn-lg"
-              disabled={!sigBlob}
+              disabled={!stroke?.path?.strokes?.length}
               onClick={goPreview}
             >
               Preview
@@ -217,9 +212,17 @@ export function SignMobilePage() {
         </>
       )}
 
-      {phase === 'preview' && previewUrl && (
+      {phase === 'preview' && stroke && (
         <div className="sign-mobile-preview-block">
-          <img className="sign-mobile-preview-img" src={previewUrl} alt="Your signature preview" />
+          {stroke.imageDataUrl ? (
+            <img
+              className="sign-mobile-preview-img"
+              src={stroke.imageDataUrl}
+              alt="Your signature preview"
+            />
+          ) : (
+            <p className="muted">Signature ready ({stroke.simplifiedPoints} points)</p>
+          )}
           <div className="sign-mobile-dock">
             <button type="button" className="btn btn-primary btn-lg" onClick={() => void send()}>
               Confirm &amp; send

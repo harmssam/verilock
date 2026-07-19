@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom'
 import { Check, Copy, LoaderCircle, Smartphone, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { paintSignaturePath } from '../pdf/annotations'
 import {
   cancelHandoff,
   completeHandoff,
@@ -11,7 +12,7 @@ import {
   decryptPayload,
   exportKeyB64url,
   generatePayloadKey,
-  payloadToBlob,
+  payloadToHandoffResult,
   unpackEncrypted,
 } from '../signatureHandoff/crypto'
 import { qrDataUrl } from '../signatureHandoff/qr'
@@ -19,14 +20,15 @@ import {
   startHostPeer,
   type PeerSession,
 } from '../signatureHandoff/webrtc'
-import type { HostPhase } from '../signatureHandoff/types'
+import type { HandoffInkResult, HostPhase } from '../signatureHandoff/types'
 
 interface SignOnMobileModalProps {
   token: string
   documentId?: string
   open: boolean
   onClose: () => void
-  onSignature: (blob: Blob) => void
+  /** Primary ink is vectors; PNG blob is optional convenience for wallet image. */
+  onSignature: (result: HandoffInkResult) => void
 }
 
 const FALLBACK_POLL_MS = 1500
@@ -44,8 +46,7 @@ export function SignOnMobileModal({
   const [error, setError] = useState<string | null>(null)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [handoffUrl, setHandoffUrl] = useState<string | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null)
+  const [received, setReceived] = useState<HandoffInkResult | null>(null)
   const [copied, setCopied] = useState(false)
   const [expiresLabel, setExpiresLabel] = useState<string | null>(null)
   const [depositHint, setDepositHint] = useState(false)
@@ -58,50 +59,50 @@ export function SignOnMobileModal({
   const receivedRef = useRef(false)
   const applyingRef = useRef(false)
   const mountedRef = useRef(true)
-  const previewUrlRef = useRef<string | null>(null)
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null)
+  const objectUrlRef = useRef<string | null>(null)
 
-  const revokePreview = useCallback(() => {
-    if (previewUrlRef.current) {
-      URL.revokeObjectURL(previewUrlRef.current)
-      previewUrlRef.current = null
+  const revokeObjectUrl = useCallback(() => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
     }
-    setPreviewUrl(null)
   }, [])
 
-  const cleanupNet = useCallback(async (cancelRoom: boolean) => {
-    if (fallbackTimer.current) {
-      clearInterval(fallbackTimer.current)
-      fallbackTimer.current = null
-    }
-    if (hintTimer.current) {
-      clearTimeout(hintTimer.current)
-      hintTimer.current = null
-    }
-    peerRef.current?.stop()
-    peerRef.current = null
-    const sid = sessionIdRef.current
-    if (cancelRoom && sid) {
-      try {
-        await cancelHandoff(token, sid)
-      } catch {
-        /* ignore */
+  const cleanupNet = useCallback(
+    async (cancelRoom: boolean) => {
+      if (fallbackTimer.current) {
+        clearInterval(fallbackTimer.current)
+        fallbackTimer.current = null
       }
-    }
-  }, [token])
+      if (hintTimer.current) {
+        clearTimeout(hintTimer.current)
+        hintTimer.current = null
+      }
+      peerRef.current?.stop()
+      peerRef.current = null
+      const sid = sessionIdRef.current
+      if (cancelRoom && sid) {
+        try {
+          await cancelHandoff(token, sid)
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+    [token],
+  )
 
   const applyEncrypted = useCallback(
     async (raw: string | { iv: string; ciphertext: string }) => {
       if (receivedRef.current || !keyRef.current || !sessionIdRef.current) return
       const pkg = typeof raw === 'string' ? unpackEncrypted(raw) : raw
       const payload = await decryptPayload(keyRef.current, sessionIdRef.current, pkg)
-      const blob = payloadToBlob(payload)
+      const result = payloadToHandoffResult(payload)
       receivedRef.current = true
       if (!mountedRef.current) return
-      revokePreview()
-      const url = URL.createObjectURL(blob)
-      previewUrlRef.current = url
-      setPreviewBlob(blob)
-      setPreviewUrl(url)
+      revokeObjectUrl()
+      setReceived(result)
       setPhase('received')
       setDepositHint(false)
       peerRef.current?.stop()
@@ -114,7 +115,7 @@ export function SignOnMobileModal({
         hintTimer.current = null
       }
     },
-    [revokePreview],
+    [revokeObjectUrl],
   )
 
   const startSession = useCallback(async () => {
@@ -122,9 +123,9 @@ export function SignOnMobileModal({
     setError(null)
     setQrUrl(null)
     setHandoffUrl(null)
-    setPreviewBlob(null)
+    setReceived(null)
     setDepositHint(false)
-    revokePreview()
+    revokeObjectUrl()
     receivedRef.current = false
     applyingRef.current = false
     await cleanupNet(true)
@@ -169,12 +170,10 @@ export function SignOnMobileModal({
           if (s === 'connected') setPhase(p => (p === 'received' ? p : 'connected'))
         },
         onError: err => {
-          // Non-fatal while durable deposit may still work
           console.warn('[sig-handoff]', err.message)
         },
       })
 
-      // Poll encrypted deposit (non-destructive until host complete). Always dual-written by guest.
       fallbackTimer.current = setInterval(() => {
         if (receivedRef.current || applyingRef.current || !sessionIdRef.current) return
         applyingRef.current = true
@@ -186,15 +185,12 @@ export function SignOnMobileModal({
           } catch (err) {
             if (!mountedRef.current || receivedRef.current) return
             const status = (err as Error & { status?: number }).status
-            // 404 = not ready yet (takeDeposit maps empty to null; other 404s rare)
             if (status === 404) return
             const message = err instanceof Error ? err.message : 'Could not read signature'
-            // Decrypt / corrupt package: surface error; deposit remains for retry after New QR
-            if (/decrypt|tamper|payload|Invalid|mismatch/i.test(message)) {
+            if (/decrypt|tamper|payload|Invalid|mismatch|Outdated|Unsupported|Missing/i.test(message)) {
               setError(message)
               setPhase('error')
             }
-            // Transient network: keep polling
           } finally {
             applyingRef.current = false
           }
@@ -210,7 +206,7 @@ export function SignOnMobileModal({
       setError(err instanceof Error ? err.message : 'Could not start mobile sign')
       setPhase('error')
     }
-  }, [token, documentId, cleanupNet, applyEncrypted, revokePreview])
+  }, [token, documentId, cleanupNet, applyEncrypted, revokeObjectUrl])
 
   useEffect(() => {
     mountedRef.current = true
@@ -218,11 +214,30 @@ export function SignOnMobileModal({
     return () => {
       mountedRef.current = false
       void cleanupNet(true)
-      revokePreview()
+      revokeObjectUrl()
     }
-    // Only re-run when open toggles
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  // Paint vector preview when we have path but no PNG (or prefer path always as canvas)
+  useEffect(() => {
+    if (!received?.path?.strokes?.length || !previewCanvasRef.current) return
+    const c = previewCanvasRef.current
+    const w = 280
+    const h = 100
+    const dpr = window.devicePixelRatio || 1
+    c.width = Math.round(w * dpr)
+    c.height = Math.round(h * dpr)
+    c.style.width = `${w}px`
+    c.style.height = `${h}px`
+    const ctx = c.getContext('2d')
+    if (!ctx) return
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, w, h)
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, w, h)
+    paintSignaturePath(ctx, received.path, { left: 8, top: 8, width: w - 16, height: h - 16 })
+  }, [received])
 
   const handleClose = () => {
     void cleanupNet(true)
@@ -231,13 +246,13 @@ export function SignOnMobileModal({
   }
 
   const handleUse = async () => {
-    if (!previewBlob || !sessionIdRef.current) return
+    if (!received || !sessionIdRef.current) return
     try {
       await completeHandoff(token, sessionIdRef.current)
     } catch {
       /* still apply locally */
     }
-    onSignature(previewBlob)
+    onSignature(received)
     void cleanupNet(false)
     onClose()
   }
@@ -269,10 +284,12 @@ export function SignOnMobileModal({
           : phase === 'connected'
             ? 'Connected — draw and confirm on your phone'
             : phase === 'received'
-              ? 'Signature received — review below'
+              ? 'Signature received (vector ink) — review below'
               : phase === 'error'
                 ? error ?? 'Something went wrong'
                 : ''
+
+  const previewImgUrl = received?.imageDataUrl || null
 
   const node = (
     <div className="login-sheet-layer sig-mobile-modal-layer" role="presentation">
@@ -300,8 +317,8 @@ export function SignOnMobileModal({
         </div>
 
         <p className="muted sig-mobile-modal-lead">
-          Draw with your finger on your phone. Your computer keeps wallet identity and seals the
-          fingerprint — the ink is end-to-end encrypted.
+          Draw with your finger on your phone. Strokes are sent as vectors (encrypted). Your computer
+          keeps wallet identity.
         </p>
 
         {phase !== 'received' && (
@@ -316,13 +333,20 @@ export function SignOnMobileModal({
           </div>
         )}
 
-        {phase === 'received' && previewUrl && (
+        {phase === 'received' && received && (
           <div className="sig-mobile-preview-wrap">
-            <img className="sig-mobile-preview" src={previewUrl} alt="Signature from phone" />
+            {previewImgUrl ? (
+              <img className="sig-mobile-preview" src={previewImgUrl} alt="Signature from phone" />
+            ) : (
+              <canvas ref={previewCanvasRef} className="sig-mobile-preview" aria-label="Signature from phone" />
+            )}
           </div>
         )}
 
-        <p className={`sig-mobile-status${phase === 'error' ? ' sig-mobile-status--error' : ''}`} role="status">
+        <p
+          className={`sig-mobile-status${phase === 'error' ? ' sig-mobile-status--error' : ''}`}
+          role="status"
+        >
           {(phase === 'creating' || phase === 'waiting' || phase === 'connecting') && (
             <LoaderCircle className="btn-spinner" size={14} strokeWidth={2.25} aria-hidden />
           )}
@@ -332,7 +356,8 @@ export function SignOnMobileModal({
 
         {depositHint && phase !== 'received' && phase !== 'error' && phase !== 'creating' && (
           <p className="muted sig-mobile-expires">
-            Still waiting — keep this window open. Your phone can still deliver via the secure backup path.
+            Still waiting — keep this window open. Your phone can still deliver via the secure backup
+            path.
           </p>
         )}
 

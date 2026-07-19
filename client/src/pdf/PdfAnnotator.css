@@ -16,6 +16,17 @@
   font-size: 0.8125rem;
 }
 
+/* Icon-only tools (checkmark / X) — square hit target, no label gap */
+.pdf-annotator-toolbar .btn.btn-icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0.4rem;
+  gap: 0;
+}
+
 .pdf-annotator-toolbar .btn.is-active {
   outline: 2px solid var(--accent, #0f766e);
   outline-offset: 1px;

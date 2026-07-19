@@ -204,7 +204,10 @@
   padding: 0.65rem 0.75rem;
 }
 
-/* Full-screen dimmed modal so the PDF stays in view (no scroll to pad) */
+/*
+ * Full-viewport overlay (always portaled to document.body).
+ * Flex-center the panel so it sits in the middle of the window, not a scrolled parent.
+ */
 .signer-fill-modal {
   position: fixed;
   inset: 0;
@@ -212,19 +215,31 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
   padding:
     max(1rem, env(safe-area-inset-top))
     max(0.85rem, env(safe-area-inset-right))
     max(1rem, env(safe-area-inset-bottom))
     max(0.85rem, env(safe-area-inset-left));
+  margin: 0;
   background: rgb(15 23 42 / 52%);
+  overscroll-behavior: contain;
   animation: signer-modal-fade 0.2s ease both;
 }
 
 .signer-fill-modal-panel {
+  position: relative;
+  box-sizing: border-box;
   width: min(28rem, 100%);
-  max-height: min(92vh, 40rem);
-  overflow: auto;
+  max-width: 100%;
+  max-height: min(92dvh, 40rem);
+  margin: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
@@ -355,6 +370,11 @@
   font-size: 0.8rem;
   line-height: 1.45;
   text-align: center;
+}
+
+.signer-fill-mobile-btn {
+  width: 100%;
+  margin-top: 0.15rem;
 }
 
 .signer-fill-modal-actions {

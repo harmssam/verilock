@@ -14,6 +14,9 @@ interface StageRailProps {
   step: JourneyStepId
   account: boolean
   doc: JourneyDoc | null
+  /** When set, completed/current steps can jump backward (creator fix-ups). */
+  onStepSelect?: (id: JourneyStepId) => void
+  canSelectStep?: (id: JourneyStepId) => boolean
 }
 
 function isStepDone(
@@ -48,7 +51,14 @@ function isStepDone(
   return false
 }
 
-export function StageRail({ role, step, account, doc }: StageRailProps) {
+export function StageRail({
+  role,
+  step,
+  account,
+  doc,
+  onStepSelect,
+  canSelectStep,
+}: StageRailProps) {
   const stages = stagesForRole(role)
   const railRef = useRef<HTMLElement>(null)
   const itemRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -122,6 +132,9 @@ export function StageRail({ role, step, account, doc }: StageRailProps) {
       {stages.map((s, i) => {
         const current = i === currentIndex
         const done = isStepDone(role, s.id, step, account, doc) && !current
+        const selectable =
+          Boolean(onStepSelect) &&
+          (canSelectStep ? canSelectStep(s.id) : current || done || i < currentIndex)
         return (
           <div
             key={s.id}
@@ -132,14 +145,32 @@ export function StageRail({ role, step, account, doc }: StageRailProps) {
               'stage-rail-item',
               current ? 'stage-rail-item--current' : '',
               done ? 'stage-rail-item--done' : '',
+              selectable ? 'stage-rail-item--selectable' : '',
             ]
               .filter(Boolean)
               .join(' ')}
           >
-            <span className="stage-rail-dot">
-              {done ? <Check size={12} strokeWidth={2.5} /> : i + 1}
-            </span>
-            <span className="stage-rail-label">{s.label}</span>
+            {selectable ? (
+              <button
+                type="button"
+                className="stage-rail-select"
+                aria-current={current ? 'step' : undefined}
+                aria-label={`${s.label}${current ? ' (current)' : done ? ' (completed — go back)' : ''}`}
+                onClick={() => onStepSelect?.(s.id)}
+              >
+                <span className="stage-rail-dot">
+                  {done ? <Check size={12} strokeWidth={2.5} /> : i + 1}
+                </span>
+                <span className="stage-rail-label">{s.label}</span>
+              </button>
+            ) : (
+              <>
+                <span className="stage-rail-dot">
+                  {done ? <Check size={12} strokeWidth={2.5} /> : i + 1}
+                </span>
+                <span className="stage-rail-label">{s.label}</span>
+              </>
+            )}
           </div>
         )
       })}

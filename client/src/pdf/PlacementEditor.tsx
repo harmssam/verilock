@@ -1,10 +1,10 @@
 /**
  * Construction-phase placement editor: name people, place empty signature/name
- * slots on a local document (PDF or image), drag/delete until Lock. No ink payloads here.
+ * slots on a local document (PDF or image). Parent freezes geometry when continuing
+ * to the next step (and can re-open until someone signs). No ink payloads here.
  */
 import {
   Check,
-  Lock,
   PenLine,
   Trash2,
   Type,
@@ -39,9 +39,8 @@ export interface PlacementEditorProps {
   file: File
   plan: ConstructionPlan
   onChange: (next: ConstructionPlan) => void
-  /** Called when user confirms lock (parent computes planRoot + persists). */
-  onLockRequest?: () => void | Promise<void>
   disabled?: boolean
+  /** True while parent is locking/unlocking the plan. */
   lockBusy?: boolean
   pageWidth?: number
 }
@@ -73,7 +72,6 @@ export function PlacementEditor({
   file,
   plan,
   onChange,
-  onLockRequest,
   disabled = false,
   lockBusy = false,
   pageWidth = 560,
@@ -98,7 +96,6 @@ export function PlacementEditor({
   /** Optional label on fillable text fields (e.g. "Date", "Printed name"). */
   const [textFieldLabel, setTextFieldLabel] = useState('')
   const [placing, setPlacing] = useState<{ type: Tool; x: number; y: number } | null>(null)
-  const [confirmLock, setConfirmLock] = useState(false)
   const dragRef = useRef<{
     id: string
     startX: number
@@ -475,18 +472,6 @@ export function PlacementEditor({
 
   void dragTick
 
-  const canLock =
-    !locked &&
-    slots.some(
-      s =>
-        s.kind === 'signature' ||
-        s.kind === 'initial' ||
-        s.kind === 'name' ||
-        s.kind === 'text',
-    ) &&
-    people.length >= 1 &&
-    Boolean(onLockRequest)
-
   const ghostStyle = (): React.CSSProperties | undefined => {
     if (!placing || placing.type === 'select') return undefined
     const kind: PlacementKind =
@@ -767,23 +752,23 @@ export function PlacementEditor({
         </button>
         <button
           type="button"
-          className={`btn btn-ghost${tool === 'checkmark' ? ' is-active' : ''}`}
+          className={`btn btn-ghost btn-icon-only${tool === 'checkmark' ? ' is-active' : ''}`}
           onClick={() => setTool('checkmark')}
           disabled={editDisabled}
           title="Place a fixed checkmark (locked with plan)"
+          aria-label="Place checkmark"
         >
-          <Check size={14} strokeWidth={2.5} aria-hidden />
-          Check
+          <Check size={16} strokeWidth={2.5} aria-hidden />
         </button>
         <button
           type="button"
-          className={`btn btn-ghost${tool === 'cross' ? ' is-active' : ''}`}
+          className={`btn btn-ghost btn-icon-only${tool === 'cross' ? ' is-active' : ''}`}
           onClick={() => setTool('cross')}
           disabled={editDisabled}
           title="Place a fixed X (locked with plan)"
+          aria-label="Place X mark"
         >
-          <X size={14} strokeWidth={2.5} aria-hidden />
-          X
+          <X size={16} strokeWidth={2.5} aria-hidden />
         </button>
         {selectedId && !locked && (
           <button
@@ -836,7 +821,7 @@ export function PlacementEditor({
 
       {locked && (
         <p className="placement-editor-hint placement-editor-hint--locked">
-          <Lock size={14} strokeWidth={2.25} aria-hidden /> Placements locked
+          Layout is set for signing. Use Edit placements to change it before anyone signs.
         </p>
       )}
       {placeError && (
@@ -1000,47 +985,6 @@ export function PlacementEditor({
         )}
       </div>
 
-      {!locked && onLockRequest && (
-        <div className="placement-editor-lock">
-          {!confirmLock ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!canLock || lockBusy || disabled}
-              onClick={() => setConfirmLock(true)}
-            >
-              <Lock size={16} strokeWidth={2.25} aria-hidden />
-              Lock placements
-            </button>
-          ) : (
-            <div className="placement-editor-confirm">
-              <p>
-                Lock {slots.length} field{slots.length === 1 ? '' : 's'}? This cannot be undone.
-              </p>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className={`btn btn-primary${lockBusy ? ' btn--busy' : ''}`}
-                  disabled={lockBusy || disabled}
-                  onClick={() => {
-                    void Promise.resolve(onLockRequest()).finally(() => setConfirmLock(false))
-                  }}
-                >
-                  {lockBusy ? 'Locking…' : 'Yes, lock placements'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  disabled={lockBusy}
-                  onClick={() => setConfirmLock(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }

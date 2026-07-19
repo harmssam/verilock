@@ -87,6 +87,7 @@ import {
   computePlanRoot,
   emptyPlan,
   lockPlan as lockConstructionPlanLocal,
+  unlockPlanLocal,
   type ConstructionPlan,
   type PlacementSlot,
 } from '../pdf/placements'
@@ -195,6 +196,8 @@ export function DocumentJourney({
   const [pdfHash, setPdfHash] = useState<string | null>(null)
   const [pageCount, setPageCount] = useState(1)
   const [title, setTitle] = useState('')
+  /** Last title we auto-filled from a file name — used so a new file replaces it. */
+  const autoTitleFromFileRef = useRef<string | null>(null)
   const [creatorName, setCreatorName] = useState('')
   /** Optional ready-to-seal email — collected only when FEATURES.emailNotifyUi is on. */
   const [creatorNotifyEmail, setCreatorNotifyEmail] = useState('')
@@ -462,7 +465,8 @@ export function DocumentJourney({
     })
   }, [registerHubLockComplete, registerHubLockError, applySession, setActiveFromSeal])
 
-  const step = useMemo<JourneyStepId>(() => {
+  /** Derived step from agreement progress (source of truth for “how far” we are). */
+  const naturalStep = useMemo<JourneyStepId>(() => {
     if (!role) return 'welcome'
     if (role === 'verifier') return 'verify'
     // Wallet login is a gate on actions — not a numbered rail step.
@@ -482,7 +486,7 @@ export function DocumentJourney({
     if (!doc) return 'fingerprint'
     if (doc.sealed) return 'done'
     if (doc.directSeal) return 'seal'
-    // Construction first (when UI on): lock placements before any wallet signature.
+    // Construction first (when UI on): freeze placements when continuing past arrange.
     // Wait for plan GET before treating as unlocked draft (avoids flash / wrong step).
     if (FEATURES.pdfAnnotationUi && planLoadState === 'loading' && signedCount(doc) === 0) {
       return 'share'
@@ -534,6 +538,52 @@ export function DocumentJourney({
   ])
 
   const pathStages = useMemo(() => stagesForRole(role), [role])
+
+  /**
+   * Optional hold on an earlier stage so creators can move backwards to fix mistakes.
+   * Cleared when natural progress no longer allows it (e.g. someone signed).
+   */
+  const [stepHold, setStepHold] = useState<JourneyStepId | null>(null)
+
+  const canHoldStep = useCallback(
+    (hold: JourneyStepId, natural: JourneyStepId): boolean => {
+      if (role !== 'creator' || !doc || doc.sealed) return false
+      const order = pathStages.map(s => s.id)
+      const hi = order.indexOf(hold)
+      const ni = order.indexOf(natural)
+      if (hi < 0 || ni < 0 || hi > ni) return false
+      // Fingerprint is finished once the agreement exists — use cancel to start over.
+      if (hold === 'fingerprint') return false
+      // After the first signature, earlier steps are view-only via natural flow only.
+      if (signedCount(doc) > 0 && hold !== natural) return false
+      return true
+    },
+    [role, doc, pathStages],
+  )
+
+  const step = useMemo<JourneyStepId>(() => {
+    if (stepHold && canHoldStep(stepHold, naturalStep)) return stepHold
+    return naturalStep
+  }, [stepHold, naturalStep, canHoldStep])
+
+  useEffect(() => {
+    if (stepHold && !canHoldStep(stepHold, naturalStep)) {
+      setStepHold(null)
+    }
+  }, [stepHold, naturalStep, canHoldStep])
+
+  const selectJourneyStep = useCallback(
+    (id: JourneyStepId) => {
+      if (id === naturalStep) {
+        setStepHold(null)
+        return
+      }
+      if (canHoldStep(id, naturalStep)) {
+        setStepHold(id)
+      }
+    },
+    [naturalStep, canHoldStep],
+  )
 
   // Quiet refresh while creator waits for co-signers after signing (share step).
   useEffect(() => {
@@ -667,11 +717,20 @@ export function DocumentJourney({
         if (cancelled) return
         setPdfHash(hash)
         setPageCount(pages)
-        setTitle(prev =>
-          (prev ?? '').trim()
-            ? prev
-            : clampField(stripDocumentExtension(pdfFile.name), MAX_TITLE_LENGTH),
+        // Auto-fill title from the file name when empty, or when the field still
+        // holds the previous auto-fill (user has not customized it). Always track
+        // this file's suggestion so a later replace can detect an untouched title.
+        const suggested = clampField(
+          stripDocumentExtension(pdfFile.name),
+          MAX_TITLE_LENGTH,
         )
+        setTitle(prev => {
+          const cur = (prev ?? '').trim()
+          const lastAuto = autoTitleFromFileRef.current
+          const shouldReplace = !cur || cur === lastAuto
+          autoTitleFromFileRef.current = suggested
+          return shouldReplace ? suggested : prev
+        })
       } catch (err) {
         if (!cancelled) {
           setLocalError(err instanceof Error ? err.message : 'Failed to read document')
@@ -897,6 +956,7 @@ export function DocumentJourney({
     setPdfFile(null)
     setPdfHash(null)
     setTitle('')
+    autoTitleFromFileRef.current = null
     setCreatorName('')
     setCreatorNotifyEmail('')
     setDocType('contract')
@@ -1434,10 +1494,11 @@ export function DocumentJourney({
           ? 'you are organizing only (not signing)'
           : `you sign as ${sortedPeople[rosterIdx]?.displayName || `Person ${cs}`}`
       setPlacementStatus(
-        `Placements locked · ${saved.slotCount} boxes · ${asLabel} · root ${shortHash(saved.planRoot ?? planRoot)}`,
+        `Layout saved · ${saved.slotCount} boxes · ${asLabel} · root ${shortHash(saved.planRoot ?? planRoot)}`,
       )
+      setStepHold(null)
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'Could not lock placements')
+      setLocalError(err instanceof Error ? err.message : 'Could not save placements')
     } finally {
       setPlacementLockBusy(false)
     }
@@ -1448,7 +1509,66 @@ export function DocumentJourney({
     pdfHash,
     signHash,
     creatorNotifyEmail,
+    setActiveFromSeal,
   ])
+
+  /** Re-open placements for editing (before anyone fills fields or signs). */
+  const unlockPlacements = useCallback(async () => {
+    if (!token || !doc || !constructionPlan) return
+    if (signedCount(doc) > 0) {
+      setLocalError('Placements cannot be changed after someone has signed.')
+      return
+    }
+    const hash = (pdfHash || signHash || doc.fingerprint || constructionPlan.pdfSha256).toLowerCase()
+    if (!/^[a-f0-9]{64}$/.test(hash)) {
+      setLocalError('Document fingerprint missing — re-open the file.')
+      return
+    }
+    setPlacementLockBusy(true)
+    setPlacementStatus(null)
+    setLocalError(null)
+    try {
+      const saved = await api.savePlacementPlan(token, {
+        originalSha256: hash,
+        documentId: doc.id,
+        unlock: true,
+      })
+      const base = unlockPlanLocal(constructionPlan)
+      const fromServer = saved.plan
+      setConstructionPlan({
+        ...base,
+        status: 'draft',
+        planRoot: undefined,
+        lockedAt: undefined,
+        ...(fromServer
+          ? {
+              people: fromServer.people.map(p => ({
+                slotIndex: p.slotIndex,
+                displayName: p.displayName,
+                role: p.role,
+                walletAddress: (p as { walletAddress?: string | null }).walletAddress ?? null,
+              })),
+              slots: (fromServer.slots as PlacementSlot[]) ?? base.slots,
+              creatorSigningAs:
+                fromServer.creatorSigningAs === undefined
+                  ? base.creatorSigningAs
+                  : fromServer.creatorSigningAs,
+            }
+          : {}),
+      })
+      setLastBatchRoot(null)
+      setFilledSlotIds(new Set())
+      setKnownBlobIds(new Set())
+      setPageFieldsConfirmed(false)
+      setSharedAck(false)
+      setStepHold(null)
+      setPlacementStatus('Placements re-opened — adjust fields, then continue.')
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Could not re-open placements')
+    } finally {
+      setPlacementLockBusy(false)
+    }
+  }, [token, doc, constructionPlan, pdfHash, signHash])
 
   /** Mark invite as sent, or solo “continue to seal” (share is after creator sign). */
   const acknowledgeShare = () => {
@@ -1889,6 +2009,12 @@ export function DocumentJourney({
               step={step}
               account={Boolean(account)}
               doc={doc}
+              onStepSelect={role === 'creator' ? selectJourneyStep : undefined}
+              canSelectStep={
+                role === 'creator'
+                  ? id => id === naturalStep || canHoldStep(id, naturalStep)
+                  : undefined
+              }
             />
           )}
 
@@ -2131,7 +2257,7 @@ export function DocumentJourney({
                       <header className="signatures-config-head">
                         <h3 id="arrange-pdf-title">
                           {constructionPlan.status === 'locked'
-                            ? 'Placements locked'
+                            ? 'Field layout'
                             : 'Arrange signers'}
                         </h3>
                       </header>
@@ -2142,12 +2268,69 @@ export function DocumentJourney({
                           setConstructionPlan(next)
                           setRequiredSigners(Math.max(1, Math.min(4, next.people.length)))
                         }}
-                        onLockRequest={
-                          constructionPlan.status === 'locked' ? undefined : () => lockPlacements()
-                        }
                         disabled={busy || !token}
                         lockBusy={placementLockBusy}
                       />
+                      {constructionPlan.status !== 'locked' && (
+                        <div className="journey-arrange-continue">
+                          <button
+                            type="button"
+                            className={`btn btn-primary btn-lg${placementLockBusy ? ' btn--busy' : ''}`}
+                            disabled={
+                              busy ||
+                              !token ||
+                              placementLockBusy ||
+                              constructionPlan.slots.length === 0 ||
+                              !constructionPlan.slots.some(
+                                s =>
+                                  s.kind === 'signature' ||
+                                  s.kind === 'initial' ||
+                                  s.kind === 'name' ||
+                                  s.kind === 'text',
+                              )
+                            }
+                            onClick={() => void lockPlacements()}
+                          >
+                            {placementLockBusy ? (
+                              <>
+                                <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
+                                Saving layout…
+                              </>
+                            ) : (
+                              'Continue'
+                            )}
+                          </button>
+                          <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                            Saves who signs where and moves on. You can come back to edit until
+                            someone signs.
+                          </p>
+                        </div>
+                      )}
+                      {constructionPlan.status === 'locked' &&
+                        signedCount(doc) === 0 &&
+                        isDocumentCreator(doc.source, address) && (
+                          <div className="journey-arrange-continue">
+                            <button
+                              type="button"
+                              className={`btn btn-secondary${placementLockBusy ? ' btn--busy' : ''}`}
+                              disabled={busy || !token || placementLockBusy}
+                              onClick={() => void unlockPlacements()}
+                            >
+                              {placementLockBusy ? (
+                                <>
+                                  <LoaderCircle
+                                    className="btn-spinner"
+                                    size={16}
+                                    strokeWidth={2.5}
+                                  />
+                                  Re-opening…
+                                </>
+                              ) : (
+                                'Edit placements'
+                              )}
+                            </button>
+                          </div>
+                        )}
                       {placementStatus && (
                         <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.8rem' }}>
                           {placementStatus}
@@ -2918,6 +3101,8 @@ export function DocumentJourney({
                                     busy={fillBusy}
                                     filledSlotIds={filledSlotIds}
                                     onSubmit={submitPageFields}
+                                    authToken={token}
+                                    documentId={doc.id}
                                   />
                                 )}
 
@@ -3002,11 +3187,26 @@ export function DocumentJourney({
                                       token={token}
                                       documentId={doc.id}
                                       onClose={() => setSignOnMobileOpen(false)}
-                                      onSignature={blob => {
-                                        setSigBlob(blob)
-                                        if (mobileSigPreview) URL.revokeObjectURL(mobileSigPreview)
-                                        setMobileSigPreview(URL.createObjectURL(blob))
-                                        setSignOnMobileOpen(false)
+                                      onSignature={result => {
+                                        // Wallet pad uses PNG; vectors are already verified for fill path.
+                                        void (async () => {
+                                          let blob = result.blob
+                                          if (!blob && result.imageDataUrl) {
+                                            try {
+                                              blob = await (await fetch(result.imageDataUrl)).blob()
+                                            } catch {
+                                              blob = null
+                                            }
+                                          }
+                                          if (blob) {
+                                            setSigBlob(blob)
+                                            if (mobileSigPreview) {
+                                              URL.revokeObjectURL(mobileSigPreview)
+                                            }
+                                            setMobileSigPreview(URL.createObjectURL(blob))
+                                          }
+                                          setSignOnMobileOpen(false)
+                                        })()
                                       }}
                                     />
                                   )}
