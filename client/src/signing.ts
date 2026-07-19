@@ -87,7 +87,7 @@ export function resolveSigningParty(
         ? `You already signed as ${signedParty?.displayName ?? 'a party'}. Waiting for other signatures.`
         : isCreator
           ? 'You already signed. You can seal the agreement when you are ready.'
-          : 'Thanks — your part is recorded. The creator will seal the agreement on Nimiq.',
+          : 'Thanks, your part is recorded. The creator will seal the agreement on Nimiq.',
     }
   }
 
@@ -102,7 +102,7 @@ export function resolveSigningParty(
         doc.signingProgress.readyToLock || doc.status === 'ready_to_lock'
           ? isCreator
             ? 'All signatures are in. Continue to seal when you are ready.'
-            : 'All signatures are in. Thanks — the creator will seal this agreement on Nimiq.'
+            : 'All signatures are in. Thanks. The creator will seal this agreement on Nimiq.'
           : 'No signatures are pending on this document.',
     }
   }

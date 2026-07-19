@@ -173,9 +173,9 @@ export function DocumentStage({
   else if (needsLocalCopy) {
     caption = 'Drop or browse to select the matching file'
   } else if (localCopyRequired && hasLocalFile && localCopyMatches === false) {
-    caption = 'This file does not match the agreement fingerprint — try the original file'
+    caption = 'This file does not match the agreement fingerprint. Try the original file.'
   } else if (localCopyRequired && hasLocalFile && localCopyMatches === true) {
-    caption = 'Local copy matches — fingerprint verified on this device'
+    caption = 'Local copy matches. Fingerprint verified on this device.'
   } else if (localCopyRequired && hasLocalFile) {
     caption = 'Checking fingerprint…'
   } else if (step === 'fingerprint' && canInteract)

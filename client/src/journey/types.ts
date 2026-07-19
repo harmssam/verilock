@@ -32,7 +32,7 @@ export const CREATOR_STAGES: JourneyStage[] = [
     label: 'Add PDF',
     verb: 'Add the PDF and fingerprint it locally',
     blurb:
-      'Drop the agreement file. We only register its fingerprint — no signing yet. Next you arrange who signs where.',
+      'Drop the agreement file. We only register its fingerprint (no signing yet). Next you arrange who signs where.',
     privacyNote: 'The file never uploads. Only the fingerprint is registered.',
   },
   {
@@ -40,8 +40,8 @@ export const CREATOR_STAGES: JourneyStage[] = [
     label: 'Create and Invite',
     verb: 'Name people, place fields, invite signers',
     blurb:
-      'Name each signer, place their boxes on the PDF, and choose whether you are one of them (or only organizing). Continue when the layout looks right — you can come back to edit until someone signs.',
-    privacyNote: 'Only placement geometry is stored — not the PDF bytes.',
+      'Name each signer, place their boxes on the PDF, and choose whether you are one of them (or only organizing). Continue when the layout looks right. You can come back to edit until someone signs.',
+    privacyNote: 'Only placement geometry is stored, not the PDF bytes.',
   },
   {
     id: 'sign',
@@ -77,12 +77,12 @@ export const SIGNER_STAGES: JourneyStage[] = [
     verb: 'Match PDF & complete your fields',
     blurb:
       'Drop the PDF the creator sent you, confirm it matches, fill your fields on the document, then bind with your wallet.',
-    privacyNote: 'You prove you hold the same file — it never uploads.',
+    privacyNote: 'You prove you hold the same file. It never uploads.',
   },
   {
     id: 'done',
     label: 'Done',
-    verb: 'Thanks — you are done',
+    verb: 'Thanks, you are done',
     blurb:
       'Your fields and wallet signature are recorded. The creator seals the agreement on Nimiq when everyone has finished. You can close this page.',
     privacyNote: 'Keep your PDF. Anyone can re-check the fingerprint later.',

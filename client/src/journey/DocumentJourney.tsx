@@ -1719,8 +1719,8 @@ export function DocumentJourney({
         const solo = signedDoc.signingProgress.required <= 1
         setLockMessage(
           solo
-            ? 'Signature complete — continue to seal.'
-            : 'All signatures collected — continue to seal.',
+            ? 'Signature complete. Continue to seal.'
+            : 'All signatures collected. Continue to seal.',
         )
       }
       // Sign form is mid-page; after success the UI swaps to done/share and the old
@@ -2891,9 +2891,9 @@ export function DocumentJourney({
                           <Check size={18} strokeWidth={2.5} />
                           {role === 'creator'
                             ? requiredCount(doc) <= 1
-                              ? 'Signature complete — continue to seal'
-                              : 'All parties signed — continue to seal'
-                            : 'Thanks — your part is complete. The creator seals the agreement on Nimiq.'}
+                              ? 'Signature complete. Continue to seal'
+                              : 'All parties signed. Continue to seal'
+                            : 'Thanks, your part is complete. The creator seals the agreement on Nimiq.'}
                         </div>
                       ) : (
                         <>
@@ -3362,7 +3362,7 @@ export function DocumentJourney({
                     <div className="done-banner">
                       <Check size={18} strokeWidth={2.5} />
                       <div>
-                        <strong>Thanks — you&apos;re done!</strong>
+                        <strong>Thanks, you&apos;re done!</strong>
                         <p className="muted">
                           {allSigned(doc) || doc.readyToLock
                             ? 'Your fields and wallet signature are recorded. The creator will seal the fingerprint on Nimiq when ready.'
