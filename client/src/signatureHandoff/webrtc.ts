@@ -8,7 +8,8 @@ export const RTC_CONFIG: RTCConfiguration = {
   ],
 }
 
-const POLL_MS = 1000
+/** Slightly under 1 Hz to stay well under signal rate limits with dual peers + ICE. */
+const POLL_MS = 1500
 
 export type PeerSession = {
   pc: RTCPeerConnection

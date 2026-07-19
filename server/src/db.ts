@@ -1656,8 +1656,8 @@ export function storeSigHandoffDeposit(
     throw new Error('Session is no longer open')
   }
   if (room.depositConsumed) throw new Error('Deposit already consumed')
-  if (room.hasDeposit) throw new Error('Deposit already present')
-
+  // Idempotent re-deposit: guest dual-writes / retries may post the same ciphertext again.
+  // Overwrite only while host has not completed the room.
   db.prepare(
     `UPDATE sig_handoff_rooms
      SET deposit_iv = ?, deposit_ciphertext = ?, status = CASE WHEN status = 'open' THEN 'connected' ELSE status END
@@ -1665,11 +1665,15 @@ export function storeSigHandoffDeposit(
   ).run(iv, ciphertext, roomId)
 }
 
-export function consumeSigHandoffDeposit(
+/**
+ * Read encrypted deposit without consuming it.
+ * Host decrypts client-side; only complete/cancel clears the blob.
+ */
+export function peekSigHandoffDeposit(
   roomId: string,
 ): { iv: Buffer; ciphertext: Buffer } | null {
   const room = getSigHandoffRoom(roomId)
-  if (!room || room.depositConsumed) return null
+  if (!room || room.depositConsumed || room.status === 'expired') return null
 
   const row = db
     .prepare(
@@ -1678,14 +1682,26 @@ export function consumeSigHandoffDeposit(
     )
     .get(roomId) as { deposit_iv: Buffer; deposit_ciphertext: Buffer } | undefined
   if (!row?.deposit_ciphertext) return null
+  return { iv: row.deposit_iv, ciphertext: row.deposit_ciphertext }
+}
 
+/** Clear deposit and mark completed (after host successfully applied ink). */
+export function clearSigHandoffDeposit(roomId: string): void {
   db.prepare(
     `UPDATE sig_handoff_rooms
      SET deposit_consumed = 1, deposit_iv = NULL, deposit_ciphertext = NULL, status = 'completed'
      WHERE id = ?`,
   ).run(roomId)
+}
 
-  return { iv: row.deposit_iv, ciphertext: row.deposit_ciphertext }
+/** @deprecated Prefer peek + clear on complete — kept for any leftover callers. */
+export function consumeSigHandoffDeposit(
+  roomId: string,
+): { iv: Buffer; ciphertext: Buffer } | null {
+  const pair = peekSigHandoffDeposit(roomId)
+  if (!pair) return null
+  clearSigHandoffDeposit(roomId)
+  return pair
 }
 
 export function deleteSigHandoffRoom(id: string): boolean {

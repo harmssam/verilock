@@ -135,21 +135,19 @@ export function SignMobilePage() {
       const pkg = await encryptPayload(keyRef.current, sessionId, payload)
       const packed = packEncrypted(pkg)
 
-      let sentP2p = false
+      // Best-effort P2P for lower latency — never the sole delivery path.
       const ch = channelRef.current
       if (ch && (ch.readyState === 'open' || channelOpenRef.current)) {
         try {
           if (ch.readyState !== 'open') await waitForChannelOpen(ch, 4000)
           sendOnChannel(ch, packed)
-          sentP2p = true
         } catch {
-          sentP2p = false
+          /* deposit below is durable */
         }
       }
 
-      if (!sentP2p) {
-        await depositEncrypted(sessionId, pkg)
-      }
+      // Always deposit ciphertext so the host can retrieve even if WebRTC drops.
+      await depositEncrypted(sessionId, pkg)
 
       setPhase('sent')
       peerRef.current?.stop()
@@ -245,8 +243,8 @@ export function SignMobilePage() {
           <Check size={28} strokeWidth={2.5} aria-hidden />
           <h2>Sent to your computer</h2>
           <p className="muted">
-            You can close this tab. On your computer, review the signature and continue with wallet
-            sign.
+            Keep the computer window open. Review the signature there and continue with wallet sign.
+            You can close this tab once it appears on the computer.
           </p>
         </div>
       )}

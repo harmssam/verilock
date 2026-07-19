@@ -1247,7 +1247,9 @@ app.post('/api/verify/hash', verifyHashLimit, (req, res) => {
 })
 
 // ── Cross-device signature ink handoff (signaling + encrypted deposit only) ──
-const sigHandoffLimit = rateLimit(60, 60_000)
+// Poll is ~1–1.5 Hz per peer + ICE posts; 60/min saturated dual-sided sessions.
+const sigHandoffLimit = rateLimit(120, 60_000)
+const sigHandoffSignalLimit = rateLimit(480, 60_000)
 const sigHandoffCreateLimit = rateLimit(20, 60_000)
 
 app.post(
@@ -1289,7 +1291,7 @@ app.get('/api/sig-handoff/:id', sigHandoffLimit, (req, res) => {
   }
 })
 
-app.post('/api/sig-handoff/:id/signal', sigHandoffLimit, (req, res) => {
+app.post('/api/sig-handoff/:id/signal', sigHandoffSignalLimit, (req, res) => {
   const { from, type, payload } = (req.body ?? {}) as {
     from?: 'host' | 'guest'
     type?: string
@@ -1327,7 +1329,7 @@ app.post('/api/sig-handoff/:id/signal', sigHandoffLimit, (req, res) => {
   }
 })
 
-app.get('/api/sig-handoff/:id/signal', sigHandoffLimit, (req, res) => {
+app.get('/api/sig-handoff/:id/signal', sigHandoffSignalLimit, (req, res) => {
   const afterRaw = req.query.after
   const after = typeof afterRaw === 'string' ? Number(afterRaw) : 0
   const afterId = Number.isFinite(after) && after >= 0 ? Math.floor(after) : 0
