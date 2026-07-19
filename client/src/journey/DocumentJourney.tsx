@@ -10,7 +10,6 @@ import {
   Shield,
   ShieldCheck,
   Trash2,
-  Upload,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -3005,20 +3004,6 @@ export function DocumentJourney({
                                     : ''}
                                 </span>
                               </div>
-
-                              {!hasVerifiedLocalPdf && (
-                                <div className="sign-upload-callout" role="status">
-                                  <Upload size={18} strokeWidth={2.25} aria-hidden />
-                                  <div>
-                                    <strong>Upload your copy of the file</strong>
-                                    <p className="muted" style={{ margin: '0.2rem 0 0' }}>
-                                      Drop the same file from your computer so we can verify the
-                                      document is identical. Required after leaving and returning
-                                      to this agreement.
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
 
                               <DocumentStage
                                 step={step}
