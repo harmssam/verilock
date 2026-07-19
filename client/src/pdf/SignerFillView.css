@@ -319,6 +319,33 @@
   border: 1.5px dashed color-mix(in srgb, var(--person-color, #0f766e) 35%, #cbd5e1);
   background:
     linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  touch-action: none;
+}
+
+/* Horizontal (wide) signature boxes: keep the pad tall enough to draw with a finger */
+.signer-fill-modal-body .sig-pad--aspect .sig-pad-canvas {
+  min-height: 9.5rem;
+  max-height: min(42dvh, 16rem);
+  width: 100%;
+}
+
+/* Landscape phones: use more of the short viewport for the pad */
+@media (orientation: landscape) and (max-height: 500px) {
+  .signer-fill-modal {
+    align-items: stretch;
+    padding-block: max(0.35rem, env(safe-area-inset-top));
+  }
+
+  .signer-fill-modal-panel {
+    max-height: none;
+    height: 100%;
+    border-radius: 12px;
+  }
+
+  .signer-fill-modal-body .sig-pad--aspect .sig-pad-canvas {
+    min-height: 6.5rem;
+    max-height: min(58dvh, 12rem);
+  }
 }
 
 /* Shorter pad for initials (matches smaller page boxes) */

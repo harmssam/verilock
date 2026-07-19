@@ -212,6 +212,8 @@ export function SignatureStrokePad({
 
   const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (disabled) return
+    // Prevent page pan/scroll while drawing (critical on mobile landscape + scrollable modals).
+    e.preventDefault()
     drawing.current = true
     canvasRef.current?.setPointerCapture(e.pointerId)
     lockMetricsIfNeeded()
@@ -222,6 +224,7 @@ export function SignatureStrokePad({
 
   const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drawing.current || disabled) return
+    e.preventDefault()
     const p = pointCss(e)
     currentStroke.current.push(p)
     // Incremental draw for responsiveness
@@ -244,6 +247,7 @@ export function SignatureStrokePad({
 
   const end = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drawing.current) return
+    e.preventDefault()
     drawing.current = false
     try {
       canvasRef.current?.releasePointerCapture(e.pointerId)
@@ -322,6 +326,9 @@ export function SignatureStrokePad({
         onPointerMove={move}
         onPointerUp={end}
         onPointerCancel={end}
+        // React 17+ registers passive listeners for touch; pointer + touch-action:none
+        // is the supported path. Keep the canvas non-passive via CSS touch-action.
+        style={{ touchAction: 'none' }}
       />
       {!compact &&
         (productMode ? (
