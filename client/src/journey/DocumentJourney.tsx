@@ -105,6 +105,7 @@ import {
   signedCount,
   stagesForRole,
   toJourneyDoc,
+  walletHasSignedJourneyDoc,
   type JourneyDoc,
   type JourneyStepId,
   type PathRole,
@@ -472,20 +473,18 @@ export function DocumentJourney({
     // Wallet login is a gate on actions — not a numbered rail step.
     if (role === 'signer') {
       if (!doc) return 'sign'
-      // After this wallet has signed (or everyone has), show the short "done" step
-      const meNorm = address ? normalizeAddress(address) : null
-      const meSigned =
-        Boolean(meNorm) &&
-        doc.parties.some(
-          p => p.signed && p.walletAddress && normalizeAddress(p.walletAddress) === meNorm,
-        )
-      if (doc.sealed || meSigned || allSigned(doc)) return 'done'
+      // After this wallet has signed (or everyone has), show the short "done" step.
+      // Never route invitees to seal — only the document creator seals.
+      if (doc.sealed || walletHasSignedJourneyDoc(doc, address)) return 'done'
       return 'sign'
     }
     // Creator path: add PDF → arrange → sign (if organizer is a party) → invite → seal
     if (!doc) return 'fingerprint'
     if (doc.sealed) return 'done'
-    if (doc.directSeal) return 'seal'
+    // Only the creator may enter the seal step (never co-signers / invitees).
+    if (doc.directSeal) {
+      return address && isDocumentCreator(doc.source, address) ? 'seal' : 'done'
+    }
     // Construction first (when UI on): freeze placements when continuing past arrange.
     // Wait for plan GET before treating as unlocked draft (avoids flash / wrong step).
     if (FEATURES.pdfAnnotationUi && planLoadState === 'loading' && signedCount(doc) === 0) {
@@ -526,7 +525,10 @@ export function DocumentJourney({
     // Waiting on invitees / progress (organizer lands here after lock if not signing)
     if (!allSigned(doc)) return 'share'
     if (requiredCount(doc) <= 1 && !sharedAck) return 'share'
-    return 'seal'
+    // Seal is creator-only. If this wallet is not the creator (mis-set role, sticky
+    // intent, etc.), finish on “done” instead of showing seal CTAs.
+    if (address && isDocumentCreator(doc.source, address)) return 'seal'
+    return 'done'
   }, [
     role,
     doc,
@@ -1708,22 +1710,19 @@ export function DocumentJourney({
         URL.revokeObjectURL(mobileSigPreview)
         setMobileSigPreview(null)
       }
-      if (signedDoc.signingProgress.readyToLock) {
-        // Only the creator seals — co-signers should not be told to continue to seal.
+      // Invitees stay on the signer path so they never land on seal CTAs.
+      if (!isDocumentCreator(signedDoc, address)) {
+        setRole('signer')
+        saveJourneyIntent('signer')
+        setSharedAck(true)
+        setLockMessage(null)
+      } else if (signedDoc.signingProgress.readyToLock) {
         const solo = signedDoc.signingProgress.required <= 1
-        if (isDocumentCreator(signedDoc, address)) {
-          setLockMessage(
-            solo
-              ? 'Signature complete — continue to seal.'
-              : 'All signatures collected — continue to seal.',
-          )
-        } else {
-          setLockMessage(
-            solo
-              ? 'Signature complete. The creator can seal this agreement on the Nimiq blockchain.'
-              : 'All signatures are in. The creator can seal this agreement on the Nimiq blockchain.',
-          )
-        }
+        setLockMessage(
+          solo
+            ? 'Signature complete — continue to seal.'
+            : 'All signatures collected — continue to seal.',
+        )
       }
       // Sign form is mid-page; after success the UI swaps to done/share and the old
       // scroll offset lands near the bottom. Snap to top so the confirmation is visible.
@@ -2895,9 +2894,7 @@ export function DocumentJourney({
                             ? requiredCount(doc) <= 1
                               ? 'Signature complete — continue to seal'
                               : 'All parties signed — continue to seal'
-                            : requiredCount(doc) <= 1
-                              ? 'Signature complete. The creator can seal this on Nimiq.'
-                              : 'All parties have signed. The creator can seal this on Nimiq.'}
+                            : 'Thanks — your part is complete. The creator seals the agreement on Nimiq.'}
                         </div>
                       ) : (
                         <>
@@ -3268,7 +3265,7 @@ export function DocumentJourney({
                 </div>
               )}
 
-              {step === 'seal' && doc && (
+              {step === 'seal' && doc && address && isDocumentCreator(doc.source, address) && (
                 <div className="action-stack">
                   {busy && creditBalance >= 1 ? (
                     <CreditSealProgress
@@ -3376,7 +3373,39 @@ export function DocumentJourney({
 
               {(step === 'verify' || step === 'done') && (
                 <div className="action-stack">
-                  {step === 'done' && doc && (
+                  {step === 'done' && doc && role === 'signer' && !doc.sealed && (
+                    <div className="done-banner">
+                      <Check size={18} strokeWidth={2.5} />
+                      <div>
+                        <strong>Thanks — you&apos;re done!</strong>
+                        <p className="muted">
+                          {allSigned(doc) || doc.readyToLock
+                            ? 'Your signature is recorded. The creator will seal the fingerprint on Nimiq when ready.'
+                            : 'Your signature is recorded. Other parties still need to sign before the creator can seal.'}{' '}
+                          Keep your copy of <em>{doc.fileName}</em>. You can close this page.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {step === 'done' && doc && role === 'signer' && !doc.sealed && (
+                    <>
+                      <PartyList doc={doc} revealNames={revealParticipantPrivate} />
+                      {doc.source.signatures.length > 0 && (
+                        <SignaturesPanel
+                          signatures={doc.source.signatures}
+                          parties={doc.source.parties}
+                          revealPrivate={revealParticipantPrivate}
+                          authToken={token}
+                        />
+                      )}
+                      <button type="button" className="btn btn-primary" onClick={resetAll}>
+                        Finish
+                      </button>
+                    </>
+                  )}
+
+                  {step === 'done' && doc && role !== 'signer' && (
                     <div className="done-banner">
                       {doc.sealed ? (
                         <Lock size={18} strokeWidth={2.5} />
@@ -3384,18 +3413,15 @@ export function DocumentJourney({
                         <Check size={18} strokeWidth={2.5} />
                       )}
                       <div>
-                        <strong>
-                          {doc.sealed
-                            ? 'Sealed.'
-                            : role === 'signer'
-                              ? 'Signature recorded.'
-                              : 'Complete.'}
-                        </strong>
+                        <strong>{doc.sealed ? 'Sealed.' : 'Complete.'}</strong>
                         <p className="muted">
                           {doc.sealed ? (
                             <>
                               {pdfFile || signFile ? (
-                                <>Use <strong>Verify this file</strong> to open the verify path with your file already loaded.</>
+                                <>
+                                  Use <strong>Verify this file</strong> to open the verify path with
+                                  your file already loaded.
+                                </>
                               ) : (
                                 <>
                                   Drop any copy of <em>{doc.fileName}</em> to check integrity.
@@ -3415,13 +3441,6 @@ export function DocumentJourney({
                                   </a>
                                 </>
                               ) : null}
-                            </>
-                          ) : role === 'signer' ? (
-                            <>
-                              {allSigned(doc) || doc.readyToLock
-                                ? 'Your signature is recorded. The creator can seal the fingerprint on Nimiq when ready.'
-                                : 'Waiting for remaining signers. Keep your PDF — you can verify anytime after sealing.'}{' '}
-                              <em>{doc.fileName}</em>
                             </>
                           ) : (
                             <>
@@ -3444,10 +3463,14 @@ export function DocumentJourney({
                     </button>
                   )}
 
-                  {doc && !doc.directSeal && (step === 'done' || (step === 'verify' && doc.sealed)) && (
+                  {doc &&
+                    !doc.directSeal &&
+                    role !== 'signer' &&
+                    (step === 'done' || (step === 'verify' && doc.sealed)) && (
                     <PartyList doc={doc} revealNames={revealParticipantPrivate} />
                   )}
                   {doc &&
+                    role !== 'signer' &&
                     doc.source.signatures.length > 0 &&
                     (step === 'done' || (step === 'verify' && doc.sealed)) && (
                       <SignaturesPanel
@@ -3458,6 +3481,8 @@ export function DocumentJourney({
                       />
                     )}
 
+                  {/* Invitees who finished do not need the verify drop zone. */}
+                  {(step === 'verify' || (step === 'done' && role !== 'signer') || doc?.sealed) && (
                   <DocumentStage
                     step={step}
                     doc={doc}
@@ -3465,19 +3490,24 @@ export function DocumentJourney({
                     onFileChange={setVerifyFile}
                     accepting
                   />
+                  )}
 
+                  {(step === 'verify' || (step === 'done' && role !== 'signer') || doc?.sealed) && (
                   <p className="muted" style={{ margin: 0 }}>
                     We hash the file locally, then look up sealed fingerprints on the server.
                   </p>
+                  )}
 
-                  {verifyOutcome.kind === 'hashing' && (
+                  {(step === 'verify' || role !== 'signer' || doc?.sealed) &&
+                    verifyOutcome.kind === 'hashing' && (
                     <div className="result-banner result-banner--ok">
                       <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
                       Computing fingerprint…
                     </div>
                   )}
 
-                  {verifyOutcome.kind === 'local' && (
+                  {(step === 'verify' || role !== 'signer' || doc?.sealed) &&
+                    verifyOutcome.kind === 'local' && (
                     <div className="verify-result-card">
                       <div className="verify-result-head">
                         <Fingerprint size={18} strokeWidth={2.25} />

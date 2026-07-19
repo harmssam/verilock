@@ -78,24 +78,31 @@ export function resolveSigningParty(
   if (existingSig) {
     const signedParty = doc.parties.find(p => p.id === existingSig.partyId)
     const waiting = doc.signingProgress.signed < doc.signingProgress.required
+    const isCreator =
+      normalizeAddress(doc.creatorAddress) === wallet
     return {
       ok: false,
       hint: 'already_signed',
       message: waiting
         ? `You already signed as ${signedParty?.displayName ?? 'a party'}. Waiting for other signatures.`
-        : 'You already signed. Sealing will start automatically once your wallet is connected.',
+        : isCreator
+          ? 'You already signed. You can seal the agreement when you are ready.'
+          : 'Thanks — your signature is recorded. The creator will seal the agreement on Nimiq.',
     }
   }
 
   const pending = doc.parties.filter(p => p.status === 'pending' && p.required)
 
   if (pending.length === 0) {
+    const isCreator = normalizeAddress(doc.creatorAddress) === wallet
     return {
       ok: false,
       hint: 'complete',
       message:
         doc.signingProgress.readyToLock || doc.status === 'ready_to_lock'
-          ? 'All signatures are in. Sealing on the blockchain will start automatically — approve the transaction in your wallet.'
+          ? isCreator
+            ? 'All signatures are in. Continue to seal when you are ready.'
+            : 'All signatures are in. Thanks — the creator will seal this agreement on Nimiq.'
           : 'No signatures are pending on this document.',
     }
   }

@@ -1,4 +1,4 @@
-import { shortAddress } from '../addresses'
+import { normalizeAddress, shortAddress } from '../addresses'
 import { shortHash } from '../pdf/hashPdf'
 import type { DocumentParty, SealDocument } from '../types'
 
@@ -81,8 +81,9 @@ export const SIGNER_STAGES: JourneyStage[] = [
   {
     id: 'done',
     label: 'Done',
-    verb: 'You are all set',
-    blurb: 'Your signature is recorded. When everyone has signed, the agreement is sealed on Nimiq.',
+    verb: 'Thanks — you are done',
+    blurb:
+      'Your signature is recorded. The creator seals the agreement on Nimiq when everyone has signed. You can close this page.',
     privacyNote: 'Keep your PDF. Anyone can re-check the fingerprint later.',
   },
 ]
@@ -227,6 +228,27 @@ export function signedCount(doc: JourneyDoc): number {
   const anySigned = doc.parties.filter(p => p.signed).length
   if (anySigned > 0) return anySigned
   return doc.source.signatures.length
+}
+
+/**
+ * Whether this wallet already submitted a signature on the agreement.
+ * Prefer signature rows (signerAddress) — party.walletAddress may still be null
+ * after an open-slot claim until a refresh binds it.
+ */
+export function walletHasSignedJourneyDoc(
+  doc: JourneyDoc,
+  walletAddress: string | null | undefined,
+): boolean {
+  if (!walletAddress) return false
+  const me = normalizeAddress(walletAddress)
+  if (
+    doc.source.signatures.some(s => normalizeAddress(s.signerAddress) === me)
+  ) {
+    return true
+  }
+  return doc.parties.some(
+    p => p.signed && p.walletAddress && normalizeAddress(p.walletAddress) === me,
+  )
 }
 
 export function requiredCount(doc: JourneyDoc): number {
