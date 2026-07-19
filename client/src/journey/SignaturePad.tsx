@@ -94,6 +94,7 @@ export function SignaturePad({
 
   const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (disabled) return
+    e.preventDefault()
     drawing.current = true
     canvasRef.current?.setPointerCapture(e.pointerId)
     current.current = [point(e)]
@@ -102,12 +103,14 @@ export function SignaturePad({
 
   const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drawing.current || disabled) return
+    e.preventDefault()
     current.current.push(point(e))
     redraw()
   }
 
   const end = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drawing.current) return
+    e.preventDefault()
     drawing.current = false
     try {
       canvasRef.current?.releasePointerCapture(e.pointerId)

@@ -89,16 +89,21 @@
   touch-action: none;
 }
 
-/* Prefer field aspect when provided, but fill available space in landscape */
+/* Prefer field aspect when provided; keep a usable draw height on wide (horizontal) boxes */
 .sign-mobile-page .sig-pad--aspect .sig-pad-canvas {
+  flex: 0 1 auto;
+  width: 100%;
   height: auto;
-  aspect-ratio: var(--sig-pad-aspect, 2.5);
+  min-height: 9rem;
   max-height: 100%;
-  width: min(100%, calc(100% * 1));
+  aspect-ratio: var(--sig-pad-aspect, 2.5);
   margin: 0 auto;
 }
 
-/* When stage is short (landscape), let canvas use max height instead of width-limited aspect */
+/*
+ * Landscape: stage height is short — size the pad by available height so aspect
+ * does not collapse to 0 (height:100% + aspect-ratio was a circular flex layout).
+ */
 @media (orientation: landscape) {
   .sign-mobile-page--draw .sign-mobile-header--compact .sign-mobile-kicker {
     display: none;
@@ -108,15 +113,29 @@
     font-size: 0.95rem;
   }
 
-  .sign-mobile-page .sig-pad--aspect .sig-pad-canvas {
-    width: auto;
-    height: 100%;
-    max-width: 100%;
-    aspect-ratio: var(--sig-pad-aspect, 2.5);
-  }
-
   .sign-mobile-pad-stage {
     justify-content: center;
+    align-items: center;
+  }
+
+  .sign-mobile-page .sig-pad--aspect {
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .sign-mobile-page .sig-pad--aspect .sig-pad-canvas {
+    flex: none;
+    width: auto;
+    height: auto;
+    min-height: 7rem;
+    max-width: 100%;
+    /* Fill short landscape stage by height; width follows field aspect */
+    max-height: min(100%, calc(100dvh - 5.25rem));
+    aspect-ratio: var(--sig-pad-aspect, 2.5);
+    /* When aspect is wide, width hits max-width first; height follows */
+    width: min(100%, calc((100dvh - 5.25rem) * var(--sig-pad-aspect, 2.5)));
   }
 }
 

@@ -2675,8 +2675,11 @@ a.hash-chip.text-link:focus-visible {
 /* Match PDF field proportions (mobile + desktop) so ink is not stretched later */
 .sig-pad--aspect .sig-pad-canvas {
   height: auto;
+  /* Wide/horizontal fields still need a finger-sized pad height on phones */
+  min-height: 7.5rem;
   aspect-ratio: var(--sig-pad-aspect, 2.5);
   max-height: min(55dvh, 360px);
+  max-width: 100%;
 }
 
 .sig-pad--compact {

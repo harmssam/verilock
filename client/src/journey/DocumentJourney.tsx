@@ -477,7 +477,7 @@ export function DocumentJourney({
       if (doc.sealed || walletHasSignedJourneyDoc(doc, address)) return 'done'
       return 'sign'
     }
-    // Creator path: add PDF → arrange → sign (if organizer is a party) → invite → seal
+    // Creator path: add PDF → arrange → sign (if organizer is a party) → invite co-signers → seal
     if (!doc) return 'fingerprint'
     if (doc.sealed) return 'done'
     // Only the creator may enter the seal step (never co-signers / invitees).
@@ -505,6 +505,7 @@ export function DocumentJourney({
         constructionPlan.creatorSigningAs === 0) &&
       Boolean(address && isDocumentCreator(doc.source, address))
 
+    // Creator still needs to sign their own party.
     if (address) {
       const resolution = resolveSigningParty(doc.source, address, {
         allowOpenClaim: !creatorBlocksOpenClaim,
@@ -521,18 +522,28 @@ export function DocumentJourney({
     ) {
       return 'sign'
     }
-    // Waiting on invitees / progress (organizer lands here after lock if not signing)
-    if (!allSigned(doc)) return 'share'
-    if (requiredCount(doc) <= 1 && !sharedAck) return 'share'
-    // Seal is creator-only. If this wallet is not the creator (mis-set role, sticky
-    // intent, etc.), finish on “done” instead of showing seal CTAs.
-    if (address && isDocumentCreator(doc.source, address)) return 'seal'
-    return 'done'
+
+    // All signatures collected → seal immediately (no bounce back to Arrange/invite).
+    if (allSigned(doc)) {
+      if (address && isDocumentCreator(doc.source, address)) return 'seal'
+      return 'done'
+    }
+
+    // Waiting on co-signers.
+    // Creator who already signed: stay on Sign (invite UI there) so the rail does not jump back to Arrange.
+    // Organizer-only: invite from the Arrange/share step.
+    if (
+      address &&
+      isDocumentCreator(doc.source, address) &&
+      walletHasSignedJourneyDoc(doc, address)
+    ) {
+      return 'sign'
+    }
+    return 'share'
   }, [
     role,
     doc,
     address,
-    sharedAck,
     constructionPlan?.status,
     constructionPlan?.creatorSigningAs,
     planLoadState,
@@ -586,11 +597,12 @@ export function DocumentJourney({
     [naturalStep, canHoldStep],
   )
 
-  // Quiet refresh while creator waits for co-signers after signing (share step).
+  // Quiet refresh while creator waits for co-signers (invite on Arrange or Sign).
   useEffect(() => {
     if (role !== 'creator' || !doc || doc.sealed) return
-    if (step !== 'share') return
+    if (step !== 'share' && step !== 'sign') return
     if (allSigned(doc)) return
+    if (signedCount(doc) === 0 && step === 'sign') return
     const slug = doc.slug
     const size = fileSizeByDocIdRef.current[doc.id] ?? doc.fileSize
     const tick = () => {
@@ -647,6 +659,33 @@ export function DocumentJourney({
     constructionPlan?.status === 'locked' &&
     (constructionPlan.creatorSigningAs == null || constructionPlan.creatorSigningAs === 0) &&
     Boolean(doc && address && isDocumentCreator(doc.source, address))
+
+  /** Creator chose a party and still needs to sign — Arrange should not force invite UI. */
+  const creatorStillNeedsToSign = Boolean(
+    doc &&
+      address &&
+      isDocumentCreator(doc.source, address) &&
+      FEATURES.pdfAnnotationUi &&
+      constructionPlan?.status === 'locked' &&
+      constructionPlan.creatorSigningAs != null &&
+      constructionPlan.creatorSigningAs > 0 &&
+      !walletHasSignedJourneyDoc(doc, address) &&
+      !allSigned(doc),
+  )
+
+  /**
+   * Invite co-signers only after arrange is locked, and never while the creator
+   * still needs to sign their own fields (invites come after their signature).
+   */
+  const showInvitePhase = Boolean(
+    doc &&
+      !doc.sealed &&
+      !allSigned(doc) &&
+      (!FEATURES.pdfAnnotationUi ||
+        constructionPlan?.status === 'locked' ||
+        signedCount(doc) > 0) &&
+      !creatorStillNeedsToSign,
+  )
 
   /** Per-person invite: /d/:slug?party=<partyId> */
   const preferredPartyFromUrl = useMemo(() => {
@@ -1715,13 +1754,21 @@ export function DocumentJourney({
         saveJourneyIntent('signer')
         setSharedAck(true)
         setLockMessage(null)
-      } else if (signedDoc.signingProgress.readyToLock) {
-        const solo = signedDoc.signingProgress.required <= 1
-        setLockMessage(
-          solo
-            ? 'Signature complete. Continue to seal.'
-            : 'All signatures collected. Continue to seal.',
-        )
+      } else {
+        // Creator: advance past Arrange. Solo/complete → seal; multi → stay on Sign to invite.
+        setSharedAck(true)
+        if (signedDoc.signingProgress.readyToLock) {
+          const solo = signedDoc.signingProgress.required <= 1
+          setLockMessage(
+            solo
+              ? 'Signature complete. Continue to seal.'
+              : 'All signatures collected. Continue to seal.',
+          )
+        } else {
+          setLockMessage(
+            'Your signature is recorded. Invite co-signers below, then seal when everyone has signed.',
+          )
+        }
       }
       // Sign form is mid-page; after success the UI swaps to done/share and the old
       // scroll offset lands near the bottom. Snap to top so the confirmation is visible.
@@ -2388,422 +2435,6 @@ export function DocumentJourney({
                     <DocumentStage step={step} doc={doc} file={pdfFile} accepting={false} />
                   )}
 
-                  {/* Invite options after placements locked (or when placement UI off). */}
-                  {(!FEATURES.pdfAnnotationUi ||
-                    constructionPlan?.status === 'locked' ||
-                    signedCount(doc) > 0) && (
-                  <>
-                  <section className="signatures-config" aria-labelledby="signatures-config-title">
-                    <header className="signatures-config-head">
-                      <h3 id="signatures-config-title">Invite</h3>
-                    </header>
-
-                    <div className="progress-bar-wrap">
-                      <div className="progress-bar-meta">
-                        <span>
-                          Signatures {signedCount(doc)}/{requiredCount(doc)}
-                        </span>
-                        <span className="muted">{doc.title}</span>
-                      </div>
-                      <div className="progress-bar-track">
-                        <div
-                          className="progress-bar-fill"
-                          style={{
-                            width: `${requiredCount(doc) ? (signedCount(doc) / requiredCount(doc)) * 100 : 0}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <PartyList doc={doc} revealNames={revealParticipantPrivate} />
-
-                    {role === 'creator' && !doc.sealed && (
-                      <div className="signatures-config-form">
-                        {/* After construction lock, roster is immutable — no configureDocumentCosigners. */}
-                        {!(
-                          FEATURES.pdfAnnotationUi && constructionPlan?.status === 'locked'
-                        ) && (
-                        <label className="field">
-                          <span className="field-label">How many parties must sign?</span>
-                          <select
-                            value={Math.max(requiredSigners, signedCount(doc))}
-                            onChange={e => {
-                              const n = Number(e.target.value)
-                              const others = Math.max(0, n - 1)
-                              const nextNames = coSignerNames.slice(0, others)
-                              while (nextNames.length < others) nextNames.push('')
-                              const nextEmails = coSignerEmails.slice(0, others)
-                              while (nextEmails.length < others) nextEmails.push('')
-                              setRequiredSigners(n)
-                              setCoSignerNames(nextNames)
-                              setCoSignerEmails(nextEmails)
-                              if (n <= 1) setCreatorNotifyEmail('')
-                              // Persist immediately so invite actions appear without a Save step.
-                              void applyCosigners({
-                                requiredSignatures: n,
-                                coSignerNames: nextNames,
-                                notifyEmail: n <= 1 ? '' : creatorNotifyEmail,
-                              })
-                            }}
-                            disabled={busy}
-                          >
-                            {[1, 2, 3, 4]
-                              .filter(n => n >= Math.max(1, signedCount(doc)))
-                              .map(n => (
-                                <option key={n} value={n}>
-                                  {n === 1
-                                    ? '1 signature (you only — no co-signers)'
-                                    : `${n} signatures (you + ${n - 1} other${n - 1 === 1 ? '' : 's'})`}
-                                </option>
-                              ))}
-                          </select>
-                        </label>
-                        )}
-
-                        {/* After lock: one clear card per party — names frozen, emails local-only, copy personal link. */}
-                        {FEATURES.pdfAnnotationUi &&
-                          constructionPlan?.status === 'locked' &&
-                          doc.parties.filter(p => p.required).length > 0 && (
-                          <div className="field-stack">
-                            <span className="field-label">Invite each person</span>
-                            {doc.parties
-                              .filter(p => p.required)
-                              .map((p, index) => {
-                                const base = doc.shareUrl.startsWith('http')
-                                  ? doc.shareUrl
-                                  : `${typeof window !== 'undefined' ? window.location.origin : ''}${doc.shareUrl.startsWith('/') ? '' : '/'}${doc.shareUrl}`
-                                const personLink = `${base}${base.includes('?') ? '&' : '?'}party=${encodeURIComponent(p.id)}`
-                                const label =
-                                  p.displayName?.trim() ||
-                                  p.roleLabel ||
-                                  `Person ${index + 1}`
-                                const emailVal = coSignerEmails[index] ?? ''
-                                const sending = inviteSendBusyId === p.id
-                                const note = inviteSendNote[p.id]
-                                return (
-                                  <div
-                                    key={p.id}
-                                    className="field-stack share-cosigner-fields"
-                                    style={{
-                                      padding: '0.65rem 0.75rem',
-                                      border: '1px solid var(--border, #e2e8f0)',
-                                      borderRadius: 10,
-                                      background: '#f8fafc',
-                                    }}
-                                  >
-                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                                      {label}
-                                      {p.signed ? (
-                                        <span className="muted" style={{ fontWeight: 500 }}>
-                                          {' '}
-                                          · signed
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                    {p.walletAddress && (
-                                      <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
-                                        {shortAddress(p.walletAddress)}
-                                      </p>
-                                    )}
-                                    <label className="field">
-                                      <span className="field-label">Email</span>
-                                      <input
-                                        type="email"
-                                        inputMode="email"
-                                        autoComplete="email"
-                                        value={emailVal}
-                                        onChange={e => {
-                                          const value = clampField(
-                                            e.target.value,
-                                            MAX_SUPPORT_EMAIL_LENGTH,
-                                          )
-                                          setCoSignerEmails(prev => {
-                                            const next = [...prev]
-                                            while (next.length <= index) next.push('')
-                                            next[index] = value
-                                            return next
-                                          })
-                                        }}
-                                        maxLength={MAX_SUPPORT_EMAIL_LENGTH}
-                                        placeholder="name@company.com"
-                                        disabled={busy || p.signed || sending}
-                                      />
-                                    </label>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                                      <button
-                                        type="button"
-                                        className={`btn btn-primary${sending ? ' btn--busy' : ''}`}
-                                        disabled={
-                                          busy ||
-                                          p.signed ||
-                                          sending ||
-                                          !token ||
-                                          !emailVal.trim() ||
-                                          !emailSendEnabled
-                                        }
-                                        title={
-                                          !emailSendEnabled
-                                            ? 'Invite email is off until Resend is enabled on the server'
-                                            : undefined
-                                        }
-                                        onClick={() => {
-                                          if (!token || !doc) return
-                                          const to = emailVal.trim()
-                                          if (!to) return
-                                          setInviteSendBusyId(p.id)
-                                          setInviteSendNote(prev => {
-                                            const next = { ...prev }
-                                            delete next[p.id]
-                                            return next
-                                          })
-                                          setLocalError(null)
-                                          void api
-                                            .sendPartyInviteEmail(token, doc.id, {
-                                              partyId: p.id,
-                                              to,
-                                            })
-                                            .then(() => {
-                                              setInviteSendNote(prev => ({
-                                                ...prev,
-                                                [p.id]: `Invite sent to ${to}`,
-                                              }))
-                                              showInviteSentToast(label)
-                                            })
-                                            .catch(err => {
-                                              setLocalError(
-                                                err instanceof Error
-                                                  ? err.message
-                                                  : 'Could not send invite email',
-                                              )
-                                            })
-                                            .finally(() => setInviteSendBusyId(null))
-                                        }}
-                                      >
-                                        {sending ? (
-                                          <>
-                                            <LoaderCircle
-                                              className="btn-spinner"
-                                              size={16}
-                                              strokeWidth={2.5}
-                                            />
-                                            Sending…
-                                          </>
-                                        ) : (
-                                          'Send invite email'
-                                        )}
-                                      </button>
-                                      {/* Mobile: OS share sheet (iMessage, WhatsApp, …) + PDF when allowed */}
-                                      {typeof navigator !== 'undefined' &&
-                                        typeof navigator.share === 'function' && (
-                                          <button
-                                            type="button"
-                                            className="btn btn-secondary"
-                                            disabled={busy || p.signed}
-                                            onClick={() =>
-                                              void sharePersonInvite({
-                                                partyId: p.id,
-                                                personName: label,
-                                                personLink,
-                                              })
-                                            }
-                                          >
-                                            <Share2 size={16} strokeWidth={2.25} aria-hidden />
-                                            Share
-                                          </button>
-                                        )}
-                                      <button
-                                        type="button"
-                                        className="btn btn-secondary"
-                                        disabled={busy || p.signed}
-                                        onClick={() => void copyText(personLink, p.id)}
-                                      >
-                                        Copy personal link
-                                      </button>
-                                    </div>
-                                    {!emailSendEnabled && (
-                                      <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>
-                                        Email send is disabled until Resend is configured (
-                                        RESEND_ENABLED). You can still copy the personal link.
-                                      </p>
-                                    )}
-                                    {note && (
-                                      <p
-                                        style={{
-                                          margin: 0,
-                                          fontSize: '0.8rem',
-                                          color: '#0f766e',
-                                          fontWeight: 500,
-                                        }}
-                                      >
-                                        {note}
-                                      </p>
-                                    )}
-                                    <code
-                                      style={{
-                                        fontSize: '0.7rem',
-                                        wordBreak: 'break-all',
-                                        display: 'block',
-                                        color: '#475569',
-                                      }}
-                                    >
-                                      {personLink}
-                                    </code>
-                                  </div>
-                                )
-                              })}
-                          </div>
-                        )}
-
-                        {/* Pre-lock / legacy: optional co-signer names + emails */}
-                        {inviteeSlotCount > 0 &&
-                          !(
-                            FEATURES.pdfAnnotationUi && constructionPlan?.status === 'locked'
-                          ) && (
-                          <div className="field-stack">
-                            <span className="field-label">
-                              Invite detail{inviteeSlotCount > 1 ? 's' : ''} (optional)
-                            </span>
-                            {Array.from({ length: inviteeSlotCount }, (_, index) => {
-                              const partyLabel = `Invitee ${index + 1}`
-                              return (
-                                <div key={index} className="field-stack share-cosigner-fields">
-                                  <label className="field">
-                                    <span className="field-label">{partyLabel} name</span>
-                                    <input
-                                      value={coSignerNames[index] ?? ''}
-                                      onChange={e => {
-                                        const value = clampField(
-                                          e.target.value,
-                                          MAX_DISPLAY_NAME_LENGTH,
-                                        )
-                                        setCoSignerNames(prev => {
-                                          const next = [...prev]
-                                          while (next.length <= index) next.push('')
-                                          next[index] = value
-                                          return next
-                                        })
-                                      }}
-                                      onBlur={() => void applyCosigners()}
-                                      maxLength={MAX_DISPLAY_NAME_LENGTH}
-                                      placeholder="Name (optional)"
-                                      disabled={busy}
-                                    />
-                                  </label>
-                                  <label className="field">
-                                    <span className="field-label">
-                                      {partyLabel} invite email (Mail app only)
-                                    </span>
-                                    <input
-                                      type="email"
-                                      inputMode="email"
-                                      autoComplete="email"
-                                      value={coSignerEmails[index] ?? ''}
-                                      onChange={e => {
-                                        const value = clampField(
-                                          e.target.value,
-                                          MAX_SUPPORT_EMAIL_LENGTH,
-                                        )
-                                        setCoSignerEmails(prev => {
-                                          const next = [...prev]
-                                          while (next.length <= index) next.push('')
-                                          next[index] = value
-                                          return next
-                                        })
-                                      }}
-                                      maxLength={MAX_SUPPORT_EMAIL_LENGTH}
-                                      placeholder="name@company.com"
-                                      disabled={busy}
-                                    />
-                                  </label>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-
-                        {FEATURES.emailNotifyUi && requiredSigners > 1 && (
-                          <label className="field">
-                            <span className="field-label">
-                              Email when everyone has signed (optional)
-                            </span>
-                            <input
-                              type="email"
-                              value={creatorNotifyEmail}
-                              onChange={e => setCreatorNotifyEmail(e.target.value)}
-                              onBlur={() => {
-                                if (requiredCount(doc) > 1) {
-                                  void applyCosigners({ notifyEmail: creatorNotifyEmail })
-                                }
-                              }}
-                              placeholder="you@example.com"
-                              autoComplete="email"
-                              disabled={busy}
-                            />
-                            <span className="muted" style={{ fontSize: '0.78rem' }}>
-                              We only use this to tell you the agreement is ready to seal. Never
-                              required.
-                            </span>
-                          </label>
-                        )}
-
-                        {busy && (
-                          <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                            <LoaderCircle
-                              className="btn-spinner"
-                              size={14}
-                              strokeWidth={2.5}
-                              style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6 }}
-                            />
-                            Updating signatures…
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </section>
-
-                  {(requiredCount(doc) > 1 || inviteeSlotCount > 0) && (
-                    <>
-                      {sharedAck ? (
-                        <div className="result-banner result-banner--ok">
-                          <Check size={18} strokeWidth={2.5} />
-                          Invite sent — waiting for co-signers. You can seal when everyone has
-                          signed.
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-lg"
-                          onClick={acknowledgeShare}
-                        >
-                          I&apos;ve shared the invite
-                        </button>
-                      )}
-                      <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                        Use each card above to email or share a personal link. Hand off the PDF
-                        separately (or via mobile Share when the OS includes the file). This view
-                        updates when they sign.
-                      </p>
-                    </>
-                  )}
-
-                  {requiredCount(doc) <= 1 && allSigned(doc) && (
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-lg"
-                      disabled={busy || requiredSigners !== requiredCount(doc)}
-                      title={
-                        requiredSigners !== requiredCount(doc)
-                          ? 'Wait for signature settings to update, or set parties back to 1'
-                          : undefined
-                      }
-                      onClick={acknowledgeShare}
-                    >
-                      Continue to seal
-                    </button>
-                  )}
-                  </>
-                  )}
-
                   {canCancelCurrent && (
                     <button
                       type="button"
@@ -3245,6 +2876,403 @@ export function DocumentJourney({
                           )}
                         </>
                       )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Invite co-signers: Arrange (organizer-only) or Sign (after creator signed). */}
+              {doc && showInvitePhase && role === 'creator' && (step === 'share' || step === 'sign') && (
+                <div className="action-stack">
+                  <section className="signatures-config" aria-labelledby="signatures-config-title">
+                    <header className="signatures-config-head">
+                      <h3 id="signatures-config-title">Invite co-signers</h3>
+                    </header>
+
+                    <div className="progress-bar-wrap">
+                      <div className="progress-bar-meta">
+                        <span>
+                          Signatures {signedCount(doc)}/{requiredCount(doc)}
+                        </span>
+                        <span className="muted">{doc.title}</span>
+                      </div>
+                      <div className="progress-bar-track">
+                        <div
+                          className="progress-bar-fill"
+                          style={{
+                            width: `${requiredCount(doc) ? (signedCount(doc) / requiredCount(doc)) * 100 : 0}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <PartyList doc={doc} revealNames={revealParticipantPrivate} />
+
+                    {role === 'creator' && !doc.sealed && (
+                      <div className="signatures-config-form">
+                        {/* After construction lock, roster is immutable — no configureDocumentCosigners. */}
+                        {!(
+                          FEATURES.pdfAnnotationUi && constructionPlan?.status === 'locked'
+                        ) && (
+                        <label className="field">
+                          <span className="field-label">How many parties must sign?</span>
+                          <select
+                            value={Math.max(requiredSigners, signedCount(doc))}
+                            onChange={e => {
+                              const n = Number(e.target.value)
+                              const others = Math.max(0, n - 1)
+                              const nextNames = coSignerNames.slice(0, others)
+                              while (nextNames.length < others) nextNames.push('')
+                              const nextEmails = coSignerEmails.slice(0, others)
+                              while (nextEmails.length < others) nextEmails.push('')
+                              setRequiredSigners(n)
+                              setCoSignerNames(nextNames)
+                              setCoSignerEmails(nextEmails)
+                              if (n <= 1) setCreatorNotifyEmail('')
+                              // Persist immediately so invite actions appear without a Save step.
+                              void applyCosigners({
+                                requiredSignatures: n,
+                                coSignerNames: nextNames,
+                                notifyEmail: n <= 1 ? '' : creatorNotifyEmail,
+                              })
+                            }}
+                            disabled={busy}
+                          >
+                            {[1, 2, 3, 4]
+                              .filter(n => n >= Math.max(1, signedCount(doc)))
+                              .map(n => (
+                                <option key={n} value={n}>
+                                  {n === 1
+                                    ? '1 signature (you only — no co-signers)'
+                                    : `${n} signatures (you + ${n - 1} other${n - 1 === 1 ? '' : 's'})`}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+                        )}
+
+                        {/* After lock: one clear card per party — names frozen, emails local-only, copy personal link. */}
+                        {FEATURES.pdfAnnotationUi &&
+                          constructionPlan?.status === 'locked' &&
+                          doc.parties.filter(p => p.required && !p.signed).length > 0 && (
+                          <div className="field-stack">
+                            <span className="field-label">Invite each person</span>
+                            {doc.parties
+                              .filter(p => p.required && !p.signed)
+                              .map((p, index) => {
+                                const base = doc.shareUrl.startsWith('http')
+                                  ? doc.shareUrl
+                                  : `${typeof window !== 'undefined' ? window.location.origin : ''}${doc.shareUrl.startsWith('/') ? '' : '/'}${doc.shareUrl}`
+                                const personLink = `${base}${base.includes('?') ? '&' : '?'}party=${encodeURIComponent(p.id)}`
+                                const label =
+                                  p.displayName?.trim() ||
+                                  p.roleLabel ||
+                                  `Person ${index + 1}`
+                                const emailVal = coSignerEmails[index] ?? ''
+                                const sending = inviteSendBusyId === p.id
+                                const note = inviteSendNote[p.id]
+                                return (
+                                  <div
+                                    key={p.id}
+                                    className="field-stack share-cosigner-fields"
+                                    style={{
+                                      padding: '0.65rem 0.75rem',
+                                      border: '1px solid var(--border, #e2e8f0)',
+                                      borderRadius: 10,
+                                      background: '#f8fafc',
+                                    }}
+                                  >
+                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                                      {label}
+                                      {p.signed ? (
+                                        <span className="muted" style={{ fontWeight: 500 }}>
+                                          {' '}
+                                          · signed
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    {p.walletAddress && (
+                                      <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
+                                        {shortAddress(p.walletAddress)}
+                                      </p>
+                                    )}
+                                    <label className="field">
+                                      <span className="field-label">Email</span>
+                                      <input
+                                        type="email"
+                                        inputMode="email"
+                                        autoComplete="email"
+                                        value={emailVal}
+                                        onChange={e => {
+                                          const value = clampField(
+                                            e.target.value,
+                                            MAX_SUPPORT_EMAIL_LENGTH,
+                                          )
+                                          setCoSignerEmails(prev => {
+                                            const next = [...prev]
+                                            while (next.length <= index) next.push('')
+                                            next[index] = value
+                                            return next
+                                          })
+                                        }}
+                                        maxLength={MAX_SUPPORT_EMAIL_LENGTH}
+                                        placeholder="name@company.com"
+                                        disabled={busy || p.signed || sending}
+                                      />
+                                    </label>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                      <button
+                                        type="button"
+                                        className={`btn btn-primary${sending ? ' btn--busy' : ''}`}
+                                        disabled={
+                                          busy ||
+                                          p.signed ||
+                                          sending ||
+                                          !token ||
+                                          !emailVal.trim() ||
+                                          !emailSendEnabled
+                                        }
+                                        title={
+                                          !emailSendEnabled
+                                            ? 'Invite email is off until Resend is enabled on the server'
+                                            : undefined
+                                        }
+                                        onClick={() => {
+                                          if (!token || !doc) return
+                                          const to = emailVal.trim()
+                                          if (!to) return
+                                          setInviteSendBusyId(p.id)
+                                          setInviteSendNote(prev => {
+                                            const next = { ...prev }
+                                            delete next[p.id]
+                                            return next
+                                          })
+                                          setLocalError(null)
+                                          void api
+                                            .sendPartyInviteEmail(token, doc.id, {
+                                              partyId: p.id,
+                                              to,
+                                            })
+                                            .then(() => {
+                                              setInviteSendNote(prev => ({
+                                                ...prev,
+                                                [p.id]: `Invite sent to ${to}`,
+                                              }))
+                                              showInviteSentToast(label)
+                                            })
+                                            .catch(err => {
+                                              setLocalError(
+                                                err instanceof Error
+                                                  ? err.message
+                                                  : 'Could not send invite email',
+                                              )
+                                            })
+                                            .finally(() => setInviteSendBusyId(null))
+                                        }}
+                                      >
+                                        {sending ? (
+                                          <>
+                                            <LoaderCircle
+                                              className="btn-spinner"
+                                              size={16}
+                                              strokeWidth={2.5}
+                                            />
+                                            Sending…
+                                          </>
+                                        ) : (
+                                          'Send invite email'
+                                        )}
+                                      </button>
+                                      {/* Mobile: OS share sheet (iMessage, WhatsApp, …) + PDF when allowed */}
+                                      {typeof navigator !== 'undefined' &&
+                                        typeof navigator.share === 'function' && (
+                                          <button
+                                            type="button"
+                                            className="btn btn-secondary"
+                                            disabled={busy || p.signed}
+                                            onClick={() =>
+                                              void sharePersonInvite({
+                                                partyId: p.id,
+                                                personName: label,
+                                                personLink,
+                                              })
+                                            }
+                                          >
+                                            <Share2 size={16} strokeWidth={2.25} aria-hidden />
+                                            Share
+                                          </button>
+                                        )}
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        disabled={busy || p.signed}
+                                        onClick={() => void copyText(personLink, p.id)}
+                                      >
+                                        Copy personal link
+                                      </button>
+                                    </div>
+                                    {!emailSendEnabled && (
+                                      <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>
+                                        Email send is disabled until Resend is configured (
+                                        RESEND_ENABLED). You can still copy the personal link.
+                                      </p>
+                                    )}
+                                    {note && (
+                                      <p
+                                        style={{
+                                          margin: 0,
+                                          fontSize: '0.8rem',
+                                          color: '#0f766e',
+                                          fontWeight: 500,
+                                        }}
+                                      >
+                                        {note}
+                                      </p>
+                                    )}
+                                    <code
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        wordBreak: 'break-all',
+                                        display: 'block',
+                                        color: '#475569',
+                                      }}
+                                    >
+                                      {personLink}
+                                    </code>
+                                  </div>
+                                )
+                              })}
+                          </div>
+                        )}
+
+                        {/* Pre-lock / legacy: optional co-signer names + emails */}
+                        {inviteeSlotCount > 0 &&
+                          !(
+                            FEATURES.pdfAnnotationUi && constructionPlan?.status === 'locked'
+                          ) && (
+                          <div className="field-stack">
+                            <span className="field-label">
+                              Invite detail{inviteeSlotCount > 1 ? 's' : ''} (optional)
+                            </span>
+                            {Array.from({ length: inviteeSlotCount }, (_, index) => {
+                              const partyLabel = `Invitee ${index + 1}`
+                              return (
+                                <div key={index} className="field-stack share-cosigner-fields">
+                                  <label className="field">
+                                    <span className="field-label">{partyLabel} name</span>
+                                    <input
+                                      value={coSignerNames[index] ?? ''}
+                                      onChange={e => {
+                                        const value = clampField(
+                                          e.target.value,
+                                          MAX_DISPLAY_NAME_LENGTH,
+                                        )
+                                        setCoSignerNames(prev => {
+                                          const next = [...prev]
+                                          while (next.length <= index) next.push('')
+                                          next[index] = value
+                                          return next
+                                        })
+                                      }}
+                                      onBlur={() => void applyCosigners()}
+                                      maxLength={MAX_DISPLAY_NAME_LENGTH}
+                                      placeholder="Name (optional)"
+                                      disabled={busy}
+                                    />
+                                  </label>
+                                  <label className="field">
+                                    <span className="field-label">
+                                      {partyLabel} invite email (Mail app only)
+                                    </span>
+                                    <input
+                                      type="email"
+                                      inputMode="email"
+                                      autoComplete="email"
+                                      value={coSignerEmails[index] ?? ''}
+                                      onChange={e => {
+                                        const value = clampField(
+                                          e.target.value,
+                                          MAX_SUPPORT_EMAIL_LENGTH,
+                                        )
+                                        setCoSignerEmails(prev => {
+                                          const next = [...prev]
+                                          while (next.length <= index) next.push('')
+                                          next[index] = value
+                                          return next
+                                        })
+                                      }}
+                                      maxLength={MAX_SUPPORT_EMAIL_LENGTH}
+                                      placeholder="name@company.com"
+                                      disabled={busy}
+                                    />
+                                  </label>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {FEATURES.emailNotifyUi && requiredSigners > 1 && (
+                          <label className="field">
+                            <span className="field-label">
+                              Email when everyone has signed (optional)
+                            </span>
+                            <input
+                              type="email"
+                              value={creatorNotifyEmail}
+                              onChange={e => setCreatorNotifyEmail(e.target.value)}
+                              onBlur={() => {
+                                if (requiredCount(doc) > 1) {
+                                  void applyCosigners({ notifyEmail: creatorNotifyEmail })
+                                }
+                              }}
+                              placeholder="you@example.com"
+                              autoComplete="email"
+                              disabled={busy}
+                            />
+                            <span className="muted" style={{ fontSize: '0.78rem' }}>
+                              We only use this to tell you the agreement is ready to seal. Never
+                              required.
+                            </span>
+                          </label>
+                        )}
+
+                        {busy && (
+                          <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                            <LoaderCircle
+                              className="btn-spinner"
+                              size={14}
+                              strokeWidth={2.5}
+                              style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6 }}
+                            />
+                            Updating signatures…
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </section>
+
+                  {(requiredCount(doc) > 1 || inviteeSlotCount > 0) && (
+                    <>
+                      {sharedAck ? (
+                        <div className="result-banner result-banner--ok">
+                          <Check size={18} strokeWidth={2.5} />
+                          Waiting for co-signers. This view updates when they sign; you can seal
+                          when everyone has finished.
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={acknowledgeShare}
+                        >
+                          I&apos;ve shared the invite
+                        </button>
+                      )}
+                      <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                        Use each card above to email or share a personal link. Hand off the PDF
+                        separately (or via mobile Share when the OS includes the file).
+                      </p>
                     </>
                   )}
                 </div>

@@ -37,10 +37,10 @@ export const CREATOR_STAGES: JourneyStage[] = [
   },
   {
     id: 'share',
-    label: 'Create and Invite',
-    verb: 'Name people, place fields, invite signers',
+    label: 'Arrange',
+    verb: 'Name people and place fields',
     blurb:
-      'Name each signer, place their boxes on the PDF, and choose whether you are one of them (or only organizing). Continue when the layout looks right. You can come back to edit until someone signs.',
+      'Name each signer, place their boxes on the PDF, and choose whether you are one of them (or only organizing). Continue when the layout looks right. Invites come after you sign (if you are a party).',
     privacyNote: 'Only placement geometry is stored, not the PDF bytes.',
   },
   {
@@ -48,7 +48,7 @@ export const CREATOR_STAGES: JourneyStage[] = [
     label: 'Sign',
     verb: 'Sign your fields on the PDF',
     blurb:
-      'If you are a signer, fill only your highlighted fields on the document, then bind with your wallet. Organizers skip this step.',
+      'If you are a signer, fill only your highlighted fields on the document, then bind with your wallet. Organizers skip this step. After you sign, invite any co-signers here before sealing.',
     privacyNote: 'You prove you hold these bytes - still no upload.',
   },
   {
