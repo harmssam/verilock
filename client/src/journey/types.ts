@@ -77,7 +77,7 @@ export const SIGNER_STAGES: JourneyStage[] = [
     verb: 'Match PDF & complete your fields',
     blurb:
       'Drop the PDF the creator sent you, confirm it matches, fill your fields on the document, then bind with your wallet.',
-    privacyNote: 'You prove you hold the same file. It never uploads.',
+    privacyNote: 'We never see your file. It stays on your device.',
   },
   {
     id: 'done',
