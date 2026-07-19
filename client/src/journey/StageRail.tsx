@@ -39,7 +39,7 @@ function isStepDone(
     return false
   }
 
-  // Creator path: Add PDF → Arrange → Sign → Seal → Verify (login is not a stage).
+  // Creator path: Add document → Arrange → Sign → Seal → Verify (login is not a stage).
   // Note: step === 'done' already returns true above for every stage.
   if (doc && stageId === 'fingerprint') return true
   // Arrange is done once placements are locked or someone has signed / moved past it

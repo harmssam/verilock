@@ -832,7 +832,7 @@ export function PlacementEditor({
 
       <div className="pdf-annotator-layout">
         <div className="pdf-annotator-stage">
-          {loading && <p className="pdf-annotator-hint">Loading PDF…</p>}
+          {loading && <p className="pdf-annotator-hint">Loading document…</p>}
           {loadError && <p className="pdf-annotator-hint">{loadError}</p>}
           <div
             ref={wrapRef}

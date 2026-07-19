@@ -2,7 +2,7 @@
   "name": "verilock",
   "version": "0.1.0",
   "private": true,
-  "description": "VeriLock \u2014 PDF signer mini app; anchor document hashes on the Nimiq blockchain",
+  "description": "VeriLock \u2014 document signer mini app; anchor document hashes on the Nimiq blockchain",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sharms/verilock.git"

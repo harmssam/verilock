@@ -202,7 +202,7 @@ export function ShareInviteCard({
   )
 
   const pdfName =
-    localPdf?.name || document.originalFilename || 'your agreement PDF'
+    localPdf?.name || document.originalFilename || 'your agreement file'
 
   const mailtoUrl = buildShareMailtoUrl(document, shareUrl, recipients, {
     pdfDownloadName: canPackEml ? pdfName : undefined,

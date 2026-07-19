@@ -33,7 +33,7 @@ const STEP_ICONS: Record<JourneyStepId, LucideIcon> = {
 
 function roleSubtitle(role: PathRole | null): string {
   if (role === 'signer')
-    return 'Match the shared PDF, complete your fields, and bind with your wallet'
+    return 'Match the shared document, complete your fields, and bind with your wallet'
   if (role === 'verifier') return 'Check a sealed fingerprint anytime, no wallet needed'
   return 'Fingerprint locally, sign together, seal permanently on Nimiq'
 }
@@ -216,7 +216,7 @@ export function HowVeriLockWorks({ role, open, onToggle }: HowVeriLockWorksProps
       {open && (
         <div className="how-story">
           <p className="how-story-lead muted">
-            Your PDF never leaves this device. Only its SHA-256 fingerprint is written to the Nimiq
+            Your document never leaves this device. Only its SHA-256 fingerprint is written to the Nimiq
             blockchain when you seal.
           </p>
           <ol className="how-story-list">

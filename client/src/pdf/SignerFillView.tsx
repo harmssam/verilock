@@ -424,7 +424,7 @@ export function SignerFillView({
       if (isServerFilled(slot.id)) continue
       const draft = previewForSlot(slot)
       if (!draft) {
-        setLocalError('Complete all of your highlighted fields on the PDF.')
+        setLocalError('Complete all of your highlighted fields on the document.')
         openSlot(slot)
         return
       }
@@ -535,7 +535,7 @@ export function SignerFillView({
           )}
         </div>
         <p className="muted signer-fill-help">
-          Tap each <strong>highlighted</strong> box on the PDF. Signing opens in a panel so you stay
+          Tap each <strong>highlighted</strong> box on the document. Signing opens in a panel so you stay
           with the document
           {sigCount > 1 || initCount > 1
             ? ' — each signature and each initial is reused on every matching box after the first.'
@@ -911,7 +911,7 @@ export function SignerFillView({
         </button>
         {myFillable.length === 0 && (
           <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-            No page fields were assigned to you — continue with wallet sign only.
+            No page fields were assigned to you — continue to submit your signature.
           </p>
         )}
       </div>

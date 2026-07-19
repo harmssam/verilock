@@ -13,7 +13,7 @@ Before restyling: load **`docs/journey-anti-slop.md`** and **`PRODUCT.md`** (fea
 | Idea | What you get |
 |------|----------------|
 | **Path-first** | Create / Invited / Verify — shell home picks intent, then focused action dock |
-| **Document stage** | Visual PDF card that gains fingerprint, signatures, and a seal stamp |
+| **Document stage** | Visual document card that gains fingerprint, signatures, and a seal stamp |
 | **One action at a time** | Controls live in the dock; stage rail shows progress |
 | **Account chrome** | Connect, address, copy, disconnect (shell header + AccountMenu) |
 | **Privacy always on** | Trust bar + per-step privacy note |

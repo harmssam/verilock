@@ -39,7 +39,7 @@ function buildHeroClaims(): HeroClaim[] {
   return [
     {
       icon: ShieldCheck,
-      status: 'Your PDF stays on this device. Always.',
+      status: 'Your document stays on this device. Always.',
     },
     {
       icon: Users,
@@ -131,12 +131,12 @@ export function LandingHome({ onPickRole }: LandingHomeProps) {
       <section className="lr-hero-band" aria-labelledby="lr-hero-headline">
         <div className="lr-hero-copy">
           <h1 id="lr-hero-headline" className="lr-hero-headline">
-            Sign a PDF together.{' '}
+            Sign a document together.{' '}
             <span className="lr-hero-headline-em">Prove it never changed.</span>
           </h1>
           <p className="lr-hero-sub">
             Co-sign agreements with your Nimiq account. Your document stays on your device. Lock a permanent
-            proof anyone can check later. No account needed to verify locked PDFs.
+            proof anyone can check later. No account needed to verify locked documents.
           </p>
           {/*
             One primary CTA only. Paths below cover Create / Invited / Verify.
@@ -217,7 +217,7 @@ export function LandingHome({ onPickRole }: LandingHomeProps) {
             What are you here to do?
           </h2>
           <p className="lr-paths-lead">
-            Pick a path. Create, sign an invite, or verify a sealed PDF.
+            Pick a path. Create, sign an invite, or verify a sealed document.
           </p>
         </div>
 

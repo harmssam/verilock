@@ -29,8 +29,8 @@ export interface JourneyStage {
 export const CREATOR_STAGES: JourneyStage[] = [
   {
     id: 'fingerprint',
-    label: 'Add PDF',
-    verb: 'Add the PDF and fingerprint it locally',
+    label: 'Add document',
+    verb: 'Add the document and fingerprint it locally',
     blurb:
       'Drop the agreement file. We only register its fingerprint (no signing yet). Next you arrange who signs where.',
     privacyNote: 'The file never uploads. Only the fingerprint is registered.',
@@ -40,13 +40,13 @@ export const CREATOR_STAGES: JourneyStage[] = [
     label: 'Arrange',
     verb: 'Name people and place fields',
     blurb:
-      'Name each signer, place their boxes on the PDF, and choose whether you are one of them (or only organizing). Continue when the layout looks right. Invites come after you sign (if you are a party).',
-    privacyNote: 'Only placement geometry is stored, not the PDF bytes.',
+      'Name each signer, place their boxes on the document, and choose whether you are one of them (or only organizing). Continue when the layout looks right. Invites come after you sign (if you are a party).',
+    privacyNote: 'Only placement geometry is stored, not the document bytes.',
   },
   {
     id: 'sign',
     label: 'Sign',
-    verb: 'Sign your fields on the PDF',
+    verb: 'Sign your fields on the document',
     blurb:
       'If you are a signer, fill only your highlighted fields on the document, then bind with your wallet. Organizers skip this step. After you sign, invite any co-signers here before sealing.',
     privacyNote: 'You prove you hold these bytes - still no upload.',
@@ -62,7 +62,7 @@ export const CREATOR_STAGES: JourneyStage[] = [
     id: 'verify',
     label: 'Verify',
     verb: 'Check anytime',
-    blurb: 'Anyone can drop a PDF copy and prove it still matches.',
+    blurb: 'Anyone can drop a document copy and prove it still matches.',
     privacyNote: 'Verification needs no wallet and never uploads the file.',
   },
 ]
@@ -74,9 +74,9 @@ export const SIGNER_STAGES: JourneyStage[] = [
   {
     id: 'sign',
     label: 'Complete',
-    verb: 'Match PDF & complete your fields',
+    verb: 'Match document & complete your fields',
     blurb:
-      'Drop the PDF the creator sent you, confirm it matches, fill your fields on the document, then bind with your wallet.',
+      'Drop the document the creator sent you, confirm it matches, fill your fields on the document, then bind with your wallet.',
     privacyNote: 'We never see your file. It stays on your device.',
   },
   {
@@ -85,7 +85,7 @@ export const SIGNER_STAGES: JourneyStage[] = [
     verb: 'Thanks, you are done',
     blurb:
       'Your fields and wallet signature are recorded. The creator seals the agreement on Nimiq when everyone has finished. You can close this page.',
-    privacyNote: 'Keep your PDF. Anyone can re-check the fingerprint later.',
+    privacyNote: 'Keep your document. Anyone can re-check the fingerprint later.',
   },
 ]
 
@@ -94,7 +94,7 @@ export const VERIFIER_STAGES: JourneyStage[] = [
   {
     id: 'verify',
     label: 'Verify',
-    verb: 'Check a PDF anytime',
+    verb: 'Check a document anytime',
     blurb: 'Drop a copy of a sealed document to prove its fingerprint still matches on-chain.',
     privacyNote: 'Verification needs no wallet and never uploads the file.',
   },

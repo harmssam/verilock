@@ -39,7 +39,7 @@ const STEP_ICONS: Record<JourneyStepId, LucideIcon> = {
 
 function roleSubtitle(role: PathRole | null): string {
   if (role === 'signer')
-    return 'Match the shared PDF, complete your fields, and bind with your wallet'
+    return 'Match the shared document, complete your fields, and bind with your wallet'
   if (role === 'verifier') return 'Check a sealed proof anytime. No wallet needed'
   return 'Sign together on your device, then lock a permanent proof'
 }
@@ -91,7 +91,7 @@ function BeatVisual({ stageId, active }: { stageId: JourneyStepId; active: boole
         </div>
       )
     case 'fingerprint':
-      /* PDF → fingerprint: file icon, arrow, fingerprint (icons alone, no boxes) */
+      /* Document → fingerprint: file icon, arrow, fingerprint (icons alone, no boxes) */
       return (
         <div className={`lr-how-visual lr-how-visual--fingerprint${play}`} aria-hidden>
           <div className="lr-fp">
@@ -127,7 +127,7 @@ function BeatVisual({ stageId, active }: { stageId: JourneyStepId; active: boole
       )
     case 'share':
       /*
-       * One PDF fans out to three co-signers.
+       * One document fans out to three co-signers.
        * Paths + person dots share one SVG viewBox so endpoints stay aligned.
        * Doc is the FileText icon itself (no surrounding box).
        */

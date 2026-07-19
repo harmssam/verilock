@@ -51,7 +51,7 @@ function filesFromDataTransfer(dt: DataTransfer): File[] {
 }
 
 /**
- * Visual document card that doubles as the primary PDF drop/browse target
+ * Visual document card that doubles as the primary document drop/browse target
  * when `accepting` is true.
  */
 export function DocumentStage({

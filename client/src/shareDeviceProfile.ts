@@ -80,7 +80,7 @@ export function buildShareActionPlan(options: {
     return {
       platform,
       isMobile,
-      // Force false so UI never shows “Share PDF + invite” on desktop Mac.
+      // Force false so UI never shows “Share file + invite” on desktop Mac.
       webShareFiles: false,
       primary: ['open-mail'],
       secondary: ['copy-link'],

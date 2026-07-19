@@ -16,7 +16,7 @@ export const PAGE_META = {
   home: {
     title: `${SITE_NAME} — Sign Documents & Seal Hashes on Nimiq`,
     description:
-      'Sign PDF or image agreements together and permanently anchor document fingerprints on the Nimiq blockchain. Your file never leaves your device — verify integrity anytime without a wallet.',
+      'Sign documents together (PDF or image) and permanently anchor fingerprints on the Nimiq blockchain. Your file never leaves your device — verify integrity anytime without a wallet.',
     path: '/',
   },
   pricing: {
@@ -46,7 +46,7 @@ export const PAGE_META = {
   verify: {
     title: `Verify a Document${TITLE_SUFFIX}`,
     description:
-      'Check whether a PDF or image matches a sealed VeriLock agreement. Fingerprint your file locally in the browser — no wallet required.',
+      'Check whether a document matches a sealed VeriLock agreement. Fingerprint your file locally in the browser — no wallet required.',
     path: '/',
   },
   agreements: {
@@ -191,7 +191,7 @@ export function documentPageMeta(title: string, role: 'sign' | 'verify'): PageMe
   const verb = role === 'verify' ? 'Verify' : 'Sign'
   return {
     title: `${title} · ${verb} on ${SITE_NAME}`,
-    description: `${verb} "${title}" on VeriLock. Fingerprint your PDF locally, collect Nimiq wallet signatures, and seal the document hash on-chain.`,
+    description: `${verb} "${title}" on VeriLock. Fingerprint your document locally, collect Nimiq wallet signatures, and seal the document hash on-chain.`,
     path: undefined,
     noindex: true,
   }
