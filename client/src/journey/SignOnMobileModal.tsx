@@ -10,6 +10,7 @@ import {
 } from '../signatureHandoff/signalingClient'
 import {
   decryptPayload,
+  ensureHandoffBlob,
   exportKeyB64url,
   generatePayloadKey,
   payloadToHandoffResult,
@@ -98,7 +99,12 @@ export function SignOnMobileModal({
       if (receivedRef.current || !keyRef.current || !sessionIdRef.current) return
       const pkg = typeof raw === 'string' ? unpackEncrypted(raw) : raw
       const payload = await decryptPayload(keyRef.current, sessionIdRef.current, pkg)
-      const result = payloadToHandoffResult(payload)
+      let result = payloadToHandoffResult(payload)
+      // Always ensure a PNG for wallet pad / img preview (vectors stay primary).
+      result = await ensureHandoffBlob(result)
+      if (!result.path?.strokes?.length) {
+        throw new Error('Signature path missing strokes')
+      }
       receivedRef.current = true
       if (!mountedRef.current) return
       revokeObjectUrl()
@@ -246,13 +252,27 @@ export function SignOnMobileModal({
   }
 
   const handleUse = async () => {
-    if (!received || !sessionIdRef.current) return
-    try {
-      await completeHandoff(token, sessionIdRef.current)
-    } catch {
-      /* still apply locally */
+    if (!received?.path?.strokes?.length) {
+      setError('No signature strokes received — try again from your phone.')
+      setPhase('error')
+      return
     }
-    onSignature(received)
+    const sid = sessionIdRef.current
+    let result = received
+    try {
+      result = await ensureHandoffBlob(received)
+    } catch {
+      /* keep received */
+    }
+    // Deliver to parent before closing so fill modal can apply while still mounted.
+    onSignature(result)
+    if (sid) {
+      try {
+        await completeHandoff(token, sid)
+      } catch {
+        /* still applied locally */
+      }
+    }
     void cleanupNet(false)
     onClose()
   }
