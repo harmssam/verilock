@@ -396,7 +396,7 @@ export function SignerFillView({
     setActiveSlotId(next.id)
   }
 
-  /** Stamp ink onto all matching signature/initial slots (desktop pad or mobile handoff). */
+  /** Stamp ink onto all matching signature/initial slots, then return to the PDF (no auto-advance). */
   const applyInkStroke = useCallback(
     (result: SignatureStrokeResult, slotOverride?: PlacementSlot | null) => {
       const slot = slotOverride ?? activeSlot
@@ -425,26 +425,14 @@ export function SignerFillView({
           }
         }
       }
-      const nextSharedSig = isInitial ? sharedInk : result
-      const nextSharedInit = isInitial ? result : sharedInitials
       if (isInitial) setSharedInitials(result)
       else setSharedInk(result)
       setLocalFills(nextFills)
-      setModalDraftInk(result)
-      setSigModalMode('reuse')
       setLocalError(null)
-      openNextAfter(slot.id, nextFills, nextSharedSig, nextSharedInit)
+      // Back to the document view — user picks the next field deliberately.
+      closeModal()
     },
-    [
-      activeSlot,
-      localFills,
-      myInitialSlots,
-      mySignatureSlots,
-      sharedInk,
-      sharedInitials,
-      isServerFilled,
-      openNextAfter,
-    ],
+    [activeSlot, localFills, myInitialSlots, mySignatureSlots, isServerFilled, closeModal],
   )
 
   const confirmModal = () => {
@@ -475,7 +463,8 @@ export function SignerFillView({
     }
     setLocalFills(nextFills)
     setLocalError(null)
-    openNextAfter(activeSlot.id, nextFills, sharedInk, sharedInitials)
+    // Return to the PDF view; user opens the next field deliberately.
+    closeModal()
   }
 
   const handleFinish = useCallback(async () => {
@@ -845,23 +834,25 @@ export function SignerFillView({
                             ? 'Initials in the box below'
                             : 'Sign in the box below'
                         }
+                        padAspect={
+                          activeSlot
+                            ? activeSlot.width / Math.max(1e-6, activeSlot.height)
+                            : undefined
+                        }
                         onChange={result => setModalDraftInk(result)}
                         disabled={disabled || busy || submitting}
                       />
-                      {FEATURES.signOnMobile &&
-                        authToken &&
-                        !isLikelyMobileViewport() &&
-                        !activeIsInitial && (
-                          <button
-                            type="button"
-                            className="btn btn-secondary signer-fill-mobile-btn"
-                            disabled={disabled || busy || submitting}
-                            onClick={() => setSignOnMobileOpen(true)}
-                          >
-                            <Smartphone size={16} strokeWidth={2.25} aria-hidden />
-                            Sign on mobile
-                          </button>
-                        )}
+                      {FEATURES.signOnMobile && authToken && !isLikelyMobileViewport() && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary signer-fill-mobile-btn"
+                          disabled={disabled || busy || submitting}
+                          onClick={() => setSignOnMobileOpen(true)}
+                        >
+                          <Smartphone size={16} strokeWidth={2.25} aria-hidden />
+                          {activeIsInitial ? 'Initials on mobile' : 'Sign on mobile'}
+                        </button>
+                      )}
                     </>
                   )
                 ) : (
@@ -920,6 +911,12 @@ export function SignerFillView({
           open={signOnMobileOpen}
           token={authToken}
           documentId={documentId ?? undefined}
+          padAspect={
+            activeSlot && isInkPlacementKind(activeSlot.kind)
+              ? activeSlot.width / Math.max(1e-6, activeSlot.height)
+              : undefined
+          }
+          fieldKind={activeSlot?.kind === 'initial' ? 'initial' : 'signature'}
           onClose={() => setSignOnMobileOpen(false)}
           onSignature={result => {
             if (!result.path?.strokes?.length) {
@@ -934,7 +931,7 @@ export function SignerFillView({
               simplifiedPoints: result.simplifiedPoints,
               epsilon: result.epsilon,
             }
-            // Apply immediately onto signature slots (don't leave it only on the draft pad).
+            // Stamp fields and return to the PDF (no auto-advance).
             setSignOnMobileOpen(false)
             applyInkStroke(stroke, activeSlot)
           }}

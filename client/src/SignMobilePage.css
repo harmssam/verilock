@@ -51,14 +51,25 @@
 }
 
 .sign-mobile-page .sig-pad-canvas {
-  flex: 1;
-  min-height: min(55dvh, 420px);
-  height: min(55dvh, 420px);
   width: 100%;
   border-radius: 12px;
   border: 1.5px solid var(--border, #e2e8f0);
   background: #fff;
   touch-action: none;
+}
+
+/* Prefer field aspect when provided; fall back to a tall enough draw area */
+.sign-mobile-page .sig-pad--aspect .sig-pad-canvas {
+  height: auto;
+  aspect-ratio: var(--sig-pad-aspect, 2.5);
+  max-height: min(55dvh, 420px);
+  min-height: 8rem;
+}
+
+.sign-mobile-page .sig-pad:not(.sig-pad--aspect) .sig-pad-canvas {
+  flex: 1;
+  min-height: min(55dvh, 420px);
+  height: min(55dvh, 420px);
 }
 
 .sign-mobile-page .sig-pad--large {

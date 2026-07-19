@@ -31,6 +31,10 @@ export interface SignaturePathStroke {
 /**
  * Canonical signature ink for later on-chain packing.
  * Prefer this over PNG when present; imageDataUrl is preview/fallback.
+ *
+ * Points are in [0,1]² relative to the capture pad (x / padW, y / padH).
+ * When `captureAspect` (padW/padH) is set, paint letterboxes into the target
+ * box so strokes are not stretched if the field shape differs.
  */
 export interface SignaturePathData {
   /** RDP epsilon used at capture (pad CSS pixels). */
@@ -38,6 +42,11 @@ export interface SignaturePathData {
   /** Stroke width as fraction of min(box width, box height) in CSS at capture. */
   lineWidthRatio: number
   strokes: SignaturePathStroke[]
+  /**
+   * Capture pad width ÷ height. Used to paint without distortion.
+   * Omit only for legacy paths (paint stretches to the field).
+   */
+  captureAspect?: number
 }
 
 export interface SignatureAnnotation extends AnnotationGeometry {
@@ -117,14 +126,40 @@ export function normalizedToCanvasRect(
   }
 }
 
-/** Paint signature path into a screen rect (path coords are 0–1 in the box). */
+/**
+ * Sub-rect inside `outer` that matches `captureAspect` (width/height), centered
+ * (“contain”). Prevents signature stretch when field shape ≠ pad shape.
+ */
+export function fitCaptureRect(outer: CanvasRect, captureAspect: number): CanvasRect {
+  const aspect = Number.isFinite(captureAspect) && captureAspect > 0.05 ? captureAspect : 1
+  let width = outer.width
+  let height = width / aspect
+  if (height > outer.height) {
+    height = outer.height
+    width = height * aspect
+  }
+  return {
+    left: outer.left + (outer.width - width) / 2,
+    top: outer.top + (outer.height - height) / 2,
+    width,
+    height,
+  }
+}
+
+/** Paint signature path into a screen rect (path coords are 0–1 on the capture pad). */
 export function paintSignaturePath(
   ctx: CanvasRenderingContext2D,
   path: SignaturePathData,
   rect: CanvasRect,
   color = '#0f172a',
 ): void {
-  const minSide = Math.min(rect.width, rect.height)
+  // With captureAspect: letterbox so strokes keep pad proportions.
+  // Without (legacy): stretch to full field (old unit-square behaviour).
+  const drawRect =
+    path.captureAspect != null && path.captureAspect > 0
+      ? fitCaptureRect(rect, path.captureAspect)
+      : rect
+  const minSide = Math.min(drawRect.width, drawRect.height)
   ctx.save()
   ctx.strokeStyle = color
   ctx.lineCap = 'round'
@@ -134,10 +169,10 @@ export function paintSignaturePath(
     if (stroke.points.length === 0) continue
     ctx.beginPath()
     const p0 = stroke.points[0]!
-    ctx.moveTo(rect.left + p0.x * rect.width, rect.top + p0.y * rect.height)
+    ctx.moveTo(drawRect.left + p0.x * drawRect.width, drawRect.top + p0.y * drawRect.height)
     for (let i = 1; i < stroke.points.length; i++) {
       const p = stroke.points[i]!
-      ctx.lineTo(rect.left + p.x * rect.width, rect.top + p.y * rect.height)
+      ctx.lineTo(drawRect.left + p.x * drawRect.width, drawRect.top + p.y * drawRect.height)
     }
     ctx.stroke()
   }

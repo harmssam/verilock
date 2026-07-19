@@ -134,10 +134,16 @@ function assertPath(raw: unknown): SignaturePathData {
     if (points.length) strokes.push({ points })
   }
   if (strokes.length === 0) throw new Error('Signature path has no points')
+  let captureAspect: number | undefined
+  if (o.captureAspect != null) {
+    const a = Number(o.captureAspect)
+    if (Number.isFinite(a) && a > 0.05 && a < 20) captureAspect = a
+  }
   return {
     epsilon,
     lineWidthRatio,
     strokes,
+    ...(captureAspect != null ? { captureAspect } : {}),
   }
 }
 
@@ -205,6 +211,7 @@ export function strokeResultToPayload(
     path: {
       epsilon: path.epsilon,
       lineWidthRatio: path.lineWidthRatio,
+      ...(path.captureAspect != null ? { captureAspect: path.captureAspect } : {}),
       strokes: path.strokes.map(s => ({
         points: s.points.map(p => ({ x: p.x, y: p.y })),
       })),
@@ -220,26 +227,49 @@ export function strokeResultToPayload(
   }
 }
 
-/** Rasterize unit-square path to a PNG data URL (wallet pad / previews). */
+/** Rasterize path to a PNG data URL (wallet pad / previews) without distortion. */
 export function pathToPngDataUrl(
   path: SignaturePathData,
   width = 400,
   height = 160,
 ): string {
   if (typeof document === 'undefined') return ''
+  // Prefer a canvas matching capture aspect so raster previews stay honest.
+  let outW = width
+  let outH = height
+  if (path.captureAspect != null && path.captureAspect > 0) {
+    outW = width
+    outH = Math.max(48, Math.round(width / path.captureAspect))
+  }
   const canvas = document.createElement('canvas')
   const dpr = Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
-  canvas.width = Math.max(1, Math.round(width * dpr))
-  canvas.height = Math.max(1, Math.round(height * dpr))
+  canvas.width = Math.max(1, Math.round(outW * dpr))
+  canvas.height = Math.max(1, Math.round(outH * dpr))
   const ctx = canvas.getContext('2d')
   if (!ctx) return ''
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, width, height)
-  // Inline paint (avoid circular import with annotations) — same unit-square rules.
-  const pad = 12
-  const rect = { left: pad, top: pad, width: width - pad * 2, height: height - pad * 2 }
-  const minSide = Math.min(rect.width, rect.height)
+  ctx.fillRect(0, 0, outW, outH)
+  const pad = 10
+  const outer = { left: pad, top: pad, width: outW - pad * 2, height: outH - pad * 2 }
+  // Inline contain-fit (same rules as paintSignaturePath).
+  let draw = outer
+  if (path.captureAspect != null && path.captureAspect > 0) {
+    const aspect = path.captureAspect
+    let w = outer.width
+    let h = w / aspect
+    if (h > outer.height) {
+      h = outer.height
+      w = h * aspect
+    }
+    draw = {
+      left: outer.left + (outer.width - w) / 2,
+      top: outer.top + (outer.height - h) / 2,
+      width: w,
+      height: h,
+    }
+  }
+  const minSide = Math.min(draw.width, draw.height)
   ctx.strokeStyle = '#0f172a'
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
@@ -248,10 +278,10 @@ export function pathToPngDataUrl(
     if (stroke.points.length === 0) continue
     ctx.beginPath()
     const p0 = stroke.points[0]!
-    ctx.moveTo(rect.left + p0.x * rect.width, rect.top + p0.y * rect.height)
+    ctx.moveTo(draw.left + p0.x * draw.width, draw.top + p0.y * draw.height)
     for (let i = 1; i < stroke.points.length; i++) {
       const p = stroke.points[i]!
-      ctx.lineTo(rect.left + p.x * rect.width, rect.top + p.y * rect.height)
+      ctx.lineTo(draw.left + p.x * draw.width, draw.top + p.y * draw.height)
     }
     ctx.stroke()
   }

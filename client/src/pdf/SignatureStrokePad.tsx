@@ -1,5 +1,5 @@
 import { Eraser } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type CSSProperties } from 'react'
 import {
   normalizeInk,
   simplifyInk,
@@ -29,6 +29,12 @@ interface SignatureStrokePadProps {
   productMode?: boolean
   /** Optional label override (default: Draw your signature). */
   label?: string
+  /**
+   * Pad width ÷ height (e.g. PDF field aspect). When set, the canvas matches
+   * that shape so capture matches placement and ink is not stretched later.
+   */
+  padAspect?: number
+  className?: string
 }
 
 const LINE_WIDTH = 2.25
@@ -43,12 +49,18 @@ export function SignatureStrokePad({
   epsilon = SIGNATURE_RDP_EPSILON_PX,
   productMode = false,
   label = 'Draw your signature',
+  padAspect,
+  className,
 }: SignatureStrokePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawing = useRef(false)
   const currentStroke = useRef<StrokePoint[]>([])
   const inkRef = useRef<SignatureInk | null>(null)
   const hasInk = useRef(false)
+  const aspect =
+    padAspect != null && Number.isFinite(padAspect) && padAspect > 0.05 && padAspect < 20
+      ? padAspect
+      : null
 
   const padSize = () => {
     const canvas = canvasRef.current
@@ -119,9 +131,11 @@ export function SignatureStrokePad({
     const simplifiedPoints = simplified.strokes.reduce((n, s) => n + s.points.length, 0)
     const unit = normalizeInk(simplified)
     const minSide = Math.min(ink.width, ink.height)
+    const captureAspect = ink.width / Math.max(1, ink.height)
     const path: SignaturePathData = {
       epsilon,
       lineWidthRatio: LINE_WIDTH / Math.max(1, minSide),
+      captureAspect,
       strokes: unit.strokes.map(s => ({
         points: s.points.map(p => ({ x: p.x, y: p.y })),
       })),
@@ -187,7 +201,22 @@ export function SignatureStrokePad({
   }
 
   return (
-    <div className={`sig-pad${disabled ? ' sig-pad--disabled' : ''}${productMode ? ' sig-pad--product' : ''}`}>
+    <div
+      className={[
+        'sig-pad',
+        disabled ? 'sig-pad--disabled' : '',
+        productMode ? 'sig-pad--product' : '',
+        aspect != null ? 'sig-pad--aspect' : '',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      style={
+        aspect != null
+          ? ({ ['--sig-pad-aspect']: String(aspect) } as CSSProperties)
+          : undefined
+      }
+    >
       <div className="sig-pad-label-row">
         <span className="field-label">{label}</span>
         <button type="button" className="btn btn-ghost sig-pad-clear" onClick={clear} disabled={disabled}>

@@ -25,13 +25,30 @@ function parseSessionId(pathname: string): string | null {
   return m?.[1] ? decodeURIComponent(m[1]) : null
 }
 
-function keyFromHash(): string | null {
+function hashParams(): URLSearchParams {
   const hash = window.location.hash.replace(/^#/, '')
-  const params = new URLSearchParams(hash)
+  // Support #k=… and #k=…&a=2.5
+  if (hash && !hash.includes('=')) return new URLSearchParams()
+  return new URLSearchParams(hash)
+}
+
+function keyFromHash(): string | null {
+  const params = hashParams()
   const k = params.get('k')
   if (k) return k
-  if (hash.startsWith('k=')) return hash.slice(2)
+  const raw = window.location.hash.replace(/^#/, '')
+  if (raw.startsWith('k=')) return raw.slice(2).split('&')[0] || null
   return null
+}
+
+function aspectFromHash(): number | null {
+  const a = Number(hashParams().get('a'))
+  if (!Number.isFinite(a) || a < 0.05 || a > 20) return null
+  return a
+}
+
+function kindFromHash(): 'signature' | 'initial' {
+  return hashParams().get('kind') === 'initial' ? 'initial' : 'signature'
 }
 
 /**
@@ -44,6 +61,9 @@ export function SignMobilePage() {
   const [error, setError] = useState<string | null>(null)
   const [stroke, setStroke] = useState<SignatureStrokeResult | null>(null)
   const [padKey, setPadKey] = useState(0)
+  const padAspect = aspectFromHash()
+  const fieldKind = kindFromHash()
+  const isInitial = fieldKind === 'initial'
 
   const keyRef = useRef<CryptoKey | null>(null)
   const channelRef = useRef<RTCDataChannel | null>(null)
@@ -165,10 +185,12 @@ export function SignMobilePage() {
     <div className="sign-mobile-page">
       <header className="sign-mobile-header">
         <p className="sign-mobile-kicker">VeriLock</p>
-        <h1 className="sign-mobile-title">Draw your signature</h1>
+        <h1 className="sign-mobile-title">
+          {isInitial ? 'Draw your initials' : 'Draw your signature'}
+        </h1>
         <p className="sign-mobile-sub muted">
-          Strokes are sent as vectors to your computer (encrypted). Wallet signing stays on the
-          computer.
+          Strokes are sent as vectors to your computer (encrypted). The pad matches the field shape
+          on the document. Wallet signing stays on the computer.
         </p>
       </header>
 
@@ -191,7 +213,8 @@ export function SignMobilePage() {
           <SignatureStrokePad
             key={padKey}
             productMode
-            label="Sign here"
+            label={isInitial ? 'Initials in the box' : 'Sign in the box'}
+            padAspect={padAspect ?? (isInitial ? 1.4 : 2.8)}
             onChange={result => setStroke(result)}
           />
           <div className="sign-mobile-dock">
