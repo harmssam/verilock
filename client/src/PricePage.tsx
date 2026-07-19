@@ -1,7 +1,8 @@
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
-import { Coins, ExternalLink, LoaderCircle } from 'lucide-react'
+import { Coins, CreditCard, ExternalLink, LoaderCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from './api'
+import { formatFiatAmount } from './fiatPricing'
 import { NimiqHexagonIcon } from './NimiqHexagonIcon'
 import { SealFeeAmount } from './SealFeeAmount'
 import { SealPricingDisplay } from './SealPricingDisplay'
@@ -21,7 +22,15 @@ const FASTSPOT_URL = 'https://www.fastspot.io/'
 
 interface CreditsPublicInfo {
   enabled: boolean
+  stripeEnabled: boolean
   stripeMarkup: number
+  stripeMinChargeCents: number
+  packs: number[]
+  /** Live Stripe USD for 1 credit (before pack floor), when quote succeeds. */
+  creditStripeUsd: number | null
+  /** Live pack totals for the smallest pack (Stripe floor may apply). */
+  minPack: number | null
+  minPackStripeUsd: number | null
 }
 
 export interface PricePageProps {
@@ -47,19 +56,42 @@ export function PricePage({
 }: PricePageProps = {}) {
   const pricing = getSealPricing()
   const [creditsInfo, setCreditsInfo] = useState<CreditsPublicInfo | null>(null)
+
   useEffect(() => {
     let cancelled = false
     void (async () => {
       try {
-        const cfg = await api.creditsConfig()
+        const [cfg, unitQuote, packCatalog] = await Promise.all([
+          api.creditsConfig(),
+          api.creditsQuote(1).catch(() => null),
+          api.creditsPackQuotes().catch(() => null),
+        ])
         if (cancelled) return
+        const packs = cfg.packs?.length ? cfg.packs : packCatalog?.packs.map(p => p.pack) ?? [10, 25, 50, 100]
+        const minPack = packs[0] ?? 10
+        const minPackQuote = packCatalog?.packs.find(p => p.pack === minPack) ?? null
         setCreditsInfo({
           enabled: cfg.enabled,
+          stripeEnabled: cfg.stripeEnabled,
           stripeMarkup: cfg.stripeMarkup,
+          stripeMinChargeCents: cfg.stripeMinChargeCents,
+          packs,
+          creditStripeUsd: unitQuote?.creditStripeUsd ?? null,
+          minPack,
+          minPackStripeUsd: minPackQuote?.creditStripeUsdTotal ?? null,
         })
       } catch {
         if (!cancelled) {
-          setCreditsInfo({ enabled: true, stripeMarkup: 2 })
+          setCreditsInfo({
+            enabled: true,
+            stripeEnabled: true,
+            stripeMarkup: 2,
+            stripeMinChargeCents: 50,
+            packs: [10, 25, 50, 100],
+            creditStripeUsd: null,
+            minPack: 10,
+            minPackStripeUsd: null,
+          })
         }
       }
     })()
@@ -70,6 +102,12 @@ export function PricePage({
 
   const signedIn = Boolean(token && address)
   const creditsEnabled = creditsInfo?.enabled !== false
+  const stripeMarkup = creditsInfo?.stripeMarkup ?? 2
+  const halfPrice = stripeMarkup === 2
+  const stripeMinUsd = (creditsInfo?.stripeMinChargeCents ?? 50) / 100
+  const minPack = creditsInfo?.minPack ?? 10
+  const unitBelowStripeMin =
+    creditsInfo?.creditStripeUsd != null && creditsInfo.creditStripeUsd < stripeMinUsd
 
   return (
     <div className="card price-page">
@@ -80,8 +118,9 @@ export function PricePage({
         <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
           Nimiq
         </a>{' '}
-        network blockchain. Buy packs ahead of time, or pay the current credit value in NIM when you
-        seal.
+        network blockchain. Buy credit packs with card by default
+        {halfPrice ? ', or pay with NIM for half the card rate' : ''}. You can also spend the current
+        NIM seal fee at seal time instead of using a credit.
       </p>
 
       {creditsEnabled ? (
@@ -101,7 +140,50 @@ export function PricePage({
           </div>
 
           <div className="price-page-model-row">
-            <span className="price-page-model-label">1 credit is currently worth</span>
+            <span className="price-page-model-label">
+              <CreditCard size={12} strokeWidth={2.5} aria-hidden />
+              Card (default)
+            </span>
+            <div className="price-page-model-value price-page-model-value--card">
+              {creditsInfo?.creditStripeUsd != null ? (
+                <span className="price-page-model-card-price">
+                  {formatFiatAmount(creditsInfo.creditStripeUsd, 'USD')}
+                  <span className="price-page-model-per">per credit</span>
+                </span>
+              ) : (
+                <span className="price-page-model-card-price price-page-model-card-price--pending">
+                  Live USD quote…
+                </span>
+              )}
+            </div>
+            <p className="muted price-page-model-hint">
+              Card price is {stripeMarkup}× the live NIM market value of one seal
+              {stripeMinUsd > 0
+                ? ` (Stripe minimum ${formatFiatAmount(stripeMinUsd, 'USD')} per charge)`
+                : ''}
+              . Rates from{' '}
+              <a href={FASTSPOT_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
+                Fastspot
+              </a>
+              .
+            </p>
+            {unitBelowStripeMin && (
+              <p className="muted price-page-model-hint price-page-model-hint--note">
+                {pricing.promoActive ? 'During the sale, ' : ''}
+                card checkout starts at a <strong>{minPack}-credit pack</strong>
+                {creditsInfo?.minPackStripeUsd != null
+                  ? ` (${formatFiatAmount(creditsInfo.minPackStripeUsd, 'USD')})`
+                  : ''}{' '}
+                so the charge meets Stripe&apos;s {formatFiatAmount(stripeMinUsd, 'USD')} minimum.
+              </p>
+            )}
+          </div>
+
+          <div className="price-page-model-row">
+            <span className="price-page-model-label">
+              <NimiqHexagonIcon size={12} />
+              NIM{halfPrice ? ' — half price' : ''}
+            </span>
             <div className="price-page-model-value">
               <SealFeeAmount
                 feeNim={pricing.feeNim}
@@ -109,6 +191,11 @@ export function PricePage({
                 showWas={pricing.promoActive}
                 showFiatPicker
               />
+              {halfPrice && (
+                <span className="price-page-model-half-badge" title="NIM is half the card rate">
+                  ½ card
+                </span>
+              )}
             </div>
             {pricing.promoActive && (
               <div className="price-page-model-promo">
@@ -119,11 +206,11 @@ export function PricePage({
               </div>
             )}
             <p className="muted price-page-model-hint">
-              Same amount whether you spend a credit or pay with NIM at seal time. Fiat estimates from{' '}
-              <a href={FASTSPOT_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
-                Fastspot
-              </a>
-              .
+              {halfPrice
+                ? 'Pay with NIM when buying credits or at seal time — half the card price (exact seal fee in NIM).'
+                : 'Pay with NIM when buying credits or at seal time for the current seal fee.'}{' '}
+              Standard list price is 1000 NIM per seal
+              {pricing.promoActive ? ` (now ${pricing.feeNim} NIM with promo)` : ''}.
             </p>
           </div>
         </div>
@@ -139,9 +226,14 @@ export function PricePage({
               Buy credits
             </h3>
             <p className="muted price-page-credits-lead">
-              Prepaid packs (10–100). Pay with NIM or card
-              {creditsInfo?.stripeMarkup != null && creditsInfo.stripeMarkup > 1
-                ? ` (card ≈${creditsInfo.stripeMarkup}× in USD)`
+              Prepaid packs (
+              {creditsInfo?.packs && creditsInfo.packs.length >= 2
+                ? `${creditsInfo.packs[0]}–${creditsInfo.packs[creditsInfo.packs.length - 1]}`
+                : '10–100'}
+              ). Card is the default
+              {halfPrice ? '; NIM is half the card rate' : ''}
+              {unitBelowStripeMin
+                ? `. Card packs start at ${minPack} to meet the ${formatFiatAmount(stripeMinUsd, 'USD')} minimum`
                 : ''}
               .
             </p>
@@ -206,10 +298,10 @@ export function PricePage({
             </span>
           </li>
           <li className="price-page-why-item">
-            <strong className="price-page-why-item-title">Cheap permanent proof</strong>
+            <strong className="price-page-why-item-title">Half-price with NIM</strong>
             <span className="price-page-why-item-body muted">
-              Network costs stay low, so one credit can anchor a document fingerprint without
-              enterprise blockchain pricing.
+              Card credits are the easy default. Paying the seal fee in NIM — when you buy packs or
+              seal — costs half the card rate, because network fees stay low.
             </span>
           </li>
           <li className="price-page-why-item">
@@ -256,7 +348,7 @@ function PriceCreditsLogin({
       {!needsSheet || !loginOpen ? (
         <>
           <p className="muted" style={{ margin: 0, fontSize: '0.86rem' }}>
-            Login with your Nimiq wallet to choose a pack.
+            Login with your Nimiq wallet to buy credit packs (card default, or NIM for half price).
           </p>
           <button
             type="button"

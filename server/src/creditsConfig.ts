@@ -17,7 +17,7 @@ export function isStripeCreditsEnabled(): boolean {
   return Boolean(process.env.STRIPE_SECRET_KEY?.trim())
 }
 
-/** Stripe unit price = sealFeeNim × nimUsd × markup (encourage direct NIM). */
+/** Stripe unit price = sealFeeNim × nimUsd × markup (default 2 → NIM is half the card rate). */
 export function getStripeMarkup(): number {
   const n = Number(process.env.CREDITS_STRIPE_MARKUP ?? 2)
   return Number.isFinite(n) && n >= 1 ? n : 2

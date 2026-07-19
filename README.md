@@ -75,7 +75,7 @@ This keeps SQLite (`verilock.db`) across deploys. PDF files are not stored — o
 | `ATTESTATION_RECIPIENT` | Seal/credit sink address |
 | `CREDITS_ENABLED` | `true` to enable prepaid credits |
 | `CREDITS_STRIPE_ENABLED` | `true` when Stripe keys are set |
-| `CREDITS_STRIPE_MARKUP` | `2` (card price = 2× live NIM market) |
+| `CREDITS_STRIPE_MARKUP` | `2` (card = 2× live NIM market; NIM advertised as half price) |
 | `CREDITS_MAX_PER_CHECKOUT` | e.g. `20` |
 | `CREDITS_MAX_PER_NIM_TOPUP` | e.g. `50` |
 | `SERVICE_WALLET_PRIVATE_KEY` | Hex key for credit-seal proofs (fund with dust NIM) |

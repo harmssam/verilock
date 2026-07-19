@@ -198,6 +198,26 @@
     color: var(--lr-muted);
   }
 
+  .price-page-model-card-price {
+    color: var(--lr-text);
+  }
+
+  .price-page-model-half-badge {
+    border-color: rgba(13, 148, 136, 0.35);
+    background: var(--lr-accent-soft);
+    color: var(--mint-deep, #0f766e);
+  }
+
+  .price-page-model-hint--note {
+    border-color: rgba(251, 191, 36, 0.4);
+    background: rgba(251, 191, 36, 0.12);
+    color: var(--lr-muted);
+  }
+
+  .price-page-model-hint--note strong {
+    color: var(--lr-text);
+  }
+
   .price-page-credits-connect {
     padding: 1.05rem 1.1rem;
     border-radius: 12px;
@@ -264,7 +284,7 @@
     color: #b91c1c;
   }
 
-  /* Pricing CTAs: NIM primary, card (Stripe) secondary — same APIs as production */
+  /* Pricing CTAs: card (Stripe) primary, NIM half-price secondary — same APIs as production */
 
   &--pricing .btn-primary {
     background: var(--lr-accent);

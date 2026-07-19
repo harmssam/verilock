@@ -124,7 +124,7 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 | `/d/:slug` | Open agreement in journey |
 | `/d/:slug?preferSeal=1` | Jump toward seal when allowed |
 | `/v/:slug` | Verify deep link |
-| `/pricing` | Seal fee + buy credits (NIM / card) |
+| `/pricing` | Seal fee + buy credits (card default; NIM half price) |
 | `/privacy` | Privacy policy |
 | `/security` | Security & integrity (product-true claims only) |
 | `/support` | Support contact form (bot-protected) |

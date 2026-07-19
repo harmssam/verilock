@@ -157,11 +157,14 @@ export function CreditsPanel({
   const packPriceLabel = (pack: number): string => {
     const q = packQuotes.find(p => p.pack === pack)
     if (!q) return '…'
-    if (preferCardPrice && stripeEnabled) {
+    // Default path is Stripe; preferCardPrice forces card figures even before stripe flag loads.
+    if ((preferCardPrice || stripeEnabled) && q.creditStripeUsdTotal > 0) {
       return `≈$${q.creditStripeUsdTotal.toFixed(2)}`
     }
     return formatSealFeeNim(q.creditNimCostTotal)
   }
+
+  const nimHalfPrice = stripeEnabled
 
   const buyWithNim = async () => {
     if (!token || !address) {
@@ -230,7 +233,8 @@ export function CreditsPanel({
           Seal credits
         </div>
         <p className="muted journey-credits-guest-text">
-          Connect your wallet to buy packs (10–100). 1 credit = 1 seal.
+          Connect your wallet to buy packs (10–100) with card, or NIM for half price. 1 credit = 1
+          seal.
         </p>
       </div>
     )
@@ -293,25 +297,10 @@ export function CreditsPanel({
               .filter(Boolean)
               .join(' ')}
           >
-            <button
-              type="button"
-              className={`btn btn-primary${busy === 'nim' ? ' btn--busy' : ''}`}
-              disabled={busyAny || !address}
-              onClick={() => void buyWithNim()}
-            >
-              {busy === 'nim' ? (
-                <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
-              ) : (
-                <Wallet size={16} strokeWidth={2.25} />
-              )}
-              {selectedQuote
-                ? `NIM · ${formatSealFeeNim(selectedQuote.creditNimCostTotal)}`
-                : 'Pay with NIM'}
-            </button>
             {stripeEnabled && (
               <button
                 type="button"
-                className={`btn btn-secondary${busy === 'card' ? ' btn--busy' : ''}`}
+                className={`btn btn-primary${busy === 'card' ? ' btn--busy' : ''}`}
                 disabled={busyAny}
                 onClick={() => void buyWithCard()}
               >
@@ -325,6 +314,27 @@ export function CreditsPanel({
                   : 'Pay with card'}
               </button>
             )}
+            <button
+              type="button"
+              className={`btn ${stripeEnabled ? 'btn-secondary' : 'btn-primary'}${
+                busy === 'nim' ? ' btn--busy' : ''
+              }`}
+              disabled={busyAny || !address}
+              onClick={() => void buyWithNim()}
+            >
+              {busy === 'nim' ? (
+                <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
+              ) : (
+                <Wallet size={16} strokeWidth={2.25} />
+              )}
+              {selectedQuote
+                ? nimHalfPrice
+                  ? `NIM · ½ price · ${formatSealFeeNim(selectedQuote.creditNimCostTotal)}`
+                  : `NIM · ${formatSealFeeNim(selectedQuote.creditNimCostTotal)}`
+                : nimHalfPrice
+                  ? 'NIM · half price'
+                  : 'Pay with NIM'}
+            </button>
           </div>
         </>
       )}
