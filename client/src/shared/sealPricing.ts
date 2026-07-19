@@ -37,8 +37,8 @@ export function getSealPricing(now = new Date()): SealPricing {
     feeLuna: getSealFeeLuna(now),
     baseFeeNim: BASE_SEAL_FEE_NIM,
     promoActive,
-    promoLabel: promoActive ? '95% off — July only' : null,
-    promoEndsLabel: promoActive ? 'Promo ends August 1' : null,
+    promoLabel: promoActive ? '95% off · July only' : null,
+    promoEndsLabel: promoActive ? 'Ends August 1' : null,
   }
 }
 
