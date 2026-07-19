@@ -254,8 +254,7 @@ export function PricePage({
               Why Nimiq?
             </h3>
             <p className="price-page-why-lead muted">
-              Browser-first Layer&nbsp;1. Your wallet signs; the record lives on the chain, not our
-              servers.{' '}
+              Browser-first Layer&nbsp;1. The record lives on the chain, not our servers.{' '}
               <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
                 nimiq.com
                 <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
@@ -283,9 +282,9 @@ export function PricePage({
             </span>
           </li>
           <li className="price-page-why-item">
-            <strong className="price-page-why-item-title">You hold the keys</strong>
+            <strong className="price-page-why-item-title">Proof outlives VeriLock</strong>
             <span className="price-page-why-item-body muted">
-              Each party signs with their own wallet. The proof outlives our servers.
+              Once on Nimiq, the fingerprint stays checkable even if our app is gone.
             </span>
           </li>
         </ul>
