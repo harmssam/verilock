@@ -171,13 +171,11 @@ export function DocumentStage({
   let caption: string
   if (sealed) caption = 'Anchored on Nimiq'
   else if (needsLocalCopy) {
-    caption = doc?.fileName
-      ? `Action required: drop your local copy of “${doc.fileName}”`
-      : 'Action required: drop your local copy of the file'
+    caption = 'Drop or browse to select the matching file'
   } else if (localCopyRequired && hasLocalFile && localCopyMatches === false) {
     caption = 'This file does not match the agreement fingerprint — try the original file'
   } else if (localCopyRequired && hasLocalFile && localCopyMatches === true) {
-    caption = 'Local copy matches - fingerprint verified on this device'
+    caption = 'Local copy matches — fingerprint verified on this device'
   } else if (localCopyRequired && hasLocalFile) {
     caption = 'Checking fingerprint…'
   } else if (step === 'fingerprint' && canInteract)
@@ -238,14 +236,14 @@ export function DocumentStage({
 
       {needsLocalCopy && doc && (
         <div className="doc-stage-expect" role="note">
-          <span className="doc-stage-expect-label">Agreement on record</span>
+          <span className="doc-stage-expect-label">Upload your copy of the file</span>
           <strong className="doc-stage-expect-title">{doc.title}</strong>
           <span className="doc-stage-expect-file">
-            Expected file name: <code className="mono">{doc.fileName}</code>
+            Expected file: <code className="mono">{doc.fileName}</code>
           </span>
           <span className="doc-stage-expect-hint">
-            The server never has your file — drop the same file from your device to prove the
-            fingerprint.
+            Drop the same file from this device so we can match the fingerprint. Required after
+            leaving and returning. The file never leaves your computer.
           </span>
         </div>
       )}
@@ -267,13 +265,13 @@ export function DocumentStage({
               )}
               <span>
                 {needsLocalCopy
-                  ? 'Drop your file copy here'
+                  ? 'Drop file here or browse'
                   : canInteract
                     ? 'Drop document here'
                     : 'Your document'}
               </span>
               {needsLocalCopy && (
-                <span className="doc-card-empty-sub">Not uploaded yet - required to sign</span>
+                <span className="doc-card-empty-sub">No file chosen yet</span>
               )}
             </div>
           ) : (
