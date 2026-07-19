@@ -141,7 +141,7 @@ check('production packaging docs use plain names', () => {
   assert.ok(!existsSync(join(rootDir, 'docs/service-b-journey.md')), 'service-b-journey.md should be renamed')
 })
 
-check('Share step supports Web Share + .eml handoff without server PDF upload', () => {
+check('Share step supports Web Share + .eml handoff without server file upload', () => {
   const share = readFileSync(join(clientDir, 'src/shareInvite.ts'), 'utf8')
   assert.match(share, /export function canShareFiles/)
   assert.match(share, /export async function shareInviteWithPdf/)
@@ -149,8 +149,10 @@ check('Share step supports Web Share + .eml handoff without server PDF upload', 
   assert.match(share, /export function parseRecipientEmails/)
   assert.match(share, /X-Unsent: 1/)
   assert.match(share, /formatToHeader/)
+  assert.match(share, /mimeForDocumentFile/)
   const card = readFileSync(join(clientDir, 'src/ShareInviteCard.tsx'), 'utf8')
-  assert.match(card, /Share PDF \+ invite/)
+  // Copy may say “PDF” or generic “file” depending on document-kinds wording.
+  assert.match(card, /Share (PDF|file) \+ invite/)
   assert.match(card, /Open in Mail/)
   assert.match(card, /openMailtoCompose/)
   assert.match(card, /shareInviteWithPdf/)
@@ -159,11 +161,16 @@ check('Share step supports Web Share + .eml handoff without server PDF upload', 
   assert.match(card, /invite email above/)
   assert.doesNotMatch(card, /To \(co-signer email\)/)
   const journey = readFileSync(join(clientDir, 'src/journey/DocumentJourney.tsx'), 'utf8')
-  assert.match(journey, /ShareInviteCard/)
+  // Journey embeds invite UI + calls shareInviteWithPdf (ShareInviteCard remains available).
+  assert.match(journey, /shareInviteWithPdf/)
   assert.match(journey, /coSignerEmails/)
   assert.match(journey, /invite email/)
   assert.doesNotMatch(journey, /Add co-signers/)
   assert.match(journey, /applyCosigners\(\{/)
+  const kinds = readFileSync(join(clientDir, 'src/pdf/documentKinds.ts'), 'utf8')
+  assert.match(kinds, /export function isSupportedDocumentFile/)
+  assert.match(kinds, /image\/png/)
+  assert.match(kinds, /image\/webp/)
 })
 
 if (process.env.VERIFY_DIST === '1') {

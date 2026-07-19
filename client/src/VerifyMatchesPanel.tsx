@@ -38,7 +38,7 @@ export function VerifyMatchesPanel({
     <div className="verify-matches">
       {matches.length > 1 && (
         <p className="verify-matches-intro muted">
-          This PDF fingerprint matches {matches.length} agreements on VeriLock. Compare dates and IDs below
+          This fingerprint matches {matches.length} agreements on VeriLock. Compare dates and IDs below
           {matches.some(match => match.status === 'locked')
             ? ' — prefer a sealed on-chain record when one exists.'
             : '.'}
@@ -59,7 +59,7 @@ export function VerifyMatchesPanel({
                 </span>
                 {match.originalFilename && (
                   <p className="document-filename verify-match-filename">
-                    <span className="document-filename-label">PDF file</span>
+                    <span className="document-filename-label">File</span>
                     <span className="document-filename-value">{match.originalFilename}</span>
                   </p>
                 )}

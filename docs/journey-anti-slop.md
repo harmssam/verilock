@@ -56,7 +56,7 @@ Design **serves the workflow** (path → rail → dock → document stage).
 
 ### IA (do not invent a fourth path)
 
-- Path picker: **Create & seal** · **I was invited** · **Verify a PDF**
+- Path picker: **Create & seal** · **I was invited** · **Verify a file**
 - Creator rail: Fingerprint → Sign → Share → Seal → Verify (login is a gate, not a step)
 - Signer rail: Sign → Done (login is a gate on submit)
 - Verifier: Verify only (wallet optional)
@@ -66,7 +66,7 @@ Design **serves the workflow** (path → rail → dock → document stage).
 
 - **One primary action** in the action dock; secondary stays secondary
 - **Document stage** metaphor (fingerprint / signatures / seal) — product, not decoration
-- **Local-file honesty** — PDF never leaves device; UI must keep saying so
+- **Local-file honesty** — file never leaves device; UI must keep saying so
 - Restrained accent: mint for primary CTAs and state, not rainbow soup
 - Familiar controls: selects, checkboxes, drop zones, buttons
 

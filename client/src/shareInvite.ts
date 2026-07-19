@@ -1,12 +1,13 @@
 import { formatPartyRole } from './signing'
 import { documentTypeUsesNotes, type RentalMetadata, type SealDocument } from './types'
+import { mimeForDocumentFile } from './pdf/documentKinds'
 
 export interface ShareInviteContent {
   subject: string
   title: string
   shareUrl: string
   pdfName: string
-  /** True when the invite is built as an .eml that already includes the PDF. */
+  /** True when the invite is built as an .eml that already includes the document file. */
   pdfAttached: boolean
   signed: number
   required: number
@@ -17,7 +18,7 @@ export interface ShareInviteContent {
 }
 
 export interface ShareInviteOptions {
-  /** When true, copy assumes the PDF is already attached (e.g. .eml package). */
+  /** When true, copy assumes the file is already attached (e.g. .eml package). */
   pdfAttached?: boolean
 }
 
@@ -74,7 +75,7 @@ export function buildShareInviteContent(
   const waitingOn = pendingPartyLabels(doc)
   const rentalLines = doc.type === 'rental' ? rentalDetailLines(doc.metadata as RentalMetadata) : []
   const detailLines = [...rentalLines, ...noteDetailLines(doc)]
-  const pdfName = doc.originalFilename ?? 'the agreement PDF'
+  const pdfName = doc.originalFilename ?? 'the agreement file'
 
   return {
     subject: `Please sign: ${doc.title}`,
@@ -117,29 +118,29 @@ export function buildShareEmailBody(
   const pdfSection = content.pdfAttached
     ? [
         '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-        '  AGREEMENT PDF (attached)',
+        '  AGREEMENT FILE (attached)',
         '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
         `This email includes the exact file to sign: ${content.pdfName}`,
         '',
-        'VeriLock never hosts your PDF. Keep this attachment with the signing link so the co-signer can verify the fingerprint locally.',
+        'VeriLock never hosts your file. Keep this attachment with the signing link so the co-signer can verify the fingerprint locally.',
       ]
     : downloadName
       ? [
           '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-          '  ATTACH THE PDF (required)',
+          '  ATTACH THE FILE (required)',
           '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
           `Attach this exact file (just downloaded to your computer): ${downloadName}`,
           '',
           'In Apple Mail: drag the file into this message, or use the paperclip button.',
-          'VeriLock never hosts your PDF. The signer must receive the same file you fingerprinted.',
+          'VeriLock never hosts your file. The signer must receive the same file you fingerprinted.',
         ]
       : [
           '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-          '  ATTACH THE PDF (required)',
+          '  ATTACH THE FILE (required)',
           '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
           `Attach this exact file to your email: ${content.pdfName}`,
           '',
-          'VeriLock never hosts your PDF. The signer must receive the same file you fingerprinted so they can verify it locally.',
+          'VeriLock never hosts your file. The signer must receive the same file you fingerprinted so they can verify it locally.',
         ]
 
   const lines = [
@@ -181,8 +182,8 @@ export function buildShareSheetText(
 ): string {
   const content = buildShareInviteContent(doc, shareUrl, options)
   const pdfLine = content.pdfAttached
-    ? `The agreement PDF (${content.pdfName}) is attached — use that exact file when you sign.`
-    : `You'll need the agreement PDF (${content.pdfName}) to verify the fingerprint.`
+    ? `The agreement file (${content.pdfName}) is attached — use that exact file when you sign.`
+    : `You'll need the agreement file (${content.pdfName}) to verify the fingerprint.`
 
   return [
     `Please sign "${content.title}" on VeriLock.`,
@@ -194,7 +195,7 @@ export function buildShareSheetText(
     'How to sign:',
     ...content.signingSteps.map((step, index) => `${index + 1}. ${step}`),
     '',
-    'VeriLock never hosts the PDF — it only travels with this share.',
+    'VeriLock never hosts the file — it only travels with this share.',
   ].join('\n')
 }
 
@@ -385,6 +386,7 @@ export async function buildShareEmlBlob(
   const body = buildShareEmailBody(doc, shareUrl, { pdfAttached: true })
   const pdfName = pdfFile.name || content.pdfName || 'agreement.pdf'
   const pdfBytes = new Uint8Array(await pdfFile.arrayBuffer())
+  const fileMime = mimeForDocumentFile(pdfFile)
   const boundary = `----=_VeriLock_${crypto.randomUUID().replace(/-/g, '')}`
   const recipients = options.recipients ?? []
   const messageId = `<verilock-invite-${crypto.randomUUID()}@local>`
@@ -415,7 +417,7 @@ export async function buildShareEmlBlob(
 
   const pdfPart = [
     `--${boundary}`,
-    `Content-Type: application/pdf; name="${pdfName.replace(/["\\]/g, '_')}"`,
+    `Content-Type: ${fileMime}; name="${pdfName.replace(/["\\]/g, '_')}"`,
     'Content-Transfer-Encoding: base64',
     `Content-Disposition: ${contentDispositionAttachment(pdfName)}`,
     '',
@@ -486,7 +488,7 @@ export function canShareFiles(files: File[]): boolean {
 }
 
 /**
- * Share the local PDF + short invite text via the OS share sheet.
+ * Share the local document file + short invite text via the OS share sheet.
  * Bytes never leave the device for VeriLock — only the app the user picks receives them.
  */
 export async function shareInviteWithPdf(
@@ -498,10 +500,10 @@ export async function shareInviteWithPdf(
   if (isDesktopMacWebShareUnreliable()) return 'unsupported'
 
   const pdfName = pdfFile.name || doc.originalFilename || 'agreement.pdf'
-  // Always materialize a named application/pdf File — some share targets ignore
+  // Always materialize a named File with explicit MIME — some share targets ignore
   // File/Blob objects without an explicit type or with empty names.
   const file = new File([pdfFile], pdfName, {
-    type: 'application/pdf',
+    type: mimeForDocumentFile(pdfFile),
     lastModified: pdfFile.lastModified || Date.now(),
   })
 

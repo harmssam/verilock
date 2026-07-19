@@ -81,7 +81,7 @@ export function SealCard({
                       : 'your signatures are safe — the last transaction never reached the blockchain.')
                   : interrupted
                     ? 'the last seal attempt did not finish. Try again.'
-                    : `approve one Nimiq transaction (${formatSealFeeSummary(pricing)}) to permanently record this document's fingerprint on-chain. Your PDF stays on your computer.`}
+                    : `approve one Nimiq transaction (${formatSealFeeSummary(pricing)}) to permanently record this document's fingerprint on-chain. Your file stays on your computer.`}
           </p>
           {!busy && !failedPrior && !interrupted && !insufficientFunds && pricing.promoActive && (
             <p className="seal-card-promo">

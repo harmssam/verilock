@@ -125,7 +125,7 @@ export async function clearCreatePdfDraft(): Promise<void> {
 /** Rebuild a File from a stored draft for React state. */
 export function fileFromCreatePdfDraft(draft: CreatePdfDraft): File {
   return new File([draft.blob], draft.fileName, {
-    type: draft.fileType || 'application/pdf',
+    type: draft.fileType || '',
     lastModified: draft.lastModified || Date.now(),
   })
 }
@@ -136,7 +136,7 @@ export function createPdfDraftFromFile(
 ): CreatePdfDraftInput {
   return {
     fileName: file.name,
-    fileType: file.type || 'application/pdf',
+    fileType: file.type || '',
     lastModified: file.lastModified,
     blob: file,
     ...meta,

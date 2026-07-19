@@ -10,6 +10,7 @@ import {
   isMobileDevice,
   isNimiqPayHost,
   launchNimiqPayMiniApp,
+  LOGIN_CANCELED_MESSAGE,
   peekHubRedirectInUrl,
   probeNimiqPay,
   setupHubRedirectHandlers,
@@ -86,6 +87,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
   >(null)
   const lockErrorRef = useRef<((err: Error) => Promise<void> | void) | null>(null)
   const deeplinkFallbackTimerRef = useRef<number | null>(null)
+  const loginCanceledTimerRef = useRef<number | null>(null)
 
   walletStatusRef.current = walletStatus
 
@@ -96,12 +98,31 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     }
   }, [])
 
+  const clearLoginCanceledTimer = useCallback(() => {
+    if (loginCanceledTimerRef.current != null) {
+      window.clearTimeout(loginCanceledTimerRef.current)
+      loginCanceledTimerRef.current = null
+    }
+  }, [])
+
+  /** Friendly banner; auto-clears after 5s (CSS fades the last second). */
+  const showLoginCanceled = useCallback(() => {
+    clearLoginCanceledTimer()
+    setWalletStatus(null)
+    setError(LOGIN_CANCELED_MESSAGE)
+    loginCanceledTimerRef.current = window.setTimeout(() => {
+      loginCanceledTimerRef.current = null
+      setError(prev => (prev === LOGIN_CANCELED_MESSAGE ? null : prev))
+    }, 5000)
+  }, [clearLoginCanceledTimer])
+
   const applySession = useCallback((sessionToken: string, addr: string) => {
+    clearLoginCanceledTimer()
     saveSession({ token: sessionToken, address: addr })
     setToken(sessionToken)
     setAddress(addr)
     setShowOpenInPay(false)
-  }, [])
+  }, [clearLoginCanceledTimer])
 
   const disconnect = useCallback(() => {
     clearSession()
@@ -203,7 +224,11 @@ export function useJourneyWallet(): UseJourneyWalletResult {
             clearSession()
             setToken(null)
             setAddress(null)
-            setError(err instanceof Error ? err.message : 'Hub login failed')
+            if (isHubCancelError(err)) {
+              showLoginCanceled()
+            } else {
+              setError(err instanceof Error ? err.message : 'Hub login failed')
+            }
           } finally {
             hubConnectInFlightRef.current = false
             setConnecting(false)
@@ -212,8 +237,12 @@ export function useJourneyWallet(): UseJourneyWalletResult {
         err => {
           hubConnectInFlightRef.current = false
           setConnecting(false)
-          setError(err.message)
-          setWalletStatus(null)
+          if (isHubCancelError(err)) {
+            showLoginCanceled()
+          } else {
+            setError(err.message)
+            setWalletStatus(null)
+          }
         },
         async lockResult => {
           const handler = lockCompleteRef.current
@@ -239,8 +268,15 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     return () => {
       cancelled = true
       clearDeeplinkFallbackTimer()
+      clearLoginCanceledTimer()
     }
-  }, [applySession, clearDeeplinkFallbackTimer, resetAbandonedHubRedirect])
+  }, [
+    applySession,
+    clearDeeplinkFallbackTimer,
+    clearLoginCanceledTimer,
+    resetAbandonedHubRedirect,
+    showLoginCanceled,
+  ])
 
   useEffect(() => {
     const onPageShow = () => {
@@ -277,6 +313,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
       }
 
       setConnecting(true)
+      clearLoginCanceledTimer()
       setError(null)
       setWalletStatus(null)
       setShowOpenInPay(false)
@@ -362,9 +399,8 @@ export function useJourneyWallet(): UseJourneyWalletResult {
           return
         }
         if (isHubCancelError(err)) {
-          setError(null)
-          setWalletStatus('Login cancelled in Hub.')
           hubConnectInFlightRef.current = false
+          showLoginCanceled()
           return
         }
         hubConnectInFlightRef.current = false
@@ -376,7 +412,13 @@ export function useJourneyWallet(): UseJourneyWalletResult {
         }
       }
     },
-    [applySession, clearDeeplinkFallbackTimer, scheduleDeeplinkFallback],
+    [
+      applySession,
+      clearDeeplinkFallbackTimer,
+      clearLoginCanceledTimer,
+      scheduleDeeplinkFallback,
+      showLoginCanceled,
+    ],
   )
 
   const account = address ? toJourneyAccount(address) : null

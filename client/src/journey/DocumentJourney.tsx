@@ -32,7 +32,9 @@ import {
   MAX_SUPPORT_EMAIL_LENGTH,
   MAX_TITLE_LENGTH,
 } from '../fieldLimits'
-import { getPdfPageCount, sha256Hex, shortHash } from '../pdf/hashPdf'
+import { stripDocumentExtension } from '../pdf/documentKinds'
+import { getDocumentPageCount } from '../pdf/documentSurface'
+import { sha256Hex, shortHash } from '../pdf/hashPdf'
 import { prepareSignatureImageUpload } from '../signatureImage'
 import { isMobileDevice } from '../nimiq'
 import { SealPricingDisplay } from '../SealPricingDisplay'
@@ -76,6 +78,7 @@ import {
 } from './journeySeal'
 import { formatFileSize } from './PdfDropZone'
 import { SignaturePad } from './SignaturePad'
+import { SignOnMobileModal, isLikelyMobileViewport } from './SignOnMobileModal'
 import { StageRail } from './StageRail'
 import { PlacementEditor } from '../pdf/PlacementEditor'
 import { SignerFillView, type SignerFillResult } from '../pdf/SignerFillView'
@@ -211,6 +214,8 @@ export function DocumentJourney({
   const [signerName, setSignerName] = useState('')
   const [sigBlob, setSigBlob] = useState<Blob | null>(null)
   const [sigPadKey, setSigPadKey] = useState(0)
+  const [signOnMobileOpen, setSignOnMobileOpen] = useState(false)
+  const [mobileSigPreview, setMobileSigPreview] = useState<string | null>(null)
   /** Construction placements (Arrange step) — empty slots until lock; then immutable. */
   const [constructionPlan, setConstructionPlan] = useState<ConstructionPlan | null>(null)
   /** idle → loading → ready (has plan) | none (404 / no plan). Avoids draft-seed race. */
@@ -658,18 +663,18 @@ export function DocumentJourney({
       try {
         const buffer = await pdfFile.arrayBuffer()
         const hash = await sha256Hex(buffer)
-        const pages = await getPdfPageCount(pdfFile)
+        const pages = await getDocumentPageCount(pdfFile)
         if (cancelled) return
         setPdfHash(hash)
         setPageCount(pages)
         setTitle(prev =>
           (prev ?? '').trim()
             ? prev
-            : clampField(pdfFile.name.replace(/\.pdf$/i, ''), MAX_TITLE_LENGTH),
+            : clampField(stripDocumentExtension(pdfFile.name), MAX_TITLE_LENGTH),
         )
       } catch (err) {
         if (!cancelled) {
-          setLocalError(err instanceof Error ? err.message : 'Failed to read PDF')
+          setLocalError(err instanceof Error ? err.message : 'Failed to read document')
           setPdfHash(null)
         }
       }
@@ -752,7 +757,7 @@ export function DocumentJourney({
         if (hash !== doc.fingerprint) {
           setSignHash(null)
           setLocalError(
-            'This PDF does not match the agreement fingerprint. Use the exact file the creator shared.',
+            'This file does not match the agreement fingerprint. Use the exact file the creator shared.',
           )
           return
         }
@@ -760,7 +765,7 @@ export function DocumentJourney({
         setSignHash(hash)
       } catch (err) {
         if (!cancelled) {
-          setLocalError(err instanceof Error ? err.message : 'Failed to read PDF')
+          setLocalError(err instanceof Error ? err.message : 'Failed to read document')
           setSignHash(null)
         }
       }
@@ -1009,7 +1014,7 @@ export function DocumentJourney({
           : undefined
 
       const { document, hashWarning } = await api.createDocument(token, {
-        title: clampField(title || pdfFile.name.replace(/\.pdf$/i, ''), MAX_TITLE_LENGTH),
+        title: clampField(title || stripDocumentExtension(pdfFile.name), MAX_TITLE_LENGTH),
         originalFileName: pdfFile.name,
         type: docType,
         creatorRole: 'creator',
@@ -1250,7 +1255,7 @@ export function DocumentJourney({
         throw new Error('Missing session or locked plan')
       }
       const hash = (pdfHash || signHash || doc.fingerprint || '').toLowerCase()
-      if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error('PDF fingerprint missing')
+      if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error('Document fingerprint missing')
 
       setFillBusy(true)
       try {
@@ -1349,7 +1354,7 @@ export function DocumentJourney({
     if (!token || !doc || !constructionPlan) return
     const hash = (pdfHash || signHash || doc.fingerprint || constructionPlan.pdfSha256).toLowerCase()
     if (!/^[a-f0-9]{64}$/.test(hash)) {
-      setLocalError('PDF fingerprint missing — re-open the PDF.')
+      setLocalError('Document fingerprint missing — re-open the file.')
       return
     }
     if (constructionPlan.slots.length === 0) {
@@ -1579,6 +1584,10 @@ export function DocumentJourney({
       setSignerName('')
       setSigBlob(null)
       setSigPadKey(k => k + 1)
+      if (mobileSigPreview) {
+        URL.revokeObjectURL(mobileSigPreview)
+        setMobileSigPreview(null)
+      }
       if (signedDoc.signingProgress.readyToLock) {
         // Only the creator seals — co-signers should not be told to continue to seal.
         const solo = signedDoc.signingProgress.required <= 1
@@ -1925,7 +1934,7 @@ export function DocumentJourney({
                     ? (activeStage?.blurb ??
                       'Your signature is recorded. When everyone has signed, the agreement is sealed on Nimiq.')
                     : step === 'done'
-                      ? 'Keep your PDF. Drop a copy below anytime to verify the fingerprint.'
+                      ? 'Keep your file. Drop a copy below anytime to verify the fingerprint.'
                       : activeStage?.blurb}
                 </p>
               </div>
@@ -2107,7 +2116,7 @@ export function DocumentJourney({
                   )}
                   {!account && (
                     <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                      Login with Nimiq when you are ready to register the fingerprint. Your PDF
+                      Login with Nimiq when you are ready to register the fingerprint. Your file
                       never leaves this device.
                     </p>
                   )}
@@ -2173,7 +2182,7 @@ export function DocumentJourney({
                               const h = await sha256Hex(buf)
                               if (h !== doc.fingerprint) {
                                 setLocalError(
-                                  'That file does not match this agreement fingerprint. Use the same PDF you created with.',
+                                  'That file does not match this agreement fingerprint. Use the same file you created with.',
                                 )
                                 return
                               }
@@ -2675,7 +2684,7 @@ export function DocumentJourney({
                   {!doc && role === 'signer' && (
                     <>
                       <p className="muted" style={{ margin: 0 }}>
-                        Drop the PDF the creator shared. We match its fingerprint to the
+                        Drop the file the creator shared. We match its fingerprint to the
                         agreement (or open the invite link they sent you).
                       </p>
                       <DocumentStage
@@ -2854,9 +2863,9 @@ export function DocumentJourney({
                                 <div className="sign-upload-callout" role="status">
                                   <Upload size={18} strokeWidth={2.25} aria-hidden />
                                   <div>
-                                    <strong>Upload your copy of the PDF</strong>
+                                    <strong>Upload your copy of the file</strong>
                                     <p className="muted" style={{ margin: '0.2rem 0 0' }}>
-                                      Drop the same PDF from your computer so we can verify the
+                                      Drop the same file from your computer so we can verify the
                                       document is identical. Required after leaving and returning
                                       to this agreement.
                                     </p>
@@ -2882,7 +2891,7 @@ export function DocumentJourney({
 
                               {signFile && !signFileMatches && !hasVerifiedLocalPdf && (
                                 <div className="result-banner result-banner--bad">
-                                  PDF doesn&apos;t match the fingerprinted file (
+                                  File doesn&apos;t match the fingerprinted file (
                                   <strong>{doc.fileName}</strong>). Drop the same document.
                                 </div>
                               )}
@@ -2896,7 +2905,7 @@ export function DocumentJourney({
                                       size={16}
                                       strokeWidth={2.5}
                                     />
-                                    Loading placement layout for this PDF…
+                                    Loading placement layout for this document…
                                   </div>
                                 )}
 
@@ -2969,16 +2978,70 @@ export function DocumentJourney({
 
                                   {/* Only show free pad if we didn't already capture ink on the PDF */}
                                   {!sigBlob && (
-                                    <SignaturePad
-                                      key={sigPadKey}
-                                      onChange={setSigBlob}
-                                      disabled={busy}
-                                    />
+                                    <>
+                                      <SignaturePad
+                                        key={sigPadKey}
+                                        onChange={setSigBlob}
+                                        disabled={busy}
+                                      />
+                                      {FEATURES.signOnMobile &&
+                                        token &&
+                                        !isLikelyMobileViewport() && (
+                                          <button
+                                            type="button"
+                                            className="btn btn-secondary sig-on-mobile-btn"
+                                            disabled={busy}
+                                            onClick={() => setSignOnMobileOpen(true)}
+                                          >
+                                            Sign on mobile
+                                          </button>
+                                        )}
+                                    </>
                                   )}
-                                  {sigBlob && pageFieldsDone && pageFieldsRequired && (
+                                  {sigBlob && mobileSigPreview && (
+                                    <div className="sig-mobile-applied">
+                                      <img
+                                        className="sig-mobile-applied-img"
+                                        src={mobileSigPreview}
+                                        alt="Signature from mobile"
+                                      />
+                                      <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                                        Signature from your phone. Continue with wallet sign below.
+                                      </p>
+                                      <button
+                                        type="button"
+                                        className="btn btn-ghost btn-sm"
+                                        disabled={busy}
+                                        onClick={() => {
+                                          setSigBlob(null)
+                                          if (mobileSigPreview) URL.revokeObjectURL(mobileSigPreview)
+                                          setMobileSigPreview(null)
+                                          setSigPadKey(k => k + 1)
+                                        }}
+                                      >
+                                        Clear &amp; redraw
+                                      </button>
+                                    </div>
+                                  )}
+                                  {sigBlob && pageFieldsDone && pageFieldsRequired && !mobileSigPreview && (
                                     <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
                                       Using the signature you drew on the PDF for wallet bind.
                                     </p>
+                                  )}
+
+                                  {FEATURES.signOnMobile && token && (
+                                    <SignOnMobileModal
+                                      open={signOnMobileOpen}
+                                      token={token}
+                                      documentId={doc.id}
+                                      onClose={() => setSignOnMobileOpen(false)}
+                                      onSignature={blob => {
+                                        setSigBlob(blob)
+                                        if (mobileSigPreview) URL.revokeObjectURL(mobileSigPreview)
+                                        setMobileSigPreview(URL.createObjectURL(blob))
+                                        setSignOnMobileOpen(false)
+                                      }}
+                                    />
                                   )}
 
                                   <button
@@ -3153,7 +3216,7 @@ export function DocumentJourney({
                           {doc.sealed ? (
                             <>
                               {pdfFile || signFile ? (
-                                <>Use <strong>Verify this PDF</strong> to open the verify path with your file already loaded.</>
+                                <>Use <strong>Verify this file</strong> to open the verify path with your file already loaded.</>
                               ) : (
                                 <>
                                   Drop any copy of <em>{doc.fileName}</em> to check integrity.
@@ -3198,7 +3261,7 @@ export function DocumentJourney({
                       onClick={openVerifyWithLocalPdf}
                     >
                       <ShieldCheck size={15} strokeWidth={2.25} />
-                      {pdfFile || signFile ? 'Verify this PDF' : 'Go to verify'}
+                      {pdfFile || signFile ? 'Verify this file' : 'Go to verify'}
                     </button>
                   )}
 
@@ -3225,7 +3288,7 @@ export function DocumentJourney({
                   />
 
                   <p className="muted" style={{ margin: 0 }}>
-                    We hash the PDF locally, then look up sealed fingerprints on the server.
+                    We hash the file locally, then look up sealed fingerprints on the server.
                   </p>
 
                   {verifyOutcome.kind === 'hashing' && (

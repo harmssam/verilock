@@ -644,6 +644,27 @@ a.exp-account-menu-full:focus-visible {
   color: var(--coral);
 }
 
+/* Login canceled (and similar): stay visible ~4s, fade last second, then unmount. */
+.exp-status--ephemeral {
+  animation: exp-status-ephemeral 5s ease forwards;
+}
+
+@keyframes exp-status-ephemeral {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exp-status--ephemeral {
+    animation: none;
+  }
+}
+
 .exp-footer {
   display: flex;
   flex-direction: column;
@@ -2615,6 +2636,12 @@ a.hash-chip.text-link:focus-visible {
   font-size: 0.74rem !important;
 }
 
+.sig-pad-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
 .sig-pad-canvas {
   width: 100%;
   height: 140px;
@@ -2624,6 +2651,151 @@ a.hash-chip.text-link:focus-visible {
   cursor: crosshair;
   touch-action: none;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.sig-on-mobile-btn {
+  width: 100%;
+  margin-top: 0.15rem;
+}
+
+.sig-mobile-applied {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: #fff;
+}
+
+.sig-mobile-applied-img {
+  width: 100%;
+  max-height: 100px;
+  object-fit: contain;
+  background: #f8fafc;
+  border-radius: 6px;
+}
+
+/* Sign-on-mobile modal (portaled; reuses login-sheet layer) */
+.sig-mobile-modal {
+  width: min(22rem, 100%);
+  max-height: min(90dvh, 40rem);
+  overflow-y: auto;
+  background: #fff !important;
+  color: var(--text, #0f172a);
+  border-color: rgba(148, 163, 184, 0.35) !important;
+  box-shadow:
+    0 18px 48px rgba(15, 23, 42, 0.14),
+    0 0 0 1px rgba(148, 163, 184, 0.08) !important;
+}
+
+.sig-mobile-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sig-mobile-modal-title {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.sig-mobile-close {
+  padding: 0.3rem !important;
+  min-width: 0;
+}
+
+.sig-mobile-modal-lead {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.sig-mobile-qr-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 0.35rem 0;
+}
+
+.sig-mobile-qr {
+  width: 220px;
+  height: 220px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: #fff;
+}
+
+.sig-mobile-qr-placeholder {
+  width: 220px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+  background: #f8fafc;
+}
+
+.sig-mobile-preview-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 0.25rem 0;
+}
+
+.sig-mobile-preview {
+  width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 0.5rem;
+}
+
+.sig-mobile-status {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.sig-mobile-status--error {
+  color: #b91c1c;
+}
+
+.sig-mobile-expires {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.sig-mobile-link-row,
+.sig-mobile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sig-mobile-actions .btn {
+  flex: 1 1 auto;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .sig-pad-canvas:active {

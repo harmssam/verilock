@@ -1,5 +1,6 @@
 import { FileText, FolderOpen } from 'lucide-react'
 import { useId, useRef } from 'react'
+import { DOCUMENT_ACCEPT, DOCUMENT_FORMATS_LABEL } from './pdf/documentKinds'
 
 interface FilePickerProps {
   accept?: string
@@ -10,9 +11,9 @@ interface FilePickerProps {
 }
 
 export function FilePicker({
-  accept,
+  accept = DOCUMENT_ACCEPT,
   disabled,
-  emptyLabel = 'Load PDF',
+  emptyLabel = 'Load document',
   file,
   onChange,
 }: FilePickerProps) {
@@ -62,11 +63,11 @@ export function FilePicker({
             </button>
           </div>
         ) : (
-          <span className="file-picker-hint muted">PDF only</span>
+          <span className="file-picker-hint muted">{DOCUMENT_FORMATS_LABEL}</span>
         )}
       </div>
       <p className="file-picker-privacy muted" role="note">
-        Your PDF never leaves your computer — only the fingerprint is saved on our servers.
+        Your file never leaves your computer — only the fingerprint is saved on our servers.
       </p>
     </div>
   )

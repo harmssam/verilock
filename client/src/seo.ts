@@ -14,39 +14,39 @@ const TITLE_SUFFIX = ` · ${SITE_NAME}`
 
 export const PAGE_META = {
   home: {
-    title: `${SITE_NAME} — Sign PDFs & Seal Document Hashes on Nimiq`,
+    title: `${SITE_NAME} — Sign Documents & Seal Hashes on Nimiq`,
     description:
-      'Sign PDF agreements together and permanently anchor document fingerprints on the Nimiq blockchain. Your PDF never leaves your device — verify integrity anytime without a wallet.',
+      'Sign PDF or image agreements together and permanently anchor document fingerprints on the Nimiq blockchain. Your file never leaves your device — verify integrity anytime without a wallet.',
     path: '/',
   },
   pricing: {
     title: `Pricing${TITLE_SUFFIX}`,
     description:
-      'One flat Nimiq seal fee locks your signed PDF fingerprint on-chain forever. Your document stays on your device — only its SHA-256 hash is recorded.',
+      'One flat Nimiq seal fee locks your signed document fingerprint on-chain forever. Your file stays on your device — only its SHA-256 hash is recorded.',
     path: '/pricing',
   },
   privacy: {
     title: `Privacy Policy${TITLE_SUFFIX}`,
     description:
-      'How VeriLock handles your data: PDFs stay on your device, only document fingerprints and signing metadata are stored, and sealed hashes remain public on Nimiq.',
+      'How VeriLock handles your data: files stay on your device, only document fingerprints and signing metadata are stored, and sealed hashes remain public on Nimiq.',
     path: '/privacy',
   },
   security: {
     title: `Security & Integrity${TITLE_SUFFIX}`,
     description:
-      'How VeriLock protects PDFs: local SHA-256 fingerprinting, wallet identity, on-chain hash seals on Nimiq, and verification without uploading your file. No invented certifications.',
+      'How VeriLock protects documents: local SHA-256 fingerprinting, wallet identity, on-chain hash seals on Nimiq, and verification without uploading your file. No invented certifications.',
     path: '/security',
   },
   support: {
     title: `Support${TITLE_SUFFIX}`,
     description:
-      'Contact VeriLock support about signing, sealing, verification, or billing. Your PDF stays on your device — describe the issue without attaching files.',
+      'Contact VeriLock support about signing, sealing, verification, or billing. Your file stays on your device — describe the issue without attaching files.',
     path: '/support',
   },
   verify: {
     title: `Verify a Document${TITLE_SUFFIX}`,
     description:
-      'Check whether a PDF matches a sealed VeriLock agreement. Fingerprint your file locally in the browser — no wallet required.',
+      'Check whether a PDF or image matches a sealed VeriLock agreement. Fingerprint your file locally in the browser — no wallet required.',
     path: '/',
   },
   agreements: {
@@ -57,7 +57,7 @@ export const PAGE_META = {
   },
   create: {
     title: `New Agreement${TITLE_SUFFIX}`,
-    description: 'Fingerprint a PDF and start a multi-party signing workflow on VeriLock.',
+    description: 'Fingerprint a document and start a multi-party signing workflow on VeriLock.',
     path: '/',
     noindex: true,
   },

@@ -1,10 +1,9 @@
 /**
- * DocuSign-style signing: the PDF is the surface. Click your highlighted fields
- * to open a modal (stay on the page preview); ink is reused across signature boxes.
+ * DocuSign-style signing: the document (PDF or image) is the surface.
+ * Click your highlighted fields to open a modal; ink is reused across signature boxes.
  */
 import { Check, ChevronLeft, ChevronRight, PenLine, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { PDFDocumentProxy } from 'pdfjs-dist'
 import {
   type BlobPayload,
   type ConstructionPlan,
@@ -17,7 +16,7 @@ import {
   paintSignaturePath,
   type SignaturePathData,
 } from './annotations'
-import { loadPdfFromFile, renderPageToCanvas } from './pdfDocument'
+import { loadDocumentSurface, type DocumentSurface } from './documentSurface'
 import {
   SignatureStrokePad,
   type SignatureStrokeResult,
@@ -80,7 +79,8 @@ export function SignerFillView({
 }: SignerFillViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const modalPanelRef = useRef<HTMLDivElement>(null)
-  const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
+  const surfaceRef = useRef<DocumentSurface | null>(null)
+  const [surface, setSurface] = useState<DocumentSurface | null>(null)
   const [pageCount, setPageCount] = useState(1)
   const [pageNumber, setPageNumber] = useState(1)
   const [cssSize, setCssSize] = useState({ width: pageWidth, height: pageWidth * 1.3 })
@@ -173,17 +173,19 @@ export function SignerFillView({
     let cancelled = false
     setLoading(true)
     setLoadError(null)
-    loadPdfFromFile(file)
-      .then(pdf => {
+    loadDocumentSurface(file)
+      .then(next => {
         if (cancelled) {
-          void pdf.destroy()
+          next.destroy()
           return
         }
-        setDoc(pdf)
-        setPageCount(pdf.numPages)
+        surfaceRef.current?.destroy()
+        surfaceRef.current = next
+        setSurface(next)
+        setPageCount(next.pageCount)
       })
       .catch(err => {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Could not open PDF')
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Could not open document')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -194,10 +196,18 @@ export function SignerFillView({
   }, [file])
 
   useEffect(() => {
-    if (!doc || !canvasRef.current) return
+    return () => {
+      surfaceRef.current?.destroy()
+      surfaceRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!surface || !canvasRef.current) return
     let cancelled = false
     const canvas = canvasRef.current
-    renderPageToCanvas(doc, pageNumber, pageWidth, canvas)
+    surface
+      .renderPage(pageNumber, pageWidth, canvas)
       .then(rendered => {
         if (cancelled) return
         setCssSize({ width: rendered.cssWidth, height: rendered.cssHeight })
@@ -208,7 +218,7 @@ export function SignerFillView({
     return () => {
       cancelled = true
     }
-  }, [doc, pageNumber, pageWidth])
+  }, [surface, pageNumber, pageWidth])
 
   // Lock background scroll while modal is open
   useEffect(() => {
@@ -564,25 +574,29 @@ export function SignerFillView({
       ) : null}
 
       <div className="signer-fill-toolbar">
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={pageNumber <= 1}
-          onClick={() => setPageNumber(p => Math.max(1, p - 1))}
-        >
-          <ChevronLeft size={16} aria-hidden /> Prev
-        </button>
-        <span className="signer-fill-page-label">
-          Page {pageNumber} / {pageCount}
-        </span>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={pageNumber >= pageCount}
-          onClick={() => setPageNumber(p => Math.min(pageCount, p + 1))}
-        >
-          Next <ChevronRight size={16} aria-hidden />
-        </button>
+        {pageCount > 1 && (
+          <>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={pageNumber <= 1}
+              onClick={() => setPageNumber(p => Math.max(1, p - 1))}
+            >
+              <ChevronLeft size={16} aria-hidden /> Prev
+            </button>
+            <span className="signer-fill-page-label">
+              Page {pageNumber} / {pageCount}
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={pageNumber >= pageCount}
+              onClick={() => setPageNumber(p => Math.min(pageCount, p + 1))}
+            >
+              Next <ChevronRight size={16} aria-hidden />
+            </button>
+          </>
+        )}
         {nextHint && (
           <button
             type="button"
@@ -596,7 +610,7 @@ export function SignerFillView({
 
       <div className="signer-fill-stage-wrap">
         <div className="pdf-annotator-stage signer-fill-stage">
-          {loading && <p className="pdf-annotator-hint">Loading PDF…</p>}
+          {loading && <p className="pdf-annotator-hint">Loading document…</p>}
           {loadError && <p className="pdf-annotator-hint">{loadError}</p>}
           <div className="pdf-annotator-page-wrap" style={{ width: cssSize.width }}>
             <canvas ref={canvasRef} />

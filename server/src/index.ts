@@ -89,6 +89,7 @@ import { getWalletBalanceLuna } from './nimiq-rpc.js'
 import { getMinimumSealBalanceLuna, getSealPricing, hasSufficientSealBalance } from './sealPricing.js'
 import { startSessionCleanup } from './session-cleanup.js'
 import { attachLocalStudios } from './localStudios.js'
+import * as sigHandoff from './sigHandoff.js'
 
 assertSafeBootConfig()
 
@@ -1244,6 +1245,199 @@ app.post('/api/verify/hash', verifyHashLimit, (req, res) => {
   }))
   res.json({ matches })
 })
+
+// ── Cross-device signature ink handoff (signaling + encrypted deposit only) ──
+const sigHandoffLimit = rateLimit(60, 60_000)
+const sigHandoffCreateLimit = rateLimit(20, 60_000)
+
+app.post(
+  '/api/sig-handoff',
+  sigHandoffCreateLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  (req, res) => {
+    const address = res.locals.address as string
+    const { documentId } = (req.body ?? {}) as { documentId?: string }
+    try {
+      const room = sigHandoff.createRoom(address, documentId)
+      res.status(201).json({
+        sessionId: room.id,
+        expiresAt: room.expiresAt,
+        status: room.status,
+      })
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : 'Could not create session' })
+    }
+  },
+)
+
+app.get('/api/sig-handoff/:id', sigHandoffLimit, (req, res) => {
+  try {
+    const room = sigHandoff.getRoom(routeParam(req.params.id))
+    if (!room) {
+      res.status(404).json({ error: 'Session not found' })
+      return
+    }
+    res.json({
+      sessionId: room.id,
+      status: room.status,
+      expiresAt: room.expiresAt,
+      hasDeposit: room.hasDeposit && !room.depositConsumed,
+    })
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : 'Lookup failed' })
+  }
+})
+
+app.post('/api/sig-handoff/:id/signal', sigHandoffLimit, (req, res) => {
+  const { from, type, payload } = (req.body ?? {}) as {
+    from?: 'host' | 'guest'
+    type?: string
+    payload?: unknown
+  }
+  if (from !== 'host' && from !== 'guest') {
+    res.status(400).json({ error: 'from must be host or guest' })
+    return
+  }
+  if (!type || typeof type !== 'string') {
+    res.status(400).json({ error: 'type required' })
+    return
+  }
+  // Host signals may be sent with wallet session; guest uses knowledge of session id only.
+  if (from === 'host') {
+    const token = req.headers.authorization?.replace('Bearer ', '')
+    const session = token ? getSession(token) : null
+    if (!session) {
+      res.status(401).json({ error: 'Host signals require a wallet session' })
+      return
+    }
+    const room = sigHandoff.getRoom(routeParam(req.params.id))
+    if (!room || normalizeAddress(room.creatorAddress) !== normalizeAddress(session.address)) {
+      res.status(403).json({ error: 'Not the host of this session' })
+      return
+    }
+  }
+  try {
+    const msg = sigHandoff.postSignal(routeParam(req.params.id), from, type, payload)
+    res.json({ ok: true, id: msg.id })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Signal failed'
+    const status = message === 'Session not found' ? 404 : 400
+    res.status(status).json({ error: message })
+  }
+})
+
+app.get('/api/sig-handoff/:id/signal', sigHandoffLimit, (req, res) => {
+  const afterRaw = req.query.after
+  const after = typeof afterRaw === 'string' ? Number(afterRaw) : 0
+  const afterId = Number.isFinite(after) && after >= 0 ? Math.floor(after) : 0
+  try {
+    const { room, messages } = sigHandoff.pullSignals(routeParam(req.params.id), afterId)
+    res.json({
+      status: room.status,
+      expiresAt: room.expiresAt,
+      hasDeposit: room.hasDeposit && !room.depositConsumed,
+      messages: messages.map(m => ({
+        id: m.id,
+        from: m.fromRole,
+        type: m.msgType,
+        payload: m.payload,
+        createdAt: m.createdAt,
+      })),
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Poll failed'
+    res.status(message === 'Session not found' ? 404 : 400).json({ error: message })
+  }
+})
+
+app.post('/api/sig-handoff/:id/deposit', sigHandoffLimit, (req, res) => {
+  const { iv, ciphertext, alg } = (req.body ?? {}) as {
+    iv?: string
+    ciphertext?: string
+    alg?: string
+  }
+  if (!iv || !ciphertext) {
+    res.status(400).json({ error: 'iv and ciphertext required' })
+    return
+  }
+  if (alg && alg !== 'A256GCM') {
+    res.status(400).json({ error: 'Only A256GCM is supported' })
+    return
+  }
+  try {
+    sigHandoff.depositCiphertext(routeParam(req.params.id), iv, ciphertext)
+    res.json({ ok: true })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Deposit failed'
+    const status = message === 'Session not found' ? 404 : 400
+    res.status(status).json({ error: message })
+  }
+})
+
+app.get(
+  '/api/sig-handoff/:id/deposit',
+  sigHandoffLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  (req, res) => {
+    const address = res.locals.address as string
+    try {
+      const deposit = sigHandoff.takeDeposit(routeParam(req.params.id), address)
+      if (!deposit) {
+        res.status(404).json({ error: 'No deposit available' })
+        return
+      }
+      res.json(deposit)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Retrieve failed'
+      const status =
+        message.includes('host') ? 403 : message === 'Session not found' ? 404 : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
+
+app.post(
+  '/api/sig-handoff/:id/complete',
+  sigHandoffLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  (req, res) => {
+    const address = res.locals.address as string
+    try {
+      sigHandoff.completeRoom(routeParam(req.params.id), address)
+      res.json({ ok: true })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Complete failed'
+      const status =
+        message.includes('host') ? 403 : message === 'Session not found' ? 404 : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
+
+app.delete(
+  '/api/sig-handoff/:id',
+  sigHandoffLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  (req, res) => {
+    const address = res.locals.address as string
+    try {
+      const ok = sigHandoff.cancelRoom(routeParam(req.params.id), address)
+      if (!ok) {
+        res.status(404).json({ error: 'Session not found' })
+        return
+      }
+      res.json({ ok: true })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Cancel failed'
+      const status = message.includes('host') ? 403 : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
 
 startAttestationPoller()
 startSessionCleanup()

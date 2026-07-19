@@ -1,6 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, Copy, Download, Mail, Paperclip, Share2, X } from 'lucide-react'
+import {
+  DOCUMENT_ACCEPT,
+  isSupportedDocumentFile,
+  unsupportedDocumentMessage,
+} from './pdf/documentKinds'
 import { sha256Hex } from './pdf/hashPdf'
 import { ShareEmailPreview } from './ShareEmailPreview'
 import {
@@ -38,7 +43,7 @@ interface ShareInviteCardProps {
    */
   onCopyLink: () => void | boolean | Promise<void | boolean>
   /**
-   * Local PDF still in memory (create/share session).
+   * Local document still in memory (create/share session).
    * When set, user can share or package the file — never uploaded.
    */
   pdfFile?: File | null
@@ -48,12 +53,6 @@ interface ShareInviteCardProps {
    */
   inviteRecipients?: string[]
   embedded?: boolean
-}
-
-function isPdfFile(file: File): boolean {
-  const name = file.name.toLowerCase()
-  if (name.endsWith('.pdf')) return true
-  return file.type === 'application/pdf' || file.type === 'application/x-pdf'
 }
 
 function isAbortError(err: unknown): boolean {
@@ -102,7 +101,7 @@ function instructionItems(
     if (kind === 'web-share') {
       items.push(
         <li key="web-share">
-          {plan.isMobile ? 'Tap' : 'Use'} <strong>Share PDF + invite</strong> and pick Mail,
+          {plan.isMobile ? 'Tap' : 'Use'} <strong>Share file + invite</strong> and pick Mail,
           Messages, or another app
         </li>,
       )
@@ -112,7 +111,7 @@ function instructionItems(
           {kinds[0] === 'web-share' ? (
             <>
               Or use <strong>Open in Mail</strong> under More (fills To from invite email above)
-              and attach the downloaded PDF
+              and attach the downloaded file
             </>
           ) : (
             <>
@@ -137,15 +136,15 @@ function instructionItems(
         </li>,
       )
     } else {
-      items.push(<li key="generic">Send the link and the PDF file together</li>)
+      items.push(<li key="generic">Send the link and the document file together</li>)
     }
   }
   items.push(
     <li key="wallet">Signer opens the link and connects a Nimiq wallet</li>,
     <li key="pdf-match">
       {plan.isMobile
-        ? 'They use the same PDF to verify it matches'
-        : 'They use that PDF to verify it matches'}
+        ? 'They use the same file to verify it matches'
+        : 'They use that file to verify it matches'}
     </li>,
   )
   return items
@@ -246,8 +245,8 @@ export function ShareInviteCard({
     const file = fileList?.[0]
     if (!file) return
     setPickError(null)
-    if (!isPdfFile(file)) {
-      setPickError('Please choose a PDF file.')
+    if (!isSupportedDocumentFile(file)) {
+      setPickError(unsupportedDocumentMessage() + '.')
       return
     }
     setPickBusy(true)
@@ -256,14 +255,14 @@ export function ShareInviteCard({
       if (hash !== document.originalSha256) {
         setPickedPdf(null)
         setPickError(
-          'That PDF does not match this agreement’s fingerprint. Use the exact file you sealed.',
+          'That file does not match this agreement’s fingerprint. Use the exact file you sealed.',
         )
         return
       }
       setPickedPdf(file)
     } catch (err) {
       setPickedPdf(null)
-      setPickError(err instanceof Error ? err.message : 'Could not read that PDF.')
+      setPickError(err instanceof Error ? err.message : 'Could not read that file.')
     } finally {
       setPickBusy(false)
     }
@@ -286,7 +285,7 @@ export function ShareInviteCard({
             ? 'Download .eml package'
             : 'Open in Mail'
         setShareError(
-          `Sharing isn’t available here. Use “${fallback}” instead — the PDF never leaves this device for VeriLock.`,
+          `Sharing isn’t available here. Use “${fallback}” instead — the file never leaves this device for VeriLock.`,
         )
         setWebShareOk(false)
       }
@@ -421,7 +420,7 @@ export function ShareInviteCard({
           onClick={() => void onWebShare()}
         >
           <Share2 size={16} strokeWidth={2.25} aria-hidden />
-          {shareBusy ? 'Opening share…' : shareReady ? 'Shared' : 'Share PDF + invite'}
+          {shareBusy ? 'Opening share…' : shareReady ? 'Shared' : 'Share file + invite'}
         </button>
       )
     }
@@ -438,7 +437,7 @@ export function ShareInviteCard({
           {mailBusy
             ? 'Opening Mail…'
             : mailReady
-              ? 'Mail opened — attach PDF'
+              ? 'Mail opened — attach file'
               : 'Open in Mail'}
         </button>
       )
@@ -514,20 +513,20 @@ export function ShareInviteCard({
                 The signing link is on your clipboard. Paste it into Messages, email, or chat.
               </p>
               <p className="share-copy-modal-body share-copy-modal-body--emphasis">
-                You also need to send the agreement PDF
+                You also need to send the agreement file
                 {canPackEml ? (
                   <>
                     {' '}
                     (<span className="share-pdf-name">{pdfName}</span>)
                   </>
                 ) : null}
-                . VeriLock never hosts the file — co-signers use that exact PDF to verify the
+                . VeriLock never hosts the file — co-signers use that exact file to verify the
                 fingerprint matches.
               </p>
               <ul className="share-copy-modal-steps">
                 <li>Paste the link for your co-signer</li>
-                <li>Send the same PDF file with it (attachment or separate share)</li>
-                <li>They open the link, connect a Nimiq wallet, and choose that PDF</li>
+                <li>Send the same file with it (attachment or separate share)</li>
+                <li>They open the link, connect a Nimiq wallet, and choose that file</li>
               </ul>
               <div className="share-copy-modal-actions">
                 {canPackEml && localPdf && (
@@ -537,7 +536,7 @@ export function ShareInviteCard({
                     onClick={downloadPdfForShare}
                   >
                     <Download size={16} strokeWidth={2.25} aria-hidden />
-                    Download PDF to attach
+                    Download file to attach
                   </button>
                 )}
                 <button
@@ -619,11 +618,11 @@ export function ShareInviteCard({
             className={`btn btn-primary share-eml-btn share-eml-pick${pickBusy ? ' btn--busy' : ''}`}
           >
             <Paperclip size={16} strokeWidth={2.25} aria-hidden />
-            {pickBusy ? 'Checking PDF…' : 'Choose PDF to share'}
+            {pickBusy ? 'Checking file…' : 'Choose file to share'}
             <input
               id={pickId}
               type="file"
-              accept="application/pdf,.pdf"
+              accept={DOCUMENT_ACCEPT}
               className="share-eml-file-input"
               disabled={pickBusy}
               onChange={e => {
@@ -634,7 +633,7 @@ export function ShareInviteCard({
           </label>
           <a href={mailtoUrl} className="btn btn-secondary share-email-btn">
             <Mail size={16} strokeWidth={2.25} aria-hidden />
-            Mail draft (no PDF)
+            Mail draft (no file)
           </a>
           <button
             type="button"
@@ -661,7 +660,7 @@ export function ShareInviteCard({
           Mail should open with <strong>To</strong> filled
           {recipients.length > 0 ? ` (${recipients.join(', ')})` : ''}. Attach the downloaded{' '}
           <code className="share-pdf-name">{pdfName}</code> (paperclip or drag from Downloads),
-          then Send. VeriLock never uploads the PDF.
+          then Send. VeriLock never uploads the file.
         </p>
       )}
 
@@ -669,7 +668,7 @@ export function ShareInviteCard({
         <p className="muted share-eml-success" role="status">
           .eml package downloaded with To set to {recipients.join(', ') || '(none)'}.
           {plan.platform === 'windows' ? (
-            <> Open the file in Outlook to send the draft with the PDF attached.</>
+            <> Open the file in Outlook to send the draft with the document attached.</>
           ) : plan.platform === 'ios' ? (
             <>
               {' '}
@@ -692,9 +691,9 @@ export function ShareInviteCard({
             instructionItems(shareInstructionKinds(plan), pdfName, plan)
           ) : (
             <>
-              <li>Send the link and the PDF file together</li>
+              <li>Send the link and the document file together</li>
               <li>Signer opens the link and connects a Nimiq wallet</li>
-              <li>They choose the PDF on their computer to verify it matches</li>
+              <li>They choose the file on their computer to verify it matches</li>
             </>
           )}
         </ul>

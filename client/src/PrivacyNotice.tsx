@@ -7,7 +7,7 @@ export function PrivacyNotice() {
       <div className="privacy-notice-body">
         <strong>Agreements that prove themselves</strong>
         <p className="muted">
-          VeriLock seals documents the right way: fingerprint your PDF locally, collect wallet-backed
+          VeriLock seals documents the right way: fingerprint your file locally, collect wallet-backed
           signatures from every party, and anchor the hash permanently on the Nimiq blockchain. Your file
           stays on your device — yet anyone with a copy can verify it matches the sealed record.
         </p>

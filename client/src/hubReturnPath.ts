@@ -68,6 +68,11 @@ export function isPdfLabPath(path: string): boolean {
   return /^\/pdf\/lab\/?$/.test(path)
 }
 
+/** Cross-device mobile signature capture (`/m/sign/:sessionId`). */
+export function isSignMobilePath(path: string): boolean {
+  return /^\/m\/sign\/[^/]+\/?$/.test(path)
+}
+
 export function isKnownAppPath(path: string): boolean {
   if (path === '/' || path === '') return true
   if (isAgreementsPath(path)) return true
@@ -76,6 +81,7 @@ export function isKnownAppPath(path: string): boolean {
   if (isSecurityPath(path)) return true
   if (isSupportPath(path)) return true
   if (isPdfPath(path)) return true
+  if (isSignMobilePath(path)) return true
   if (documentSlugFromPath(path)) return true
   if (verifySlugFromPath(path)) return true
   return false
