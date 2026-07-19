@@ -342,60 +342,6 @@ export function SignerFillView({
     return null
   }
 
-  /** After applying one field, open the next incomplete one (or close). */
-  const openNextAfter = (
-    justFilledId: string,
-    fillsSnapshot: Record<string, LocalFill>,
-    sharedSig: SignatureStrokeResult | null,
-    sharedInit: SignatureStrokeResult | null,
-  ) => {
-    const isFilled = (slot: PlacementSlot) => {
-      if (isServerFilled(slot.id)) return true
-      if (slot.id === justFilledId) return true
-      const f = fillsSnapshot[slot.id]
-      if (f?.kind === 'ink') return Boolean(f.path.strokes?.length)
-      if (f?.kind === 'text') return f.text.trim().length > 0
-      if (slot.kind === 'signature' && sharedSig?.path?.strokes?.length) return true
-      if (slot.kind === 'initial' && sharedInit?.path?.strokes?.length) return true
-      return false
-    }
-    const next = myFillable.find(s => !isFilled(s))
-    if (!next) {
-      closeModal()
-      return
-    }
-    // Open next without full close (smoother)
-    if (next.pageIndex !== pageNumber - 1) {
-      setPageNumber(next.pageIndex + 1)
-    }
-    if (isInkPlacementKind(next.kind)) {
-      const existing = (() => {
-        const local = fillsSnapshot[next.id]
-        if (local?.kind === 'ink' && local.path.strokes?.length) {
-          return inkFromLocal(local.path, local.imageDataUrl)
-        }
-        return next.kind === 'initial' ? sharedInit : sharedSig
-      })()
-      if (existing?.path?.strokes?.length) {
-        setSigModalMode('reuse')
-        setModalDraftInk(existing)
-      } else {
-        setSigModalMode('draw')
-        setModalDraftInk(null)
-        setSigPadKey(k => k + 1)
-      }
-      setModalDraftText('')
-    } else {
-      const existingText =
-        fillsSnapshot[next.id]?.kind === 'text'
-          ? (fillsSnapshot[next.id] as { text: string }).text
-          : ''
-      setModalDraftText(existingText)
-      setModalDraftInk(null)
-    }
-    setActiveSlotId(next.id)
-  }
-
   /** Stamp ink onto all matching signature/initial slots, then return to the PDF (no auto-advance). */
   const applyInkStroke = useCallback(
     (result: SignatureStrokeResult, slotOverride?: PlacementSlot | null) => {
