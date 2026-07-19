@@ -4,12 +4,13 @@
  */
 import { randomBytes } from 'node:crypto'
 import {
-  consumeSigHandoffDeposit,
+  clearSigHandoffDeposit,
   createSigHandoffRoom,
   deleteSigHandoffRoom,
   getSigHandoffRoom,
   insertSigHandoffSignal,
   listSigHandoffSignals,
+  peekSigHandoffDeposit,
   setSigHandoffStatus,
   storeSigHandoffDeposit,
   type SigHandoffRoom,
@@ -127,6 +128,10 @@ export function depositCiphertext(
   storeSigHandoffDeposit(roomId, iv, ciphertext)
 }
 
+/**
+ * Host retrieves ciphertext without consuming it.
+ * Decrypt happens client-side; call completeRoom after successful apply.
+ */
 export function takeDeposit(
   roomId: string,
   requesterAddress: string,
@@ -136,7 +141,9 @@ export function takeDeposit(
   if (normalizeAddress(room.creatorAddress) !== normalizeAddress(requesterAddress)) {
     throw new Error('Only the session host can retrieve the deposit')
   }
-  const pair = consumeSigHandoffDeposit(roomId)
+  if (room.status === 'expired') throw new Error('Session expired — show a new QR code')
+  if (room.status === 'completed') return null
+  const pair = peekSigHandoffDeposit(roomId)
   if (!pair) return null
   return {
     iv: pair.iv.toString('base64'),
@@ -151,7 +158,7 @@ export function completeRoom(roomId: string, requesterAddress: string): void {
   if (normalizeAddress(room.creatorAddress) !== normalizeAddress(requesterAddress)) {
     throw new Error('Only the session host can complete this session')
   }
-  setSigHandoffStatus(roomId, 'completed')
+  clearSigHandoffDeposit(roomId)
 }
 
 export function cancelRoom(roomId: string, requesterAddress: string): boolean {

@@ -30,7 +30,8 @@ interface SignOnMobileModalProps {
 }
 
 const FALLBACK_POLL_MS = 1500
-const WEBRTC_GIVE_UP_MS = 14_000
+/** After this, surface a soft hint that the durable deposit path is still active. */
+const DEPOSIT_HINT_MS = 12_000
 
 export function SignOnMobileModal({
   token,
@@ -47,23 +48,34 @@ export function SignOnMobileModal({
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null)
   const [copied, setCopied] = useState(false)
   const [expiresLabel, setExpiresLabel] = useState<string | null>(null)
+  const [depositHint, setDepositHint] = useState(false)
 
   const sessionIdRef = useRef<string | null>(null)
   const keyRef = useRef<CryptoKey | null>(null)
   const peerRef = useRef<PeerSession | null>(null)
   const fallbackTimer = useRef<ReturnType<typeof setInterval> | null>(null)
-  const giveUpTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const receivedRef = useRef(false)
+  const applyingRef = useRef(false)
   const mountedRef = useRef(true)
+  const previewUrlRef = useRef<string | null>(null)
+
+  const revokePreview = useCallback(() => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current)
+      previewUrlRef.current = null
+    }
+    setPreviewUrl(null)
+  }, [])
 
   const cleanupNet = useCallback(async (cancelRoom: boolean) => {
     if (fallbackTimer.current) {
       clearInterval(fallbackTimer.current)
       fallbackTimer.current = null
     }
-    if (giveUpTimer.current) {
-      clearTimeout(giveUpTimer.current)
-      giveUpTimer.current = null
+    if (hintTimer.current) {
+      clearTimeout(hintTimer.current)
+      hintTimer.current = null
     }
     peerRef.current?.stop()
     peerRef.current = null
@@ -85,17 +97,24 @@ export function SignOnMobileModal({
       const blob = payloadToBlob(payload)
       receivedRef.current = true
       if (!mountedRef.current) return
+      revokePreview()
       const url = URL.createObjectURL(blob)
+      previewUrlRef.current = url
       setPreviewBlob(blob)
       setPreviewUrl(url)
       setPhase('received')
+      setDepositHint(false)
       peerRef.current?.stop()
       if (fallbackTimer.current) {
         clearInterval(fallbackTimer.current)
         fallbackTimer.current = null
       }
+      if (hintTimer.current) {
+        clearTimeout(hintTimer.current)
+        hintTimer.current = null
+      }
     },
-    [],
+    [revokePreview],
   )
 
   const startSession = useCallback(async () => {
@@ -104,9 +123,10 @@ export function SignOnMobileModal({
     setQrUrl(null)
     setHandoffUrl(null)
     setPreviewBlob(null)
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
-    setPreviewUrl(null)
+    setDepositHint(false)
+    revokePreview()
     receivedRef.current = false
+    applyingRef.current = false
     await cleanupNet(true)
 
     try {
@@ -129,12 +149,18 @@ export function SignOnMobileModal({
         onChannel: ch => {
           ch.onmessage = ev => {
             const data = typeof ev.data === 'string' ? ev.data : null
-            if (data) void applyEncrypted(data).catch(err => {
-              if (mountedRef.current) {
-                setError(err instanceof Error ? err.message : 'Could not read signature')
-                setPhase('error')
-              }
-            })
+            if (!data || applyingRef.current || receivedRef.current) return
+            applyingRef.current = true
+            void applyEncrypted(data)
+              .catch(err => {
+                if (mountedRef.current) {
+                  setError(err instanceof Error ? err.message : 'Could not read signature')
+                  setPhase('error')
+                }
+              })
+              .finally(() => {
+                applyingRef.current = false
+              })
           }
         },
         onStatus: s => {
@@ -143,32 +169,48 @@ export function SignOnMobileModal({
           if (s === 'connected') setPhase(p => (p === 'received' ? p : 'connected'))
         },
         onError: err => {
-          // Non-fatal while fallback may still work
+          // Non-fatal while durable deposit may still work
           console.warn('[sig-handoff]', err.message)
         },
       })
 
-      // Poll encrypted deposit as fallback (and after WebRTC soft-fail)
+      // Poll encrypted deposit (non-destructive until host complete). Always dual-written by guest.
       fallbackTimer.current = setInterval(() => {
-        if (receivedRef.current || !sessionIdRef.current) return
-        void takeDeposit(token, sessionIdRef.current)
-          .then(pkg => {
-            if (pkg) return applyEncrypted(pkg)
-          })
-          .catch(() => {
-            /* no deposit yet */
-          })
+        if (receivedRef.current || applyingRef.current || !sessionIdRef.current) return
+        applyingRef.current = true
+        void (async () => {
+          try {
+            const pkg = await takeDeposit(token, sessionIdRef.current!)
+            if (!pkg || receivedRef.current || !mountedRef.current) return
+            await applyEncrypted(pkg)
+          } catch (err) {
+            if (!mountedRef.current || receivedRef.current) return
+            const status = (err as Error & { status?: number }).status
+            // 404 = not ready yet (takeDeposit maps empty to null; other 404s rare)
+            if (status === 404) return
+            const message = err instanceof Error ? err.message : 'Could not read signature'
+            // Decrypt / corrupt package: surface error; deposit remains for retry after New QR
+            if (/decrypt|tamper|payload|Invalid|mismatch/i.test(message)) {
+              setError(message)
+              setPhase('error')
+            }
+            // Transient network: keep polling
+          } finally {
+            applyingRef.current = false
+          }
+        })()
       }, FALLBACK_POLL_MS)
 
-      giveUpTimer.current = setTimeout(() => {
-        // WebRTC may still connect later; deposit remains primary fallback — no hard fail.
-      }, WEBRTC_GIVE_UP_MS)
+      hintTimer.current = setTimeout(() => {
+        if (!mountedRef.current || receivedRef.current) return
+        setDepositHint(true)
+      }, DEPOSIT_HINT_MS)
     } catch (err) {
       if (!mountedRef.current) return
       setError(err instanceof Error ? err.message : 'Could not start mobile sign')
       setPhase('error')
     }
-  }, [token, documentId, cleanupNet, applyEncrypted, previewUrl])
+  }, [token, documentId, cleanupNet, applyEncrypted, revokePreview])
 
   useEffect(() => {
     mountedRef.current = true
@@ -176,7 +218,7 @@ export function SignOnMobileModal({
     return () => {
       mountedRef.current = false
       void cleanupNet(true)
-      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      revokePreview()
     }
     // Only re-run when open toggles
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -287,6 +329,12 @@ export function SignOnMobileModal({
           {phase === 'received' && <Check size={14} strokeWidth={2.5} aria-hidden />}
           {statusText}
         </p>
+
+        {depositHint && phase !== 'received' && phase !== 'error' && phase !== 'creating' && (
+          <p className="muted sig-mobile-expires">
+            Still waiting — keep this window open. Your phone can still deliver via the secure backup path.
+          </p>
+        )}
 
         {expiresLabel && phase !== 'received' && phase !== 'error' && (
           <p className="muted sig-mobile-expires">Session expires around {expiresLabel}</p>
