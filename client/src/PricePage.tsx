@@ -114,25 +114,21 @@ export function PricePage({
       <h2>Pricing</h2>
       <p className="muted price-page-lead">
         Signing and file checks are free.{' '}
-        <strong>1 credit = 1 document verified and locked</strong> on the{' '}
+        <strong>1 credit = 1 document verified and locked</strong> on{' '}
         <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
           Nimiq
-        </a>{' '}
-        network: a permanent fingerprint anyone can re-check. Pay with card or NIM.
+        </a>
+        . Permanent fingerprint; re-checkable without VeriLock.
       </p>
 
       {creditsEnabled ? (
         <div className="price-page-model" aria-labelledby="price-model-heading">
           <div className="price-page-model-row">
             <span className="price-page-model-label" id="price-model-heading">
-              What a credit covers
+              How to pay
             </span>
-            <div className="price-page-model-primary">
-              <span className="price-page-model-credits">1 credit</span>
-              <span className="price-page-model-per">= 1 document verified and locked</span>
-            </div>
             <p className="muted price-page-model-explain">
-              The fingerprint goes on Nimiq and stays checkable forever, even without VeriLock.
+              Card or NIM. Same credit either way.
             </p>
           </div>
 
@@ -154,26 +150,22 @@ export function PricePage({
               )}
             </div>
             <p className="muted price-page-model-hint">
-              {halfPrice
-                ? `Card is ${stripeMarkup}× the live NIM rate`
-                : `Card tracks the live NIM rate`}
-              {' '}
-              via{' '}
+              {halfPrice ? `${stripeMarkup}× live NIM rate` : 'Live NIM rate'} via{' '}
               <a href={FASTSPOT_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
                 Fastspot
               </a>
               .
+              {unitBelowStripeMin && (
+                <>
+                  {' '}
+                  Min charge {formatFiatAmount(stripeMinUsd, 'USD')}
+                  {creditsInfo?.minPackStripeUsd != null
+                    ? `: ${minPack}-credit pack (${formatFiatAmount(creditsInfo.minPackStripeUsd, 'USD')})`
+                    : ` from a ${minPack}-credit pack`}
+                  .
+                </>
+              )}
             </p>
-            {unitBelowStripeMin && (
-              <p className="muted price-page-model-hint price-page-model-hint--note">
-                {pricing.promoActive ? 'During the sale, ' : ''}
-                card checkout starts at a <strong>{minPack}-credit pack</strong>
-                {creditsInfo?.minPackStripeUsd != null
-                  ? ` (${formatFiatAmount(creditsInfo.minPackStripeUsd, 'USD')})`
-                  : ''}{' '}
-                so the charge meets Stripe&apos;s {formatFiatAmount(stripeMinUsd, 'USD')} minimum.
-              </p>
-            )}
           </div>
 
           <div className="price-page-model-row">
@@ -202,10 +194,11 @@ export function PricePage({
                 )}
               </div>
             )}
-            <p className="muted price-page-model-hint">
-              List price: 1000 NIM per document
-              {pricing.promoActive ? ` (now ${pricing.feeNim} NIM with promo)` : ''}.
-            </p>
+            {!pricing.promoActive && (
+              <p className="muted price-page-model-hint">
+                {pricing.feeNim} NIM per document.
+              </p>
+            )}
           </div>
         </div>
       ) : (
@@ -220,14 +213,10 @@ export function PricePage({
               Buy credits
             </h3>
             <p className="muted price-page-credits-lead">
-              Prepaid packs (
+              Packs of{' '}
               {creditsInfo?.packs && creditsInfo.packs.length >= 2
                 ? `${creditsInfo.packs[0]}–${creditsInfo.packs[creditsInfo.packs.length - 1]}`
                 : '10–100'}
-              ). Card or NIM
-              {unitBelowStripeMin
-                ? `. Card packs start at ${minPack} to meet the ${formatFiatAmount(stripeMinUsd, 'USD')} minimum`
-                : ''}
               .
             </p>
           </div>
@@ -262,55 +251,44 @@ export function PricePage({
           </span>
           <div className="price-page-why-head-copy">
             <h3 id="price-why-nimiq" className="price-page-why-title">
-              Why the Nimiq network?
+              Why Nimiq?
             </h3>
             <p className="price-page-why-lead muted">
-              Document locks land on{' '}
+              Browser-first Layer&nbsp;1. Your wallet signs; the record lives on the chain, not our
+              servers.{' '}
               <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
-                Nimiq
+                nimiq.com
                 <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
               </a>
-              , a browser-first Layer&nbsp;1. Your wallet signs; the fingerprint goes on the network.
-              We never hold the proof.
             </p>
           </div>
         </header>
         <ul className="price-page-why-list">
           <li className="price-page-why-item">
-            <strong className="price-page-why-item-title">Direct to the chain</strong>
+            <strong className="price-page-why-item-title">Look it up yourself</strong>
             <span className="price-page-why-item-body muted">
-              No broker, escrow, or opaque API between you and the record. The lock is a normal Nimiq
-              transaction anyone can look up without VeriLock.
+              A normal Nimiq transaction. No broker or escrow between you and the record.
             </span>
           </li>
           <li className="price-page-why-item">
-            <strong className="price-page-why-item-title">Fast and light</strong>
+            <strong className="price-page-why-item-title">Built for the browser</strong>
             <span className="price-page-why-item-body muted">
-              Quick confirmations, light clients, no full node for signers. Locking a document stays
-              practical in the browser or Nimiq Pay.
+              Fast confirms, light clients. No full node to lock a document.
             </span>
           </li>
           <li className="price-page-why-item">
-            <strong className="price-page-why-item-title">Document stays on your device</strong>
+            <strong className="price-page-why-item-title">File never leaves your device</strong>
             <span className="price-page-why-item-body muted">
-              Only a short integrity fingerprint goes on-chain. The file itself never uploads.
+              Only a short integrity fingerprint goes on-chain.
             </span>
           </li>
           <li className="price-page-why-item">
-            <strong className="price-page-why-item-title">Self-custodial identity</strong>
+            <strong className="price-page-why-item-title">You hold the keys</strong>
             <span className="price-page-why-item-body muted">
-              Each party signs with their own wallet. We never hold your keys, and the proof outlives
-              our servers.
+              Each party signs with their own wallet. The proof outlives our servers.
             </span>
           </li>
         </ul>
-        <p className="muted price-page-why-cta">
-          Learn more at{' '}
-          <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
-            nimiq.com
-            <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
-          </a>
-        </p>
       </section>
     </div>
   )

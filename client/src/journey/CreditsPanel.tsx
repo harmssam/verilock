@@ -164,8 +164,6 @@ export function CreditsPanel({
     return formatSealFeeNim(q.creditNimCostTotal)
   }
 
-  const nimHalfPrice = stripeEnabled
-
   const buyWithNim = async () => {
     if (!token || !address) {
       setError('Connect your wallet first')
@@ -230,11 +228,10 @@ export function CreditsPanel({
       >
         <div className="journey-credits-top-label">
           <Coins size={15} strokeWidth={2.25} aria-hidden />
-          Seal credits
+          Credits
         </div>
         <p className="muted journey-credits-guest-text">
-          Connect your wallet to buy packs (10–100) with card, or NIM for half price. 1 credit = 1
-          seal.
+          Connect your wallet to buy packs. 1 credit = 1 document verified and locked.
         </p>
       </div>
     )
@@ -311,7 +308,7 @@ export function CreditsPanel({
                 )}
                 {selectedQuote
                   ? `Card · $${selectedQuote.creditStripeUsdTotal.toFixed(2)}`
-                  : 'Pay with card'}
+                  : 'Card'}
               </button>
             )}
             <button
@@ -328,12 +325,8 @@ export function CreditsPanel({
                 <Wallet size={16} strokeWidth={2.25} />
               )}
               {selectedQuote
-                ? nimHalfPrice
-                  ? `NIM · ½ price · ${formatSealFeeNim(selectedQuote.creditNimCostTotal)}`
-                  : `NIM · ${formatSealFeeNim(selectedQuote.creditNimCostTotal)}`
-                : nimHalfPrice
-                  ? 'NIM · half price'
-                  : 'Pay with NIM'}
+                ? `NIM · ${formatSealFeeNim(selectedQuote.creditNimCostTotal)}`
+                : 'NIM'}
             </button>
           </div>
         </>
