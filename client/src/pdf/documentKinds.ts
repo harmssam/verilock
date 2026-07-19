@@ -88,16 +88,16 @@ export function detectDocumentKindFromName(filename: string | null | undefined):
   return null
 }
 
-/** Short noun for UI: "PDF" vs "file" when kind unknown. */
+/** Short noun for UI when referring to the local file generically. */
 export function documentFileNoun(
   fileOrName: File | string | null | undefined,
-): 'PDF' | 'file' {
+): 'document' | 'file' {
   if (!fileOrName) return 'file'
   const kind =
     typeof fileOrName === 'string'
       ? detectDocumentKindFromName(fileOrName)
       : detectDocumentKind(fileOrName)
-  return kind === 'pdf' ? 'PDF' : 'file'
+  return kind ? 'document' : 'file'
 }
 
 export function unsupportedDocumentMessage(): string {

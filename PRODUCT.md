@@ -14,18 +14,18 @@ When a redesign task is scoped only to pricing marketing copy, that slice may us
 
 | Priority | Who | Context |
 |----------|-----|---------|
-| Primary | People who need a permanent integrity proof of a PDF agreement | Remote parties, rental/contract/NDA flows, no shared document store |
-| Secondary | Co-signers who received a PDF + invite link | Match file, sign with wallet, leave |
-| Secondary | Anyone verifying a sealed PDF later | No account required |
+| Primary | People who need a permanent integrity proof of a document | Remote parties, rental/contract/NDA flows, no shared document store |
+| Secondary | Co-signers who received a document + invite link | Match file, sign with wallet, leave |
+| Secondary | Anyone verifying a sealed document later | No account required |
 | Tertiary | Pricing visitors | Buy seal credits |
 
 ## Purpose
 
-Fingerprint a PDF **on-device**, optionally collect multi-party wallet signatures, then **anchor only the hash** on Nimiq so anyone can re-verify the same bytes later. The file never uploads.
+Fingerprint a document **on-device** (PDF or image), optionally collect multi-party wallet signatures, then **anchor only the hash** on Nimiq so anyone can re-verify the same bytes later. The file never uploads.
 
 ## Positioning
 
-**Wallet identity + local PDF fingerprint + on-chain hash lock** — multi-party agreements without uploading documents to VeriLock.
+**Wallet identity + local document fingerprint + on-chain hash lock** — multi-party agreements without uploading files to VeriLock.
 
 ## Brand personality
 
@@ -67,7 +67,7 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 3. **Same action-dock steps and controls** (fields, toggles, CTAs, cancel, share, credits, signature pad).
 4. **Same shell screens** (home journey, pricing, privacy, security, support, agreements, 404).
 5. **Same account/login/credits behaviors** (Hub vs Pay modes, balance chip → pricing, Stripe return).
-6. **Same privacy model** in UI copy and structure: PDF stays local; chain stores hash only.
+6. **Same privacy model** in UI copy and structure: document stays local; chain stores hash only.
 7. **Feature flags stay flags** (`FEATURES.emailNotifyUi`); do not hard-remove optional email when the flag exists.
 8. **Information architecture** from `AGENTS.md` stays: path picker → stage rail → action dock → document stage, unless the user explicitly redesigns IA.
 
@@ -148,20 +148,20 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 
 Wallet login (LoginSheet / Hub / Pay) is a **gate** when creating, signing, or sealing — not a numbered stage.
 
-1. **Fingerprint** — PDF drop/browse, local SHA-256, agreement type (rental/contract/nda/other), rental landlord/tenant, full name, optional email notify (flag), optional title, **direct seal** checkbox, required signer count 1–4, optional co-signer names, optional notes (type-dependent), create CTA (prompts login if needed)
-2. **Sign** — Creator signs first: signature progress, party list, cancel (creator), match PDF, signature pad / image, optional **Sign on mobile** (QR handoff), sign CTA
+1. **Fingerprint** — Document drop/browse (PDF or image), local SHA-256, agreement type (rental/contract/nda/other), rental landlord/tenant, full name, optional email notify (flag), optional title, **direct seal** checkbox, required signer count 1–4, optional co-signer names, optional notes (type-dependent), create CTA (prompts login if needed)
+2. **Sign** — Creator signs first: signature progress, party list, cancel (creator), match document, signature pad / image, optional **Sign on mobile** (QR handoff), sign CTA
 3. **Share** — After creator signed: party list, ShareInviteCard (copy link / email package), wait for co-signers, cancel until first signature (if still allowed)
 4. **Seal** — Pricing display, credits panel / NIM pay / credit seal progress, lock on chain
-5. **Verify** — Re-drop PDF to confirm match after seal / done
+5. **Verify** — Re-drop document to confirm match after seal / done
 
 ### Signer path stages
 
-1. **Sign** — Drop PDF to lookup agreement **or** open `/d/:slug`; match fingerprint; login when ready to sign; name if needed; signature pad (or Sign on mobile); sign
+1. **Sign** — Drop document to lookup agreement **or** open `/d/:slug`; match fingerprint; login when ready to sign; name if needed; signature pad (or Sign on mobile); sign
 2. **Done** — Confirmation; seal is creator’s job
 
 ### Verifier path stages
 
-1. **Verify** — Drop PDF, local hash, lookup matches, mismatch handling; **wallet optional** (skip login)
+1. **Verify** — Drop document, local hash, lookup matches, mismatch handling; **wallet optional** (skip login)
 
 ### Cross-cutting journey UI
 
@@ -170,7 +170,7 @@ Wallet login (LoginSheet / Hub / Pay) is a **gate** when creating, signing, or s
 | Stage rail progress | `StageRail` |
 | Action dock (one action focus) | `DocumentJourney` dock |
 | Document stage visual | `DocumentStage` |
-| PDF drop zone | `PdfDropZone` / stage accepting |
+| Document drop zone | `PdfDropZone` / stage accepting |
 | Start over | Reset to path picker |
 | Role pill | Creating / signing / verifying as… |
 | Per-step privacy note | Dock header |

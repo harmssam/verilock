@@ -5,7 +5,7 @@ export function PrivacyPolicyPage() {
     <div className="card privacy-policy-page">
       <h2>Privacy Policy</h2>
       <p className="muted privacy-policy-lead">
-        VeriLock is built so your PDF never leaves your device. This policy explains what we do and do not
+        VeriLock is built so your document never leaves your device. This policy explains what we do and do not
         collect when you use the service.
       </p>
       <p className="muted privacy-policy-updated">Last updated: July 6, 2026</p>
@@ -13,8 +13,8 @@ export function PrivacyPolicyPage() {
       <section className="privacy-policy-section">
         <h3>Your documents stay local</h3>
         <p className="muted">
-          When you fingerprint, sign, or verify a PDF, the file is processed entirely in your browser. We
-          never upload, store, or host your PDF content on our servers.
+          When you fingerprint, sign, or verify a document, the file is processed entirely in your browser. We
+          never upload, store, or host your document content on our servers.
         </p>
       </section>
 
@@ -22,7 +22,7 @@ export function PrivacyPolicyPage() {
         <h3>What we store</h3>
         <p className="muted">To run agreements and verification, we store only metadata tied to a document:</p>
         <ul className="privacy-policy-list muted">
-          <li>SHA-256 fingerprints of your PDF (before and after signing, when applicable)</li>
+          <li>SHA-256 fingerprints of your document (before and after signing, when applicable)</li>
           <li>Document title, type, page count, and optional notes you enter</li>
           <li>Party names, wallet addresses, and signature status</li>
           <li>Drawn signature images you submit when signing</li>
@@ -61,7 +61,7 @@ export function PrivacyPolicyPage() {
         <p className="muted">
           If you use the Support page, we receive the name, email, subject, and message you submit so we can
           reply. Messages are delivered by email to VeriLock support. We also apply bot protections (rate
-          limits, honeypot checks, and when configured, Cloudflare Turnstile). Do not send PDF contents
+          limits, honeypot checks, and when configured, Cloudflare Turnstile). Do not send document contents
           through this form.
         </p>
       </section>

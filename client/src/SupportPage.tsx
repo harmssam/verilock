@@ -242,7 +242,7 @@ export function SupportPage() {
       <h2>Support</h2>
       <p className="muted support-lead">
         Questions about signing, sealing, verification, or billing? Send a message and we&apos;ll get back
-        to you. Your PDF never needs to leave your device for support — describe the issue in words; don&apos;t
+        to you. Your document never needs to leave your device for support — describe the issue in words; don&apos;t
         attach files here.
       </p>
 

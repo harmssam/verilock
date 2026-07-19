@@ -305,7 +305,7 @@ export function PricePage({
             </span>
           </li>
           <li className="price-page-why-item">
-            <strong className="price-page-why-item-title">PDF stays on your device</strong>
+            <strong className="price-page-why-item-title">Document stays on your device</strong>
             <span className="price-page-why-item-body muted">
               Only a short integrity fingerprint is written on-chain. The file itself never uploads.
             </span>

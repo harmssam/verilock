@@ -40,6 +40,8 @@ import { SealPricingDisplay } from '../SealPricingDisplay'
 import { canShareFiles, shareInviteWithPdf } from '../shareInvite'
 import {
   formatPartyRole,
+  isPlaceholderPartyName,
+  looksLikeAddressLabel,
   partyNeedsSignerName,
   resolveSigningParty,
 } from '../signing'
@@ -700,6 +702,26 @@ export function DocumentJourney({
 
   const effectivePreferredPartyId = pickedPartyId || preferredPartyFromUrl
 
+  /** Prefer typed name, then create-time name, then a real party label (not placeholders). */
+  const resolveSignDisplayName = useCallback(
+    (party: { displayName?: string | null }, ...candidates: Array<string | null | undefined>) => {
+      for (const raw of candidates) {
+        const t = raw?.trim()
+        if (t && !isPlaceholderPartyName(t) && !looksLikeAddressLabel(t)) return t
+      }
+      const partyName = party.displayName?.trim()
+      if (
+        partyName &&
+        !isPlaceholderPartyName(partyName) &&
+        !looksLikeAddressLabel(partyName)
+      ) {
+        return partyName
+      }
+      return ''
+    },
+    [],
+  )
+
   const signingResolution =
     doc && address
       ? resolveSigningParty(doc.source, address, {
@@ -711,6 +733,18 @@ export function DocumentJourney({
     signingResolution?.ok
       ? doc!.parties.find(p => p.id === signingResolution.party.id) ?? null
       : null
+
+  // Prefill sign-step name from create-time name or party label so solo auto-submit can run.
+  useEffect(() => {
+    if (!signingResolution?.ok || signerName.trim()) return
+    if (!partyNeedsSignerName(signingResolution.party)) return
+    const next = resolveSignDisplayName(
+      signingResolution.party,
+      creatorName,
+      signingResolution.party.displayName,
+    )
+    if (next) setSignerName(next)
+  }, [signingResolution, signerName, creatorName, resolveSignDisplayName])
 
   /** Invite targets: all parties when organizer does not sign; else everyone except the creator slot. */
   const inviteeSlotCount = useMemo(() => {
@@ -1193,7 +1227,7 @@ export function DocumentJourney({
         if (result === 'shared') {
           setInviteSendNote(prev => ({
             ...prev,
-            [opts.partyId]: 'Opened share sheet (include PDF when the app allows)',
+            [opts.partyId]: 'Opened share sheet (include file when the app allows)',
           }))
           return
         }
@@ -1206,7 +1240,7 @@ export function DocumentJourney({
           text: [
             `${organizerLabel} has requested you sign “${doc.title}” on VeriLock.`,
             opts.personName ? `This invite is for ${opts.personName}.` : '',
-            'Open your personal link (use the exact PDF the organizer shared with you):',
+            'Open your personal link (use the exact file the organizer shared with you):',
             opts.personLink,
           ]
             .filter(Boolean)
@@ -1349,31 +1383,212 @@ export function DocumentJourney({
     [doc, constructionPlan, address],
   )
 
+  const signAsCurrentUser = useCallback(
+    async (opts?: { signatureBlob?: Blob | null; displayName?: string }) => {
+      if (!token || !doc || !address) return false
+
+      // Prefer explicit sign-step hash; fall back to create-time file still in this session.
+      const clientHash =
+        signHash && signHash === doc.fingerprint
+          ? signHash
+          : pdfHash && pdfHash === doc.fingerprint
+            ? pdfHash
+            : null
+      if (!clientHash) {
+        setLocalError('Choose the matching document before signing')
+        return false
+      }
+
+      const creatorOnlyBlock =
+        FEATURES.pdfAnnotationUi &&
+        constructionPlan?.status === 'locked' &&
+        (constructionPlan.creatorSigningAs == null || constructionPlan.creatorSigningAs === 0) &&
+        isDocumentCreator(doc.source, address)
+      const resolution = resolveSigningParty(doc.source, address, {
+        allowOpenClaim: !creatorOnlyBlock,
+        preferredPartyId: effectivePreferredPartyId,
+      })
+      if (!resolution.ok) {
+        setLocalError(resolution.message)
+        return false
+      }
+      const myParty = resolution.party
+      const nameForSign = resolveSignDisplayName(
+        myParty,
+        opts?.displayName,
+        signerName,
+        creatorName,
+      )
+      const ink = opts?.signatureBlob ?? sigBlob
+      if (partyNeedsSignerName(myParty) && !nameForSign) {
+        setLocalError('Enter your full name before signing')
+        return false
+      }
+      if (!ink) {
+        setLocalError('Draw your signature on the document before submitting')
+        return false
+      }
+
+      setBusy(true)
+      setLocalError(null)
+      try {
+        const signatureImage = await prepareSignatureImageUpload(ink)
+        const { document: signedDoc } = await api.signDocument(token, doc.id, {
+          partyId: myParty.id,
+          signatureType: 'drawn',
+          clientSha256: clientHash,
+          displayName: partyNeedsSignerName(myParty)
+            ? clampField(nameForSign, MAX_DISPLAY_NAME_LENGTH)
+            : undefined,
+          signatureImage,
+        })
+        setActiveFromSeal(signedDoc, doc.fileSize)
+        // Keep the matched file in this session for share / any return to sign.
+        // Re-upload is only needed after a full leave (reload) drops local File state.
+        setSignerName('')
+        setSigBlob(null)
+        setSigPadKey(k => k + 1)
+        if (mobileSigPreview) {
+          URL.revokeObjectURL(mobileSigPreview)
+          setMobileSigPreview(null)
+        }
+        // Invitees stay on the signer path so they never land on seal CTAs.
+        if (!isDocumentCreator(signedDoc, address)) {
+          setRole('signer')
+          saveJourneyIntent('signer')
+          setSharedAck(true)
+          setLockMessage(null)
+        } else {
+          // Creator: advance past Arrange. Solo/complete → seal; multi → stay on Sign to invite.
+          setSharedAck(true)
+          if (signedDoc.signingProgress.readyToLock) {
+            const solo = signedDoc.signingProgress.required <= 1
+            setLockMessage(
+              solo
+                ? 'Signature complete. Continue to seal.'
+                : 'All signatures collected. Continue to seal.',
+            )
+          } else {
+            setLockMessage(
+              'Your signature is recorded. Invite co-signers below, then seal when everyone has signed.',
+            )
+          }
+        }
+        // Sign form is mid-page; after success the UI swaps to done/share and the old
+        // scroll offset lands near the bottom. Snap to top so the confirmation is visible.
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+            window.document.documentElement.scrollTop = 0
+            window.document.body.scrollTop = 0
+          })
+        })
+        return true
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Sign failed'
+        setLocalError(message)
+        // Slot races / already-signed: pull latest party assignment for a clean retry.
+        if (/already signed|claimed this slot|refresh/i.test(message) && doc?.slug) {
+          try {
+            const { document: latest } = await api.getDocument(doc.slug, token)
+            setActiveFromSeal(latest, doc.fileSize)
+          } catch {
+            /* keep prior doc state */
+          }
+        }
+        return false
+      } finally {
+        setBusy(false)
+      }
+    },
+    [
+      token,
+      doc,
+      address,
+      signHash,
+      pdfHash,
+      constructionPlan,
+      effectivePreferredPartyId,
+      signerName,
+      creatorName,
+      sigBlob,
+      mobileSigPreview,
+      setActiveFromSeal,
+      setRole,
+      resolveSignDisplayName,
+    ],
+  )
+
   const submitPageFields = useCallback(
     async (result: SignerFillResult) => {
       if (!token || !doc || !constructionPlan?.planRoot) {
         throw new Error('Missing session or locked plan')
+      }
+      if (!address) {
+        throw new Error('Connect your wallet before submitting fields')
       }
       const hash = (pdfHash || signHash || doc.fingerprint || '').toLowerCase()
       if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error('Document fingerprint missing')
 
       setFillBusy(true)
       try {
-        // Use drawn ink for the wallet signature image (no second pad).
+        // Capture ink for the party signature image (no second pad).
+        let inkBlob: Blob | null = null
         if (result.signatureImageDataUrl) {
           try {
-            const blob = await (await fetch(result.signatureImageDataUrl)).blob()
-            setSigBlob(blob)
+            inkBlob = await (await fetch(result.signatureImageDataUrl)).blob()
+          } catch {
+            /* try path raster below */
+          }
+        }
+        if (!inkBlob && result.inkPath?.strokes?.length) {
+          try {
+            const { pathToPngDataUrl } = await import('../signatureHandoff/crypto')
+            const url = pathToPngDataUrl(result.inkPath)
+            inkBlob = await (await fetch(url)).blob()
           } catch {
             /* pad still available as fallback */
           }
         }
-        if (result.printedName && !signerName.trim()) {
-          setSignerName(result.printedName)
+        if (inkBlob) setSigBlob(inkBlob)
+
+        const creatorOnlyBlock =
+          FEATURES.pdfAnnotationUi &&
+          constructionPlan.status === 'locked' &&
+          (constructionPlan.creatorSigningAs == null ||
+            constructionPlan.creatorSigningAs === 0) &&
+          isDocumentCreator(doc.source, address)
+        const resolution = resolveSigningParty(doc.source, address, {
+          allowOpenClaim: !creatorOnlyBlock,
+          preferredPartyId: effectivePreferredPartyId,
+        })
+        const nameHint = resolution.ok
+          ? resolveSignDisplayName(
+              resolution.party,
+              result.printedName,
+              signerName,
+              creatorName,
+            )
+          : (result.printedName || signerName || creatorName).trim()
+        if (nameHint && !signerName.trim()) {
+          setSignerName(nameHint)
+        }
+
+        const finishFieldsAndMaybeAutoSign = async () => {
+          setPageFieldsConfirmed(true)
+          // Solo + on-document ink: record the party signature immediately (no second CTA).
+          // Multi-party always uses an explicit Submit step.
+          if (requiredCount(doc) > 1 || !inkBlob || !resolution.ok) return
+          if (partyNeedsSignerName(resolution.party) && !nameHint) return
+          // Sign errors are reported via localError; do not retry fill append.
+          await signAsCurrentUser({
+            signatureBlob: inkBlob,
+            displayName: nameHint || undefined,
+          })
         }
 
         if (result.fills.length === 0) {
-          setPageFieldsConfirmed(true)
+          await finishFieldsAndMaybeAutoSign()
           return
         }
 
@@ -1432,7 +1647,8 @@ export function DocumentJourney({
               ]),
             )
             setLastBatchRoot(saved.lastBatchRoot ?? batchRoot)
-            setPageFieldsConfirmed(true)
+            // Separate from fill-retry loop: sign failures must not re-append fills.
+            await finishFieldsAndMaybeAutoSign()
             return
           } catch (err) {
             lastErr = err instanceof Error ? err : new Error(String(err))
@@ -1447,7 +1663,21 @@ export function DocumentJourney({
         setFillBusy(false)
       }
     },
-    [token, doc, constructionPlan, pdfHash, signHash, lastBatchRoot, knownBlobIds, signerName],
+    [
+      token,
+      doc,
+      constructionPlan,
+      pdfHash,
+      signHash,
+      lastBatchRoot,
+      knownBlobIds,
+      signerName,
+      creatorName,
+      address,
+      effectivePreferredPartyId,
+      signAsCurrentUser,
+      resolveSignDisplayName,
+    ],
   )
 
   const lockPlacements = useCallback(async () => {
@@ -1687,115 +1917,6 @@ export function DocumentJourney({
     }
   }
 
-  const signAsCurrentUser = async () => {
-    if (!token || !doc || !address) return
-
-    // Prefer explicit sign-step hash; fall back to create-time PDF still in this session.
-    const clientHash =
-      signHash && signHash === doc.fingerprint
-        ? signHash
-        : pdfHash && pdfHash === doc.fingerprint
-          ? pdfHash
-          : null
-    if (!clientHash) {
-      setLocalError('Choose the matching PDF before signing')
-      return
-    }
-
-    const creatorOnlyBlock =
-      FEATURES.pdfAnnotationUi &&
-      constructionPlan?.status === 'locked' &&
-      (constructionPlan.creatorSigningAs == null || constructionPlan.creatorSigningAs === 0) &&
-      isDocumentCreator(doc.source, address)
-    const resolution = resolveSigningParty(doc.source, address, {
-      allowOpenClaim: !creatorOnlyBlock,
-      preferredPartyId: effectivePreferredPartyId,
-    })
-    if (!resolution.ok) {
-      setLocalError(resolution.message)
-      return
-    }
-    const myParty = resolution.party
-    if (partyNeedsSignerName(myParty) && !signerName.trim()) {
-      setLocalError('Enter your full name before signing')
-      return
-    }
-    if (!sigBlob) {
-      setLocalError('Draw your signature before signing')
-      return
-    }
-
-    setBusy(true)
-    setLocalError(null)
-    try {
-      const signatureImage = await prepareSignatureImageUpload(sigBlob)
-      const { document: signedDoc } = await api.signDocument(token, doc.id, {
-        partyId: myParty.id,
-        signatureType: 'drawn',
-        clientSha256: clientHash,
-        displayName: partyNeedsSignerName(myParty)
-          ? clampField(signerName.trim(), MAX_DISPLAY_NAME_LENGTH)
-          : undefined,
-        signatureImage,
-      })
-      setActiveFromSeal(signedDoc, doc.fileSize)
-      // Keep the matched PDF in this session for share / any return to sign.
-      // Re-upload is only needed after a full leave (reload) drops local File state.
-      setSignerName('')
-      setSigBlob(null)
-      setSigPadKey(k => k + 1)
-      if (mobileSigPreview) {
-        URL.revokeObjectURL(mobileSigPreview)
-        setMobileSigPreview(null)
-      }
-      // Invitees stay on the signer path so they never land on seal CTAs.
-      if (!isDocumentCreator(signedDoc, address)) {
-        setRole('signer')
-        saveJourneyIntent('signer')
-        setSharedAck(true)
-        setLockMessage(null)
-      } else {
-        // Creator: advance past Arrange. Solo/complete → seal; multi → stay on Sign to invite.
-        setSharedAck(true)
-        if (signedDoc.signingProgress.readyToLock) {
-          const solo = signedDoc.signingProgress.required <= 1
-          setLockMessage(
-            solo
-              ? 'Signature complete. Continue to seal.'
-              : 'All signatures collected. Continue to seal.',
-          )
-        } else {
-          setLockMessage(
-            'Your signature is recorded. Invite co-signers below, then seal when everyone has signed.',
-          )
-        }
-      }
-      // Sign form is mid-page; after success the UI swaps to done/share and the old
-      // scroll offset lands near the bottom. Snap to top so the confirmation is visible.
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
-          window.document.documentElement.scrollTop = 0
-          window.document.body.scrollTop = 0
-        })
-      })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Sign failed'
-      setLocalError(message)
-      // Slot races / already-signed: pull latest party assignment for a clean retry.
-      if (/already signed|claimed this slot|refresh/i.test(message) && doc?.slug) {
-        try {
-          const { document: latest } = await api.getDocument(doc.slug, token)
-          setActiveFromSeal(latest, doc.fileSize)
-        } catch {
-          /* keep prior doc state */
-        }
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const seal = async () => {
     if (!token || !address || !doc) return
     if (!doc.directSeal && !allSigned(doc)) {
@@ -1910,7 +2031,7 @@ export function DocumentJourney({
       const { matches } = await api.verifyHash(hash)
       if (matches.length === 0) {
         setLocalError(
-          'No agreement matches this PDF on this host. Check you have the exact file, or open the invite link from the creator.',
+          'No agreement matches this document on this host. Check you have the exact file, or open the invite link from the creator.',
         )
         return
       }
@@ -1932,7 +2053,7 @@ export function DocumentJourney({
         try {
           const { document } = await api.getDocument(m.slug, token)
           if (document.status === 'locked') {
-            openError = `"${document.title}" is already sealed. Use Verify a PDF to check integrity.`
+            openError = `"${document.title}" is already sealed. Use Verify a document to check integrity.`
             continue
           }
           // If wallet connected, prefer a doc this wallet can still sign
@@ -1969,7 +2090,7 @@ export function DocumentJourney({
       if (openError) setLocalError(openError)
       else setLocalError(null)
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'Could not look up this PDF')
+      setLocalError(err instanceof Error ? err.message : 'Could not look up this document')
     } finally {
       setBusy(false)
     }
@@ -2020,7 +2141,7 @@ export function DocumentJourney({
         >
           <Shield className="trust-bar-icon" size={18} strokeWidth={2.25} aria-hidden />
           <span>
-            <strong>Your PDF never leaves this device.</strong>
+            <strong>Your document never leaves this device.</strong>
             {/* Desktop: keep subtitle on the collapsed row. Mobile: only in expanded detail. */}
             <span className="trust-bar-sub trust-bar-sub--inline">
               {' '}
@@ -2132,7 +2253,7 @@ export function DocumentJourney({
               {step === 'fingerprint' && (
                 <div className="action-stack">
                   <header className="signatures-config-head">
-                    <h3>Add the PDF</h3>
+                    <h3>Add the document</h3>
                     <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
                       No signing on this step. Fingerprint the file locally, then name people and
                       place their fields on the next screen. You can organize without being a
@@ -2161,7 +2282,7 @@ export function DocumentJourney({
                       </>
                     ) : (
                       <>
-                        <strong>Drop a PDF</strong> or <strong>Browse files</strong>. The file
+                        <strong>Drop a document</strong> or <strong>Browse files</strong>. The file
                         stays on this device.
                       </>
                     )}
@@ -2387,7 +2508,7 @@ export function DocumentJourney({
                   {FEATURES.pdfAnnotationUi && !pdfFile && !signFile && (
                     <section className="journey-pdf-editor">
                       <p className="muted" style={{ margin: 0 }}>
-                        Re-open the same PDF to arrange signature lines (bytes stay local).
+                        Re-open the same document to arrange signature lines (bytes stay local).
                       </p>
                       <DocumentStage
                         step={step}
@@ -2416,7 +2537,7 @@ export function DocumentJourney({
                               }
                             } catch (err) {
                               setLocalError(
-                                err instanceof Error ? err.message : 'Could not read PDF',
+                                err instanceof Error ? err.message : 'Could not read document',
                               )
                             } finally {
                               setBusy(false)
@@ -2693,10 +2814,27 @@ export function DocumentJourney({
                                   pageFieldsConfirmed ||
                                   (myFillableSlots.length > 0 &&
                                     myFillableSlots.every(s => filledSlotIds.has(s.id)))
-                                const canWalletBind =
+                                const canPartySubmit =
                                   hasVerifiedLocalPdf &&
                                   planLoadState !== 'loading' &&
                                   (!pageFieldsRequired || pageFieldsDone)
+                                const isMultiParty = requiredCount(doc) > 1
+                                const resolvedName = resolveSignDisplayName(
+                                  signingResolution.party,
+                                  signerName,
+                                  creatorName,
+                                )
+                                const needsNameField =
+                                  partyNeedsSignerName(signingResolution.party) &&
+                                  !resolvedName
+                                // Solo: after on-doc fields + ink, party sign runs automatically.
+                                const soloAutoRecording =
+                                  !isMultiParty &&
+                                  pageFieldsRequired &&
+                                  pageFieldsDone &&
+                                  Boolean(sigBlob) &&
+                                  !needsNameField &&
+                                  (busy || fillBusy)
 
                                 return (
                                   <>
@@ -2719,18 +2857,31 @@ export function DocumentJourney({
                                   />
                                 )}
 
-                              {/* Wallet bind: only after plan load + required page fields */}
-                              {canWalletBind && (
+                              {canPartySubmit && soloAutoRecording && (
+                                <div className="result-banner result-banner--ok">
+                                  <LoaderCircle
+                                    className="btn-spinner"
+                                    size={16}
+                                    strokeWidth={2.5}
+                                  />
+                                  Submitting your signature…
+                                </div>
+                              )}
+
+                              {/* Party submit: multi always; solo when pad-only, name needed, or auto failed */}
+                              {canPartySubmit && !soloAutoRecording && (
                                 <>
                                   {pageFieldsDone && pageFieldsRequired && (
                                     <div className="result-banner result-banner--ok">
                                       <Check size={16} strokeWidth={2.5} />
-                                      Page fields saved on the document. Bind with your Nimiq wallet
-                                      to finish.
+                                      {isMultiParty
+                                        ? 'Page fields saved. Submit to record your signature on this agreement.'
+                                        : 'Page fields saved. Submit to finish signing.'}
                                     </div>
                                   )}
 
-                                  {partyNeedsSignerName(signingResolution.party) && (
+                                  {partyNeedsSignerName(signingResolution.party) &&
+                                    !resolvedName && (
                                     <label className="field">
                                       <span className="field-label">Your name</span>
                                       <input
@@ -2741,7 +2892,7 @@ export function DocumentJourney({
                                     </label>
                                   )}
 
-                                  {/* Only show free pad if we didn't already capture ink on the PDF */}
+                                  {/* Free pad only when ink was not captured on the document */}
                                   {!sigBlob && (
                                     <>
                                       <SignaturePad
@@ -2771,7 +2922,7 @@ export function DocumentJourney({
                                         alt="Signature from mobile"
                                       />
                                       <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                                        Signature from your phone. Continue with wallet sign below.
+                                        Signature from your phone. Submit below to record it.
                                       </p>
                                       <button
                                         type="button"
@@ -2790,7 +2941,8 @@ export function DocumentJourney({
                                   )}
                                   {sigBlob && pageFieldsDone && pageFieldsRequired && !mobileSigPreview && (
                                     <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                                      Using the signature you drew on the PDF for wallet bind.
+                                      Using the signature you drew on the document — no need to draw
+                                      again.
                                     </p>
                                   )}
 
@@ -2801,7 +2953,7 @@ export function DocumentJourney({
                                       documentId={doc.id}
                                       onClose={() => setSignOnMobileOpen(false)}
                                       onSignature={result => {
-                                        // Wallet pad needs PNG; host synthesizes one from vectors if needed.
+                                        // Party signature image: host synthesizes PNG from vectors if needed.
                                         void (async () => {
                                           let blob = result.blob
                                           if (!blob && result.imageDataUrl) {
@@ -2842,7 +2994,7 @@ export function DocumentJourney({
                                       !hasVerifiedLocalPdf ||
                                       !sigBlob ||
                                       (partyNeedsSignerName(signingResolution.party) &&
-                                        !signerName.trim()) ||
+                                        !resolvedName) ||
                                       busy
                                     }
                                     onClick={() => void signAsCurrentUser()}
@@ -2854,18 +3006,18 @@ export function DocumentJourney({
                                           size={18}
                                           strokeWidth={2.5}
                                         />
-                                        Signing…
+                                        Submitting…
                                       </>
                                     ) : (
-                                      'Sign with wallet'
+                                      'Submit'
                                     )}
                                   </button>
                                   <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                                    {role === 'creator'
-                                      ? requiredCount(doc) <= 1
-                                        ? 'Wallet sign anchors your identity, then you can seal on Nimiq.'
-                                        : 'Wallet sign, then share the invite so co-signers can fill their fields on the same PDF.'
-                                      : 'Wallet sign records you as this party on the agreement.'}
+                                    {isMultiParty
+                                      ? role === 'creator'
+                                        ? 'Records your signature, then invite co-signers to complete their fields on the same document.'
+                                        : 'Records you as this party on the agreement. You are already signed in — this does not open a new wallet login.'
+                                      : 'Records you as the signer. Next you can seal on Nimiq.'}
                                   </p>
                                 </>
                               )}
@@ -3270,7 +3422,7 @@ export function DocumentJourney({
                         </button>
                       )}
                       <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                        Use each card above to email or share a personal link. Hand off the PDF
+                        Use each card above to email or share a personal link. Hand off the document
                         separately (or via mobile Share when the OS includes the file).
                       </p>
                     </>
@@ -3710,9 +3862,9 @@ export function DocumentJourney({
               <MailCheck size={22} strokeWidth={2.25} />
             </span>
             <div className="invite-sent-toast-body">
-              <strong>Email sent — PDF not attached</strong>
+              <strong>Email sent — file not attached</strong>
               <p>
-                Send the agreement PDF to{' '}
+                Send the agreement file to{' '}
                 <span className="invite-sent-toast-contact">{inviteToast.contactLabel}</span>{' '}
                 yourself (email, Messages, Drive…). VeriLock only sends the signing link.
               </p>

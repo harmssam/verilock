@@ -72,7 +72,7 @@ const TRACK_META: Record<
   },
   signer: {
     title: 'I was invited',
-    detail: 'Drop the shared PDF (or open your invite link), then sign',
+    detail: 'Drop the shared document (or open your invite link), then sign',
     icon: Users,
     accent: 'signer',
   },

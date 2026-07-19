@@ -127,10 +127,10 @@ export function journeyConnectLead(
 ): string {
   const tail =
     role === 'signer'
-      ? ' After connect you can drop the shared PDF to open the agreement.'
+      ? ' After connect you can drop the shared document to open the agreement.'
       : role === 'verifier'
         ? ' Wallet is optional for verify — connect only if you need it.'
-        : ' After connect, step 2 opens the PDF stage.'
+        : ' After connect, step 2 opens the document stage.'
 
   switch (mode) {
     case 'pay-native':

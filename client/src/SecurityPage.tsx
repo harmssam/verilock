@@ -16,7 +16,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
     <article className="security-page" aria-labelledby="security-title">
       <header className="security-hero">
         <p className="security-eyebrow">Security &amp; integrity</p>
-        <h1 id="security-title">How VeriLock protects your PDF</h1>
+        <h1 id="security-title">How VeriLock protects your document</h1>
         <p className="security-lead">
           VeriLock is built so your file stays on your device, your wallet proves who you are, and only a
           fingerprint is anchored on Nimiq. This page explains that model in plain language — not a
@@ -50,14 +50,14 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
         </div>
         <div className="security-pill">
           <Shield size={18} strokeWidth={1.75} />
-          <span>No PDF upload</span>
+          <span>No file upload</span>
         </div>
       </div>
 
       <section id="what-is-sealed" className="security-section">
         <h2>What is sealed</h2>
         <p>
-          A seal records the <strong>SHA-256 fingerprint</strong> of the PDF bytes you chose — a fixed-length
+          A seal records the <strong>SHA-256 fingerprint</strong> of the document bytes you chose — a fixed-length
           digest computed in your browser. When parties co-sign, the agreement record ties wallet
           signatures to that fingerprint. Sealing on Nimiq anchors the hash so anyone can compare a later
           copy of the file against what was locked.
@@ -71,8 +71,8 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
       <section id="what-stays-local" className="security-section">
         <h2>What never leaves this device</h2>
         <p>
-          Fingerprinting, signing, and verification process the PDF <strong>in your browser</strong>. VeriLock
-          does not upload or host your PDF content. If you share the file with co-signers, that handoff is
+          Fingerprinting, signing, and verification process the document <strong>in your browser</strong>. VeriLock
+          does not upload or host your document content. If you share the file with co-signers, that handoff is
           out-of-band (email, chat, AirDrop) — you control who receives the bytes.
         </p>
       </section>
@@ -81,7 +81,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
         <h2>What wallets prove</h2>
         <p>
           Connecting a Nimiq wallet proves <strong>control of an address</strong> used as identity for
-          create, sign, and seal steps. The wallet does not receive your PDF bytes through VeriLock. Signing
+          create, sign, and seal steps. The wallet does not receive your document bytes through VeriLock. Signing
           records intent from that address against the agreement fingerprint, not custody of the file on our
           servers.
         </p>
@@ -92,14 +92,14 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
         <p>
           A sealed agreement results in a Nimiq transaction that anchors the document fingerprint (and related
           attestation details shown in the app). That on-chain record is public on Nimiq and is not something
-          VeriLock can erase. It does <strong>not</strong> include the PDF itself.
+          VeriLock can erase. It does <strong>not</strong> include the document itself.
         </p>
       </section>
 
       <section id="verify" className="security-section">
         <h2>How anyone verifies</h2>
         <p>
-          Verification re-hashes a local copy of the PDF in the browser and checks it against sealed
+          Verification re-hashes a local copy of the document in the browser and checks it against sealed
           fingerprints (via invite link, lookup, or your agreements). <strong>No wallet is required</strong>{' '}
           for a basic integrity check. Matching means the bytes match the sealed fingerprint; it does not
           mean VeriLock holds a copy of the file.
@@ -149,7 +149,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
       </section>
 
       <footer className="security-footer-cta">
-        <p>Ready to fingerprint a PDF locally?</p>
+        <p>Ready to fingerprint a document locally?</p>
         <div className="security-footer-actions">
           {onCreate ? (
             <button type="button" className="security-btn security-btn--primary" onClick={onCreate}>
@@ -162,11 +162,11 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
           )}
           {onVerify ? (
             <button type="button" className="security-btn security-btn--ghost" onClick={onVerify}>
-              Verify a PDF
+              Verify a document
             </button>
           ) : (
             <a className="security-btn security-btn--ghost" href="/?intent=verifier">
-              Verify a PDF
+              Verify a document
             </a>
           )}
         </div>

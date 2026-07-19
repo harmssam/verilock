@@ -454,7 +454,7 @@ function isUserShareCancel(err: unknown): boolean {
 /**
  * Desktop Safari on macOS reports canShare({ files }) but many targets (especially
  * Messages) open with an empty compose — no text, no PDF. Treat as unsupported so
- * the UI does not offer “Share PDF + invite” there. iOS/iPadOS keep file share.
+ * the UI does not offer “Share file + invite” there. iOS/iPadOS keep file share.
  */
 export function isDesktopMacWebShareUnreliable(
   nav: Pick<Navigator, 'userAgent' | 'platform' | 'maxTouchPoints'> = navigator,

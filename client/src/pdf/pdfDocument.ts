@@ -14,10 +14,10 @@ function mapPdfImportError(err: unknown): Error {
   const msg = err instanceof Error ? err.message : String(err ?? '')
   if (STALE_CHUNK.test(msg)) {
     return new Error(
-      'VeriLock was updated while this tab was open. Refresh the page, then try the PDF again.',
+      'VeriLock was updated while this tab was open. Refresh the page, then try the document again.',
     )
   }
-  return err instanceof Error ? err : new Error(String(err ?? 'PDF library failed to load'))
+  return err instanceof Error ? err : new Error(String(err ?? 'Document library failed to load'))
 }
 
 export async function ensurePdfWorker(): Promise<void> {

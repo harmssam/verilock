@@ -29,7 +29,7 @@ export function NimiqLockInfo({ onOpenPricing }: NimiqLockInfoProps) {
           <div className="nimiq-info-grid">
             <section className="nimiq-info-section">
               <ol className="nimiq-info-steps">
-                <li>Fingerprint your PDF locally in the browser.</li>
+                <li>Fingerprint your document locally in the browser.</li>
                 <li>Each party signs with their Nimiq wallet to prove identity.</li>
                 <li>
                   When all signatures are in, approve one Nimiq transaction that embeds the document hash
@@ -52,7 +52,7 @@ export function NimiqLockInfo({ onOpenPricing }: NimiqLockInfoProps) {
                   <strong>NIM balance</strong> — for the seal fee below.
                 </li>
                 <li>
-                  <strong>PDF on your device</strong> — the same file every signer uses.
+                  <strong>Document on your device</strong> — the same file every signer uses.
                 </li>
                 <li>
                   <strong>All required signatures</strong> — sealing starts once everyone has signed.
