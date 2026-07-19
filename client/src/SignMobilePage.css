@@ -41,6 +41,26 @@
   line-height: 1.45;
 }
 
+/* Vector stroke pad (SignatureStrokePad) on mobile capture */
+.sign-mobile-page .sig-pad {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 0.5rem;
+}
+
+.sign-mobile-page .sig-pad-canvas {
+  flex: 1;
+  min-height: min(55dvh, 420px);
+  height: min(55dvh, 420px);
+  width: 100%;
+  border-radius: 12px;
+  border: 1.5px solid var(--border, #e2e8f0);
+  background: #fff;
+  touch-action: none;
+}
+
 .sign-mobile-page .sig-pad--large {
   flex: 1;
   display: flex;

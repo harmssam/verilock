@@ -407,6 +407,78 @@ export function saveDraftPlan(input: {
   return recordToPublic(rec)
 }
 
+/**
+ * Re-open a locked plan as draft so the creator can rearrange.
+ * Allowed only before any fill batch or document signature exists.
+ */
+export function unlockPlan(input: {
+  originalSha256: string
+  creatorAddress: string
+  documentId?: string | null
+}): ReturnType<typeof recordToPublic> {
+  const sha = input.originalSha256.toLowerCase()
+  if (!/^[a-f0-9]{64}$/.test(sha)) {
+    throw new Error('Valid originalSha256 required')
+  }
+  const existing = getPlacementPlan(sha)
+  if (!existing) {
+    throw new Error('No placement plan for this PDF hash')
+  }
+  const publisher = normalizeAddress(input.creatorAddress)
+  if (
+    existing.creatorAddress &&
+    normalizeAddress(existing.creatorAddress) !== publisher
+  ) {
+    throw new Error('Only the plan owner can unlock this placement plan')
+  }
+  if (existing.status !== 'locked') {
+    // Already editable — return current public view.
+    return recordToPublic(existing)
+  }
+  if ((existing.fillBatches ?? []).length > 0) {
+    throw new Error('Cannot edit placements after someone has filled fields')
+  }
+  const docId = input.documentId ?? existing.documentId
+  if (docId) {
+    const signatures = getSignaturesForDocument(docId)
+    if (signatures.length > 0) {
+      throw new Error('Cannot edit placements after someone has signed')
+    }
+  }
+
+  let plan: SanitizedPlan
+  try {
+    const parsed = JSON.parse(existing.planJson) as unknown
+    const sanitized = sanitizePlanInput(parsed, sha)
+    if (!sanitized.ok) throw new Error(sanitized.error)
+    plan = { ...sanitized.plan, status: 'draft' }
+    delete plan.planRoot
+    delete plan.lockedAt
+  } catch {
+    throw new Error('Could not re-open placement plan')
+  }
+
+  const now = Date.now()
+  const rec: PlacementPlanRecord = {
+    originalSha256: sha,
+    documentId: docId ?? null,
+    creatorAddress: publisher,
+    status: 'draft',
+    planJson: JSON.stringify(planToPublic(plan)),
+    planRoot: null,
+    batch0FramesHex: [],
+    batch0Root: null,
+    fillBatches: [],
+    slotCount: plan.slots.length,
+    personCount: plan.people.length,
+    lockedAt: null,
+    createdAt: existing.createdAt,
+    updatedAt: now,
+  }
+  upsertPlacementPlan(rec)
+  return recordToPublic(rec)
+}
+
 export function lockPlan(input: {
   originalSha256: string
   creatorAddress: string

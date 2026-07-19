@@ -2,8 +2,11 @@
  * DocuSign-style signing: the document (PDF or image) is the surface.
  * Click your highlighted fields to open a modal; ink is reused across signature boxes.
  */
-import { Check, ChevronLeft, ChevronRight, PenLine, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, PenLine, Smartphone, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { FEATURES } from '../features'
+import { SignOnMobileModal, isLikelyMobileViewport } from '../journey/SignOnMobileModal'
 import {
   type BlobPayload,
   type ConstructionPlan,
@@ -61,6 +64,9 @@ export interface SignerFillViewProps {
   filledSlotIds?: ReadonlySet<string>
   onSubmit: (result: SignerFillResult) => void | Promise<void>
   pageWidth?: number
+  /** Session token for cross-device Sign on mobile (vector handoff). */
+  authToken?: string | null
+  documentId?: string | null
 }
 
 type LocalFill =
@@ -76,6 +82,8 @@ export function SignerFillView({
   filledSlotIds,
   onSubmit,
   pageWidth = 640,
+  authToken = null,
+  documentId = null,
 }: SignerFillViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const modalPanelRef = useRef<HTMLDivElement>(null)
@@ -100,6 +108,7 @@ export function SignerFillView({
   const [sigPadKey, setSigPadKey] = useState(0)
   const [localError, setLocalError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [signOnMobileOpen, setSignOnMobileOpen] = useState(false)
 
   const person =
     plan.people.find(p => p.slotIndex === personSlotIndex) ?? {
@@ -696,10 +705,14 @@ export function SignerFillView({
         </div>
       </div>
 
-      {/* Centered modal — stay with the PDF; no scroll-to-pad */}
+      {/*
+        Portal to document.body so journey overflow/transform ancestors cannot trap
+        position:fixed and park the dialog above the visible viewport.
+      */}
       {activeSlot &&
         activeSlot.personSlotIndex === personSlotIndex &&
-        !isServerFilled(activeSlot.id) && (
+        !isServerFilled(activeSlot.id) &&
+        createPortal(
           <div
             className="signer-fill-modal"
             role="presentation"
@@ -790,17 +803,33 @@ export function SignerFillView({
                       </button>
                     </div>
                   ) : (
-                    <SignatureStrokePad
-                      key={sigPadKey}
-                      productMode
-                      label={
-                        activeIsInitial
-                          ? 'Initials in the box below'
-                          : 'Sign in the box below'
-                      }
-                      onChange={result => setModalDraftInk(result)}
-                      disabled={disabled || busy || submitting}
-                    />
+                    <>
+                      <SignatureStrokePad
+                        key={sigPadKey}
+                        productMode
+                        label={
+                          activeIsInitial
+                            ? 'Initials in the box below'
+                            : 'Sign in the box below'
+                        }
+                        onChange={result => setModalDraftInk(result)}
+                        disabled={disabled || busy || submitting}
+                      />
+                      {FEATURES.signOnMobile &&
+                        authToken &&
+                        !isLikelyMobileViewport() &&
+                        !activeIsInitial && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary signer-fill-mobile-btn"
+                            disabled={disabled || busy || submitting}
+                            onClick={() => setSignOnMobileOpen(true)}
+                          >
+                            <Smartphone size={16} strokeWidth={2.25} aria-hidden />
+                            Sign on mobile
+                          </button>
+                        )}
+                    </>
                   )
                 ) : (
                   <input
@@ -849,8 +878,31 @@ export function SignerFillView({
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
+
+      {FEATURES.signOnMobile && authToken && (
+        <SignOnMobileModal
+          open={signOnMobileOpen}
+          token={authToken}
+          documentId={documentId ?? undefined}
+          onClose={() => setSignOnMobileOpen(false)}
+          onSignature={result => {
+            const stroke: SignatureStrokeResult = {
+              path: result.path,
+              imageDataUrl: result.imageDataUrl || '',
+              rawPoints: result.rawPoints,
+              simplifiedPoints: result.simplifiedPoints,
+              epsilon: result.epsilon,
+            }
+            setModalDraftInk(stroke)
+            setSigModalMode('reuse')
+            setSignOnMobileOpen(false)
+            setLocalError(null)
+          }}
+        />
+      )}
 
       {localError && (
         <p className="signer-fill-error" role="alert">

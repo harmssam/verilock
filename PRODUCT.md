@@ -175,7 +175,7 @@ Wallet login (LoginSheet / Hub / Pay) is a **gate** when creating, signing, or s
 | Role pill | Creating / signing / verifying as… |
 | Per-step privacy note | Dock header |
 | Signatures panel patterns | Party list, signed counts |
-| Sign on mobile | `SignOnMobileModal` + `/m/sign/:sessionId` (`FEATURES.signOnMobile`) — ink only; wallet bind on desktop |
+| Sign on mobile | `SignOnMobileModal` + `/m/sign/:sessionId` (`FEATURES.signOnMobile`) — **vector strokes** E2E (+ optional PNG preview); wallet bind on desktop |
 | Delete/cancel agreement | When `canDeleteDocument` allows |
 | Credit seal progress | Non-blocking seal UX |
 | Hub return path + intent restore | `hubReturnPath`, `journeyIntent` |

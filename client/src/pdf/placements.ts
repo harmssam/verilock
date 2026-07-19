@@ -380,6 +380,17 @@ export function lockPlan(
   }
 }
 
+/** Local draft re-open (pair with server unlock before anyone fills or signs). */
+export function unlockPlanLocal(plan: ConstructionPlan): ConstructionPlan {
+  const { planRoot: _root, lockedAt: _at, ...rest } = plan
+  return {
+    ...rest,
+    status: 'draft',
+    planRoot: undefined,
+    lockedAt: undefined,
+  }
+}
+
 /** Build batch 0 from a locked plan (places only; no fills yet). */
 export function planLockBatch(plan: ConstructionPlan): PlacementBatch {
   if (plan.status !== 'locked' || !plan.planRoot) {

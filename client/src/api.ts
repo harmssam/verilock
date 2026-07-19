@@ -99,14 +99,16 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  /** Construction placement plan (structure + roots). lock freezes geometry. */
+  /** Construction placement plan (structure + roots). lock freezes geometry until unlock. */
   savePlacementPlan: (
     token: string,
     body: {
       originalSha256: string
-      plan: unknown
+      plan?: unknown
       documentId?: string
       lock?: boolean
+      /** Re-open a locked plan as draft (only before fills/signatures). */
+      unlock?: boolean
       planRoot?: string
       batch0FramesHex?: string[]
       batch0Root?: string
@@ -129,6 +131,7 @@ export const api = {
         status: 'draft' | 'locked'
         planRoot?: string
         lockedAt?: number
+        creatorSigningAs?: number | null
       } | null
       hasBatch0Frames: boolean
       batch0FrameCount: number
