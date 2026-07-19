@@ -6,7 +6,6 @@ import {
   Check,
   Lock,
   PenLine,
-  Pencil,
   Trash2,
   Type,
   UserRound,
@@ -552,7 +551,7 @@ export function PlacementEditor({
         </div>
 
         <label className="placement-creator-role">
-          <span className="field-label">You (the organizer) will sign as</span>
+          <span className="field-label">You sign as</span>
           <select
             value={creatorSigningAs == null ? '' : String(creatorSigningAs)}
             disabled={editDisabled}
@@ -561,7 +560,7 @@ export function PlacementEditor({
               setCreatorSigningAs(v === '' ? null : Number(v))
             }}
           >
-            <option value="">Not signing — organizing only</option>
+            <option value="">Organizing only</option>
             {people.map(p => (
               <option key={p.slotIndex} value={p.slotIndex}>
                 Person {p.slotIndex}
@@ -569,21 +568,8 @@ export function PlacementEditor({
               </option>
             ))}
           </select>
-          <span className="muted" style={{ fontSize: '0.78rem' }}>
-            You do not have to be Person 1. Pick who you are, or none if others will sign.
-          </span>
         </label>
 
-        <p className="muted" style={{ margin: '0 0 0.5rem', fontSize: '0.78rem' }}>
-          <strong>Rename each person</strong> in the dashed name field (e.g. Tom) — click the
-          placeholder text to edit. Optional <strong>Nimiq address</strong> locks that wallet.
-          After you lock placements, names freeze — you only invite next.
-        </p>
-
-        <p className="placement-editor-active-banner" style={{ ['--person-color' as string]: personColor(activePerson) }}>
-          Placing fields for <strong>{activeName}</strong>
-          <span className="muted"> — click another person to place their boxes</span>
-        </p>
         <ul className="placement-editor-people-list">
           {people.map(p => {
             const color = personColor(p.slotIndex)
@@ -639,10 +625,6 @@ export function PlacementEditor({
                           className="placement-person-name-wrap"
                           onClick={e => e.stopPropagation()}
                         >
-                          <span className="placement-person-name-hint">
-                            <Pencil size={12} strokeWidth={2.25} aria-hidden />
-                            Click to rename
-                          </span>
                           <input
                             className={[
                               'placement-person-name',
@@ -655,7 +637,7 @@ export function PlacementEditor({
                             value={p.displayName}
                             disabled={editDisabled}
                             maxLength={80}
-                            placeholder="Type their name…"
+                            placeholder="Name"
                             onFocus={e => {
                               selectPerson(p.slotIndex)
                               // Default "Person 1" → select all so typing replaces immediately
@@ -696,7 +678,7 @@ export function PlacementEditor({
                         />
                         {!walletOk && (
                           <span className="placement-person-wallet-err">
-                            Address should look like NQ… (36 characters)
+                            Invalid Nimiq address
                           </span>
                         )}
                       </>
@@ -705,18 +687,24 @@ export function PlacementEditor({
                         <span className="placement-person-name-static">
                           {p.displayName || `Person ${p.slotIndex}`}
                         </span>
-                        <span className="muted placement-person-counts">
-                          {p.walletAddress
-                            ? `Wallet ${shortAddress(p.walletAddress)} (required)`
-                            : 'Name only — invitee picks this person'}
-                        </span>
+                        {p.walletAddress && (
+                          <span className="muted placement-person-counts">
+                            {shortAddress(p.walletAddress)}
+                          </span>
+                        )}
                       </>
                     )}
                     <span className="muted placement-person-counts">
-                      {nSig} sig · {nInit} init · {nName} name · {nText} text
+                      {[
+                        nSig > 0 ? `${nSig} sig` : null,
+                        nInit > 0 ? `${nInit} init` : null,
+                        nName > 0 ? `${nName} name` : null,
+                        nText > 0 ? `${nText} text` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || 'No fields yet'}
                     </span>
                   </span>
-                  {active && <span className="placement-person-active-tag">Active</span>}
                 </div>
               </li>
             )
@@ -846,22 +834,9 @@ export function PlacementEditor({
         )}
       </div>
 
-      {!locked && (
-        <p className="placement-editor-hint muted">
-          Click a person card so it is <strong>Active</strong>, then place signature / initial / name / text
-          boxes (color-coded). Click a box to drag or delete it; Esc cancels place mode. Lock when
-          the layout is right — boxes cannot move after that.
-        </p>
-      )}
       {locked && (
         <p className="placement-editor-hint placement-editor-hint--locked">
           <Lock size={14} strokeWidth={2.25} aria-hidden /> Placements locked
-          {plan.planRoot ? (
-            <>
-              {' '}
-              · root <code>{plan.planRoot.slice(0, 8)}…</code>
-            </>
-          ) : null}
         </p>
       )}
       {placeError && (
@@ -960,11 +935,9 @@ export function PlacementEditor({
           </div>
         </div>
 
-        <aside className="pdf-annotator-side placement-editor-side">
-          <h4>Slots on this page</h4>
-          {pageSlots.length === 0 ? (
-            <p className="pdf-annotator-hint">No boxes on this page yet.</p>
-          ) : (
+        {pageSlots.length > 0 && (
+          <aside className="pdf-annotator-side placement-editor-side">
+            <h4>Slots on this page</h4>
             <ul className="placement-slot-list">
               {pageSlots.map(slot => {
                 const person =
@@ -1017,14 +990,14 @@ export function PlacementEditor({
                 )
               })}
             </ul>
-          )}
-          <p className="pdf-annotator-hint">
-            Total: {slots.length} box{slots.length === 1 ? '' : 'es'} ·{' '}
-            {slots.filter(s => s.kind === 'signature').length} sig ·{' '}
-            {slots.filter(s => s.kind === 'initial').length} initial
-            {slots.filter(s => s.kind === 'initial').length === 1 ? '' : 's'}
-          </p>
-        </aside>
+            <p className="pdf-annotator-hint">
+              Total: {slots.length} box{slots.length === 1 ? '' : 'es'} ·{' '}
+              {slots.filter(s => s.kind === 'signature').length} sig ·{' '}
+              {slots.filter(s => s.kind === 'initial').length} initial
+              {slots.filter(s => s.kind === 'initial').length === 1 ? '' : 's'}
+            </p>
+          </aside>
+        )}
       </div>
 
       {!locked && onLockRequest && (
@@ -1042,10 +1015,7 @@ export function PlacementEditor({
           ) : (
             <div className="placement-editor-confirm">
               <p>
-                Lock <strong>{slots.length}</strong> box
-                {slots.length === 1 ? '' : 'es'} for{' '}
-                <strong>{people.map(p => p.displayName || `Person ${p.slotIndex}`).join(', ')}</strong>
-                ? You will not be able to move or delete them after this.
+                Lock {slots.length} field{slots.length === 1 ? '' : 's'}? This cannot be undone.
               </p>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button

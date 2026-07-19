@@ -2132,16 +2132,8 @@ export function DocumentJourney({
                         <h3 id="arrange-pdf-title">
                           {constructionPlan.status === 'locked'
                             ? 'Placements locked'
-                            : 'Arrange signers on the PDF'}
+                            : 'Arrange signers'}
                         </h3>
-                        <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-                          {constructionPlan.status === 'locked'
-                            ? constructionPlan.creatorSigningAs == null ||
-                              constructionPlan.creatorSigningAs === 0
-                              ? 'Layout is fixed. You are organizing only — share the invite so each person can sign their own fields. You will not be asked to sign as Person 1.'
-                              : 'Layout is fixed. Sign your fields on the document next, then invite anyone else who still needs to sign.'
-                            : 'Name each person, place their fields, and choose whether you sign as one of them (or none). The PDF never uploads.'}
-                        </p>
                       </header>
                       <PlacementEditor
                         file={(pdfFile ?? signFile)!}
@@ -2222,17 +2214,7 @@ export function DocumentJourney({
                   <>
                   <section className="signatures-config" aria-labelledby="signatures-config-title">
                     <header className="signatures-config-head">
-                      <h3 id="signatures-config-title">Invite &amp; seal options</h3>
-                      <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-                        {constructionPlan?.status === 'locked'
-                          ? constructionPlan.creatorSigningAs == null ||
-                            constructionPlan.creatorSigningAs === 0
-                            ? 'People and placements are locked. Share the invite so each person can sign their fields. Party count cannot change after lock.'
-                            : 'People and placements are locked. Finish your fields if needed, then share the invite. Party count cannot change after lock.'
-                          : signedCount(doc) > 0
-                            ? 'Seal alone, or add co-signers and share the invite before sealing.'
-                            : 'Configure who must sign, then share the invite.'}
-                      </p>
+                      <h3 id="signatures-config-title">Invite</h3>
                     </header>
 
                     <div className="progress-bar-wrap">
@@ -2303,12 +2285,6 @@ export function DocumentJourney({
                           doc.parties.filter(p => p.required).length > 0 && (
                           <div className="field-stack">
                             <span className="field-label">Invite each person</span>
-                            <p className="muted" style={{ margin: '0 0 0.55rem', fontSize: '0.8rem' }}>
-                              <strong>Names</strong> were set on Arrange (frozen after lock). Enter an
-                              email and send a branded invite with their personal signing link —{' '}
-                              <strong>no PDF is attached</strong> (they use the file you shared
-                              separately). You can also copy the link.
-                            </p>
                             {doc.parties
                               .filter(p => p.required)
                               .map((p, index) => {
@@ -2343,13 +2319,9 @@ export function DocumentJourney({
                                         </span>
                                       ) : null}
                                     </div>
-                                    {p.walletAddress ? (
+                                    {p.walletAddress && (
                                       <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
-                                        Wallet required: {shortAddress(p.walletAddress)}
-                                      </p>
-                                    ) : (
-                                      <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
-                                        Name-only — personal link pre-selects this person
+                                        {shortAddress(p.walletAddress)}
                                       </p>
                                     )}
                                     <label className="field">
@@ -2510,11 +2482,6 @@ export function DocumentJourney({
                             <span className="field-label">
                               Invite detail{inviteeSlotCount > 1 ? 's' : ''} (optional)
                             </span>
-                            <p className="muted" style={{ margin: '0 0 0.45rem', fontSize: '0.8rem' }}>
-                              Prefer naming people on <strong>Arrange</strong> before you lock.
-                              Invite emails only prefill Mail / .eml on this device — VeriLock does
-                              not send email.
-                            </p>
                             {Array.from({ length: inviteeSlotCount }, (_, index) => {
                               const partyLabel = `Invitee ${index + 1}`
                               return (
