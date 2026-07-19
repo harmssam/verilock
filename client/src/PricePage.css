@@ -32,6 +32,9 @@
 }
 
 .price-page-model-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -70,6 +73,53 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
+  gap: 0.45rem 0.65rem;
+}
+
+.price-page-model-card-price {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.55rem;
+}
+
+.price-page-model-card-price--pending {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.price-page-model-half-badge {
+  display: inline-block;
+  padding: 0.18rem 0.5rem;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid rgba(94, 234, 212, 0.45);
+  background: rgba(94, 234, 212, 0.14);
+  color: var(--mint-deep, #0f766e);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  align-self: center;
+}
+
+.price-page-model-hint--note {
+  margin-top: 0.15rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.1);
+  color: var(--text-muted);
+}
+
+.price-page-model-hint--note strong {
+  color: var(--text);
+  font-weight: 700;
 }
 
 .price-page-model-promo {

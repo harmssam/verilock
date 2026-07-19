@@ -3113,6 +3113,7 @@ export function DocumentJourney({
                         setNimiq={setNimiq}
                         refreshKey={creditsRefresh}
                         compact
+                        preferCardPrice
                         balanceOnly={creditBalance >= 1}
                         onBalanceChange={setCreditBalance}
                       />
@@ -3152,7 +3153,7 @@ export function DocumentJourney({
                             <p className="muted journey-seal-hint" style={{ margin: 0 }}>
                               {isMobileDevice()
                                 ? 'Sealing works best inside Nimiq Pay. In the browser, this seal uses Nimiq Hub — keep VeriLock open until you return and the on-chain proof is confirmed.'
-                                : 'Sealing redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the on-chain proof is confirmed. Or buy credits with NIM / card above to seal without another wallet payment.'}
+                                : 'Sealing redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the on-chain proof is confirmed. Or buy credits with card (or NIM at half the card rate) above to seal without another wallet payment.'}
                             </p>
                           )}
                         </>
