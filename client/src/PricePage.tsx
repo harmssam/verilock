@@ -118,11 +118,7 @@ export function PricePage({
         <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
           Nimiq
         </a>{' '}
-        network: a permanent fingerprint anyone can re-check.
-        {halfPrice
-          ? ' Pay with card, or pay with NIM at 1/2 price.'
-          : ' Pay with card or NIM.'}{' '}
-        You can also pay the NIM fee when you lock, instead of using a credit.
+        network: a permanent fingerprint anyone can re-check. Pay with card or NIM.
       </p>
 
       {creditsEnabled ? (
@@ -159,12 +155,10 @@ export function PricePage({
             </div>
             <p className="muted price-page-model-hint">
               {halfPrice
-                ? `Card is ${stripeMarkup}× the live NIM market rate for one document`
-                : `Card tracks the live NIM market rate for one document`}
-              {stripeMinUsd > 0
-                ? ` (Stripe minimum ${formatFiatAmount(stripeMinUsd, 'USD')} per charge)`
-                : ''}
-              . Quotes from{' '}
+                ? `Card is ${stripeMarkup}× the live NIM rate`
+                : `Card tracks the live NIM rate`}
+              {' '}
+              via{' '}
               <a href={FASTSPOT_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
                 Fastspot
               </a>
@@ -185,7 +179,7 @@ export function PricePage({
           <div className="price-page-model-row">
             <span className="price-page-model-label">
               <NimiqHexagonIcon size={12} />
-              NIM{halfPrice ? ' · 1/2 price' : ''}
+              NIM
             </span>
             <div className="price-page-model-value">
               <SealFeeAmount
@@ -209,9 +203,6 @@ export function PricePage({
               </div>
             )}
             <p className="muted price-page-model-hint">
-              {halfPrice
-                ? 'NIM is 1/2 price, whether you buy credits or pay the NIM fee when you lock.'
-                : 'Pay with NIM when buying credits or when you lock, for the current NIM fee.'}{' '}
               List price: 1000 NIM per document
               {pricing.promoActive ? ` (now ${pricing.feeNim} NIM with promo)` : ''}.
             </p>
@@ -234,7 +225,6 @@ export function PricePage({
                 ? `${creditsInfo.packs[0]}–${creditsInfo.packs[creditsInfo.packs.length - 1]}`
                 : '10–100'}
               ). Card or NIM
-              {halfPrice ? '; NIM is 1/2 price' : ''}
               {unitBelowStripeMin
                 ? `. Card packs start at ${minPack} to meet the ${formatFiatAmount(stripeMinUsd, 'USD')} minimum`
                 : ''}
@@ -247,7 +237,6 @@ export function PricePage({
               connectMode={connectMode}
               connecting={connecting}
               onConnect={onConnect}
-              halfPrice={halfPrice}
             />
           )}
 
@@ -302,13 +291,6 @@ export function PricePage({
             </span>
           </li>
           <li className="price-page-why-item">
-            <strong className="price-page-why-item-title">1/2 price in NIM</strong>
-            <span className="price-page-why-item-body muted">
-              Same lock either way. Pay with card for convenience, or pay with NIM at 1/2 price when
-              you buy packs or lock a document. Network fees stay low, so we pass that through.
-            </span>
-          </li>
-          <li className="price-page-why-item">
             <strong className="price-page-why-item-title">Document stays on your device</strong>
             <span className="price-page-why-item-body muted">
               Only a short integrity fingerprint goes on-chain. The file itself never uploads.
@@ -338,12 +320,10 @@ function PriceCreditsLogin({
   connectMode,
   connecting,
   onConnect,
-  halfPrice = true,
 }: {
   connectMode: JourneyConnectMode
   connecting: boolean
   onConnect: (options?: JourneyConnectRequest) => void
-  halfPrice?: boolean
 }) {
   const [loginOpen, setLoginOpen] = useState(false)
   const entry = journeyLoginEntryLabels()
@@ -354,8 +334,7 @@ function PriceCreditsLogin({
       {!needsSheet || !loginOpen ? (
         <>
           <p className="muted" style={{ margin: 0, fontSize: '0.86rem' }}>
-            Log in with your Nimiq wallet to buy packs. Card or NIM
-            {halfPrice ? ' (1/2 price)' : ''}.
+            Log in with your Nimiq wallet to buy packs.
           </p>
           <button
             type="button"
