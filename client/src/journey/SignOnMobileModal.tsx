@@ -30,6 +30,13 @@ interface SignOnMobileModalProps {
   onClose: () => void
   /** Primary ink is vectors; PNG blob is optional convenience for wallet image. */
   onSignature: (result: HandoffInkResult) => void
+  /**
+   * Target field width÷height so the phone pad matches the PDF box
+   * (avoids stretch when applying strokes).
+   */
+  padAspect?: number
+  /** `signature` | `initial` — labels on the phone capture page. */
+  fieldKind?: 'signature' | 'initial'
 }
 
 const FALLBACK_POLL_MS = 1500
@@ -42,6 +49,8 @@ export function SignOnMobileModal({
   open,
   onClose,
   onSignature,
+  padAspect,
+  fieldKind = 'signature',
 }: SignOnMobileModalProps) {
   const [phase, setPhase] = useState<HostPhase>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -142,7 +151,14 @@ export function SignOnMobileModal({
       const k = await exportKeyB64url(key)
       const room = await createHandoffSession(token, documentId)
       sessionIdRef.current = room.sessionId
-      const url = `${window.location.origin}/m/sign/${room.sessionId}#k=${k}`
+      // Fragment holds key + pad geometry (never sent to server as query).
+      const frag = new URLSearchParams()
+      frag.set('k', k)
+      if (padAspect != null && Number.isFinite(padAspect) && padAspect > 0.05) {
+        frag.set('a', String(Math.round(padAspect * 1000) / 1000))
+      }
+      if (fieldKind === 'initial') frag.set('kind', 'initial')
+      const url = `${window.location.origin}/m/sign/${room.sessionId}#${frag.toString()}`
       setHandoffUrl(url)
       setExpiresLabel(new Date(room.expiresAt).toLocaleTimeString())
       const qr = await qrDataUrl(url, 240)
@@ -212,7 +228,7 @@ export function SignOnMobileModal({
       setError(err instanceof Error ? err.message : 'Could not start mobile sign')
       setPhase('error')
     }
-  }, [token, documentId, cleanupNet, applyEncrypted, revokeObjectUrl])
+  }, [token, documentId, padAspect, fieldKind, cleanupNet, applyEncrypted, revokeObjectUrl])
 
   useEffect(() => {
     mountedRef.current = true

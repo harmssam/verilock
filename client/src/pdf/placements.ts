@@ -291,15 +291,19 @@ export async function computePlanRoot(plan: ConstructionPlan): Promise<string> {
 /** Canonical blob payload for hashing (no blob id). */
 export function canonicalizeBlobPayload(payload: BlobPayload): Record<string, unknown> {
   if (payload.kind === 'ink') {
+    const path: Record<string, unknown> = {
+      epsilon: q(payload.path.epsilon, 2),
+      lineWidthRatio: q(payload.path.lineWidthRatio, 4),
+      strokes: payload.path.strokes.map(s => ({
+        points: s.points.map(pt => ({ x: q(pt.x), y: q(pt.y) })),
+      })),
+    }
+    if (payload.path.captureAspect != null && Number.isFinite(payload.path.captureAspect)) {
+      path.captureAspect = q(payload.path.captureAspect, 4)
+    }
     return {
       t: 'ink',
-      path: {
-        epsilon: q(payload.path.epsilon, 2),
-        lineWidthRatio: q(payload.path.lineWidthRatio, 4),
-        strokes: payload.path.strokes.map(s => ({
-          points: s.points.map(pt => ({ x: q(pt.x), y: q(pt.y) })),
-        })),
-      },
+      path,
     }
   }
   const row: Record<string, unknown> = {
@@ -331,11 +335,22 @@ export async function makeContentBlob(payload: BlobPayload): Promise<ContentBlob
   // Re-canonicalize path so stored payload matches hash input
   if (payload.kind === 'ink') {
     const c = canonicalizeBlobPayload(payload) as {
-      path: SignaturePathData
+      path: {
+        epsilon: number
+        lineWidthRatio: number
+        captureAspect?: number
+        strokes: SignaturePathData['strokes']
+      }
+    }
+    const path: SignaturePathData = {
+      epsilon: c.path.epsilon,
+      lineWidthRatio: c.path.lineWidthRatio,
+      strokes: c.path.strokes,
+      ...(c.path.captureAspect != null ? { captureAspect: c.path.captureAspect } : {}),
     }
     return {
       blobId,
-      payload: { kind: 'ink', path: c.path },
+      payload: { kind: 'ink', path },
     }
   }
   const c = canonicalizeBlobPayload(payload) as {
