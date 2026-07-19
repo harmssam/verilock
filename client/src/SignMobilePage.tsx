@@ -27,7 +27,6 @@ function parseSessionId(pathname: string): string | null {
 
 function hashParams(): URLSearchParams {
   const hash = window.location.hash.replace(/^#/, '')
-  // Support #k=… and #k=…&a=2.5
   if (hash && !hash.includes('=')) return new URLSearchParams()
   return new URLSearchParams(hash)
 }
@@ -52,8 +51,8 @@ function kindFromHash(): 'signature' | 'initial' {
 }
 
 /**
- * Focused mobile signature capture — no wallet, no PDF.
- * Sends unit-square stroke vectors (primary) + optional PNG preview, E2E encrypted.
+ * Full-screen mobile signature capture — no wallet, no PDF, no preview step.
+ * Draw → Done sends vectors (E2E encrypted) to the desktop host.
  */
 export function SignMobilePage() {
   const sessionId = parseSessionId(window.location.pathname)
@@ -69,6 +68,9 @@ export function SignMobilePage() {
   const channelRef = useRef<RTCDataChannel | null>(null)
   const peerRef = useRef<PeerSession | null>(null)
   const channelOpenRef = useRef(false)
+  const strokeRef = useRef<SignatureStrokeResult | null>(null)
+  strokeRef.current = stroke
+  const sendingRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -105,7 +107,7 @@ export function SignMobilePage() {
             ch.onopen = () => {
               channelOpenRef.current = true
               if (!cancelled) {
-                setPhase(p => (p === 'sending' || p === 'sent' || p === 'preview' ? p : 'connected'))
+                setPhase(p => (p === 'sending' || p === 'sent' ? p : 'connected'))
               }
             }
           },
@@ -134,25 +136,22 @@ export function SignMobilePage() {
     }
   }, [sessionId])
 
-  const goPreview = useCallback(() => {
-    if (!stroke?.path?.strokes?.length) return
-    setPhase('preview')
-  }, [stroke])
-
   const send = useCallback(async () => {
-    if (!stroke?.path?.strokes?.length || !sessionId || !keyRef.current) return
+    const current = strokeRef.current
+    if (!current?.path?.strokes?.length || !sessionId || !keyRef.current) return
+    if (sendingRef.current) return
+    sendingRef.current = true
     setPhase('sending')
     setError(null)
     try {
       const payload = strokeResultToPayload(
         sessionId,
-        stroke.path,
-        stroke.imageDataUrl || undefined,
+        current.path,
+        current.imageDataUrl || undefined,
       )
       const pkg = await encryptPayload(keyRef.current, sessionId, payload)
       const packed = packEncrypted(pkg)
 
-      // Best-effort P2P for lower latency — never the sole delivery path.
       const ch = channelRef.current
       if (ch && (ch.readyState === 'open' || channelOpenRef.current)) {
         try {
@@ -163,7 +162,6 @@ export function SignMobilePage() {
         }
       }
 
-      // Always deposit ciphertext so the host can retrieve even if WebRTC drops.
       await depositEncrypted(sessionId, pkg)
 
       setPhase('sent')
@@ -171,28 +169,54 @@ export function SignMobilePage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send signature')
       setPhase('error')
+    } finally {
+      sendingRef.current = false
     }
-  }, [stroke, sessionId])
+  }, [sessionId])
 
-  const redraw = () => {
-    setStroke(null)
-    setPadKey(k => k + 1)
-    setPhase(channelOpenRef.current ? 'connected' : 'ready')
-    setError(null)
-  }
+  const drawing =
+    phase === 'ready' || phase === 'connecting' || phase === 'connected'
 
   return (
-    <div className="sign-mobile-page">
-      <header className="sign-mobile-header">
-        <p className="sign-mobile-kicker">VeriLock</p>
-        <h1 className="sign-mobile-title">
-          {isInitial ? 'Draw your initials' : 'Draw your signature'}
-        </h1>
-        <p className="sign-mobile-sub muted">
-          Strokes are sent as vectors to your computer (encrypted). The pad matches the field shape
-          on the document. Wallet signing stays on the computer.
-        </p>
-      </header>
+    <div className={`sign-mobile-page${drawing ? ' sign-mobile-page--draw' : ''}`}>
+      {drawing && (
+        <>
+          <header className="sign-mobile-header sign-mobile-header--compact">
+            <p className="sign-mobile-kicker">VeriLock</p>
+            <h1 className="sign-mobile-title">
+              {isInitial ? 'Draw your initials' : 'Draw your signature'}
+            </h1>
+          </header>
+
+          <div className="sign-mobile-pad-stage">
+            <SignatureStrokePad
+              key={padKey}
+              productMode
+              compact
+              label={isInitial ? 'Initials' : 'Signature'}
+              padAspect={padAspect ?? (isInitial ? 1.4 : 2.8)}
+              onChange={result => setStroke(result)}
+            />
+          </div>
+
+          {/*
+            Floating dock: canvas stays full-size underneath. Pointer capture on the
+            pad keeps drawing continuous when the finger passes over the buttons.
+          */}
+          <div className="sign-mobile-float-dock">
+            <button
+              type="button"
+              className={`btn btn-primary btn-lg sign-mobile-done-btn${
+                !stroke?.path?.strokes?.length ? ' is-disabled' : ''
+              }`}
+              disabled={!stroke?.path?.strokes?.length}
+              onClick={() => void send()}
+            >
+              Done
+            </button>
+          </div>
+        </>
+      )}
 
       {phase === 'loading' && (
         <p className="sign-mobile-status" role="status">
@@ -205,55 +229,18 @@ export function SignMobilePage() {
         <div className="sign-mobile-error" role="alert">
           <p>{error ?? 'Something went wrong'}</p>
           <p className="muted">Return to your computer and open a new QR code.</p>
-        </div>
-      )}
-
-      {(phase === 'ready' || phase === 'connecting' || phase === 'connected') && (
-        <>
-          <SignatureStrokePad
-            key={padKey}
-            productMode
-            label={isInitial ? 'Initials in the box' : 'Sign in the box'}
-            padAspect={padAspect ?? (isInitial ? 1.4 : 2.8)}
-            onChange={result => setStroke(result)}
-          />
-          <div className="sign-mobile-dock">
-            <button
-              type="button"
-              className="btn btn-primary btn-lg"
-              disabled={!stroke?.path?.strokes?.length}
-              onClick={goPreview}
-            >
-              Preview
-            </button>
-            <p className="muted sign-mobile-dock-hint">
-              {phase === 'connected'
-                ? 'Private channel ready'
-                : 'You can confirm even if the channel is still connecting'}
-            </p>
-          </div>
-        </>
-      )}
-
-      {phase === 'preview' && stroke && (
-        <div className="sign-mobile-preview-block">
-          {stroke.imageDataUrl ? (
-            <img
-              className="sign-mobile-preview-img"
-              src={stroke.imageDataUrl}
-              alt="Your signature preview"
-            />
-          ) : (
-            <p className="muted">Signature ready ({stroke.simplifiedPoints} points)</p>
-          )}
-          <div className="sign-mobile-dock">
-            <button type="button" className="btn btn-primary btn-lg" onClick={() => void send()}>
-              Confirm &amp; send
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={redraw}>
-              Redraw
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              setError(null)
+              setStroke(null)
+              setPadKey(k => k + 1)
+              setPhase(channelOpenRef.current ? 'connected' : 'ready')
+            }}
+          >
+            Try again
+          </button>
         </div>
       )}
 
@@ -269,8 +256,7 @@ export function SignMobilePage() {
           <Check size={28} strokeWidth={2.5} aria-hidden />
           <h2>Sent to your computer</h2>
           <p className="muted">
-            Keep the computer window open. Review the signature there and continue with wallet sign.
-            You can close this tab once it appears on the computer.
+            Keep the computer window open until the signature appears. You can close this tab.
           </p>
         </div>
       )}

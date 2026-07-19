@@ -2701,6 +2701,17 @@ a.hash-chip.text-link:focus-visible {
   max-height: min(55dvh, 360px);
 }
 
+.sig-pad--compact {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.sig-pad--compact .sig-pad-canvas {
+  flex: 1;
+  min-height: 0;
+}
+
 .sig-on-mobile-btn {
   width: 100%;
   margin-top: 0.15rem;
