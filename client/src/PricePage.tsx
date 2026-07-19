@@ -113,14 +113,16 @@ export function PricePage({
     <div className="card price-page">
       <h2>Pricing</h2>
       <p className="muted price-page-lead">
-        Signing and verifying are free. Sealing costs <strong>1 credit</strong> and permanently records
-        your document&apos;s fingerprint on the{' '}
+        Signing and verifying are free. Sealing costs <strong>1 credit</strong>: a permanent
+        fingerprint of your document on the{' '}
         <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
           Nimiq
         </a>{' '}
-        network blockchain. Buy credit packs with card by default
-        {halfPrice ? ', or pay with NIM for half the card rate' : ''}. You can also spend the current
-        NIM seal fee at seal time instead of using a credit.
+        network.
+        {halfPrice
+          ? ' Pay with card, or pay half that rate in NIM.'
+          : ' Pay with card or NIM.'}{' '}
+        You can also pay the NIM seal fee at seal time instead of using a credit.
       </p>
 
       {creditsEnabled ? (
@@ -134,15 +136,15 @@ export function PricePage({
               <span className="price-page-model-per">per document</span>
             </div>
             <p className="muted price-page-model-explain">
-              One credit pays for a permanent on-chain seal: the document fingerprint is written to the
-              Nimiq network blockchain and can be verified forever, independently of VeriLock.
+              One credit buys a permanent on-chain seal. The fingerprint lands on Nimiq and stays
+              verifiable forever, even without VeriLock.
             </p>
           </div>
 
           <div className="price-page-model-row">
             <span className="price-page-model-label">
               <CreditCard size={12} strokeWidth={2.5} aria-hidden />
-              Card (default)
+              Card
             </span>
             <div className="price-page-model-value price-page-model-value--card">
               {creditsInfo?.creditStripeUsd != null ? (
@@ -157,11 +159,13 @@ export function PricePage({
               )}
             </div>
             <p className="muted price-page-model-hint">
-              Card price is {stripeMarkup}× the live NIM market value of one seal
+              {halfPrice
+                ? `Card is ${stripeMarkup}× the live NIM market rate for one seal`
+                : `Card tracks the live NIM market rate for one seal`}
               {stripeMinUsd > 0
                 ? ` (Stripe minimum ${formatFiatAmount(stripeMinUsd, 'USD')} per charge)`
                 : ''}
-              . Rates from{' '}
+              . Quotes from{' '}
               <a href={FASTSPOT_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
                 Fastspot
               </a>
@@ -182,7 +186,7 @@ export function PricePage({
           <div className="price-page-model-row">
             <span className="price-page-model-label">
               <NimiqHexagonIcon size={12} />
-              NIM{halfPrice ? ' — half price' : ''}
+              NIM{halfPrice ? ' · half card' : ''}
             </span>
             <div className="price-page-model-value">
               <SealFeeAmount
@@ -192,8 +196,8 @@ export function PricePage({
                 showFiatPicker
               />
               {halfPrice && (
-                <span className="price-page-model-half-badge" title="NIM is half the card rate">
-                  ½ card
+                <span className="price-page-model-half-badge" title="NIM costs half the card price">
+                  ½ card price
                 </span>
               )}
             </div>
@@ -207,9 +211,9 @@ export function PricePage({
             )}
             <p className="muted price-page-model-hint">
               {halfPrice
-                ? 'Pay with NIM when buying credits or at seal time — half the card price (exact seal fee in NIM).'
+                ? 'NIM is half the card price, whether you buy credits or pay the seal fee at seal time.'
                 : 'Pay with NIM when buying credits or at seal time for the current seal fee.'}{' '}
-              Standard list price is 1000 NIM per seal
+              List price: 1000 NIM per seal
               {pricing.promoActive ? ` (now ${pricing.feeNim} NIM with promo)` : ''}.
             </p>
           </div>
@@ -230,8 +234,8 @@ export function PricePage({
               {creditsInfo?.packs && creditsInfo.packs.length >= 2
                 ? `${creditsInfo.packs[0]}–${creditsInfo.packs[creditsInfo.packs.length - 1]}`
                 : '10–100'}
-              ). Card is the default
-              {halfPrice ? '; NIM is half the card rate' : ''}
+              ). Card or NIM
+              {halfPrice ? '; NIM is half the card price' : ''}
               {unitBelowStripeMin
                 ? `. Card packs start at ${minPack} to meet the ${formatFiatAmount(stripeMinUsd, 'USD')} minimum`
                 : ''}
@@ -244,6 +248,7 @@ export function PricePage({
               connectMode={connectMode}
               connecting={connecting}
               onConnect={onConnect}
+              halfPrice={halfPrice}
             />
           )}
 
@@ -272,13 +277,13 @@ export function PricePage({
               Why the Nimiq network?
             </h3>
             <p className="price-page-why-lead muted">
-              VeriLock seals documents on{' '}
+              Seals land on{' '}
               <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
                 Nimiq
                 <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
               </a>
               , a browser-first Layer&nbsp;1. Your wallet signs; the fingerprint goes on the network.
-              VeriLock never takes custody of the proof.
+              We never hold the proof.
             </p>
           </div>
         </header>
@@ -286,35 +291,35 @@ export function PricePage({
           <li className="price-page-why-item">
             <strong className="price-page-why-item-title">Direct to the chain</strong>
             <span className="price-page-why-item-body muted">
-              No attestation broker, escrow, or opaque API sits between you and the record. The seal is
-              a normal Nimiq transaction anyone can look up independently of VeriLock.
+              No broker, escrow, or opaque API between you and the record. A seal is a normal Nimiq
+              transaction anyone can look up without VeriLock.
             </span>
           </li>
           <li className="price-page-why-item">
-            <strong className="price-page-why-item-title">Fast and lightweight</strong>
+            <strong className="price-page-why-item-title">Fast and light</strong>
             <span className="price-page-why-item-body muted">
-              Built for the web: quick confirmations, lightweight clients, no full node for signers.
-              Sealing stays practical in the browser or Nimiq Pay.
+              Quick confirmations, light clients, no full node for signers. Sealing stays practical in
+              the browser or Nimiq Pay.
             </span>
           </li>
           <li className="price-page-why-item">
-            <strong className="price-page-why-item-title">Half-price with NIM</strong>
+            <strong className="price-page-why-item-title">Half price in NIM</strong>
             <span className="price-page-why-item-body muted">
-              Card credits are the easy default. Paying the seal fee in NIM — when you buy packs or
-              seal — costs half the card rate, because network fees stay low.
+              Same seal either way. Pay with card for convenience, or pay half that rate in NIM when
+              you buy packs or seal. Network fees stay low, so we pass that through.
             </span>
           </li>
           <li className="price-page-why-item">
             <strong className="price-page-why-item-title">Document stays on your device</strong>
             <span className="price-page-why-item-body muted">
-              Only a short integrity fingerprint is written on-chain. The file itself never uploads.
+              Only a short integrity fingerprint goes on-chain. The file itself never uploads.
             </span>
           </li>
           <li className="price-page-why-item">
             <strong className="price-page-why-item-title">Self-custodial identity</strong>
             <span className="price-page-why-item-body muted">
-              Each party signs with their own wallet. VeriLock never holds your keys, and the proof
-              outlives our servers.
+              Each party signs with their own wallet. We never hold your keys, and the proof outlives
+              our servers.
             </span>
           </li>
         </ul>
@@ -334,10 +339,12 @@ function PriceCreditsLogin({
   connectMode,
   connecting,
   onConnect,
+  halfPrice = true,
 }: {
   connectMode: JourneyConnectMode
   connecting: boolean
   onConnect: (options?: JourneyConnectRequest) => void
+  halfPrice?: boolean
 }) {
   const [loginOpen, setLoginOpen] = useState(false)
   const entry = journeyLoginEntryLabels()
@@ -348,7 +355,8 @@ function PriceCreditsLogin({
       {!needsSheet || !loginOpen ? (
         <>
           <p className="muted" style={{ margin: 0, fontSize: '0.86rem' }}>
-            Login with your Nimiq wallet to buy credit packs (card default, or NIM for half price).
+            Log in with your Nimiq wallet to buy packs. Card or NIM
+            {halfPrice ? ' (half the card price)' : ''}.
           </p>
           <button
             type="button"
