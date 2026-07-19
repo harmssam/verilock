@@ -39,7 +39,8 @@ function isStepDone(
     return false
   }
 
-  // Creator path: Add PDF → Arrange → Sign → Seal → Verify (login is not a stage)
+  // Creator path: Add PDF → Arrange → Sign → Seal → Verify (login is not a stage).
+  // Note: step === 'done' already returns true above for every stage.
   if (doc && stageId === 'fingerprint') return true
   // Arrange is done once placements are locked or someone has signed / moved past it
   if (
@@ -49,16 +50,15 @@ function isStepDone(
       allSigned(doc) ||
       step === 'sign' ||
       step === 'seal' ||
-      step === 'done' ||
       signedCount(doc) > 0)
   ) {
     return true
   }
-  // Sign is done once everyone finished (or we advanced to seal/done). Stay current while waiting on co-signers.
+  // Sign is done once everyone finished (or we advanced to seal). Stay current while waiting on co-signers.
   if (
     doc &&
     stageId === 'sign' &&
-    (doc.directSeal || allSigned(doc) || step === 'seal' || step === 'done')
+    (doc.directSeal || allSigned(doc) || step === 'seal')
   ) {
     return true
   }
