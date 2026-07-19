@@ -3188,12 +3188,23 @@ export function DocumentJourney({
                                       documentId={doc.id}
                                       onClose={() => setSignOnMobileOpen(false)}
                                       onSignature={result => {
-                                        // Wallet pad uses PNG; vectors are already verified for fill path.
+                                        // Wallet pad needs PNG; host synthesizes one from vectors if needed.
                                         void (async () => {
                                           let blob = result.blob
                                           if (!blob && result.imageDataUrl) {
                                             try {
                                               blob = await (await fetch(result.imageDataUrl)).blob()
+                                            } catch {
+                                              blob = null
+                                            }
+                                          }
+                                          if (!blob && result.path?.strokes?.length) {
+                                            try {
+                                              const { pathToPngDataUrl } = await import(
+                                                '../signatureHandoff/crypto'
+                                              )
+                                              const url = pathToPngDataUrl(result.path)
+                                              blob = await (await fetch(url)).blob()
                                             } catch {
                                               blob = null
                                             }

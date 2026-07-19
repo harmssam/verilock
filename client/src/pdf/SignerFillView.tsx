@@ -396,17 +396,24 @@ export function SignerFillView({
     setActiveSlotId(next.id)
   }
 
-  const confirmModal = () => {
-    if (!activeSlot) return
-    if (isInkPlacementKind(activeSlot.kind)) {
-      const isInitial = activeSlot.kind === 'initial'
-      if (!modalDraftInk?.path?.strokes?.length) {
+  /** Stamp ink onto all matching signature/initial slots (desktop pad or mobile handoff). */
+  const applyInkStroke = useCallback(
+    (result: SignatureStrokeResult, slotOverride?: PlacementSlot | null) => {
+      const slot = slotOverride ?? activeSlot
+      if (!slot || !isInkPlacementKind(slot.kind)) {
+        setModalDraftInk(result)
+        setSigModalMode('reuse')
+        return
+      }
+      if (!result.path?.strokes?.length) {
         setLocalError(
-          isInitial ? 'Draw your initials before applying.' : 'Draw your signature before applying.',
+          slot.kind === 'initial'
+            ? 'Draw your initials before applying.'
+            : 'Draw your signature before applying.',
         )
         return
       }
-      const result = modalDraftInk
+      const isInitial = slot.kind === 'initial'
       const targets = isInitial ? myInitialSlots : mySignatureSlots
       const nextFills = { ...localFills }
       for (const s of targets) {
@@ -423,9 +430,35 @@ export function SignerFillView({
       if (isInitial) setSharedInitials(result)
       else setSharedInk(result)
       setLocalFills(nextFills)
+      setModalDraftInk(result)
+      setSigModalMode('reuse')
       setLocalError(null)
-      // Stamp every same-kind line immediately, then move to remaining fields.
-      openNextAfter(activeSlot.id, nextFills, nextSharedSig, nextSharedInit)
+      openNextAfter(slot.id, nextFills, nextSharedSig, nextSharedInit)
+    },
+    [
+      activeSlot,
+      localFills,
+      myInitialSlots,
+      mySignatureSlots,
+      sharedInk,
+      sharedInitials,
+      isServerFilled,
+      openNextAfter,
+    ],
+  )
+
+  const confirmModal = () => {
+    if (!activeSlot) return
+    if (isInkPlacementKind(activeSlot.kind)) {
+      if (!modalDraftInk?.path?.strokes?.length) {
+        setLocalError(
+          activeSlot.kind === 'initial'
+            ? 'Draw your initials before applying.'
+            : 'Draw your signature before applying.',
+        )
+        return
+      }
+      applyInkStroke(modalDraftInk, activeSlot)
       return
     }
 
@@ -889,6 +922,11 @@ export function SignerFillView({
           documentId={documentId ?? undefined}
           onClose={() => setSignOnMobileOpen(false)}
           onSignature={result => {
+            if (!result.path?.strokes?.length) {
+              setLocalError('Mobile signature had no strokes — try again.')
+              setSignOnMobileOpen(false)
+              return
+            }
             const stroke: SignatureStrokeResult = {
               path: result.path,
               imageDataUrl: result.imageDataUrl || '',
@@ -896,10 +934,9 @@ export function SignerFillView({
               simplifiedPoints: result.simplifiedPoints,
               epsilon: result.epsilon,
             }
-            setModalDraftInk(stroke)
-            setSigModalMode('reuse')
+            // Apply immediately onto signature slots (don't leave it only on the draft pad).
             setSignOnMobileOpen(false)
-            setLocalError(null)
+            applyInkStroke(stroke, activeSlot)
           }}
         />
       )}

@@ -220,7 +220,53 @@ export function strokeResultToPayload(
   }
 }
 
-/** Host: decrypt package → UI-ready ink (vectors primary). */
+/** Rasterize unit-square path to a PNG data URL (wallet pad / previews). */
+export function pathToPngDataUrl(
+  path: SignaturePathData,
+  width = 400,
+  height = 160,
+): string {
+  if (typeof document === 'undefined') return ''
+  const canvas = document.createElement('canvas')
+  const dpr = Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
+  canvas.width = Math.max(1, Math.round(width * dpr))
+  canvas.height = Math.max(1, Math.round(height * dpr))
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return ''
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, width, height)
+  // Inline paint (avoid circular import with annotations) — same unit-square rules.
+  const pad = 12
+  const rect = { left: pad, top: pad, width: width - pad * 2, height: height - pad * 2 }
+  const minSide = Math.min(rect.width, rect.height)
+  ctx.strokeStyle = '#0f172a'
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = Math.max(1.25, path.lineWidthRatio * minSide)
+  for (const stroke of path.strokes) {
+    if (stroke.points.length === 0) continue
+    ctx.beginPath()
+    const p0 = stroke.points[0]!
+    ctx.moveTo(rect.left + p0.x * rect.width, rect.top + p0.y * rect.height)
+    for (let i = 1; i < stroke.points.length; i++) {
+      const p = stroke.points[i]!
+      ctx.lineTo(rect.left + p.x * rect.width, rect.top + p.y * rect.height)
+    }
+    ctx.stroke()
+  }
+  return canvas.toDataURL('image/png')
+}
+
+async function dataUrlToBlob(dataUrl: string): Promise<Blob | null> {
+  try {
+    return await (await fetch(dataUrl)).blob()
+  } catch {
+    return null
+  }
+}
+
+/** Host: decrypt package → UI-ready ink (vectors primary; PNG synthesized if missing). */
 export function payloadToHandoffResult(payload: SigHandoffPayload): HandoffInkResult {
   const path = payload.path
   const simplifiedPoints = path.strokes.reduce((n, s) => n + s.points.length, 0)
@@ -230,6 +276,8 @@ export function payloadToHandoffResult(payload: SigHandoffPayload): HandoffInkRe
     const bytes = b64ToBytes(payload.imageB64)
     blob = new Blob([toArrayBuffer(bytes)], { type: 'image/png' })
     imageDataUrl = `data:image/png;base64,${payload.imageB64}`
+  } else {
+    imageDataUrl = pathToPngDataUrl(path)
   }
   return {
     path,
@@ -239,6 +287,17 @@ export function payloadToHandoffResult(payload: SigHandoffPayload): HandoffInkRe
     simplifiedPoints,
     epsilon: path.epsilon,
   }
+}
+
+/** Ensure result has a PNG blob (rasterize vectors if the phone omitted imageB64). */
+export async function ensureHandoffBlob(result: HandoffInkResult): Promise<HandoffInkResult> {
+  if (result.blob) return result
+  let imageDataUrl = result.imageDataUrl
+  if (!imageDataUrl && result.path.strokes.length) {
+    imageDataUrl = pathToPngDataUrl(result.path)
+  }
+  const blob = imageDataUrl ? await dataUrlToBlob(imageDataUrl) : null
+  return { ...result, imageDataUrl, blob }
 }
 
 /** @deprecated Prefer strokeResultToPayload — kept name for call-site clarity. */
