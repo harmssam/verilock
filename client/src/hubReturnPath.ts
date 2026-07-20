@@ -58,6 +58,11 @@ export function isSupportPath(path: string): boolean {
   return /^\/support\/?$/.test(path)
 }
 
+/** Blog index (`/blog`) or a post (`/blog/:slug`). */
+export function isBlogPath(path: string): boolean {
+  return /^\/blog(?:\/[^/]+)?\/?$/.test(path)
+}
+
 /** PDF annotation experiment (local overlays, no pdf-lib). */
 export function isPdfPath(path: string): boolean {
   return /^\/pdf\/?$/.test(path) || isPdfLabPath(path)
@@ -80,6 +85,7 @@ export function isKnownAppPath(path: string): boolean {
   if (isPrivacyPath(path)) return true
   if (isSecurityPath(path)) return true
   if (isSupportPath(path)) return true
+  if (isBlogPath(path)) return true
   if (isPdfPath(path)) return true
   if (isSignMobilePath(path)) return true
   if (documentSlugFromPath(path)) return true

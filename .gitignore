@@ -29,12 +29,6 @@ client/tmp-home.png
 # Historical UI snapshots — keep locally, not in GitHub
 client/src/archive/
 
-# Product blog (content + art + BlogPage) — local only, not production SPA
-client/src/blog/
-client/public/blog/
-client/src/journey/BlogPage.tsx
-client/src/journey/BlogPage.css
-
 # Local design / promo assets (production logos live in client/public/verilock-mark*)
 branding/
 logo-ideas/

@@ -6,6 +6,7 @@ import { Fingerprint, ScanSearch, Users, type LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   isAgreementsPath,
+  isBlogPath,
   isKnownAppPath,
   isPdfLabPath,
   isPdfPath,
@@ -16,7 +17,8 @@ import {
   isSupportPath,
   saveHubReturnPath,
 } from './hubReturnPath'
-import { applyPageMeta, journeyPathMeta, PAGE_META, type PageMeta } from './seo'
+import { applyPageMeta, blogPostMeta, journeyPathMeta, PAGE_META, type PageMeta } from './seo'
+import { blogSlugFromPath, getPostBySlug } from './blog'
 import type { SealDocument } from './types'
 import { PricePage } from './PricePage'
 import { PrivacyPolicyPage } from './PrivacyPolicyPage'
@@ -24,6 +26,7 @@ import { SecurityPage } from './SecurityPage'
 import { SupportPage } from './SupportPage'
 import { AccountMenu } from './journey/AccountMenu'
 import { AgreementsPage } from './journey/AgreementsPage'
+import { BlogPage } from './journey/BlogPage'
 import { DocumentJourney } from './journey/DocumentJourney'
 import { DocumentJourney as PdfAnnotationJourney } from './experiment/DocumentJourney'
 import { SignatureLab } from './experiment/SignatureLab'
@@ -98,6 +101,7 @@ type ShellScreen =
   | 'security'
   | 'support'
   | 'agreements'
+  | 'blog'
   | 'pdf'
   | 'pdf-lab'
   | 'sign-mobile'
@@ -110,6 +114,7 @@ function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotation
   if (isSecurityPath(pathname)) return 'security'
   if (isSupportPath(pathname)) return 'support'
   if (isAgreementsPath(pathname)) return 'agreements'
+  if (isBlogPath(pathname)) return 'blog'
   // PDF lab is parallel to seal — only mount when flag allows
   if (pdfLabEnabled && isPdfLabPath(pathname)) return 'pdf-lab'
   if (pdfLabEnabled && isPdfPath(pathname)) return 'pdf'
@@ -269,6 +274,7 @@ export function App() {
       !isSecurityPath(window.location.pathname) &&
       !isSupportPath(window.location.pathname) &&
       !isAgreementsPath(window.location.pathname) &&
+      !isBlogPath(window.location.pathname) &&
       !isPdfPath(window.location.pathname) &&
       !isPdfLabPath(window.location.pathname)
     ) {
@@ -320,6 +326,14 @@ export function App() {
     rememberJourneyPath()
     setScreen('agreements')
     pushShellUrl('/agreements')
+    scrollShellTop()
+  }, [rememberJourneyPath])
+
+  const goBlog = useCallback((slug?: string) => {
+    rememberJourneyPath()
+    setScreen('blog')
+    const next = slug ? `/blog/${slug}` : '/blog'
+    pushShellUrl(next)
     scrollShellTop()
   }, [rememberJourneyPath])
 
@@ -491,6 +505,18 @@ export function App() {
       applyPageMeta({ ...PAGE_META.agreements })
       return
     }
+    if (screen === 'blog') {
+      const slug = blogSlugFromPath(path)
+      if (slug) {
+        const post = getPostBySlug(slug)
+        if (post) {
+          applyPageMeta(blogPostMeta(post))
+          return
+        }
+      }
+      applyPageMeta({ ...PAGE_META.blog })
+      return
+    }
     if (screen === 'pdf' || screen === 'pdf-lab') {
       applyPageMeta({
         ...PAGE_META.pdf,
@@ -522,12 +548,13 @@ export function App() {
   const trackMeta = trackRole ? TRACK_META[trackRole] : null
   const TrackIcon = trackMeta?.icon
 
-  // Wider content shell (privacy, security, support, etc.). Agreements matches landing (960px), not this.
+  // Wider content shell (blog, privacy, security, support, etc.). Agreements matches landing (960px), not this.
   const wideShell =
     screen === 'pricing' ||
     screen === 'privacy' ||
     screen === 'security' ||
     screen === 'support' ||
+    screen === 'blog' ||
     screen === 'pdf' ||
     screen === 'pdf-lab' ||
     screen === 'not-found'
@@ -594,6 +621,14 @@ export function App() {
                 Pricing
               </button>
             )}
+            <button
+              type="button"
+              className={`lr-nav lr-nav--blog${screen === 'blog' ? ' lr-nav--active' : ''}`}
+              onClick={() => goBlog()}
+              aria-current={screen === 'blog' ? 'page' : undefined}
+            >
+              Blog
+            </button>
             {/* Desktop only: on narrow viewports Security lives in the footer (prod parity, less crowding). */}
             <button
               type="button"
@@ -638,12 +673,23 @@ export function App() {
         screen === 'security' ||
         screen === 'support' ||
         screen === 'agreements' ||
+        screen === 'blog' ||
         screen === 'pdf' ||
         screen === 'pdf-lab' ||
         screen === 'not-found') && (
         <button type="button" className="lr-back" onClick={goJourney}>
           ← Back to home
         </button>
+      )}
+
+      {screen === 'blog' && (
+        <BlogPage
+          key={typeof window !== 'undefined' ? window.location.pathname : '/blog'}
+          path={typeof window !== 'undefined' ? window.location.pathname : '/blog'}
+          onOpenIndex={() => goBlog()}
+          onOpenPost={slug => goBlog(slug)}
+          onPricing={goPricing}
+        />
       )}
 
       {screen === 'pricing' && (
@@ -702,7 +748,11 @@ export function App() {
             .join(' ')}
         >
           {showHome && (
-            <LandingHome onPickRole={pickRole} />
+            <LandingHome
+              onPickRole={pickRole}
+              onOpenBlogPost={slug => goBlog(slug)}
+              onOpenBlogIndex={() => goBlog()}
+            />
           )}
           {/* hidden (not unmounted) when home so DocumentJourney keep-alive works */}
           <div className="lr-track" hidden={!showTrack}>
@@ -756,6 +806,13 @@ export function App() {
           Your wallet is your identity; the chain is the proof.
         </p>
         <div className="lr-footer-links">
+          <button
+            type="button"
+            className={`lr-footer-link${screen === 'blog' ? ' lr-footer-link--active' : ''}`}
+            onClick={() => goBlog()}
+          >
+            Blog
+          </button>
           <button
             type="button"
             className={`lr-footer-link${screen === 'security' ? ' lr-footer-link--active' : ''}`}

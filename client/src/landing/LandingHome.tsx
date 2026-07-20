@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { formatBlogDate, getAllPosts } from '../blog'
 import { formatSealFeeNim, getSealPricing } from '../sealPricing'
 import type { PathRole } from '../journey/types'
 import { LandingHowItWorks } from './LandingHowItWorks'
@@ -24,6 +25,8 @@ import {
 
 interface LandingHomeProps {
   onPickRole: (role: PathRole) => void
+  onOpenBlogPost?: (slug: string) => void
+  onOpenBlogIndex?: () => void
 }
 
 /** Hero status line under CTAs (rotating trust / fee beats). */
@@ -119,9 +122,14 @@ function useHeroClaims() {
   return { claim: claims[index] ?? claims[0], visible }
 }
 
-export function LandingHome({ onPickRole }: LandingHomeProps) {
+export function LandingHome({
+  onPickRole,
+  onOpenBlogPost,
+  onOpenBlogIndex,
+}: LandingHomeProps) {
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [howOpen, setHowOpen] = useState(false)
+  const latestPost = useMemo(() => getAllPosts()[0] ?? null, [])
   const { claim, visible: claimVisible } = useHeroClaims()
   const ClaimIcon = claim.icon
 
@@ -266,6 +274,53 @@ export function LandingHome({ onPickRole }: LandingHomeProps) {
         <LandingHowItWorks role={null} open={howOpen} onToggle={() => setHowOpen(v => !v)} />
       </div>
 
+      {latestPost && onOpenBlogPost && (
+        <section className="lr-blog-latest" aria-labelledby="lr-blog-latest-title">
+          <div className="lr-blog-latest-head">
+            <div>
+              <h2 id="lr-blog-latest-title" className="lr-blog-latest-heading">
+                From the blog
+              </h2>
+            </div>
+            {onOpenBlogIndex && (
+              <button type="button" className="lr-blog-latest-all" onClick={onOpenBlogIndex}>
+                All posts
+                <ArrowRight size={14} strokeWidth={2.25} aria-hidden />
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            className="lr-blog-latest-card"
+            onClick={() => onOpenBlogPost(latestPost.slug)}
+          >
+            <span className="lr-blog-latest-thumb" aria-hidden>
+              <img
+                src={latestPost.coverImage}
+                alt=""
+                width={640}
+                height={360}
+                loading="lazy"
+                decoding="async"
+              />
+            </span>
+            <span className="lr-blog-latest-body">
+              <span className="lr-blog-latest-meta">
+                <time dateTime={latestPost.date}>{formatBlogDate(latestPost.date)}</time>
+                {latestPost.tags[0] && (
+                  <span className="lr-blog-latest-tag">{latestPost.tags[0]}</span>
+                )}
+              </span>
+              <strong className="lr-blog-latest-title">{latestPost.title}</strong>
+              <span className="lr-blog-latest-desc">{latestPost.description}</span>
+              <span className="lr-blog-latest-cta">
+                Read post
+                <ArrowRight size={15} strokeWidth={2.25} aria-hidden />
+              </span>
+            </span>
+          </button>
+        </section>
+      )}
     </div>
   )
 }
