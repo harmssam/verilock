@@ -75,8 +75,10 @@ Archive-only (do not invest product work without an explicit request):
 
 ### Blog
 
-- **Not in production / not on GitHub.** Blog content, art, and `BlogPage` are local-only (gitignored under `client/src/blog/`, `client/public/blog/`).
-- Do not re-add `/blog` routes, nav, or sitemap entries unless the user explicitly asks.
+- **In production.** Content: `client/src/blog/`, art: `client/public/blog/`, UI: `client/src/journey/BlogPage.tsx` (+ CSS).
+- Shell routes `/blog` and `/blog/:slug` in `App.tsx`; header + footer Blog links; homepage “From the blog”.
+- Server SPA deep links: `server/src/static.ts` `isKnownAppPath` must include `/blog`.
+- **Do not ship** Blog Studio / X Post Studio (still gitignored under `server/src/blogStudio*`, etc.).
 
 ### If the user says “the app” / “production” / “VeriLock UI”
 

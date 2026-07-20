@@ -48,25 +48,10 @@ if (html.includes('lr-preview-banner') || html.includes('Landing redesign previe
   process.exit(1)
 }
 
-// Blog is local-only / gitignored; strip if a dirty local public/blog was copied.
-for (const dir of [distBuild, dist]) {
-  const blogDir = join(dir, 'blog')
-  if (existsSync(blogDir)) {
-    console.log(`[production] Stripping leftover ${blogDir.replace(clientDir + '/', '')}/ …`)
-    rmSync(blogDir, { recursive: true, force: true })
-  }
-}
-
 console.log('[production] Installing build into client/dist …')
 rmSync(dist, { recursive: true, force: true })
 mkdirSync(dist, { recursive: true })
 cpSync(distBuild, dist, { recursive: true })
-
-// Re-strip after copy in case anything reappeared
-const distBlog = join(dist, 'blog')
-if (existsSync(distBlog)) {
-  rmSync(distBlog, { recursive: true, force: true })
-}
 
 console.log('[production] Ready: client/dist/index.html is the production shell')
 console.log('[production] Start server with NODE_ENV=production')

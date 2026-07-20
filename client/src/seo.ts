@@ -43,6 +43,12 @@ export const PAGE_META = {
       'Contact VeriLock support about signing, sealing, verification, or billing. Your file stays on your device — describe the issue without attaching files.',
     path: '/support',
   },
+  blog: {
+    title: `Blog${TITLE_SUFFIX}`,
+    description:
+      'Guides on what VeriLock is, how fingerprinting and Nimiq seals work, private document signing, wallet-optional verification, and product updates.',
+    path: '/blog',
+  },
   verify: {
     title: `Verify a Document${TITLE_SUFFIX}`,
     description:
@@ -194,6 +200,14 @@ export function documentPageMeta(title: string, role: 'sign' | 'verify'): PageMe
     description: `${verb} "${title}" on VeriLock. Fingerprint your document locally, collect Nimiq wallet signatures, and seal the document hash on-chain.`,
     path: undefined,
     noindex: true,
+  }
+}
+
+export function blogPostMeta(post: { title: string; description: string; slug: string }): PageMeta {
+  return {
+    title: `${post.title}${TITLE_SUFFIX}`,
+    description: post.description,
+    path: `/blog/${post.slug}`,
   }
 }
 

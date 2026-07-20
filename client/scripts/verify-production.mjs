@@ -104,7 +104,7 @@ check('product modules live under src/journey and shell under App', () => {
   assert.ok(!existsSync(join(clientDir, 'src/landing-redesign')), 'src/landing-redesign should be removed')
   const app = readFileSync(join(clientDir, 'src/App.tsx'), 'utf8')
   assert.match(app, /DocumentJourney/)
-  assert.ok(!app.includes('BlogPage'), 'production shell must not mount BlogPage')
+  assert.match(app, /BlogPage/, 'production shell must mount BlogPage')
   assert.ok(!app.includes('lr-preview-banner'), 'preview banner must not ship')
   // PDF annotation experiment may be mounted at /pdf via App (not a parallel shell entry).
   // Forbidden: separate vite/html experiment product entrypoints.
@@ -119,21 +119,25 @@ check('product modules live under src/journey and shell under App', () => {
   }
 })
 
-check('archives and blog are excluded from GitHub / production wiring', () => {
+check('archives stay excluded; blog is production-wired', () => {
   const gi = readFileSync(join(rootDir, '.gitignore'), 'utf8')
   assert.match(gi, /client\/src\/archive\//)
-  assert.match(gi, /client\/src\/blog\//)
-  assert.match(gi, /client\/public\/blog\//)
+  assert.ok(!/^\s*client\/src\/blog\//m.test(gi), 'client/src/blog must not be gitignored')
+  assert.ok(!/^\s*client\/public\/blog\//m.test(gi), 'client/public/blog must not be gitignored')
   const app = readFileSync(join(clientDir, 'src/App.tsx'), 'utf8')
-  assert.ok(!app.includes("from './blog'"), 'App must not import blog modules')
-  assert.ok(!app.includes('BlogPage'), 'App must not mount BlogPage')
+  assert.match(app, /from ['"]\.\/blog['"]/, 'App must import blog modules')
+  assert.match(app, /BlogPage/, 'App must mount BlogPage')
   const hub = readFileSync(join(clientDir, 'src/hubReturnPath.ts'), 'utf8')
-  assert.ok(!hub.includes('isBlogPath'), 'blog paths are not known app routes')
+  assert.match(hub, /isBlogPath/, 'blog paths must be known app routes')
+  const staticTs = readFileSync(join(rootDir, 'server/src/static.ts'), 'utf8')
+  assert.match(staticTs, /\/blog/, 'server SPA fallback must serve /blog')
   const sitemap = readFileSync(join(clientDir, 'public/sitemap.xml'), 'utf8')
-  assert.ok(!sitemap.includes('/blog'), 'sitemap must not list blog URLs')
+  assert.match(sitemap, /\/blog/, 'sitemap must list blog URLs')
   const css = readFileSync(join(clientDir, 'src/App.css'), 'utf8')
   assert.ok(!css.includes('lr-preview-banner'), 'preview banner CSS must be removed')
-  assert.ok(!css.includes('lr-blog-latest'), 'blog-latest CSS must be removed')
+  assert.match(css, /lr-blog-latest/, 'homepage blog-latest styles required')
+  assert.ok(existsSync(join(clientDir, 'src/journey/BlogPage.tsx')))
+  assert.ok(existsSync(join(clientDir, 'src/blog/posts.ts')))
 })
 
 check('production packaging docs use plain names', () => {
@@ -187,7 +191,7 @@ if (process.env.VERIFY_DIST === '1') {
     assert.match(html, /content="index,\s*follow"/)
     assert.ok(!html.includes('noindex'), 'dist must not noindex')
     assert.ok(!html.includes('Landing redesign preview'), 'dist still has preview chrome')
-    assert.ok(!existsSync(join(clientDir, 'dist', 'blog')), 'dist must not ship blog assets')
+    assert.ok(existsSync(join(clientDir, 'dist', 'blog')), 'dist must ship blog assets')
   })
 }
 
