@@ -277,6 +277,20 @@
   line-height: 1.4;
 }
 
+.placement-editor-hint--design {
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--amber, #fbbf24) 35%, var(--border, #e2e8f0));
+  border-left: 3px solid #d97706;
+  background: color-mix(in srgb, var(--amber, #fbbf24) 12%, var(--surface-raised, #ffffff));
+  color: var(--text, #0f172a);
+}
+
+.placement-editor-hint--design strong {
+  font-weight: 650;
+  color: #92400e;
+}
+
 .placement-editor-hint--locked {
   display: flex;
   align-items: center;
