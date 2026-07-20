@@ -307,8 +307,8 @@ export function CreditsPanel({
                   <CreditCard size={16} strokeWidth={2.25} />
                 )}
                 {selectedQuote
-                  ? `Card · $${selectedQuote.creditStripeUsdTotal.toFixed(2)}`
-                  : 'Card'}
+                  ? `Credit card · $${selectedQuote.creditStripeUsdTotal.toFixed(2)}`
+                  : 'Credit card'}
               </button>
             )}
             <button

@@ -31,6 +31,32 @@
   border-top: 1px solid rgba(94, 234, 212, 0.16);
 }
 
+/* Line + OR + line between credit card and NIM */
+.price-page-model-or {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: -0.15rem 0;
+}
+
+.price-page-model-or::before,
+.price-page-model-or::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: rgba(94, 234, 212, 0.28);
+}
+
+.price-page-model-or-text {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  line-height: 1;
+}
+
 .price-page-model-label {
   display: inline-flex;
   align-items: center;
