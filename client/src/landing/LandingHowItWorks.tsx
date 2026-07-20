@@ -41,7 +41,7 @@ function roleSubtitle(role: PathRole | null): string {
   if (role === 'signer')
     return 'Match the shared document, complete your fields, and bind with your wallet'
   if (role === 'verifier') return 'Check a sealed proof anytime. No wallet needed'
-  return 'Sign together on your device, then lock a permanent proof'
+  return 'Sign the document, then lock a permanent proof'
 }
 
 function prefersReducedMotion(): boolean {

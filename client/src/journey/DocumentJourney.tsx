@@ -2238,15 +2238,19 @@ export function DocumentJourney({
                 </p>
                 <h3>
                   {step === 'done' && role === 'signer'
-                    ? (activeStage?.verb ?? 'You are all set')
+                    ? doc?.sealed
+                      ? 'Agreement sealed — your part is done'
+                      : (activeStage?.verb ?? 'Your signature is recorded')
                     : step === 'done'
                       ? 'Agreement sealed'
                       : activeStage?.verb ?? 'Continue'}
                 </h3>
                 <p className="muted action-blurb">
                   {step === 'done' && role === 'signer'
-                    ? (activeStage?.blurb ??
-                      'Your fields and wallet signature are recorded. The creator seals when everyone has finished.')
+                    ? doc?.sealed
+                      ? 'Your signature is on this agreement. Review parties and recorded ink below. Drop the same file you signed to see the organizer’s field layout (the PDF never left anyone’s device).'
+                      : (activeStage?.blurb ??
+                        'Your fields and wallet signature are recorded. Review them below; the creator seals when everyone has finished.')
                     : step === 'done'
                       ? 'Keep your file. Drop a copy below anytime to verify the fingerprint.'
                       : activeStage?.blurb}
@@ -3571,32 +3575,168 @@ export function DocumentJourney({
 
               {(step === 'verify' || step === 'done') && (
                 <div className="action-stack">
-                  {step === 'done' && doc && role === 'signer' && !doc.sealed && (
-                    <div className="done-banner">
-                      <Check size={18} strokeWidth={2.5} />
-                      <div>
-                        <strong>Thanks, you&apos;re done!</strong>
-                        <p className="muted">
-                          {allSigned(doc) || doc.readyToLock
-                            ? 'Your fields and wallet signature are recorded. The creator will seal the fingerprint on Nimiq when ready.'
-                            : 'Your fields and wallet signature are recorded. Other parties still need to finish before the creator can seal.'}{' '}
-                          Keep your copy of <em>{doc.fileName}</em>. You can close this page.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {step === 'done' && doc && role === 'signer' && !doc.sealed && (
+                  {/* Co-signer revisit: show parties, ink, and optional local PDF layout — not a dead-end "verify" screen. */}
+                  {step === 'done' && doc && role === 'signer' && (
                     <>
+                      <div className="done-banner">
+                        {doc.sealed ? (
+                          <Lock size={18} strokeWidth={2.5} />
+                        ) : (
+                          <Check size={18} strokeWidth={2.5} />
+                        )}
+                        <div>
+                          <strong>
+                            {doc.sealed
+                              ? 'Sealed on-chain — you already signed.'
+                              : 'Thanks, you are done signing.'}
+                          </strong>
+                          <p className="muted">
+                            {doc.sealed ? (
+                              <>
+                                This agreement is locked on Nimiq. Your wallet signature and page
+                                fields are part of the record
+                                {doc.source.attestation?.explorerUrl ? (
+                                  <>
+                                    {' '}
+                                    ·{' '}
+                                    <a
+                                      className="inline-link"
+                                      href={doc.source.attestation.explorerUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      View on explorer
+                                    </a>
+                                  </>
+                                ) : null}
+                                .
+                              </>
+                            ) : allSigned(doc) || doc.readyToLock ? (
+                              <>
+                                Your fields and wallet signature are recorded. The creator will seal
+                                the fingerprint on Nimiq when ready.
+                              </>
+                            ) : (
+                              <>
+                                Your fields and wallet signature are recorded. Other parties still
+                                need to finish before the creator can seal.
+                              </>
+                            )}{' '}
+                            Keep your copy of <em>{doc.fileName}</em>.
+                          </p>
+                        </div>
+                      </div>
+
                       <PartyList doc={doc} revealNames={revealParticipantPrivate} />
-                      {doc.source.signatures.length > 0 && (
+
+                      {doc.source.signatures.length > 0 ? (
                         <SignaturesPanel
                           signatures={doc.source.signatures}
                           parties={doc.source.parties}
                           revealPrivate={revealParticipantPrivate}
                           authToken={token}
                         />
+                      ) : (
+                        <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+                          {revealParticipantPrivate
+                            ? 'No signature images loaded yet. Try refreshing, or open this agreement again while logged in.'
+                            : 'Connect with the wallet you used to sign to unlock names and signature images.'}
+                        </p>
                       )}
+
+                      {FEATURES.pdfAnnotationUi && (
+                        <section
+                          className="journey-pdf-editor"
+                          aria-labelledby="signer-review-layout-title"
+                        >
+                          <header className="signatures-config-head">
+                            <h3 id="signer-review-layout-title">Designed document layout</h3>
+                            <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
+                              The organizer placed signature and initial boxes on the PDF. VeriLock
+                              never hosts the file — drop the same document you signed to see that
+                              layout. Your ink appears under Recorded signatures above.
+                            </p>
+                          </header>
+                          <DocumentStage
+                            step={step}
+                            doc={doc}
+                            file={signFile ?? pdfFile}
+                            onFileChange={file => {
+                              setSignFile(file)
+                              setSignHash(null)
+                              if (!file) setLocalError(null)
+                            }}
+                            accepting
+                            disabled={busy}
+                            localCopyRequired
+                            localCopyMatches={
+                              hasVerifiedLocalPdf
+                                ? true
+                                : !(signFile || pdfFile)
+                                  ? null
+                                  : signFileMatches ||
+                                    Boolean(pdfFile && pdfHash === doc.fingerprint)
+                            }
+                          />
+                          {signFile &&
+                            !hasVerifiedLocalPdf &&
+                            signHash &&
+                            signHash !== doc.fingerprint && (
+                              <div className="result-banner result-banner--bad">
+                                That file does not match this agreement fingerprint. Use the same
+                                document the creator shared (<strong>{doc.fileName}</strong>).
+                              </div>
+                            )}
+                          {hasVerifiedLocalPdf &&
+                            planLoadState === 'loading' && (
+                              <div className="result-banner result-banner--ok">
+                                <LoaderCircle
+                                  className="btn-spinner"
+                                  size={16}
+                                  strokeWidth={2.5}
+                                />
+                                Loading field layout…
+                              </div>
+                            )}
+                          {hasVerifiedLocalPdf &&
+                            constructionPlan &&
+                            planLoadState === 'ready' &&
+                            (signFile || pdfFile) && (
+                              <PlacementEditor
+                                file={(signFile ?? pdfFile)!}
+                                plan={
+                                  constructionPlan.status === 'locked'
+                                    ? constructionPlan
+                                    : { ...constructionPlan, status: 'locked' }
+                                }
+                                onChange={() => {
+                                  /* review only */
+                                }}
+                                disabled
+                                reviewMode
+                                filledSlotIds={filledSlotIds}
+                              />
+                            )}
+                          {hasVerifiedLocalPdf && planLoadState === 'none' && (
+                            <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
+                              No field layout is stored for this fingerprint (it may have been signed
+                              without placement boxes). Your wallet signature is still recorded above.
+                            </p>
+                          )}
+                        </section>
+                      )}
+
+                      {doc.sealed && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={openVerifyWithLocalPdf}
+                        >
+                          <ShieldCheck size={15} strokeWidth={2.25} />
+                          {hasVerifiedLocalPdf ? 'Verify this file on-chain' : 'Open verify path'}
+                        </button>
+                      )}
+
                       <button type="button" className="btn btn-primary" onClick={resetAll}>
                         Finish
                       </button>
@@ -3650,7 +3790,7 @@ export function DocumentJourney({
                     </div>
                   )}
 
-                  {step === 'done' && doc?.sealed && (
+                  {step === 'done' && doc?.sealed && role !== 'signer' && (
                     <button
                       type="button"
                       className="btn btn-primary"
@@ -3679,8 +3819,8 @@ export function DocumentJourney({
                       />
                     )}
 
-                  {/* Invitees who finished do not need the verify drop zone. */}
-                  {(step === 'verify' || (step === 'done' && role !== 'signer') || doc?.sealed) && (
+                  {/* Invitees on Done have their own review UI above — skip the bare verify drop. */}
+                  {(step === 'verify' || (step === 'done' && role !== 'signer')) && (
                   <DocumentStage
                     step={step}
                     doc={doc}
@@ -3690,13 +3830,13 @@ export function DocumentJourney({
                   />
                   )}
 
-                  {(step === 'verify' || (step === 'done' && role !== 'signer') || doc?.sealed) && (
+                  {(step === 'verify' || (step === 'done' && role !== 'signer')) && (
                   <p className="muted" style={{ margin: 0 }}>
                     We hash the file locally, then look up sealed fingerprints on the server.
                   </p>
                   )}
 
-                  {(step === 'verify' || role !== 'signer' || doc?.sealed) &&
+                  {(step === 'verify' || (step === 'done' && role !== 'signer')) &&
                     verifyOutcome.kind === 'hashing' && (
                     <div className="result-banner result-banner--ok">
                       <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
@@ -3704,7 +3844,7 @@ export function DocumentJourney({
                     </div>
                   )}
 
-                  {(step === 'verify' || role !== 'signer' || doc?.sealed) &&
+                  {(step === 'verify' || (step === 'done' && role !== 'signer')) &&
                     verifyOutcome.kind === 'local' && (
                     <div className="verify-result-card">
                       <div className="verify-result-head">
