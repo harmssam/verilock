@@ -48,7 +48,7 @@ export const CREATOR_STAGES: JourneyStage[] = [
     label: 'Sign',
     verb: 'Sign your fields on the document',
     blurb:
-      'If you are a signer, fill only your highlighted fields on the document, then bind with your wallet. Organizers skip this step. After you sign, invite any co-signers here before sealing.',
+      'If you are a signer, fill in your applicable fields on the document, then sign. After you sign, invite any co-signers here before sealing.',
     privacyNote: 'You prove you hold these bytes - still no upload.',
   },
   {
@@ -82,9 +82,9 @@ export const SIGNER_STAGES: JourneyStage[] = [
   {
     id: 'done',
     label: 'Done',
-    verb: 'Thanks, you are done',
+    verb: 'Your signature is recorded',
     blurb:
-      'Your fields and wallet signature are recorded. The creator seals the agreement on Nimiq when everyone has finished. You can close this page.',
+      'Review who signed and your recorded signature below. To see the field layout on the document, drop the same file you signed (VeriLock never stores the PDF). The creator seals on Nimiq when everyone is finished.',
     privacyNote: 'Keep your document. Anyone can re-check the fingerprint later.',
   },
 ]

@@ -43,6 +43,13 @@ export interface PlacementEditorProps {
   /** True while parent is locking/unlocking the plan. */
   lockBusy?: boolean
   pageWidth?: number
+  /**
+   * Read-only revisit (e.g. co-signer Done step). Locked layout with
+   * copy that explains boxes were designed earlier — not for filling now.
+   */
+  reviewMode?: boolean
+  /** Slot ids already filled on the server (review summary). */
+  filledSlotIds?: ReadonlySet<string>
 }
 
 function personColor(slotIndex: number): string {
@@ -75,8 +82,10 @@ export function PlacementEditor({
   disabled = false,
   lockBusy = false,
   pageWidth = 560,
+  reviewMode = false,
+  filledSlotIds,
 }: PlacementEditorProps) {
-  const locked = plan.status === 'locked'
+  const locked = plan.status === 'locked' || reviewMode
   const editDisabled = disabled || locked || lockBusy
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -819,13 +828,22 @@ export function PlacementEditor({
         )}
       </div>
 
-      {!locked && (
+      {!locked && !reviewMode && (
         <p className="placement-editor-hint placement-editor-hint--design" role="status">
           <strong>Designing, not signing.</strong> These boxes mark where people will sign later.
           No ink or wallet signature is collected on this step.
         </p>
       )}
-      {locked && (
+      {reviewMode && (
+        <p className="placement-editor-hint placement-editor-hint--locked" role="status">
+          Field layout the organizer designed
+          {filledSlotIds && filledSlotIds.size > 0
+            ? ` · ${filledSlotIds.size} field${filledSlotIds.size === 1 ? '' : 's'} recorded as filled`
+            : ''}
+          . Signature images appear under Recorded signatures — not redrawn on this preview.
+        </p>
+      )}
+      {locked && !reviewMode && (
         <p className="placement-editor-hint placement-editor-hint--locked">
           Layout is set for signing. Use Edit placements to change it before anyone signs.
         </p>
