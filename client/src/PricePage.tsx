@@ -128,14 +128,14 @@ export function PricePage({
               How to pay
             </span>
             <p className="muted price-page-model-explain">
-              Card or NIM. Same credit either way.
+              Credit card or NIM. Same credit either way.
             </p>
           </div>
 
           <div className="price-page-model-row">
             <span className="price-page-model-label">
               <CreditCard size={12} strokeWidth={2.5} aria-hidden />
-              Card
+              Credit card
             </span>
             <div className="price-page-model-value price-page-model-value--card">
               {creditsInfo?.creditStripeUsd != null ? (
@@ -168,6 +168,10 @@ export function PricePage({
             </p>
           </div>
 
+          <div className="price-page-model-or" role="separator" aria-label="or">
+            <span className="price-page-model-or-text">or</span>
+          </div>
+
           <div className="price-page-model-row">
             <span className="price-page-model-label">
               <NimiqHexagonIcon size={12} />
@@ -181,7 +185,7 @@ export function PricePage({
                 showFiatPicker
               />
               {halfPrice && (
-                <span className="price-page-model-half-badge" title="NIM is 1/2 price vs card">
+                <span className="price-page-model-half-badge" title="NIM is 1/2 price vs credit card">
                   1/2 price
                 </span>
               )}
