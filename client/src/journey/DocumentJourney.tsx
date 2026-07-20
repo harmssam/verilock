@@ -60,6 +60,7 @@ import {
   saveJourneyIntent,
   syncIntentToUrl,
 } from './journeyIntent'
+import { loadCreateFormCache } from './journeyPdfDraft'
 import { useCreatePdfDraft } from './useCreatePdfDraft'
 import { useRevealDocumentOnAuth } from './useRevealDocumentOnAuth'
 import {
@@ -197,18 +198,25 @@ export function DocumentJourney({
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfHash, setPdfHash] = useState<string | null>(null)
   const [pageCount, setPageCount] = useState(1)
-  const [title, setTitle] = useState('')
+  // Form fields rehydrate from sessionStorage so Hub login remount keeps type/title/etc.
+  const [title, setTitle] = useState(() => loadCreateFormCache()?.title ?? '')
   /** Last title we auto-filled from a file name — used so a new file replaces it. */
   const autoTitleFromFileRef = useRef<string | null>(null)
-  const [creatorName, setCreatorName] = useState('')
+  const [creatorName, setCreatorName] = useState(
+    () => loadCreateFormCache()?.creatorName ?? '',
+  )
   /** Optional ready-to-seal email — collected only when FEATURES.emailNotifyUi is on. */
-  const [creatorNotifyEmail, setCreatorNotifyEmail] = useState('')
-  const [docType, setDocType] = useState<DocumentType>('contract')
+  const [creatorNotifyEmail, setCreatorNotifyEmail] = useState(
+    () => loadCreateFormCache()?.creatorNotifyEmail ?? '',
+  )
+  const [docType, setDocType] = useState<DocumentType>(
+    () => loadCreateFormCache()?.docType ?? 'contract',
+  )
   /** Optional display names for other parties (index 0 = first co-signer). */
   const [coSignerNames, setCoSignerNames] = useState<string[]>([''])
   /** Client-only invite emails for co-signers — prefill Share .eml To; never uploaded with the PDF. */
   const [coSignerEmails, setCoSignerEmails] = useState<string[]>([''])
-  const [docNotes, setDocNotes] = useState('')
+  const [docNotes, setDocNotes] = useState(() => loadCreateFormCache()?.docNotes ?? '')
   /** Draft total parties for share-step Signatures UI (applied via API). */
   const [requiredSigners, setRequiredSigners] = useState(1)
   const [busy, setBusy] = useState(false)
@@ -580,6 +588,18 @@ export function DocumentJourney({
     return naturalStep
   }, [stepHold, naturalStep, canHoldStep])
 
+  // Keep the viewport at the top when advancing (or stepping back) between stages.
+  const prevStepRef = useRef<JourneyStepId | null>(null)
+  useEffect(() => {
+    const prev = prevStepRef.current
+    prevStepRef.current = step
+    if (prev == null || prev === step) return
+    if (typeof window === 'undefined') return
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    window.document.documentElement.scrollTop = 0
+    window.document.body.scrollTop = 0
+  }, [step])
+
   useEffect(() => {
     if (stepHold && !canHoldStep(stepHold, naturalStep)) {
       setStepHold(null)
@@ -827,11 +847,13 @@ export function DocumentJourney({
       pdfHash: string | null
       pageCount: number
     }) => {
-      if (m.title) setTitle(m.title)
-      if (m.creatorName) setCreatorName(m.creatorName)
-      if (m.creatorNotifyEmail) setCreatorNotifyEmail(m.creatorNotifyEmail)
-      if (m.docType) setDocType(m.docType)
-      if (m.docNotes) setDocNotes(m.docNotes)
+      // Always apply form fields (including empty) so Hub restore cannot leave
+      // defaults like agreement type = contract when the user chose NDA.
+      setTitle(m.title)
+      setCreatorName(m.creatorName)
+      setCreatorNotifyEmail(m.creatorNotifyEmail)
+      setDocType(m.docType)
+      setDocNotes(m.docNotes)
       if (m.pdfHash) setPdfHash(m.pdfHash)
       if (m.pageCount > 0) setPageCount(m.pageCount)
     },
@@ -2424,8 +2446,19 @@ export function DocumentJourney({
                         <h3 id="arrange-pdf-title">
                           {constructionPlan.status === 'locked'
                             ? 'Field layout'
-                            : 'Arrange signers'}
+                            : 'Design the document'}
                         </h3>
+                        {constructionPlan.status !== 'locked' ? (
+                          <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
+                            Layout only — place empty signature, initial, and name boxes for each
+                            person. You are not signing yet; that starts after you continue.
+                          </p>
+                        ) : (
+                          <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
+                            Field positions are set. Signing and invites come next (or edit
+                            placements first if no one has signed yet).
+                          </p>
+                        )}
                       </header>
                       <PlacementEditor
                         file={(pdfFile ?? signFile)!}
@@ -2467,8 +2500,8 @@ export function DocumentJourney({
                             )}
                           </button>
                           <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                            Saves who signs where and moves on. You can come back to edit until
-                            someone signs.
+                            Saves the field layout and moves on — still no signatures collected
+                            here. You can come back to edit until someone signs.
                           </p>
                         </div>
                       )}

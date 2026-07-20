@@ -38,9 +38,9 @@ export const CREATOR_STAGES: JourneyStage[] = [
   {
     id: 'share',
     label: 'Arrange',
-    verb: 'Name people and place fields',
+    verb: 'Design where people will sign',
     blurb:
-      'Name each signer, place their boxes on the document, and choose whether you are one of them (or only organizing). Continue when the layout looks right. Invites come after you sign (if you are a party).',
+      'This step is design only — not signing. Name each person, place empty signature / initial / name boxes on the document, and choose whether you are one of them (or only organizing). Continue when the layout looks right; signing and invites come next.',
     privacyNote: 'Only placement geometry is stored, not the document bytes.',
   },
   {
