@@ -11,13 +11,14 @@ export const post: BlogPost = {
   date: '2026-07-19',
   tags: ['guide', 'privacy'],
   coverImage: cover,
-  coverAlt: 'Matte charcoal hardware key fob on a mint-washed desk with teal network nodes and fading login-button silhouettes, representing passwordless VeriLock identity',
+  coverAlt:
+    'Light mint graphic: crossed-out email and password fields next to a wallet-identity card with a hexagonal V mark, captioned “Your key is the account”',
   relatedSlugs: [
     'how-verilock-works',
     'what-is-verilock',
     'blockchain-pdf-signature-verification',
   ],
-    body: [
+  body: [
     {
       type: 'p',
       text: 'Your email inbox is a security liability. Passwords are frequently compromised. VeriLock removes these vulnerabilities entirely. There is no sign in with Google. There is no Microsoft account. We store no email addresses on our servers. Your account exists solely as a cryptographic key pair.',
@@ -41,8 +42,8 @@ export const post: BlogPost = {
     {
       type: 'figure',
       src: cover,
-      alt: 'Diagram showing a private key stored locally while a public address connects to the network',
-      caption: 'Your private key stays on your device. Only the public address interacts with the network.',
+      alt: 'Email and password fields struck through beside a wallet identity card — private key stays on device',
+      caption: 'No inbox, no password vault. Your Nimiq wallet key is the account; only the public address is shared.',
     },
     {
       type: 'h2',
@@ -93,8 +94,9 @@ export const post: BlogPost = {
     {
       type: 'figure',
       src: verify,
-      alt: 'Verification tool displaying a green checkmark next to a document hash',
-      caption: 'Verification confirms the file has not changed since the seal was created.',
+      alt: 'Laptop showing a green verification complete check while a physical wallet sits unused on the desk',
+      caption:
+        'Verification confirms the file has not changed since the seal. Checking integrity does not require a wallet.',
     },
     {
       type: 'p',
