@@ -46,14 +46,14 @@ export function SealCard({
   const insufficientFunds = sealFunds !== null && !sealFunds.sufficient
   const canSeal = !busy && !insufficientFunds && !sealFundsLoading
   const title = busy
-    ? 'Sealing on-chain…'
+    ? 'Locking on-chain…'
     : insufficientFunds
-      ? 'Add NIM to seal'
+      ? 'Add NIM to lock'
       : failedPrior
-        ? 'Retry seal'
+        ? 'Retry lock'
         : interrupted
-          ? 'Seal interrupted'
-          : 'Ready to seal'
+          ? 'Lock interrupted'
+          : 'Ready to lock'
 
   return (
     <div className={`card seal-card${busy ? ' seal-card--active' : ''}`}>
@@ -69,19 +69,19 @@ export function SealCard({
           <h2>{title}</h2>
           <p className="muted seal-card-subtitle">
             {document.signingProgress.required === 0
-              ? 'Direct seal'
+              ? 'Direct lock'
               : `${document.signingProgress.signed}/${document.signingProgress.required} signed`} —{' '}
             {busy
               ? 'approve the wallet prompt to finish.'
               : insufficientFunds
-                ? 'Your wallet does not have enough NIM for the seal fee and network costs.'
+                ? 'Your wallet does not have enough NIM for the lock fee and network costs.'
                 : failedPrior
                   ? (document.signingProgress.required === 0
                       ? 'the last transaction never reached the blockchain.'
                       : 'your signatures are safe — the last transaction never reached the blockchain.')
                   : interrupted
-                    ? 'the last seal attempt did not finish. Try again.'
-                    : `approve one Nimiq transaction (${formatSealFeeSummary(pricing)}) to permanently record this document's fingerprint on-chain. Your file stays on your computer.`}
+                    ? 'the last lock attempt did not finish. Try again.'
+                    : `approve one Nimiq transaction (${formatSealFeeSummary(pricing)}) to permanently lock this document's fingerprint on the blockchain. Your file stays on your computer.`}
           </p>
           {!busy && !failedPrior && !interrupted && !insufficientFunds && pricing.promoActive && (
             <p className="seal-card-promo">
@@ -110,7 +110,7 @@ export function SealCard({
 
       {failedPrior && !busy && !lockError && !insufficientFunds && (
         <p className="seal-card-notice" role="status">
-          Previous seal did not confirm on-chain. Tap below to submit a new transaction.
+          Previous lock did not confirm on-chain. Tap below to submit a new transaction.
         </p>
       )}
 
@@ -144,7 +144,7 @@ export function SealCard({
           {busy ? (
             <>
               <LoaderCircle className="seal-card-btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
-              Sealing…
+              Locking…
             </>
           ) : sealFundsLoading ? (
             <>
@@ -154,11 +154,11 @@ export function SealCard({
           ) : insufficientFunds ? (
             'Add NIM to continue'
           ) : interrupted ? (
-            'Retry seal'
+            'Retry lock'
           ) : inNimiqPay || hasNimiqProvider ? (
-            document.signingProgress.required === 0 ? 'Seal document' : 'Seal agreement'
+            document.signingProgress.required === 0 ? 'Lock document' : 'Lock agreement'
           ) : (
-            'Seal via Hub'
+            'Lock via Hub'
           )}
         </button>
         {onRefreshFunds && !busy && (
@@ -175,7 +175,7 @@ export function SealCard({
 
       {!inNimiqPay && !hasNimiqProvider && (
         <p className="muted seal-card-hint">
-          Sealing redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the
+          Locking redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the
           on-chain proof is confirmed.
         </p>
       )}

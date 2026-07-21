@@ -51,12 +51,12 @@ function buildHeroClaims(): HeroClaim[] {
     {
       icon: Lock,
       status: pricing.promoActive
-        ? `Permanent seal for ${feeNim} (July promo)`
-        : `Permanent seal for a flat ${feeNim} fee`,
+        ? `Permanent on-chain lock for ${feeNim} (July promo)`
+        : `Permanent on-chain lock for a flat ${feeNim} fee`,
     },
     {
       icon: Fingerprint,
-      status: 'Anyone can re-check the sealed proof later',
+      status: 'Anyone can re-check the locked proof later',
     },
   ]
 }
@@ -77,7 +77,7 @@ const PATHS: {
 }[] = [
   {
     role: 'creator',
-    title: 'Create & seal',
+    title: 'Create & lock',
     detail: 'Start an agreement, invite co-signers, lock a permanent proof',
     icon: Fingerprint,
     imageAlt: '',
@@ -92,7 +92,7 @@ const PATHS: {
   {
     role: 'verifier',
     title: 'Verify a file',
-    detail: 'Drop a file to check it still matches a sealed proof',
+    detail: 'Drop a file to check it still matches a locked proof',
     icon: ScanSearch,
     imageAlt: '',
   },
@@ -156,7 +156,7 @@ export function LandingHome({
               className="lr-cta lr-cta--primary"
               onClick={() => onPickRole('creator')}
             >
-              Create &amp; seal
+              Create &amp; lock
               <ArrowRight size={16} strokeWidth={2.25} aria-hidden />
             </button>
             <a className="lr-cta lr-cta--ghost" href="#lr-paths">
@@ -208,7 +208,7 @@ export function LandingHome({
             <ul>
               <li>The math that identifies your file runs in the browser. The file stays local.</li>
               <li>Servers keep agreement metadata and that short proof string, never the file bytes.</li>
-              <li>A permanent seal records only the proof on the Nimiq blockchain.</li>
+              <li>A permanent on-chain lock records only the proof on the Nimiq blockchain.</li>
               <li>Verification re-checks a local copy. No wallet required to verify.</li>
             </ul>
           </div>
@@ -225,7 +225,7 @@ export function LandingHome({
             What are you here to do?
           </h2>
           <p className="lr-paths-lead">
-            Pick a path. Create, sign an invite, or verify a sealed document.
+            Pick a path. Create, sign an invite, or verify a locked document.
           </p>
         </div>
 

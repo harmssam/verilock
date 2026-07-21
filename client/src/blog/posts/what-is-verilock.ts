@@ -8,7 +8,7 @@ export const post: BlogPost = {
   slug: 'what-is-verilock',
   title: 'What is VeriLock?',
   description:
-    'VeriLock is private multi-party PDF signing with local fingerprints and a permanent Nimiq seal. What it is, how proof works, and what it does not claim.',
+    'VeriLock is private multi-party PDF signing with local fingerprints and a permanent Nimiq on-chain lock. What it is, how proof works, and what it does not claim.',
   date: '2026-07-13',
   tags: ['guide', 'privacy'],
   coverImage: cover,
@@ -22,7 +22,7 @@ export const post: BlogPost = {
     body: [
     {
       type: 'p',
-      text: 'VeriLock helps people sign the same PDF together, keep the file on their own devices, and lock a permanent fingerprint of that file on the Nimiq blockchain. Later, anyone with a copy can check whether the bytes still match what was sealed.',
+      text: 'VeriLock helps people sign the same PDF together, keep the file on their own devices, and lock a permanent fingerprint of that file on the Nimiq blockchain. Later, anyone with a copy can check whether the bytes still match what was locked on the blockchain.',
     },
     {
       type: 'p',
@@ -38,7 +38,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Cloud e-sign tools solve workflow by hosting the document. That is fine for many teams. It is less fine when you would rather the NDA, lease, or side letter never sit on a third-party file server. VeriLock is built for that privacy-minded loop: same fingerprint for every party, signatures against that fingerprint, then a seal you can re-check without trusting one vendor database alone.',
+      text: 'Cloud e-sign tools solve workflow by hosting the document. That is fine for many teams. It is less fine when you would rather the NDA, lease, or side letter never sit on a third-party file server. VeriLock is built for that privacy-minded loop: same fingerprint for every party, signatures against that fingerprint, then a lock you can re-check without trusting one vendor database alone.',
     },
     {
       type: 'h2',
@@ -50,13 +50,13 @@ export const post: BlogPost = {
         'A web app for multi-party PDF agreements on Nimiq wallets (Hub or Pay).',
         'Local SHA-256 fingerprinting in the browser so the file stays on your device.',
         'Wallet-backed signatures over the agreed fingerprint.',
-        'An on-chain seal that anchors the hash when parties are ready.',
-        'A verify path that re-hashes a candidate PDF and compares it to the sealed record. Integrity checks do not require a wallet.',
+        'An on-chain lock that anchors the hash when parties are ready.',
+        'A verify path that re-hashes a candidate PDF and compares it to the locked record. Integrity checks do not require a wallet.',
       ],
     },
     {
       type: 'p',
-      text: 'Workflow metadata (title, fingerprints, parties, seal details) can live with the product so the agreement is reopenable. The full PDF is not the payload you publish to the world.',
+      text: 'Workflow metadata (title, fingerprints, parties, lock details) can live with the product so the agreement is reopenable. The full PDF is not the payload you publish to the world.',
     },
     {
       type: 'figure',
@@ -66,15 +66,15 @@ export const post: BlogPost = {
     },
     {
       type: 'h2',
-      text: 'What a seal actually proves',
+      text: 'What an on-chain lock actually proves',
     },
     {
       type: 'p',
-      text: 'A cryptographic hash is a fingerprint of exact bytes. Change a fee, a date, or a name, and the hash changes. When you seal on Nimiq, you anchor that fingerprint in a public transaction with a timestamped permanent record.',
+      text: 'A cryptographic hash is a fingerprint of exact bytes. Change a fee, a date, or a name, and the hash changes. When you lock it on Nimiq, you anchor that fingerprint in a public transaction with a timestamped permanent record.',
     },
     {
       type: 'p',
-      text: 'Re-hashing later answers one question well: does this file still match what was sealed? That is document integrity. It is not the same as full legal authenticity, and it is not a substitute for knowing who had authority to sign under local law.',
+      text: 'Re-hashing later answers one question well: does this file still match what was locked on the blockchain? That is document integrity. It is not the same as full legal authenticity, and it is not a substitute for knowing who had authority to sign under local law.',
     },
     {
       type: 'figure',
@@ -92,12 +92,12 @@ export const post: BlogPost = {
         'Not a document forensics suite (no Error Level Analysis, MRZ, or layout template scanners).',
         'Not a government eID or qualified electronic signature product by default.',
         'Not a claim that a hash alone makes a contract enforceable in your jurisdiction.',
-        'Not a host for the PDF content on-chain. Only the fingerprint is sealed.',
+        'Not a host for the PDF content on-chain. Only the fingerprint is locked on the blockchain.',
       ],
     },
     {
       type: 'note',
-      text: 'An intact or matching result means no byte change was detected against the sealed fingerprint. It does not prove a document was genuine if it was fabricated before sealing, and it does not show which clause changed when a hash mismatches. Keep your own sealed PDF copy.',
+      text: 'An intact or matching result means no byte change was detected against the locked fingerprint. It does not prove a document was genuine if it was fabricated before locking, and it does not show which clause changed when a hash mismatches. Keep your own locked PDF copy.',
     },
     {
       type: 'h2',
@@ -105,7 +105,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Teams and individuals who want multi-party signing with a clear integrity story: freelancers and clients, remote collaborators, anyone exchanging PDFs who cares that the sealed version stays checkable. If you need classic cloud e-sign features first and privacy of the file second, a hosted tool may fit better. If you want the opposite balance, VeriLock is aimed at you.',
+      text: 'Teams and individuals who want multi-party signing with a clear integrity story: freelancers and clients, remote collaborators, anyone exchanging PDFs who cares that the locked version stays checkable. If you need classic cloud e-sign features first and privacy of the file second, a hosted tool may fit better. If you want the opposite balance, VeriLock is aimed at you.',
     },
     {
       type: 'h2',
@@ -113,11 +113,11 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'On the home screen, pick a path: create and seal, join as a co-signer, or verify. Steps stay focused on one job at a time. Under the hood the loop is still fingerprint, sign, seal, and verify. For the step-by-step pipeline, read How VeriLock works.',
+      text: 'On the home screen, pick a path: create and lock, join as a co-signer, or verify. Steps stay focused on one job at a time. Under the hood the loop is still fingerprint, sign, lock, and verify. For the step-by-step pipeline, read How VeriLock works.',
     },
     {
       type: 'p',
-      text: 'Sign together. Prove forever. Through the end of July, a permanent Nimiq seal is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
+      text: 'Sign together. Prove forever. Through the end of July, a permanent Nimiq on-chain lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
     },
   ],
 }

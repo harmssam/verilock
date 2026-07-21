@@ -217,7 +217,7 @@ export function HowVeriLockWorks({ role, open, onToggle }: HowVeriLockWorksProps
         <div className="how-story">
           <p className="how-story-lead muted">
             Your document never leaves this device. Only its SHA-256 fingerprint is written to the Nimiq
-            blockchain when you seal.
+            blockchain when you lock the proof.
           </p>
           <ol className="how-story-list">
             {stages.map((stage, i) => (

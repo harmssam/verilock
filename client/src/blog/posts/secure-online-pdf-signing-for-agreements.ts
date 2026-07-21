@@ -23,7 +23,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'VeriLock fingerprints the PDF in the browser, collects wallet signatures, and seals a compact hash on Nimiq. The PDF stays on each device. The chain holds proof, not the contract wording.',
+      text: 'VeriLock fingerprints the PDF in the browser, collects wallet signatures, and locks a compact hash on Nimiq. The PDF stays on each device. The chain holds proof, not the contract wording.',
     },
     {
       type: 'figure',
@@ -45,7 +45,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Local SHA-256 fingerprinting, multi-party signing against that fingerprint, and an on-chain seal answer those questions. Change the file, and the hash will not match.',
+      text: 'Local SHA-256 fingerprinting, multi-party signing against that fingerprint, and an on-chain lock answer those questions. Change the file, and the hash will not match.',
     },
     {
       type: 'h2',
@@ -53,15 +53,15 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'VeriLock stores workflow metadata (title, fingerprints, parties, seal details). The full PDF is never uploaded. When you seal, a Nimiq transaction anchors the fingerprint permanently.',
+      text: 'VeriLock stores workflow metadata (title, fingerprints, parties, lock details). The full PDF is never uploaded. When you lock it on the blockchain, a Nimiq transaction anchors the fingerprint permanently.',
     },
     {
       type: 'note',
-      text: 'VeriLock helps you sign together and prove the sealed fingerprint later. It is not legal advice about enforceability in your jurisdiction.',
+      text: 'VeriLock helps you sign together and prove the locked fingerprint later. It is not legal advice about enforceability in your jurisdiction.',
     },
     {
       type: 'p',
-      text: 'Sign together. Prove forever. Seals are 50 NIM through July (95% off list), then the standard fee returns August 1.',
+      text: 'Sign together. Prove forever. Locks are 50 NIM through July (95% off list), then the standard fee returns August 1.',
     },
   ],
 }

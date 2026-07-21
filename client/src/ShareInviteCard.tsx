@@ -255,7 +255,7 @@ export function ShareInviteCard({
       if (hash !== document.originalSha256) {
         setPickedPdf(null)
         setPickError(
-          'That file does not match this agreement’s fingerprint. Use the exact file you sealed.',
+          'That file does not match this agreement’s fingerprint. Use the exact file you locked.',
         )
         return
       }

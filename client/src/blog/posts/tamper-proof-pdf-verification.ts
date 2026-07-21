@@ -8,11 +8,11 @@ export const post: BlogPost = {
   slug: 'tamper-proof-pdf-verification',
   title: 'Tamper-Proof PDF Verification',
   description:
-    'Why re-hashing a sealed PDF catches silent edits, what hashes cannot show, and how a Nimiq seal stays checkable without trusting one server.',
+    'Why re-hashing a locked PDF catches silent edits, what hashes cannot show, and how a Nimiq on-chain lock stays checkable without trusting one server.',
   date: '2026-07-07',
   tags: ['guide', 'verify'],
   coverImage: cover,
-  coverAlt: 'Printed service agreement on a warm gray desk showing a document hash strip, fingerprint seal, and offline verified stamp',
+  coverAlt: 'Printed service agreement on a warm gray desk showing a document hash strip, fingerprint mark, and offline verified stamp',
   relatedSlugs: [
     'how-verilock-works',
     'how-to-verify-signed-pdf-without-a-wallet',
@@ -22,11 +22,11 @@ export const post: BlogPost = {
     body: [
     {
       type: 'p',
-      text: 'Tamper-proof verification is re-runnable math. If two parties claim to hold the same sealed agreement, the bytes must match the sealed fingerprint. Human eyes miss small edits. A hash does not.',
+      text: 'Tamper-proof verification is re-runnable math. If two parties claim to hold the same locked agreement, the bytes must match the locked fingerprint. Human eyes miss small edits. A hash does not.',
     },
     {
       type: 'p',
-      text: 'This is not a forensic lab. VeriLock does not run error level analysis or AI noise scanners on arbitrary files. It seals a fingerprint at agreement time and lets anyone re-check that fingerprint later. Prevention comes first. Detection is a simple comparison.',
+      text: 'This is not a forensic lab. VeriLock does not run error level analysis or AI noise scanners on arbitrary files. It locks a fingerprint at agreement time and lets anyone re-check that fingerprint later. Prevention comes first. Detection is a simple comparison.',
     },
     {
       type: 'h2',
@@ -39,43 +39,43 @@ export const post: BlogPost = {
     {
       type: 'figure',
       src: edit,
-      alt: 'Document with a solid wax seal and a translucent altered layer peeling away',
-      caption: 'A tiny post-seal change breaks the integrity claim.',
+      alt: 'Document with a solid wax stamp and a translucent altered layer peeling away',
+      caption: 'A tiny after locking change breaks the integrity claim.',
     },
     {
       type: 'h2',
-      text: 'Seal once, verify forever',
+      text: 'Lock once, verify forever',
     },
     {
       type: 'p',
-      text: 'When you seal on Nimiq, you anchor the agreed SHA-256 fingerprint in a public transaction. Later, anyone can re-hash the file they hold and compare. A swapped or edited PDF will not align. You do not need to trust a single vendor database as the only place the permanent record lives.',
+      text: 'When you lock it on Nimiq, you anchor the agreed SHA-256 fingerprint in a public transaction. Later, anyone can re-hash the file they hold and compare. A swapped or edited PDF will not align. You do not need to trust a single vendor database as the only place the permanent record lives.',
     },
     {
       type: 'figure',
       src: permanent,
-      alt: 'Stone tablet mark beside a luminous golden seal stamp',
-      caption: 'The seal is a permanent reference. Re-hash anytime against the file you still have.',
+      alt: 'Stone tablet mark beside a luminous golden lock stamp',
+      caption: 'The on-chain lock is a permanent reference. Re-hash anytime against the file you still have.',
     },
     {
       type: 'ul',
       items: [
         'Fingerprint locally in the browser when you create or join.',
         'Collect signatures on that fingerprint from every required party.',
-        'Seal the agreed hash when the group is ready.',
+        'Lock the agreed hash when the group is ready.',
         'Re-hash any candidate file later to detect changes.',
       ],
     },
     {
       type: 'h2',
-      text: 'Seal vs post-hoc forensics',
+      text: 'Lock vs post-hoc forensics',
     },
     {
       type: 'p',
-      text: 'Industry document tampering detection tries to reverse-engineer whether a file was edited after the fact using metadata and compression artifacts. That helps for documents received without a prior seal. It is also probabilistic and tool-dependent.',
+      text: 'Industry document tampering detection tries to reverse-engineer whether a file was edited after the fact using metadata and compression artifacts. That helps for documents received without a prior on-chain lock. It is also probabilistic and tool-dependent.',
     },
     {
       type: 'p',
-      text: 'A cryptographic seal flips the problem. You decide the moment of truth when everyone agrees and lock the fingerprint. Treat later mismatches as definitive for that sealed version. You keep the PDF. The chain keeps the hash.',
+      text: 'A cryptographic lock flips the problem. You decide the moment of truth when everyone agrees and lock the fingerprint. Treat later mismatches as definitive for that locked version. You keep the PDF. The chain keeps the hash.',
     },
     {
       type: 'h2',
@@ -84,19 +84,19 @@ export const post: BlogPost = {
     {
       type: 'ul',
       items: [
-        'Match: the candidate file bytes match the sealed fingerprint.',
-        'Mismatch: the candidate is not the sealed document.',
+        'Match: the candidate file bytes match the locked fingerprint.',
+        'Mismatch: the candidate is not the locked document.',
         'Not shown: which specific word or field changed.',
-        'Not proven by hash alone: legal authority of signers or pre-seal authenticity.',
+        'Not proven by hash alone: legal authority of signers or before locking authenticity.',
       ],
     },
     {
       type: 'note',
-      text: 'Hashes detect change but do not localize edits. Keep your own sealed PDF copy. An unsealed file fabricated from scratch may have no edit history to find. Sealing makes later comparison meaningful.',
+      text: 'Hashes detect change but do not localize edits. Keep your own locked PDF copy. An unlocked file fabricated from scratch may have no edit history to find. Locking makes later comparison meaningful.',
     },
     {
       type: 'h2',
-      text: 'How to check a sealed PDF',
+      text: 'How to check a locked PDF',
     },
     {
       type: 'p',
@@ -109,15 +109,15 @@ export const post: BlogPost = {
     {
       type: 'ul',
       items: [
-        'Seal only after the final version is agreed.',
-        'Do not re-export the sealed PDF through tools that rewrite bytes.',
-        'Store the sealed file with every party who may need to verify it later.',
+        'Lock only after the final version is agreed.',
+        'Do not re-export the locked PDF through tools that rewrite bytes.',
+        'Store the locked file with every party who may need to verify it later.',
         'Treat filename similarity as a hint, never as proof.',
       ],
     },
     {
       type: 'p',
-      text: 'Need a check now? Click the Verify a PDF link on the homepage. No wallet is required. When you are ready to lock a new fingerprint, seals are 50 NIM through July. This is 95% off the 1000 NIM list price. The promo ends August 1.',
+      text: 'Need a check now? Click the Verify a PDF link on the homepage. No wallet is required. When you are ready to lock a new fingerprint, locks are 50 NIM through July. This is 95% off the 1000 NIM list price. The promo ends August 1.',
     },
   ],
 }

@@ -40,8 +40,8 @@ const STEP_ICONS: Record<JourneyStepId, LucideIcon> = {
 function roleSubtitle(role: PathRole | null): string {
   if (role === 'signer')
     return 'Match the shared document, complete your fields, and bind with your wallet'
-  if (role === 'verifier') return 'Check a sealed proof anytime. No wallet needed'
-  return 'Sign the document, then lock a permanent proof'
+  if (role === 'verifier') return 'Check a locked proof anytime. No wallet needed'
+  return 'Sign the document, then lock a permanent proof on the blockchain'
 }
 
 function prefersReducedMotion(): boolean {
@@ -391,7 +391,7 @@ export function LandingHowItWorks({ role, open, onToggle }: LandingHowItWorksPro
         <div className="lr-how-story">
           <p className="lr-how-lead">
             Your file never leaves this device. Only its SHA-256 fingerprint is written to the Nimiq
-            blockchain when you seal.
+            blockchain when you lock the proof.
           </p>
           <ol className="lr-how-list">
             {stages.map((stage, i) => (

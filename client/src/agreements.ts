@@ -20,9 +20,9 @@ export const BUCKET_ORDER: AgreementBucket[] = [
 
 export const BUCKET_LABELS: Record<AgreementBucket, string> = {
   needs_you: 'Needs your action',
-  ready_to_seal: 'Ready to seal',
+  ready_to_seal: 'Ready to lock',
   waiting: 'Waiting on others',
-  locked: 'Sealed',
+  locked: 'Locked',
 }
 
 export function isDocumentCreator(
@@ -100,12 +100,12 @@ export function isSealingPhase(doc: SealDocument): boolean {
 
 export function getAgreementView(doc: SealDocument, address: string | null): AgreementView {
   const { signed, required, readyToLock } = doc.signingProgress
-  const progress = required === 0 ? 'direct seal' : `${signed}/${required} signed`
+  const progress = required === 0 ? 'direct lock' : `${signed}/${required} signed`
 
   if (doc.status === 'locked' || doc.attestation?.status === 'confirmed') {
     return {
       bucket: 'locked',
-      headline: 'Sealed on-chain',
+      headline: 'Locked on-chain',
       detail: progress,
       cta: 'View',
     }
@@ -116,7 +116,7 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
   if (doc.status === 'locking' && doc.attestation?.status !== 'failed') {
     return {
       bucket: 'ready_to_seal',
-      headline: doc.attestation?.status === 'pending' ? 'Confirming seal' : 'Sealing in progress',
+      headline: doc.attestation?.status === 'pending' ? 'Confirming lock' : 'Locking in progress',
       detail: progress,
       cta: 'View',
     }
@@ -125,25 +125,28 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
   if (doc.attestation?.status === 'failed' && doc.status !== 'locked') {
     return {
       bucket: 'ready_to_seal',
-      headline: 'Seal again',
+      headline: 'Lock again',
       detail: progress,
-      cta: 'Seal now',
+      cta: 'Lock now',
     }
   }
 
   if (readyToLock || doc.status === 'ready_to_lock') {
     if (creator) {
-      const headline = doc.signingProgress.required === 0 ? 'Ready to seal on-chain' : 'All signed — seal on-chain'
+      const headline =
+        doc.signingProgress.required === 0
+          ? 'Ready to lock on-chain'
+          : 'All signed — lock on-chain'
       return {
         bucket: 'ready_to_seal',
         headline,
         detail: progress,
-        cta: 'Seal now',
+        cta: 'Lock now',
       }
     }
     return {
       bucket: 'waiting',
-      headline: 'Waiting to seal',
+      headline: 'Waiting to lock',
       detail: progress,
       cta: 'View',
     }
@@ -171,13 +174,16 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
       return creator
         ? {
             bucket: 'ready_to_seal',
-            headline: doc.signingProgress.required === 0 ? 'Ready to seal on-chain' : 'All signed — seal on-chain',
+            headline:
+              doc.signingProgress.required === 0
+                ? 'Ready to lock on-chain'
+                : 'All signed — lock on-chain',
             detail: progress,
-            cta: 'Seal now',
+            cta: 'Lock now',
           }
         : {
             bucket: 'waiting',
-            headline: 'Waiting to seal',
+            headline: 'Waiting to lock',
             detail: progress,
             cta: 'View',
           }
@@ -188,9 +194,9 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
     if (doc.signingProgress.required === 0) {
       return {
         bucket: 'ready_to_seal',
-        headline: 'Ready to seal on-chain',
+        headline: 'Ready to lock on-chain',
         detail: progress,
-        cta: 'Seal now',
+        cta: 'Lock now',
       }
     }
     return {

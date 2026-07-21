@@ -6,7 +6,7 @@ export const post: BlogPost = {
   slug: 'wallet-scoped-agreements-history',
   title: 'Your Agreements, Scoped to Your Wallet',
   description:
-    'Agreements history follows the Nimiq wallet you connect. Reopen in-progress work, jump to sealed docs, or start create without hunting old links.',
+    'Agreements history follows the Nimiq wallet you connect. Reopen in-progress work, jump to locked docs, or start create without hunting old links.',
   date: '2026-07-09',
   tags: ['feature'],
   coverImage: cover,
@@ -20,7 +20,7 @@ export const post: BlogPost = {
   body: [
     {
       type: 'p',
-      text: 'VeriLock does not use a separate username for document history. When you connect a Nimiq wallet, Agreements shows what that address created or signed. The list is a workspace for in-progress and sealed work, not a public directory of every file on the network.',
+      text: 'VeriLock does not use a separate username for document history. When you connect a Nimiq wallet, Agreements shows what that address created or signed. The list is a workspace for in-progress and locked work, not a public directory of every file on the network.',
     },
     {
       type: 'figure',
@@ -34,7 +34,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'After login, open Agreements from the header, or from the account menu. You land on a full page of documents for that wallet: reopen a draft, continue signing, jump toward seal when the agreement is ready, or start Create & seal if the list is empty.',
+      text: 'After login, open Agreements from the header, or from the account menu. You land on a full page of documents for that wallet: reopen a draft, continue signing, jump toward locking when the agreement is ready, or start Create & lock if the list is empty.',
     },
     {
       type: 'h2',
@@ -45,8 +45,8 @@ export const post: BlogPost = {
       items: [
         'Agreements you created (you are the party who fingerprinted the PDF and invited others).',
         'Agreements you co-signed after someone shared a link and the same PDF with you.',
-        'Status cues such as in progress versus sealed, so you can tell what still needs signatures or a chain lock.',
-        'Actions to open a document, prefer seal when you are allowed to, or remove work when the product rules allow cancel or delete.',
+        'Status cues such as in progress versus locked, so you can tell what still needs signatures or a chain lock.',
+        'Actions to open a document, prefer lock when you are allowed to, or remove work when the product rules allow cancel or delete.',
       ],
     },
     {
@@ -67,11 +67,11 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'No rows yet usually means this wallet has not created or signed anything in VeriLock. Start Create & seal from Agreements or from the home path picker. If you expected a document, confirm you are on the same wallet that signed or created it, and that the agreement was not cancelled by the creator before the first signature.',
+      text: 'No rows yet usually means this wallet has not created or signed anything in VeriLock. Start Create & lock from Agreements or from the home path picker. If you expected a document, confirm you are on the same wallet that signed or created it, and that the agreement was not cancelled by the creator before the first signature.',
     },
     {
       type: 'p',
-      text: 'Connect, open Agreements in the header, and keep work moving from one place. Through the end of July, a permanent Nimiq seal is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
+      text: 'Connect, open Agreements in the header, and keep work moving from one place. Through the end of July, a permanent Nimiq on-chain lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
     },
   ],
 }

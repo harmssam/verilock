@@ -69,7 +69,7 @@ const TRACK_META: Record<
   }
 > = {
   creator: {
-    title: 'Create & seal',
+    title: 'Create & lock',
     detail: 'Start an agreement, invite co-signers, lock a permanent proof',
     icon: Fingerprint,
     accent: 'creator',
@@ -82,7 +82,7 @@ const TRACK_META: Record<
   },
   verifier: {
     title: 'Verify a file',
-    detail: 'Drop a file to check it still matches a sealed proof',
+    detail: 'Drop a file to check it still matches a locked proof',
     icon: ScanSearch,
     accent: 'verifier',
   },

@@ -40,10 +40,10 @@ const PHASE_META: Record<
 }
 
 const WAIT_TIPS = [
-  'Your file never leaves this device — only the fingerprint is sealed.',
-  'Closing this tab is fine. The server keeps working until the seal lands.',
-  'Come back anytime: open this agreement to see when it is sealed.',
-  'One credit = one permanent on-chain seal. No NIM wallet prompt needed.',
+  'Your file never leaves this device — only the fingerprint is locked on the blockchain.',
+  'Closing this tab is fine. The server keeps working until the lock confirms.',
+  'Come back anytime: open this agreement to see when it is locked.',
+  'One credit = one permanent on-chain lock. No NIM wallet prompt needed.',
 ]
 
 function phaseFromMessage(message: string | null): CreditSealPhase {
@@ -138,7 +138,7 @@ export function CreditSealProgress({
 
   const statusLine = useMemo(() => {
     if (message?.trim()) return message.trim()
-    if (phase === 'done') return 'Sealed on Nimiq.'
+    if (phase === 'done') return 'Locked on Nimiq.'
     if (phase === 'confirm') return 'Confirming on Nimiq — safe to close this tab…'
     if (phase === 'broadcast') return 'Posting on-chain proof from VeriLock servers…'
     return 'Reserving 1 credit — you can leave this page anytime…'
@@ -162,10 +162,10 @@ export function CreditSealProgress({
       <div className="credit-seal-progress-copy">
         <p className="credit-seal-progress-kicker">
           <Sparkles size={14} strokeWidth={2.25} aria-hidden />
-          Sealing with 1 credit
+          Locking with 1 credit
         </p>
         <h3 className="credit-seal-progress-title">
-          {phase === 'done' ? 'Sealed on the Nimiq blockchain' : 'Anchoring your document on-chain'}
+          {phase === 'done' ? 'Locked on the Nimiq blockchain' : 'Anchoring your document on-chain'}
         </h3>
         {title && <p className="credit-seal-progress-doc muted">{title}</p>}
         {fingerprintPreview && (
@@ -220,8 +220,8 @@ export function CreditSealProgress({
           <div>
             <strong>You can leave this page</strong>
             <p className="muted">
-              Sealing runs on VeriLock’s servers — closing the tab or switching apps does not cancel
-              it. Reopen this agreement anytime to see the sealed status.
+              Locking runs on VeriLock’s servers — closing the tab or switching apps does not cancel
+              it. Reopen this agreement anytime to see the locked status.
             </p>
           </div>
         </div>
