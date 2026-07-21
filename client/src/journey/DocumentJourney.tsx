@@ -1595,19 +1595,20 @@ export function DocumentJourney({
       setFillBusy(true)
       try {
         // Capture ink for the party signature image (no second pad).
+        // Prefer vector path raster when present so a bad PNG (e.g. initials) cannot win.
         let inkBlob: Blob | null = null
-        if (result.signatureImageDataUrl) {
-          try {
-            inkBlob = await (await fetch(result.signatureImageDataUrl)).blob()
-          } catch {
-            /* try path raster below */
-          }
-        }
-        if (!inkBlob && result.inkPath?.strokes?.length) {
+        if (result.inkPath?.strokes?.length) {
           try {
             const { pathToPngDataUrl } = await import('../signatureHandoff/crypto')
             const url = pathToPngDataUrl(result.inkPath)
             inkBlob = await (await fetch(url)).blob()
+          } catch {
+            /* try data URL below */
+          }
+        }
+        if (!inkBlob && result.signatureImageDataUrl) {
+          try {
+            inkBlob = await (await fetch(result.signatureImageDataUrl)).blob()
           } catch {
             /* pad still available as fallback */
           }
@@ -3562,6 +3563,7 @@ export function DocumentJourney({
                           compact
                           revealPrivate={revealParticipantPrivate}
                           authToken={token}
+                          fingerprint={doc.fingerprint}
                         />
                       )}
                       <div className="seal-summary">
@@ -3704,6 +3706,7 @@ export function DocumentJourney({
                           parties={doc.source.parties}
                           revealPrivate={revealParticipantPrivate}
                           authToken={token}
+                          fingerprint={doc.fingerprint}
                         />
                       ) : (
                         <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
@@ -3877,6 +3880,7 @@ export function DocumentJourney({
                         parties={doc.source.parties}
                         revealPrivate={revealParticipantPrivate}
                         authToken={token}
+                        fingerprint={doc.fingerprint}
                       />
                     )}
 
@@ -4064,6 +4068,7 @@ export function DocumentJourney({
                               canRevealParticipantDetails(primary, address)
                             }
                             authToken={token}
+                            fingerprint={primary.originalSha256}
                           />
                         )
                       })()}
