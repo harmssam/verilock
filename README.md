@@ -6,6 +6,8 @@ Built for the [Mini Apps Competition](https://miniappscompetition.com/).
 
 **Live demo:** [https://verilock.online/](https://verilock.online/) (Railway)
 
+**Offline verifier (open source):** [harmssam/verilock-offline](https://github.com/harmssam/verilock-offline) — hash and re-check seals on your device (web + macOS / Windows / Linux desktop) without using this site. Companion repo; product create/sign/seal stays here.
+
 > **UI source of truth:** production SPA — `client/src/App.tsx` (shell) + `client/src/landing/` + `client/src/journey/`  
 > (default `npm run dev` / `npm run build`). Historical UIs live only under `client/src/archive/`. See **`AGENTS.md`**.
 
