@@ -104,6 +104,19 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
           for a basic integrity check. Matching means the bytes match the locked fingerprint; it does not
           mean VeriLock holds a copy of the file.
         </p>
+        <p>
+          Prefer a fully open-source tool that never talks to this site? Use{' '}
+          <a
+            className="security-inline-link"
+            href="https://github.com/harmssam/verilock-offline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            VeriLock Offline
+          </a>{' '}
+          — hash on your device and check a Nimiq lock transaction or certificate without uploading the
+          file. Source and desktop builds (macOS, Windows, Linux) are on GitHub.
+        </p>
       </section>
 
       <section id="we-store" className="security-section">

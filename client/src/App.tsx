@@ -834,6 +834,14 @@ export function App() {
           >
             Support
           </button>
+          <a
+            className="lr-footer-link"
+            href="https://github.com/harmssam/verilock-offline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Offline verifier
+          </a>
         </div>
       </footer>
     </div>
