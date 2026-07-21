@@ -33,7 +33,7 @@ const PHASE_META: Record<
     Icon: Link2,
   },
   done: {
-    label: 'Sealed forever',
+    label: 'Locked forever',
     detail: 'Proof is permanent on the chain',
     Icon: Lock,
   },

@@ -2023,7 +2023,7 @@ export function DocumentJourney({
     })
     if (result.ok) {
       setActiveFromSeal(result.document, doc.fileSize)
-      setLockMessage('Sealed forever on Nimiq (1 credit).')
+      setLockMessage('Locked forever on Nimiq (1 credit).')
       setCreditsRefresh(k => k + 1)
     } else {
       setLocalError(result.message)
@@ -3617,7 +3617,7 @@ export function DocumentJourney({
                         <div>
                           <strong>
                             {doc.sealed
-                              ? 'Sealed on-chain — you already signed.'
+                              ? 'Locked on-chain — you already signed.'
                               : 'Thanks, you are done signing.'}
                           </strong>
                           <p className="muted">
