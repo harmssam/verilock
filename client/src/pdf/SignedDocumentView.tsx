@@ -3,13 +3,18 @@
  * Used when an involved party verifies (or revisits Done) with their copy of the file.
  * Same visual surface as create/sign (pdf.js stage), not the document-card metaphor.
  */
-import { useEffect, useState } from 'react'
+import { Printer } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import type { DocumentAnnotation, DocumentParty, DocumentSignature } from '../types'
 import type { PdfAnnotation } from './annotations'
 import type { PlacementSlot } from './placements'
 import { reconstructAnnotationsFromPlanAndFills } from './placementStream'
-import { PdfReconstructor } from './PdfReconstructor'
+import {
+  PdfReconstructor,
+  printRenderedPages,
+  type PdfReconstructorHandle,
+} from './PdfReconstructor'
 import './PdfAnnotator.css'
 import './SignedDocumentView.css'
 
@@ -244,9 +249,13 @@ export function SignedDocumentView({
   pageWidth = 640,
   className,
 }: SignedDocumentViewProps) {
+  const reconRef = useRef<PdfReconstructorHandle>(null)
   const [annotations, setAnnotations] = useState<PdfAnnotation[]>([])
   const [loadState, setLoadState] = useState<LoadState>('idle')
   const [note, setNote] = useState<string | null>(null)
+  const [pagesReady, setPagesReady] = useState(false)
+  const [printBusy, setPrintBusy] = useState(false)
+  const [printError, setPrintError] = useState<string | null>(null)
 
   // Stable keys so parent re-renders with new array refs do not re-fetch forever.
   const sigKey = signatures
@@ -410,28 +419,65 @@ export function SignedDocumentView({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sigKey/partyKey/legacyKey stabilize array props
   }, [file, fingerprint, authToken, revealPrivate, sigKey, partyKey, legacyKey])
 
+  const handlePrint = async () => {
+    setPrintError(null)
+    setPrintBusy(true)
+    try {
+      await printRenderedPages(
+        reconRef.current?.getPagesRoot() ?? null,
+        file.name ? `Signed — ${file.name}` : 'Signed document',
+      )
+    } catch (err) {
+      setPrintError(err instanceof Error ? err.message : 'Could not print')
+    } finally {
+      setPrintBusy(false)
+    }
+  }
+
   return (
     <section
       className={className ?? 'signed-document-view'}
       aria-label="Signed document preview"
     >
       <header className="signed-document-view-head">
-        <h3 className="signed-document-view-title">Signed document</h3>
-        <p className="muted signed-document-view-lead">
-          Your local file opened in the browser with recorded signatures on the page. Read only —
-          nothing leaves this device.
-        </p>
+        <div className="signed-document-view-head-row">
+          <div className="signed-document-view-head-text">
+            <h3 className="signed-document-view-title">Signed document</h3>
+            <p className="muted signed-document-view-lead">
+              Your local file with recorded signatures on the page. Read only — nothing leaves this
+              device.
+            </p>
+          </div>
+          {(loadState === 'ready' || loadState === 'plain') && (
+            <button
+              type="button"
+              className={`btn btn-secondary signed-document-print${printBusy ? ' btn--busy' : ''}`}
+              disabled={!pagesReady || printBusy}
+              onClick={() => void handlePrint()}
+            >
+              <Printer size={16} strokeWidth={2.25} aria-hidden />
+              {printBusy ? 'Preparing…' : 'Print'}
+            </button>
+          )}
+        </div>
       </header>
       {loadState === 'loading' && (
         <p className="pdf-annotator-hint">Building signed view…</p>
       )}
       {(loadState === 'ready' || loadState === 'plain') && (
         <PdfReconstructor
+          ref={reconRef}
           file={file}
           annotations={annotations}
           pageWidth={pageWidth}
           className="signed-document-view-recon"
+          onReadyChange={setPagesReady}
         />
+      )}
+      {printError && (
+        <p className="signed-document-view-note signed-document-print-error" role="alert">
+          {printError}
+        </p>
       )}
       {note && (
         <p className="muted signed-document-view-note" role="status">
