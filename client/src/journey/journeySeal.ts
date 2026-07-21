@@ -120,7 +120,7 @@ export async function sealJourneyDocumentWithCredit(args: {
     // Authenticated read: seal completes as creator — unlock participant details.
     const { document } = await api.getDocument(doc.id, token)
     clearSealInFlight()
-    onProgress('Sealed forever on Nimiq (1 credit).')
+    onProgress('Locked forever on Nimiq (1 credit).')
     return { ok: true, document }
   } catch (err) {
     return {
