@@ -1,6 +1,6 @@
 import { normalizeAddress } from './addresses'
 import { resolveSigningParty } from './signing'
-import type { SealDocument } from './types'
+import { documentTypeLabel, type SealDocument } from './types'
 
 export type AgreementBucket = 'needs_you' | 'ready_to_seal' | 'waiting' | 'locked'
 
@@ -231,6 +231,28 @@ export function groupAgreements(
   }
 
   return groups
+}
+
+/** Case-insensitive match on title, filename, type label, and hash prefixes. */
+export function filterAgreements(docs: SealDocument[], query: string): SealDocument[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return docs
+
+  // Strip ellipsis / non-hex noise so short-hash UI strings still match.
+  const qHex = q.replace(/[^0-9a-f]/g, '')
+
+  return docs.filter(doc => {
+    if (doc.title.toLowerCase().includes(q)) return true
+    if (doc.originalFilename?.toLowerCase().includes(q)) return true
+    if (doc.type.toLowerCase().includes(q)) return true
+    if (documentTypeLabel(doc.type).toLowerCase().includes(q)) return true
+    if (qHex.length >= 2) {
+      const original = doc.originalSha256.toLowerCase()
+      const final = doc.finalSha256?.toLowerCase() ?? ''
+      if (original.includes(qHex) || final.includes(qHex)) return true
+    }
+    return false
+  })
 }
 
 export function countActionable(docs: SealDocument[], address: string | null): number {
