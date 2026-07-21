@@ -457,8 +457,8 @@ export function configureSigningRoster(
     }
 
     const list = Array.isArray(input.parties) ? input.parties : []
-    if (list.length < 1 || list.length > 4) {
-      throw new Error('Parties must be between 1 and 4')
+    if (list.length < 1 || list.length > 10) {
+      throw new Error('Parties must be between 1 and 10')
     }
     const creatorIdx = input.creatorSignsAsIndex
     if (creatorIdx != null) {

@@ -4,8 +4,9 @@
  * to the next step (and can re-open until someone signs). No ink payloads here.
  */
 import {
+  AlignLeft,
   Check,
-  PenLine,
+  Square,
   Trash2,
   Type,
   UserRound,
@@ -18,9 +19,12 @@ import {
   type ConstructionPlan,
   type PlacementKind,
   type PlacementSlot,
+  MAX_CONSTRUCTION_PEOPLE,
+  MIN_CONSTRUCTION_PEOPLE,
   clamp01,
   defaultPeople,
   newSlotId,
+  personColor,
 } from './placements'
 import {
   canvasRectToNormalized,
@@ -31,9 +35,97 @@ import { loadDocumentSurface, type DocumentSurface } from './documentSurface'
 import './PdfAnnotator.css'
 import './PlacementEditor.css'
 
-const PERSON_COLORS = ['#0f766e', '#b45309', '#1d4ed8', '#7c3aed'] as const
-
 type Tool = 'select' | 'signature' | 'initial' | 'name' | 'text' | 'checkmark' | 'cross'
+
+/** Handwritten signature mark (black via currentColor on white tool buttons). */
+function SignatureToolIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+      className="placement-tool-svg"
+    >
+      {/* Cursive ink stroke */}
+      <path
+        d="M2.8 15.2c1.1-2.4 2.4-4.6 3.6-5.1 1.4-.6 2.2 1.6 3.1 2.4 1.1 1 2.1-2.8 3.5-2.6 1.6.2 2.2 3.4 3.5 3.2 1.2-.2 1.8-2.8 3.3-2.4 1.1.3 2.2 1.9 3.2 3.4"
+        stroke="currentColor"
+        strokeWidth="1.65"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Flourish / end loop */}
+      <path
+        d="M17.2 13.4c.7.9 1.1 1.7.9 2.4-.3 1.1-1.6 1.3-2.3.4"
+        stroke="currentColor"
+        strokeWidth="1.65"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Signature baseline */}
+      <path
+        d="M3.2 19.2h14.6"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+/** Compact monogram-style initials mark. */
+function InitialsToolIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+      className="placement-tool-svg"
+    >
+      {/* Capital A-like stroke */}
+      <path
+        d="M5.2 17.5 9 6.8l3.6 10.7"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6.6 13.4h4.6"
+        stroke="currentColor"
+        strokeWidth="1.55"
+        strokeLinecap="round"
+      />
+      {/* Capital B-like stroke */}
+      <path
+        d="M14.2 6.8v10.7"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <path
+        d="M14.2 7.2h3.1c1.35 0 2.25.85 2.25 2.05S18.65 11.3 17.3 11.3H14.2"
+        stroke="currentColor"
+        strokeWidth="1.55"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M14.2 11.3h3.4c1.45 0 2.4.9 2.4 2.2s-1 2.25-2.45 2.25H14.2"
+        stroke="currentColor"
+        strokeWidth="1.55"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
 
 export interface PlacementEditorProps {
   file: File
@@ -50,10 +142,6 @@ export interface PlacementEditorProps {
   reviewMode?: boolean
   /** Slot ids already filled on the server (review summary). */
   filledSlotIds?: ReadonlySet<string>
-}
-
-function personColor(slotIndex: number): string {
-  return PERSON_COLORS[(Math.max(1, slotIndex) - 1) % PERSON_COLORS.length]!
 }
 
 function kindLabel(kind: PlacementKind): string {
@@ -99,7 +187,8 @@ export function PlacementEditor({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [tool, setTool] = useState<Tool>('select')
-  const [activePerson, setActivePerson] = useState(1)
+  /** No person pre-selected — user must choose Person 1/2/… before tools unlock. */
+  const [activePerson, setActivePerson] = useState<number | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [placeError, setPlaceError] = useState<string | null>(null)
   /** Optional label on fillable text fields (e.g. "Date", "Printed name"). */
@@ -111,15 +200,21 @@ export function PlacementEditor({
     startY: number
     origX: number
     origY: number
+    moved: boolean
   } | null>(null)
   const [dragTick, setDragTick] = useState(0)
 
   const people = plan.people.length > 0 ? plan.people : defaultPeople(1)
   const slots = plan.slots
+  /** Placement tools stay off until a person chip is selected. */
+  const toolsDisabled = editDisabled || activePerson == null
 
+  // Drop selection if that person slot was removed (never auto-pick another).
   useEffect(() => {
-    if (!people.some(p => p.slotIndex === activePerson) && people[0]) {
-      setActivePerson(people[0].slotIndex)
+    if (activePerson != null && !people.some(p => p.slotIndex === activePerson)) {
+      setActivePerson(null)
+      setTool('select')
+      setPlacing(null)
     }
   }, [people, activePerson])
 
@@ -217,7 +312,7 @@ export function PlacementEditor({
   )
 
   const setPeopleCount = (n: number) => {
-    const count = Math.max(1, Math.min(4, n))
+    const count = Math.max(MIN_CONSTRUCTION_PEOPLE, Math.min(MAX_CONSTRUCTION_PEOPLE, n))
     const next: ConstructionPerson[] = []
     for (let i = 1; i <= count; i++) {
       const existing = people.find(p => p.slotIndex === i)
@@ -235,7 +330,11 @@ export function PlacementEditor({
       slots: p.slots.filter(s => next.some(x => x.slotIndex === s.personSlotIndex)),
       creatorSigningAs: cs != null && cs > count ? null : cs ?? null,
     }))
-    if (activePerson > count) setActivePerson(count)
+    if (activePerson != null && activePerson > count) {
+      setActivePerson(null)
+      setTool('select')
+      setPlacing(null)
+    }
   }
 
   const renamePerson = (slotIndex: number, displayName: string) => {
@@ -308,11 +407,13 @@ export function PlacementEditor({
   }
 
   const activeName =
-    people.find(p => p.slotIndex === activePerson)?.displayName?.trim() ||
-    `Person ${activePerson}`
+    activePerson == null
+      ? 'a person'
+      : people.find(p => p.slotIndex === activePerson)?.displayName?.trim() ||
+        `Person ${activePerson}`
 
   const placeAt = (cssX: number, cssY: number) => {
-    if (editDisabled || tool === 'select') return
+    if (toolsDisabled || tool === 'select' || activePerson == null) return
 
     if (!people.some(p => p.slotIndex === activePerson)) {
       setPlaceError('Select a person first, then place their boxes.')
@@ -343,16 +444,17 @@ export function PlacementEditor({
         )
         return
       }
-      if (kind === 'signature' && slots.filter(s => s.kind === 'signature').length >= 8) {
-        setPlaceError('At most 8 signature lines on one agreement.')
+      // Per person caps above; totals allow every person a full set (up to 10 people).
+      if (kind === 'signature' && slots.filter(s => s.kind === 'signature').length >= 20) {
+        setPlaceError('At most 20 signature lines on one agreement.')
         return
       }
-      if (kind === 'initial' && slots.filter(s => s.kind === 'initial').length >= 12) {
-        setPlaceError('At most 12 initial boxes on one agreement.')
+      if (kind === 'initial' && slots.filter(s => s.kind === 'initial').length >= 40) {
+        setPlaceError('At most 40 initial boxes on one agreement.')
         return
       }
-      if (kind === 'name' && slots.filter(s => s.kind === 'name').length >= 8) {
-        setPlaceError('At most 8 name lines on one agreement.')
+      if (kind === 'name' && slots.filter(s => s.kind === 'name').length >= 20) {
+        setPlaceError('At most 20 name lines on one agreement.')
         return
       }
     }
@@ -364,8 +466,8 @@ export function PlacementEditor({
         setPlaceError(`${activeName} already has ${personText.length} text fields (max 4).`)
         return
       }
-      if (slots.filter(s => s.kind === 'text').length >= 12) {
-        setPlaceError('At most 12 text fields on one agreement.')
+      if (slots.filter(s => s.kind === 'text').length >= 40) {
+        setPlaceError('At most 40 text fields on one agreement.')
         return
       }
     }
@@ -396,6 +498,7 @@ export function PlacementEditor({
     geo.y = Math.min(Math.max(0, geo.y), 1 - geo.height)
 
     const label = textFieldLabel.trim().slice(0, 80)
+    // Check / X start as empty squares; click the slot to toggle the mark on or off.
     const slot: PlacementSlot = {
       id: newSlotId(),
       personSlotIndex: activePerson,
@@ -405,19 +508,12 @@ export function PlacementEditor({
       y: clamp01(geo.y),
       width: clamp01(geo.width),
       height: clamp01(geo.height),
-      ...(kind === 'checkmark' || kind === 'cross'
+      ...(kind === 'text' && label
         ? {
-            lockedContent: {
-              mark: kind,
-              color: kind === 'checkmark' ? '#0f766e' : '#b91c1c',
-            },
+            // Field label only (e.g. "Date") — fill value comes later at sign time
+            lockedContent: { text: label, fontSizeRatio: 0.018, color: '#64748b' },
           }
-        : kind === 'text' && label
-          ? {
-              // Field label only (e.g. "Date") — fill value comes later at sign time
-              lockedContent: { text: label, fontSizeRatio: 0.018, color: '#64748b' },
-            }
-          : {}),
+        : {}),
     }
 
     patchPlan(p => ({ ...p, slots: [...p.slots, slot] }))
@@ -428,9 +524,34 @@ export function PlacementEditor({
     setPlacing(null)
   }
 
+  /** Toggle empty check/X square ↔ filled mark (select mode, click without drag). */
+  const toggleMarkSlot = useCallback(
+    (id: string) => {
+      if (locked) return
+      const slot = slots.find(s => s.id === id)
+      if (!slot || (slot.kind !== 'checkmark' && slot.kind !== 'cross')) return
+      const isOn = slot.lockedContent?.mark === slot.kind
+      if (isOn) {
+        updateSlot(id, { lockedContent: undefined })
+      } else {
+        updateSlot(id, {
+          lockedContent: {
+            mark: slot.kind,
+            color: personColor(slot.personSlotIndex),
+          },
+        })
+      }
+    },
+    [locked, slots, updateSlot],
+  )
+
   const onStagePointerDown = (e: React.PointerEvent) => {
     if (editDisabled) return
     if (tool !== 'select') {
+      if (toolsDisabled) {
+        setPlaceError('Select a person first, then place their boxes.')
+        return
+      }
       e.preventDefault()
       const p = pointerToLocal(e)
       placeAt(p.x, p.y)
@@ -442,12 +563,15 @@ export function PlacementEditor({
   }
 
   const onStagePointerMove = (e: React.PointerEvent) => {
-    if (!editDisabled && tool !== 'select') {
+    if (!toolsDisabled && tool !== 'select') {
       const p = pointerToLocal(e)
       setPlacing({ type: tool, x: p.x, y: p.y })
     }
     const drag = dragRef.current
     if (!drag || editDisabled) return
+    const dist = Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY)
+    if (dist > 4) drag.moved = true
+    if (!drag.moved) return
     const slot = slots.find(s => s.id === drag.id)
     if (!slot) return
     let nx = drag.origX + (e.clientX - drag.startX) / cssSize.width
@@ -459,7 +583,13 @@ export function PlacementEditor({
   }
 
   const endDrag = () => {
+    const drag = dragRef.current
     dragRef.current = null
+    if (!drag || drag.moved || editDisabled) return
+    const slot = slots.find(s => s.id === drag.id)
+    if (slot && (slot.kind === 'checkmark' || slot.kind === 'cross')) {
+      toggleMarkSlot(drag.id)
+    }
   }
 
   const startItemDrag = (e: React.PointerEvent, id: string) => {
@@ -475,6 +605,7 @@ export function PlacementEditor({
       startY: e.clientY,
       origX: slot.x,
       origY: slot.y,
+      moved: false,
     }
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }
@@ -482,7 +613,7 @@ export function PlacementEditor({
   void dragTick
 
   const ghostStyle = (): React.CSSProperties | undefined => {
-    if (!placing || placing.type === 'select') return undefined
+    if (!placing || placing.type === 'select' || activePerson == null) return undefined
     const kind: PlacementKind =
       placing.type === 'signature'
         ? 'signature'
@@ -498,13 +629,14 @@ export function PlacementEditor({
     const size = defaultSize(kind)
     const w = size.width * cssSize.width
     const h = size.height * cssSize.height
+    const color = personColor(activePerson)
     return {
       left: placing.x - w / 2,
       top: placing.y - h / 2,
       width: w,
       height: h,
-      borderColor: personColor(activePerson),
-      background: `${personColor(activePerson)}18`,
+      borderColor: color,
+      background: `${color}18`,
     }
   }
 
@@ -512,6 +644,8 @@ export function PlacementEditor({
     setActivePerson(slotIndex)
     setPlaceError(null)
   }
+
+  const activePersonColor = activePerson != null ? personColor(activePerson) : null
 
   const creatorSigningAs = plan.creatorSigningAs ?? null
 
@@ -534,7 +668,7 @@ export function PlacementEditor({
                 disabled={editDisabled}
                 onChange={e => setPeopleCount(Number(e.target.value))}
               >
-                {[1, 2, 3, 4].map(n => (
+                {Array.from({ length: MAX_CONSTRUCTION_PEOPLE }, (_, i) => i + 1).map(n => (
                   <option key={n} value={n}>
                     {n} {n === 1 ? 'person' : 'people'}
                   </option>
@@ -610,6 +744,11 @@ export function PlacementEditor({
                     }
                   }}
                 >
+                  {active && (
+                    <span className="placement-person-active-tag" aria-hidden>
+                      Active
+                    </span>
+                  )}
                   <span className="placement-person-swatch" aria-hidden />
                   <span className="placement-person-meta">
                     <span className="placement-person-label">Person {p.slotIndex}</span>
@@ -706,89 +845,131 @@ export function PlacementEditor({
         </ul>
       </div>
 
-      <div className="pdf-annotator-toolbar">
+      <div
+        className={[
+          'pdf-annotator-toolbar',
+          'placement-editor-toolbar',
+          activePersonColor ? 'has-person' : '',
+          toolsDisabled && !locked ? 'is-tools-disabled' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        style={
+          activePersonColor
+            ? ({ ['--person-color' as string]: activePersonColor } as React.CSSProperties)
+            : undefined
+        }
+        role="toolbar"
+        aria-label="Placement tools"
+        aria-disabled={toolsDisabled || undefined}
+      >
         <button
           type="button"
-          className={`btn btn-ghost${tool === 'signature' ? ' is-active' : ''}`}
-          onClick={() => {
-            selectPerson(activePerson)
-            setTool('signature')
-          }}
-          disabled={editDisabled}
-          title={`Place signature line for ${activeName}`}
+          className={`placement-tool-btn${tool === 'signature' ? ' is-active' : ''}`}
+          onClick={() => setTool('signature')}
+          disabled={toolsDisabled}
+          title={
+            activePerson == null
+              ? 'Select a person first'
+              : `Place signature line for ${activeName}`
+          }
+          aria-label="Signature"
+          aria-pressed={tool === 'signature'}
         >
-          <PenLine size={14} strokeWidth={2.25} aria-hidden />
-          Signature
+          <SignatureToolIcon size={18} />
         </button>
         <button
           type="button"
-          className={`btn btn-ghost${tool === 'initial' ? ' is-active' : ''}`}
-          onClick={() => {
-            selectPerson(activePerson)
-            setTool('initial')
-          }}
-          disabled={editDisabled}
-          title={`Place short initials box for ${activeName}`}
+          className={`placement-tool-btn${tool === 'initial' ? ' is-active' : ''}`}
+          onClick={() => setTool('initial')}
+          disabled={toolsDisabled}
+          title={
+            activePerson == null
+              ? 'Select a person first'
+              : `Place initials box for ${activeName}`
+          }
+          aria-label="Initials"
+          aria-pressed={tool === 'initial'}
         >
-          <PenLine size={14} strokeWidth={2.25} aria-hidden />
-          Initial
+          <InitialsToolIcon size={18} />
         </button>
         <button
           type="button"
-          className={`btn btn-ghost${tool === 'name' ? ' is-active' : ''}`}
-          onClick={() => {
-            selectPerson(activePerson)
-            setTool('name')
-          }}
-          disabled={editDisabled}
-          title={`Place printed-name line for ${activeName}`}
+          className={`placement-tool-btn${tool === 'name' ? ' is-active' : ''}`}
+          onClick={() => setTool('name')}
+          disabled={toolsDisabled}
+          title={
+            activePerson == null
+              ? 'Select a person first'
+              : `Place printed-name line for ${activeName}`
+          }
+          aria-label="Printed name"
+          aria-pressed={tool === 'name'}
         >
-          <Type size={14} strokeWidth={2.25} aria-hidden />
-          Name
+          <Type size={18} strokeWidth={2.1} aria-hidden />
         </button>
         <button
           type="button"
-          className={`btn btn-ghost${tool === 'text' ? ' is-active' : ''}`}
-          onClick={() => {
-            selectPerson(activePerson)
-            setTool('text')
-          }}
-          disabled={editDisabled}
-          title={`Place text field (date, etc.) for ${activeName}`}
+          className={`placement-tool-btn${tool === 'text' ? ' is-active' : ''}`}
+          onClick={() => setTool('text')}
+          disabled={toolsDisabled}
+          title={
+            activePerson == null
+              ? 'Select a person first'
+              : `Place text field (date, etc.) for ${activeName}`
+          }
+          aria-label="Text field"
+          aria-pressed={tool === 'text'}
         >
-          <Type size={14} strokeWidth={2.25} aria-hidden />
-          Text field
+          <AlignLeft size={18} strokeWidth={2.1} aria-hidden />
         </button>
+        <span className="placement-toolbar-sep" aria-hidden />
         <button
           type="button"
-          className={`btn btn-ghost btn-icon-only${tool === 'checkmark' ? ' is-active' : ''}`}
+          className={`placement-tool-btn${tool === 'checkmark' ? ' is-active' : ''}`}
           onClick={() => setTool('checkmark')}
-          disabled={editDisabled}
-          title="Place a fixed checkmark (locked with plan)"
-          aria-label="Place checkmark"
+          disabled={toolsDisabled}
+          title={
+            activePerson == null
+              ? 'Select a person first'
+              : 'Place empty checkbox — click the box to toggle check on or off'
+          }
+          aria-label="Checkbox"
+          aria-pressed={tool === 'checkmark'}
         >
-          <Check size={16} strokeWidth={2.5} aria-hidden />
+          <Square size={17} strokeWidth={2.1} aria-hidden />
+          <Check size={11} strokeWidth={2.75} className="placement-tool-check-overlay" aria-hidden />
         </button>
         <button
           type="button"
-          className={`btn btn-ghost btn-icon-only${tool === 'cross' ? ' is-active' : ''}`}
+          className={`placement-tool-btn${tool === 'cross' ? ' is-active' : ''}`}
           onClick={() => setTool('cross')}
-          disabled={editDisabled}
-          title="Place a fixed X (locked with plan)"
-          aria-label="Place X mark"
+          disabled={toolsDisabled}
+          title={
+            activePerson == null
+              ? 'Select a person first'
+              : 'Place empty X box — click the box to toggle X on or off'
+          }
+          aria-label="X mark"
+          aria-pressed={tool === 'cross'}
         >
-          <X size={16} strokeWidth={2.5} aria-hidden />
+          <Square size={17} strokeWidth={2.1} aria-hidden />
+          <X size={11} strokeWidth={2.75} className="placement-tool-check-overlay" aria-hidden />
         </button>
         {selectedId && !locked && (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => removeSlot(selectedId)}
-            disabled={editDisabled}
-          >
-            <Trash2 size={14} strokeWidth={2.25} aria-hidden />
-            Delete
-          </button>
+          <>
+            <span className="placement-toolbar-sep" aria-hidden />
+            <button
+              type="button"
+              className="placement-tool-btn placement-tool-btn--danger"
+              onClick={() => removeSlot(selectedId)}
+              disabled={editDisabled}
+              title="Delete selected box"
+              aria-label="Delete selected box"
+            >
+              <Trash2 size={17} strokeWidth={2.1} aria-hidden />
+            </button>
+          </>
         )}
         {tool === 'text' && !locked && (
           <label className="placement-text-label-field">
@@ -799,39 +980,49 @@ export function PlacementEditor({
               onChange={e => setTextFieldLabel(e.target.value.slice(0, 80))}
               placeholder="Label (optional): Date, City…"
               maxLength={80}
-              disabled={editDisabled}
+              disabled={toolsDisabled}
             />
           </label>
         )}
         {pageCount > 1 && (
-          <div className="pdf-annotator-pages">
+          <div className="pdf-annotator-pages placement-toolbar-pages">
             <button
               type="button"
-              className="btn btn-ghost"
+              className="placement-tool-btn placement-tool-btn--sm"
               disabled={disabled || pageNumber <= 1}
               onClick={() => setPageNumber(p => Math.max(1, p - 1))}
+              title="Previous page"
+              aria-label="Previous page"
             >
-              Prev
+              ‹
             </button>
             <span>
-              Page {pageNumber} / {pageCount}
+              {pageNumber} / {pageCount}
             </span>
             <button
               type="button"
-              className="btn btn-ghost"
+              className="placement-tool-btn placement-tool-btn--sm"
               disabled={disabled || pageNumber >= pageCount}
               onClick={() => setPageNumber(p => Math.min(pageCount, p + 1))}
+              title="Next page"
+              aria-label="Next page"
             >
-              Next
+              ›
             </button>
           </div>
         )}
       </div>
 
-      {!locked && !reviewMode && (
+      {!locked && !reviewMode && activePerson == null && (
+        <p className="placement-editor-hint placement-editor-hint--pick" role="status">
+          <strong>Select a person</strong> above to unlock the toolbar and place fields for them.
+        </p>
+      )}
+      {!locked && !reviewMode && activePerson != null && (
         <p className="placement-editor-hint placement-editor-hint--design" role="status">
           <strong>Designing, not signing.</strong> These boxes mark where people will sign later.
-          No ink or wallet signature is collected on this step.
+          No ink or wallet signature is collected on this step. Check and X boxes start empty — click
+          a placed box to toggle the mark.
         </p>
       )}
       {reviewMode && (
@@ -893,10 +1084,31 @@ export function PlacementEditor({
                       ['--person-color' as string]: color,
                     }}
                     onPointerDown={e => startItemDrag(e, slot.id)}
+                    onPointerUp={endDrag}
+                    onPointerCancel={endDrag}
                   >
+                    {!locked && (
+                      <button
+                        type="button"
+                        className="placement-slot-remove"
+                        aria-label={`Remove ${kindLabel(slot.kind)} for ${person}`}
+                        title="Remove"
+                        onPointerDown={e => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                        }}
+                        onClick={e => {
+                          e.stopPropagation()
+                          removeSlot(slot.id)
+                        }}
+                      >
+                        <X size={10} strokeWidth={3} aria-hidden />
+                      </button>
+                    )}
                     {slot.kind === 'checkmark' || slot.kind === 'cross' ? (
                       <MarkPreview
-                        kind={slot.lockedContent?.mark ?? slot.kind}
+                        kind={slot.kind}
+                        checked={slot.lockedContent?.mark === slot.kind}
                         color={slot.lockedContent?.color ?? color}
                         width={r.width}
                         height={r.height}
@@ -915,98 +1127,40 @@ export function PlacementEditor({
                   </div>
                 )
               })}
-              {placing && tool !== 'select' && (
+              {placing && tool !== 'select' && activePerson != null && (
                 <div className="pdf-annotator-ghost placement-ghost" style={ghostStyle()}>
-                  <div className="placement-slot-label">
-                    <span className="placement-slot-person">{activeName}</span>
-                    <span className="placement-slot-kind">
-                      ·{' '}
-                      {tool === 'text' && textFieldLabel.trim()
-                        ? textFieldLabel.trim()
-                        : kindLabel(
-                            tool === 'signature'
-                              ? 'signature'
-                              : tool === 'initial'
-                                ? 'initial'
-                                : tool === 'name'
-                                  ? 'name'
-                                  : tool === 'text'
-                                    ? 'text'
-                                    : tool === 'checkmark'
-                                      ? 'checkmark'
-                                      : 'cross',
-                          )}
-                    </span>
-                  </div>
+                  {tool === 'checkmark' || tool === 'cross' ? (
+                    <MarkPreview
+                      kind={tool}
+                      checked={false}
+                      color={personColor(activePerson)}
+                      width={defaultSize(tool).width * cssSize.width}
+                      height={defaultSize(tool).height * cssSize.height}
+                    />
+                  ) : (
+                    <div className="placement-slot-label">
+                      <span className="placement-slot-person">{activeName}</span>
+                      <span className="placement-slot-kind">
+                        ·{' '}
+                        {tool === 'text' && textFieldLabel.trim()
+                          ? textFieldLabel.trim()
+                          : kindLabel(
+                              tool === 'signature'
+                                ? 'signature'
+                                : tool === 'initial'
+                                  ? 'initial'
+                                  : tool === 'name'
+                                    ? 'name'
+                                    : 'text',
+                            )}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
         </div>
-
-        {pageSlots.length > 0 && (
-          <aside className="pdf-annotator-side placement-editor-side">
-            <h4>Slots on this page</h4>
-            <ul className="placement-slot-list">
-              {pageSlots.map(slot => {
-                const person =
-                  people.find(p => p.slotIndex === slot.personSlotIndex)?.displayName ||
-                  `Person ${slot.personSlotIndex}`
-                const kind =
-                  slot.kind === 'text' && slot.lockedContent?.text?.trim()
-                    ? slot.lockedContent.text.trim()
-                    : kindLabel(slot.kind)
-                return (
-                  <li key={slot.id}>
-                    <button
-                      type="button"
-                      className={`placement-slot-list-item${selectedId === slot.id ? ' is-selected' : ''}`}
-                      style={
-                        {
-                          ['--person-color' as string]: personColor(slot.personSlotIndex),
-                        } as React.CSSProperties
-                      }
-                      onClick={() => setSelectedId(slot.id)}
-                    >
-                      <span className="placement-slot-list-swatch" aria-hidden />
-                      <span className="placement-slot-list-meta">
-                        <span className="placement-slot-list-person">{person}</span>
-                        <span className="placement-slot-list-kind">{kind}</span>
-                      </span>
-                      {!locked && (
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          className="placement-slot-list-del"
-                          aria-label={`Remove ${kind} for ${person}`}
-                          onClick={e => {
-                            e.stopPropagation()
-                            removeSlot(slot.id)
-                          }}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              removeSlot(slot.id)
-                            }
-                          }}
-                        >
-                          <Trash2 size={13} strokeWidth={2.25} aria-hidden />
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-            <p className="pdf-annotator-hint">
-              Total: {slots.length} box{slots.length === 1 ? '' : 'es'} ·{' '}
-              {slots.filter(s => s.kind === 'signature').length} sig ·{' '}
-              {slots.filter(s => s.kind === 'initial').length} initial
-              {slots.filter(s => s.kind === 'initial').length === 1 ? '' : 's'}
-            </p>
-          </aside>
-        )}
       </div>
 
     </div>
@@ -1015,11 +1169,14 @@ export function PlacementEditor({
 
 function MarkPreview({
   kind,
+  checked,
   color,
   width,
   height,
 }: {
   kind: 'checkmark' | 'cross'
+  /** When false, draws an empty square the user can click to fill. */
+  checked: boolean
   color: string
   width: number
   height: number
@@ -1037,7 +1194,24 @@ function MarkPreview({
     if (!ctx) return
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, width, height)
-    paintMark(ctx, kind, { left: 0, top: 0, width, height }, color)
-  }, [kind, color, width, height])
-  return <canvas ref={ref} className="placement-mark-preview" aria-hidden />
+    // Empty checkbox frame (always)
+    const inset = Math.max(1, Math.min(width, height) * 0.08)
+    const lw = Math.max(1.5, Math.min(width, height) * 0.08)
+    ctx.save()
+    ctx.strokeStyle = color
+    ctx.lineWidth = lw
+    ctx.lineJoin = 'miter'
+    ctx.strokeRect(inset, inset, width - inset * 2, height - inset * 2)
+    ctx.restore()
+    if (checked) {
+      paintMark(ctx, kind, { left: 0, top: 0, width, height }, color)
+    }
+  }, [kind, checked, color, width, height])
+  return (
+    <canvas
+      ref={ref}
+      className={`placement-mark-preview${checked ? ' is-checked' : ' is-empty'}`}
+      aria-hidden
+    />
+  )
 }

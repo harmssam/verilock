@@ -5,6 +5,13 @@
 import { Check, ChevronLeft, ChevronRight, PenLine, Smartphone, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import {
+  DateField,
+  formatDisplayDate,
+  isDateFieldLabel,
+  parseFlexibleDateToIso,
+  todayIsoDate,
+} from '../DateField'
 import { FEATURES } from '../features'
 import { SignOnMobileModal, isLikelyMobileViewport } from '../journey/SignOnMobileModal'
 import {
@@ -12,6 +19,7 @@ import {
   type ConstructionPlan,
   type PlacementSlot,
   isInkPlacementKind,
+  personColor,
 } from './placements'
 import {
   normalizedToCanvasRect,
@@ -27,11 +35,7 @@ import {
 import './PdfAnnotator.css'
 import './SignerFillView.css'
 
-const PERSON_COLORS = ['#0f766e', '#b45309', '#1d4ed8', '#7c3aed'] as const
 
-function personColor(slotIndex: number): string {
-  return PERSON_COLORS[(Math.max(1, slotIndex) - 1) % PERSON_COLORS.length]!
-}
 
 function inkFromLocal(
   path: SignaturePathData,
@@ -316,7 +320,13 @@ export function SignerFillView({
         localFills[slot.id]?.kind === 'text'
           ? (localFills[slot.id] as { text: string }).text
           : ''
-      setModalDraftText(existingText)
+      if (isDateFieldLabel(slot.lockedContent?.text)) {
+        // Date fields store ISO in the modal; default to today when empty.
+        const fromExisting = existingText ? parseFlexibleDateToIso(existingText) : null
+        setModalDraftText(fromExisting ?? todayIsoDate())
+      } else {
+        setModalDraftText(existingText)
+      }
       setModalDraftInk(null)
     }
 
@@ -399,13 +409,22 @@ export function SignerFillView({
     const t = modalDraftText.trim()
     if (!t) {
       setLocalError(
-        activeSlot.kind === 'name' ? 'Enter your name.' : 'Enter the required text.',
+        activeSlot.kind === 'name'
+          ? 'Enter your name.'
+          : isDateFieldLabel(activeSlot.lockedContent?.text)
+            ? 'Choose a date.'
+            : 'Enter the required text.',
       )
       return
     }
+    // Date picker works in ISO; stamp a locale-friendly string on the document.
+    const storedText =
+      activeSlot.kind === 'text' && isDateFieldLabel(activeSlot.lockedContent?.text)
+        ? formatDisplayDate(t) || t
+        : t
     const nextFills = {
       ...localFills,
-      [activeSlot.id]: { kind: 'text' as const, text: t },
+      [activeSlot.id]: { kind: 'text' as const, text: storedText },
     }
     setLocalFills(nextFills)
     setLocalError(null)
@@ -543,7 +562,8 @@ export function SignerFillView({
   ])
 
   const remaining = pendingSlots.length
-  const nextHint = pendingSlots[0]
+  const activeIsDateField =
+    activeSlot?.kind === 'text' && isDateFieldLabel(activeSlot.lockedContent?.text)
   const modalCanApply =
     activeSlot && isInkPlacementKind(activeSlot.kind)
       ? Boolean(modalDraftInk?.path?.strokes?.length)
@@ -610,15 +630,6 @@ export function SignerFillView({
               Next <ChevronRight size={16} aria-hidden />
             </button>
           </>
-        )}
-        {nextHint && (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => openSlot(nextHint)}
-          >
-            Next field
-          </button>
         )}
       </div>
 
@@ -727,7 +738,7 @@ export function SignerFillView({
           >
             <div
               ref={modalPanelRef}
-              className="signer-fill-modal-panel"
+              className={`signer-fill-modal-panel${activeIsDateField ? ' is-date' : ''}`}
               style={{ ['--person-color' as string]: color }}
               role="dialog"
               aria-modal="true"
@@ -838,6 +849,19 @@ export function SignerFillView({
                       )}
                     </>
                   )
+                ) : activeIsDateField ? (
+                  <div className="signer-fill-date-field">
+                    <p className="muted signer-fill-date-hint">
+                      Defaults to today. Tap the calendar to pick another date.
+                    </p>
+                    <DateField
+                      tone="light"
+                      value={modalDraftText}
+                      onChange={setModalDraftText}
+                      placeholder="Select date"
+                      disabled={disabled || busy || submitting}
+                    />
+                  </div>
                 ) : (
                   <input
                     className="field-input signer-fill-inline-input"
@@ -879,9 +903,7 @@ export function SignerFillView({
                       : activeIsInitial
                         ? 'Apply initials'
                         : 'Apply signature'
-                    : remaining > 1
-                      ? 'Save & next field'
-                      : 'Save'}
+                    : 'Save'}
                 </button>
               </div>
             </div>

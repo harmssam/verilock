@@ -707,9 +707,9 @@ app.patch(
       body.requiredSignatures == null ||
       !Number.isFinite(body.requiredSignatures) ||
       body.requiredSignatures < 1 ||
-      body.requiredSignatures > 4
+      body.requiredSignatures > 10
     ) {
-      res.status(400).json({ error: 'requiredSignatures must be between 1 and 4' })
+      res.status(400).json({ error: 'requiredSignatures must be between 1 and 10' })
       return
     }
     try {

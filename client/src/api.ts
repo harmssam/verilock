@@ -342,7 +342,7 @@ export const api = {
       },
     ),
 
-  /** Creator share step: set total required signatures (1–4) and optional co-signer names. */
+  /** Creator share step: set total required signatures (1–10) and optional co-signer names. */
   configureCosigners: (
     token: string,
     docId: string,

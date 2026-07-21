@@ -32,8 +32,9 @@ export const CREATOR_STAGES: JourneyStage[] = [
     label: 'Add document',
     verb: 'Add the document and fingerprint it locally',
     blurb:
-      'Drop the agreement file. We only register its fingerprint (no signing yet). Next you arrange who signs where.',
-    privacyNote: 'The file never uploads. Only the fingerprint is registered.',
+      'Drop a PDF, PNG, JPEG, or WebP. We only register its fingerprint (no signing yet). Next you arrange who signs where.',
+    privacyNote:
+      'Opened in your browser only — never sent to VeriLock servers. Only the fingerprint is registered.',
   },
   {
     id: 'share',

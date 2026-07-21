@@ -265,3 +265,130 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ── Light tone (sign modal / light panels) ── */
+
+.date-field--light .date-field-trigger {
+  background: #fff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.date-field--light .date-field-trigger:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.date-field--light.date-field--open .date-field-trigger,
+.date-field--light .date-field-trigger:focus-visible {
+  border-color: var(--person-color, #0f766e);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--person-color, #0f766e) 22%, transparent);
+}
+
+.date-field--light .date-field-icon {
+  color: var(--person-color, #0f766e);
+}
+
+.date-field--light .date-field-value {
+  color: #0f172a;
+}
+
+.date-field--light .date-field-placeholder {
+  color: #94a3b8;
+}
+
+.date-field--light .date-field-popover {
+  z-index: 300;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow:
+    0 16px 40px rgb(15 23 42 / 16%),
+    0 2px 8px rgb(15 23 42 / 8%);
+  backdrop-filter: none;
+}
+
+.date-field--light .date-field-select {
+  background: #fff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #64748b 50%),
+    linear-gradient(135deg, #64748b 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) calc(50% + 2px),
+    calc(100% - 9px) calc(50% + 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.date-field--light .date-field-select:focus {
+  border-color: var(--person-color, #0f766e);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--person-color, #0f766e) 20%, transparent);
+}
+
+.date-field--light .date-field-select option {
+  background: #fff;
+  color: #0f172a;
+}
+
+.date-field--light .date-field-nav {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.date-field--light .date-field-nav:hover {
+  color: var(--person-color, #0f766e);
+  border-color: color-mix(in srgb, var(--person-color, #0f766e) 40%, #e2e8f0);
+  background: color-mix(in srgb, var(--person-color, #0f766e) 8%, #fff);
+}
+
+.date-field--light .date-field-weekday {
+  color: #94a3b8;
+}
+
+.date-field--light .date-field-day {
+  color: #0f172a;
+}
+
+.date-field--light .date-field-day:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--person-color, #0f766e) 10%, #fff);
+  border-color: color-mix(in srgb, var(--person-color, #0f766e) 25%, #e2e8f0);
+}
+
+.date-field--light .date-field-day--today:not(.date-field-day--selected) {
+  border-color: color-mix(in srgb, var(--person-color, #0f766e) 45%, #cbd5e1);
+  color: var(--person-color, #0f766e);
+}
+
+.date-field--light .date-field-day--selected {
+  background: var(--person-color, #0f766e);
+  color: #fff;
+  box-shadow: none;
+}
+
+.date-field--light .date-field-footer {
+  border-top-color: #e2e8f0;
+}
+
+.date-field--light .date-field-footer-btn {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.date-field--light .date-field-footer-btn:hover:not(:disabled) {
+  color: #0f172a;
+  border-color: #cbd5e1;
+  background: #fff;
+}
+
+.date-field--light .date-field-footer-btn--primary {
+  color: #fff;
+  border-color: transparent;
+  background: var(--person-color, #0f766e);
+}
+
+.date-field--light .date-field-footer-btn--primary:hover:not(:disabled) {
+  filter: brightness(0.95);
+}

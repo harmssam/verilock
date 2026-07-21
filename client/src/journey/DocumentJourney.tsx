@@ -31,7 +31,7 @@ import {
   MAX_SUPPORT_EMAIL_LENGTH,
   MAX_TITLE_LENGTH,
 } from '../fieldLimits'
-import { stripDocumentExtension } from '../pdf/documentKinds'
+import { DOCUMENT_FORMATS_LABEL, stripDocumentExtension } from '../pdf/documentKinds'
 import { getDocumentPageCount } from '../pdf/documentSurface'
 import { sha256Hex, shortHash } from '../pdf/hashPdf'
 import { prepareSignatureImageUpload } from '../signatureImage'
@@ -665,7 +665,7 @@ export function DocumentJourney({
   // Seed share-step cosigner draft from the live document once per agreement.
   useEffect(() => {
     if (!doc || step !== 'share') return
-    const need = Math.max(1, Math.min(4, requiredCount(doc)))
+    const need = Math.max(1, Math.min(10, requiredCount(doc)))
     setRequiredSigners(need)
     const others = Math.max(0, need - 1)
     const creatorNorm = address ? normalizeAddress(address) : null
@@ -1372,7 +1372,7 @@ export function DocumentJourney({
           ...(r.planRoot ? { planRoot: r.planRoot } : {}),
         })
         if (planPeople.length) {
-          setRequiredSigners(Math.max(1, Math.min(4, planPeople.length)))
+          setRequiredSigners(Math.max(1, Math.min(10, planPeople.length)))
         }
         setFilledSlotIds(new Set(r.filledSlotIds ?? []))
         setKnownBlobIds(new Set(r.knownBlobIds ?? []))
@@ -1920,7 +1920,7 @@ export function DocumentJourney({
     if (!token || !doc) return
     const total = Math.max(
       1,
-      Math.min(4, overrides?.requiredSignatures ?? requiredSigners),
+      Math.min(10, overrides?.requiredSignatures ?? requiredSigners),
     )
     const names = overrides?.coSignerNames ?? coSignerNames
     const notifyRaw =
@@ -2350,9 +2350,9 @@ export function DocumentJourney({
                   <header className="signatures-config-head">
                     <h3>Add the document</h3>
                     <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-                      No signing on this step. Fingerprint the file locally, then name people and
-                      place their fields on the next screen. You can organize without being a
-                      signer.
+                      No signing on this step. Accepts {DOCUMENT_FORMATS_LABEL}. Fingerprint the
+                      file locally, then name people and place their fields on the next screen. You
+                      can organize without being a signer.
                     </p>
                   </header>
                   <DocumentStage
@@ -2378,7 +2378,7 @@ export function DocumentJourney({
                     ) : (
                       <>
                         <strong>Drop a document</strong> or <strong>Browse files</strong>. The file
-                        stays on this device.
+                        is opened in your browser only — never sent to VeriLock servers.
                       </>
                     )}
                   </p>
@@ -2523,8 +2523,8 @@ export function DocumentJourney({
                         </h3>
                         {constructionPlan.status !== 'locked' ? (
                           <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-                            Layout only — place empty signature, initial, and name boxes for each
-                            person. You are not signing yet; that starts after you continue.
+                            Layout design only — place empty signature, initial, and name boxes for each
+                            person. You are not signing yet; that happens in the next step.
                           </p>
                         ) : (
                           <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
@@ -2538,7 +2538,7 @@ export function DocumentJourney({
                         plan={constructionPlan}
                         onChange={next => {
                           setConstructionPlan(next)
-                          setRequiredSigners(Math.max(1, Math.min(4, next.people.length)))
+                          setRequiredSigners(Math.max(1, Math.min(10, next.people.length)))
                         }}
                         disabled={busy || !token}
                         lockBusy={placementLockBusy}
@@ -3196,7 +3196,7 @@ export function DocumentJourney({
                             }}
                             disabled={busy}
                           >
-                            {[1, 2, 3, 4]
+                            {Array.from({ length: 10 }, (_, i) => i + 1)
                               .filter(n => n >= Math.max(1, signedCount(doc)))
                               .map(n => (
                                 <option key={n} value={n}>
