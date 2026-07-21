@@ -581,6 +581,55 @@ export function expandMergedToAnnotations(state: MergedPlacementState): PdfAnnot
   return out
 }
 
+/**
+ * Reconstruct paint-ready annotations from plan geometry + authorized fill
+ * wire frames (BLOB/FILL payloads). Used for party-only signed document review.
+ */
+export async function reconstructAnnotationsFromPlanAndFills(input: {
+  slots: PlacementSlot[]
+  fillBatches: Array<{ framesHex?: string[] | null }>
+}): Promise<{ annotations: PdfAnnotation[]; filledCount: number; missingBlobIds: string[] }> {
+  const blobs = new Map<string, ContentBlob['payload']>()
+  const fills = new Map<string, string>()
+  const referenced = new Set<string>()
+
+  for (const batch of input.fillBatches) {
+    const hex = batch.framesHex
+    if (!hex?.length) continue
+    try {
+      const frames = hex.map(h => hexToFrame(h))
+      const unpacked = await unpackPlacementBatch(frames)
+      for (const blob of unpacked.batch.blobs) {
+        blobs.set(blob.blobId, blob.payload)
+      }
+      for (const f of unpacked.batch.fills) {
+        fills.set(f.slotId, f.blobId)
+        referenced.add(f.blobId)
+      }
+    } catch {
+      /* skip malformed batch */
+    }
+  }
+
+  const missingBlobIds = [...referenced].filter(id => !blobs.has(id))
+  const annotations = expandMergedToAnnotations({
+    pdfSha256: '',
+    planRoot: '',
+    people: [],
+    slots: input.slots,
+    blobs,
+    fills,
+    batches: [],
+    missingBlobIds,
+  })
+
+  return {
+    annotations,
+    filledCount: fills.size,
+    missingBlobIds,
+  }
+}
+
 export function estimatePlacementBatchStats(batch: PlacementBatch) {
   const frames = packPlacementBatch(batch)
   const payloadBytes = new TextEncoder().encode(wireJson(batch)).length

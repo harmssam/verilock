@@ -22,6 +22,7 @@ import {
 import { api } from '../api'
 import { shortHash } from '../pdf/hashPdf'
 import { documentTypeLabel, type SealDocument } from '../types'
+import { CancelAgreementModal } from './CancelAgreementModal'
 import {
   journeyLoginEntryLabels,
   journeyLoginNeedsSheet,
@@ -127,6 +128,8 @@ export function AgreementsPage({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [pendingCancel, setPendingCancel] = useState<SealDocument | null>(null)
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!token) {
@@ -152,19 +155,31 @@ export function AgreementsPage({
     void load()
   }, [load])
 
-  const cancelAgreement = async (doc: SealDocument) => {
+  const requestCancel = (doc: SealDocument) => {
     if (!token || !canDeleteDocument(doc, address)) return
-    const ok = window.confirm(
-      `Cancel “${doc.title}”? This removes the agreement permanently. Only possible before anyone signs.`,
-    )
-    if (!ok) return
-    setCancellingId(doc.id)
+    setCancelError(null)
+    setPendingCancel(doc)
+  }
+
+  const closeCancelModal = () => {
+    if (cancellingId) return
+    setPendingCancel(null)
+    setCancelError(null)
+  }
+
+  const confirmCancelAgreement = async () => {
+    if (!token || !pendingCancel || !canDeleteDocument(pendingCancel, address)) return
+    setCancellingId(pendingCancel.id)
+    setCancelError(null)
     setError(null)
     try {
-      await api.deleteDocument(token, doc.id)
-      setDocuments(prev => prev.filter(d => d.id !== doc.id))
+      await api.deleteDocument(token, pendingCancel.id)
+      setDocuments(prev => prev.filter(d => d.id !== pendingCancel.id))
+      setPendingCancel(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not cancel agreement')
+      const message = err instanceof Error ? err.message : 'Could not cancel agreement'
+      setCancelError(message)
+      setError(message)
     } finally {
       setCancellingId(null)
     }
@@ -327,7 +342,7 @@ export function AgreementsPage({
                           type="button"
                           className={`btn btn-ghost agreements-page-cancel${cancelling ? ' btn--busy' : ''}`}
                           disabled={Boolean(cancellingId)}
-                          onClick={() => void cancelAgreement(doc)}
+                          onClick={() => requestCancel(doc)}
                         >
                           {cancelling ? (
                             <>
@@ -355,6 +370,14 @@ export function AgreementsPage({
           </div>
         )
       })}
+
+      <CancelAgreementModal
+        document={pendingCancel}
+        busy={Boolean(pendingCancel && cancellingId === pendingCancel.id)}
+        error={cancelError}
+        onClose={closeCancelModal}
+        onConfirm={() => void confirmCancelAgreement()}
+      />
     </section>
   )
 }

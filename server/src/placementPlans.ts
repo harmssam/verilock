@@ -13,6 +13,7 @@ import {
   type PlacementFillBatchRecord,
   type PlacementPlanRecord,
 } from './db.js'
+import { canRevealParticipantDetails } from './documents.js'
 
 const MAX_PEOPLE = 4
 const MAX_SLOTS = 40
@@ -304,7 +305,29 @@ function planToPublic(plan: SanitizedPlan) {
   }
 }
 
-function recordToPublic(rec: PlacementPlanRecord) {
+/**
+ * Whether this viewer may receive fill wire frames (ink/text payloads) for
+ * reconstructing a signed document view. Mirrors document participant privacy.
+ */
+function canRevealFillPayload(
+  rec: PlacementPlanRecord,
+  viewerAddress: string | null | undefined,
+): boolean {
+  if (!viewerAddress) return false
+  const me = normalizeAddress(viewerAddress)
+  if (rec.creatorAddress && normalizeAddress(rec.creatorAddress) === me) return true
+  if (!rec.documentId) return false
+  const doc = getDocumentById(rec.documentId)
+  if (!doc) return false
+  const parties = getPartiesForDocument(doc.id)
+  const signatures = getSignaturesForDocument(doc.id)
+  return canRevealParticipantDetails(doc, parties, signatures, viewerAddress)
+}
+
+function recordToPublic(
+  rec: PlacementPlanRecord,
+  options?: { revealFillPayload?: boolean },
+) {
   let plan: SanitizedPlan | null = null
   try {
     const parsed = JSON.parse(rec.planJson) as SanitizedPlan
@@ -324,6 +347,8 @@ function recordToPublic(rec: PlacementPlanRecord) {
     for (const id of b.blobIds ?? []) knownBlobIds.add(id)
   }
 
+  const revealFillPayload = Boolean(options?.revealFillPayload)
+
   return {
     originalSha256: rec.originalSha256,
     documentId: rec.documentId,
@@ -337,9 +362,14 @@ function recordToPublic(rec: PlacementPlanRecord) {
     createdAt: rec.createdAt,
     updatedAt: rec.updatedAt,
     plan: plan ? planToPublic(plan) : null,
-    // frames omitted on public GET — hashes-only surface
+    // frames omitted for public viewers — hashes-only surface
     hasBatch0Frames: rec.batch0FramesHex.length > 0,
     batch0FrameCount: rec.batch0FramesHex.length,
+    // Wire frames (BLOB payloads) only for creator / parties so they can rebuild
+    // the signed document view with the local PDF.
+    ...(revealFillPayload && rec.batch0FramesHex.length > 0
+      ? { batch0FramesHex: rec.batch0FramesHex }
+      : {}),
     fillBatchCount: (rec.fillBatches ?? []).length,
     lastBatchRoot:
       rec.fillBatches?.length
@@ -347,6 +377,7 @@ function recordToPublic(rec: PlacementPlanRecord) {
         : rec.batch0Root,
     filledSlotIds: [...filledSlotIds],
     knownBlobIds: [...knownBlobIds],
+    fillPayloadRevealed: revealFillPayload,
     fillBatches: (rec.fillBatches ?? []).map(b => ({
       batchIndex: b.batchIndex,
       batchRoot: b.batchRoot,
@@ -357,6 +388,7 @@ function recordToPublic(rec: PlacementPlanRecord) {
       fills: b.fills,
       createdAt: b.createdAt,
       frameCount: b.framesHex?.length ?? 0,
+      ...(revealFillPayload && b.framesHex?.length ? { framesHex: b.framesHex } : {}),
     })),
   }
 }
@@ -759,7 +791,12 @@ export function appendFillBatch(input: {
   return recordToPublic(rec)
 }
 
-export function getPlanPublic(originalSha256: string) {
+export function getPlanPublic(
+  originalSha256: string,
+  options?: { viewerAddress?: string | null },
+) {
   const rec = getPlacementPlan(originalSha256)
-  return rec ? recordToPublic(rec) : null
+  if (!rec) return null
+  const revealFillPayload = canRevealFillPayload(rec, options?.viewerAddress)
+  return recordToPublic(rec, { revealFillPayload })
 }
