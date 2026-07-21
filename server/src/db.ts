@@ -900,24 +900,7 @@ export function getAnnotationStream(originalSha256: string): AnnotationStreamRec
 }
 
 // ── Placement construction plans (structure + roots only; no PDF / no ink) ─
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS placement_plans (
-    original_sha256 TEXT PRIMARY KEY,
-    document_id TEXT,
-    creator_address TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'draft',
-    plan_json TEXT NOT NULL,
-    plan_root TEXT,
-    batch0_frames_json TEXT,
-    batch0_root TEXT,
-    slot_count INTEGER NOT NULL DEFAULT 0,
-    person_count INTEGER NOT NULL DEFAULT 0,
-    locked_at INTEGER,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-  );
-`)
+// Scoped per agreement (document_id PK). Same PDF fingerprint may have many plans.
 
 export interface PlacementFillBatchRecord {
   batchIndex: number
@@ -933,7 +916,8 @@ export interface PlacementFillBatchRecord {
 
 export interface PlacementPlanRecord {
   originalSha256: string
-  documentId: string | null
+  /** Always set after doc-scope migration; legacy rows use `legacy:<sha256>`. */
+  documentId: string
   creatorAddress: string
   status: 'draft' | 'locked'
   planJson: string
@@ -948,12 +932,170 @@ export interface PlacementPlanRecord {
   updatedAt: number
 }
 
-const placementPlanColumns = db
-  .prepare('PRAGMA table_info(placement_plans)')
-  .all() as Array<{ name: string }>
-if (!placementPlanColumns.some(col => col.name === 'fill_batches_json')) {
-  db.exec(`ALTER TABLE placement_plans ADD COLUMN fill_batches_json TEXT NOT NULL DEFAULT '[]'`)
+/** Synthetic document_id for pre-migration hash-only rows. */
+export function legacyPlacementDocumentId(originalSha256: string): string {
+  return `legacy:${originalSha256.toLowerCase()}`
 }
+
+/**
+ * Prefer a real document id for hash-only legacy rows so they stay loadable after
+ * the client always queries by agreement id.
+ */
+function documentIdForMigratedPlan(
+  sha: string,
+  existingDocumentId: string | null,
+): string {
+  if (existingDocumentId) return existingDocumentId
+  try {
+    const matches = findDocumentsByHash(sha)
+    if (matches.length === 1) return matches[0]!.id
+  } catch {
+    /* documents table always exists before this migration */
+  }
+  return legacyPlacementDocumentId(sha)
+}
+
+function ensurePlacementPlansDocumentScoped(): void {
+  // Resume/cleanup a crashed prior migration.
+  const incomplete = db
+    .prepare(
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'placement_plans__docscope'`,
+    )
+    .get() as { name: string } | undefined
+  const main = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'placement_plans'`)
+    .get() as { sql: string } | undefined
+
+  if (incomplete && main?.sql && /original_sha256\s+TEXT\s+PRIMARY\s+KEY/i.test(main.sql)) {
+    db.exec(`DROP TABLE IF EXISTS placement_plans__docscope`)
+  } else if (incomplete && !main) {
+    db.exec(`ALTER TABLE placement_plans__docscope RENAME TO placement_plans`)
+  } else if (incomplete) {
+    db.exec(`DROP TABLE IF EXISTS placement_plans__docscope`)
+  }
+
+  const master = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'placement_plans'`)
+    .get() as { sql: string } | undefined
+
+  if (!master?.sql) {
+    db.exec(`
+      CREATE TABLE placement_plans (
+        document_id TEXT PRIMARY KEY,
+        original_sha256 TEXT NOT NULL,
+        creator_address TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'draft',
+        plan_json TEXT NOT NULL,
+        plan_root TEXT,
+        batch0_frames_json TEXT,
+        batch0_root TEXT,
+        fill_batches_json TEXT NOT NULL DEFAULT '[]',
+        slot_count INTEGER NOT NULL DEFAULT 0,
+        person_count INTEGER NOT NULL DEFAULT 0,
+        locked_at INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_placement_plans_sha ON placement_plans(original_sha256);
+    `)
+    return
+  }
+
+  // Already on document_id primary key.
+  if (
+    /document_id\s+TEXT\s+PRIMARY\s+KEY/i.test(master.sql) ||
+    /PRIMARY\s+KEY\s*\(\s*document_id\s*\)/i.test(master.sql)
+  ) {
+    const cols = db.prepare('PRAGMA table_info(placement_plans)').all() as Array<{ name: string }>
+    if (!cols.some(c => c.name === 'fill_batches_json')) {
+      db.exec(
+        `ALTER TABLE placement_plans ADD COLUMN fill_batches_json TEXT NOT NULL DEFAULT '[]'`,
+      )
+    }
+    db.exec(
+      `CREATE INDEX IF NOT EXISTS idx_placement_plans_sha ON placement_plans(original_sha256)`,
+    )
+    return
+  }
+
+  // Migrate: original_sha256 was PRIMARY KEY → one plan per PDF, blocking reuse.
+  const migrate = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE placement_plans__docscope (
+        document_id TEXT PRIMARY KEY,
+        original_sha256 TEXT NOT NULL,
+        creator_address TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'draft',
+        plan_json TEXT NOT NULL,
+        plan_root TEXT,
+        batch0_frames_json TEXT,
+        batch0_root TEXT,
+        fill_batches_json TEXT NOT NULL DEFAULT '[]',
+        slot_count INTEGER NOT NULL DEFAULT 0,
+        person_count INTEGER NOT NULL DEFAULT 0,
+        locked_at INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_placement_plans_sha ON placement_plans__docscope(original_sha256);
+    `)
+
+    const oldCols = db.prepare('PRAGMA table_info(placement_plans)').all() as Array<{
+      name: string
+    }>
+    const hasFillBatches = oldCols.some(c => c.name === 'fill_batches_json')
+    const oldRows = db.prepare('SELECT * FROM placement_plans').all() as Array<
+      Record<string, unknown>
+    >
+    const insert = db.prepare(`
+      INSERT OR IGNORE INTO placement_plans__docscope (
+        document_id, original_sha256, creator_address, status, plan_json, plan_root,
+        batch0_frames_json, batch0_root, fill_batches_json, slot_count, person_count,
+        locked_at, created_at, updated_at
+      ) VALUES (
+        @documentId, @originalSha256, @creatorAddress, @status, @planJson, @planRoot,
+        @batch0FramesJson, @batch0Root, @fillBatchesJson, @slotCount, @personCount,
+        @lockedAt, @createdAt, @updatedAt
+      )
+    `)
+
+    for (const row of oldRows) {
+      const sha = String(row.original_sha256 ?? '').toLowerCase()
+      if (!sha) continue
+      const rawDoc =
+        row.document_id != null && String(row.document_id).trim()
+          ? String(row.document_id).trim()
+          : null
+      const documentId = documentIdForMigratedPlan(sha, rawDoc)
+      insert.run({
+        documentId,
+        originalSha256: sha,
+        creatorAddress: String(row.creator_address ?? ''),
+        status: row.status === 'locked' ? 'locked' : 'draft',
+        planJson: String(row.plan_json ?? '{}'),
+        planRoot: row.plan_root != null ? String(row.plan_root) : null,
+        batch0FramesJson: String(row.batch0_frames_json ?? '[]'),
+        batch0Root: row.batch0_root != null ? String(row.batch0_root) : null,
+        fillBatchesJson: hasFillBatches
+          ? String(row.fill_batches_json ?? '[]')
+          : '[]',
+        slotCount: Number(row.slot_count ?? 0),
+        personCount: Number(row.person_count ?? 0),
+        lockedAt: row.locked_at != null ? Number(row.locked_at) : null,
+        createdAt: Number(row.created_at ?? Date.now()),
+        updatedAt: Number(row.updated_at ?? Date.now()),
+      })
+    }
+
+    db.exec(`
+      DROP TABLE placement_plans;
+      ALTER TABLE placement_plans__docscope RENAME TO placement_plans;
+    `)
+  })
+  migrate()
+}
+
+ensurePlacementPlansDocumentScoped()
 
 function rowToPlacementPlan(row: Record<string, unknown>): PlacementPlanRecord {
   let frames: string[] = []
@@ -970,9 +1112,11 @@ function rowToPlacementPlan(row: Record<string, unknown>): PlacementPlanRecord {
     fillBatches = []
   }
   const status = row.status === 'locked' ? 'locked' : 'draft'
+  const sha = String(row.original_sha256)
+  const rawDoc = row.document_id != null ? String(row.document_id) : ''
   return {
-    originalSha256: String(row.original_sha256),
-    documentId: row.document_id != null ? String(row.document_id) : null,
+    originalSha256: sha,
+    documentId: rawDoc || legacyPlacementDocumentId(sha),
     creatorAddress: String(row.creator_address ?? ''),
     status,
     planJson: String(row.plan_json ?? '{}'),
@@ -989,16 +1133,18 @@ function rowToPlacementPlan(row: Record<string, unknown>): PlacementPlanRecord {
 }
 
 export function upsertPlacementPlan(rec: PlacementPlanRecord): void {
+  const documentId =
+    rec.documentId?.trim() || legacyPlacementDocumentId(rec.originalSha256)
   db.prepare(`
     INSERT INTO placement_plans (
-      original_sha256, document_id, creator_address, status, plan_json, plan_root,
+      document_id, original_sha256, creator_address, status, plan_json, plan_root,
       batch0_frames_json, batch0_root, fill_batches_json, slot_count, person_count, locked_at, created_at, updated_at
     ) VALUES (
-      @originalSha256, @documentId, @creatorAddress, @status, @planJson, @planRoot,
+      @documentId, @originalSha256, @creatorAddress, @status, @planJson, @planRoot,
       @batch0FramesJson, @batch0Root, @fillBatchesJson, @slotCount, @personCount, @lockedAt, @createdAt, @updatedAt
     )
-    ON CONFLICT(original_sha256) DO UPDATE SET
-      document_id = COALESCE(excluded.document_id, placement_plans.document_id),
+    ON CONFLICT(document_id) DO UPDATE SET
+      original_sha256 = excluded.original_sha256,
       creator_address = excluded.creator_address,
       status = excluded.status,
       plan_json = excluded.plan_json,
@@ -1011,8 +1157,8 @@ export function upsertPlacementPlan(rec: PlacementPlanRecord): void {
       locked_at = excluded.locked_at,
       updated_at = excluded.updated_at
   `).run({
+    documentId,
     originalSha256: rec.originalSha256.toLowerCase(),
-    documentId: rec.documentId,
     creatorAddress: rec.creatorAddress,
     status: rec.status,
     planJson: rec.planJson,
@@ -1028,17 +1174,77 @@ export function upsertPlacementPlan(rec: PlacementPlanRecord): void {
   })
 }
 
+/** Move a plan row from one document_id PK to another (e.g. legacy:sha → real id). */
+function rekeyPlacementPlan(fromId: string, toId: string): PlacementPlanRecord | null {
+  if (!fromId || !toId || fromId === toId) return null
+  if (getPlacementPlanByDocumentId(toId)) return getPlacementPlanByDocumentId(toId)
+  const existing = getPlacementPlanByDocumentId(fromId)
+  if (!existing) return null
+  const moved: PlacementPlanRecord = { ...existing, documentId: toId }
+  const run = db.transaction(() => {
+    upsertPlacementPlan(moved)
+    db.prepare('DELETE FROM placement_plans WHERE document_id = ?').run(fromId)
+  })
+  run()
+  return getPlacementPlanByDocumentId(toId)
+}
+
+/**
+ * Resolve plan for an agreement. Prefer documentId (correct multi-use PDF).
+ * Hash-only lookup returns a plan only when exactly one row exists for that hash
+ * (never “latest of many”).
+ */
+export function resolvePlacementPlan(opts: {
+  originalSha256: string
+  documentId?: string | null
+}): PlacementPlanRecord | null {
+  const sha = opts.originalSha256.toLowerCase()
+  if (!/^[a-f0-9]{64}$/.test(sha)) return null
+  const docId = opts.documentId?.trim() || null
+  if (docId) {
+    const byDoc = getPlacementPlanByDocumentId(docId)
+    if (byDoc) {
+      // Reject hash/document mismatch when both are provided.
+      if (byDoc.originalSha256.toLowerCase() !== sha) return null
+      return byDoc
+    }
+    // Recover pre-migration hash-only plan that was keyed as legacy:<sha> when this
+    // document is the sole agreement for that fingerprint.
+    const legacyId = legacyPlacementDocumentId(sha)
+    const legacy = getPlacementPlanByDocumentId(legacyId)
+    if (legacy) {
+      const matches = findDocumentsByHash(sha)
+      if (matches.length === 1 && matches[0]!.id === docId) {
+        return rekeyPlacementPlan(legacyId, docId)
+      }
+    }
+    // New agreement with a reused PDF: do not inherit another document's plan.
+    return null
+  }
+  return getPlacementPlan(sha)
+}
+
+/**
+ * Hash-only lookup. Returns a plan only when exactly one row matches the
+ * fingerprint (including a sole legacy:<sha> row). Never picks “latest of many.”
+ */
 export function getPlacementPlan(originalSha256: string): PlacementPlanRecord | null {
-  const row = db
-    .prepare('SELECT * FROM placement_plans WHERE original_sha256 = ?')
-    .get(originalSha256.toLowerCase()) as Record<string, unknown> | undefined
-  return row ? rowToPlacementPlan(row) : null
+  const sha = originalSha256.toLowerCase()
+  if (!/^[a-f0-9]{64}$/.test(sha)) return null
+  const rows = db
+    .prepare(`SELECT * FROM placement_plans WHERE original_sha256 = ?`)
+    .all(sha) as Record<string, unknown>[]
+  if (rows.length === 0) return null
+  if (rows.length === 1) return rowToPlacementPlan(rows[0]!)
+  // Ambiguous: multiple agreements share this PDF — require documentId.
+  return null
 }
 
 export function getPlacementPlanByDocumentId(documentId: string): PlacementPlanRecord | null {
+  if (!documentId?.trim()) return null
   const row = db
-    .prepare('SELECT * FROM placement_plans WHERE document_id = ? ORDER BY updated_at DESC LIMIT 1')
-    .get(documentId) as Record<string, unknown> | undefined
+    .prepare('SELECT * FROM placement_plans WHERE document_id = ?')
+    .get(documentId.trim()) as Record<string, unknown> | undefined
   return row ? rowToPlacementPlan(row) : null
 }
 

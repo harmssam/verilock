@@ -1333,7 +1333,7 @@ export function DocumentJourney({
     let cancelled = false
     setPlanLoadState('loading')
     void api
-      .getPlacementPlan(doc.fingerprint, token)
+      .getPlacementPlan(doc.fingerprint, token, { documentId: doc.id })
       .then(r => {
         if (cancelled) return
         if (!r.plan) {
@@ -1666,7 +1666,7 @@ export function DocumentJourney({
               lastBatchRoot ||
               planRoot ||
               '0000000000000000000000000000000000000000000000000000000000000000'
-            const live = await api.getPlacementPlan(hash, token)
+            const live = await api.getPlacementPlan(hash, token, { documentId: doc.id })
             batchIndex = (live.fillBatchCount ?? 0) + 1
             prev = live.lastBatchRoot || live.batch0Root || live.planRoot || prev
             known = new Set(live.knownBlobIds ?? [])
@@ -1696,6 +1696,7 @@ export function DocumentJourney({
                 personSlotIndex: f.personSlotIndex,
               })),
               blobIds: batch.blobs.map(b => b.blobId),
+              documentId: doc.id,
             })
             setFilledSlotIds(
               new Set([
@@ -3564,6 +3565,7 @@ export function DocumentJourney({
                           revealPrivate={revealParticipantPrivate}
                           authToken={token}
                           fingerprint={doc.fingerprint}
+                          documentId={doc.id}
                         />
                       )}
                       <div className="seal-summary">
@@ -3707,6 +3709,7 @@ export function DocumentJourney({
                           revealPrivate={revealParticipantPrivate}
                           authToken={token}
                           fingerprint={doc.fingerprint}
+                          documentId={doc.id}
                         />
                       ) : (
                         <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
@@ -3763,6 +3766,7 @@ export function DocumentJourney({
                               className="signed-document-view signed-document-view--primary"
                               file={(signFile ?? pdfFile)!}
                               fingerprint={doc.fingerprint}
+                              documentId={doc.id}
                               authToken={token}
                               revealPrivate={revealParticipantPrivate}
                               documentAnnotations={doc.source.annotations}
@@ -3881,6 +3885,7 @@ export function DocumentJourney({
                         revealPrivate={revealParticipantPrivate}
                         authToken={token}
                         fingerprint={doc.fingerprint}
+                        documentId={doc.id}
                       />
                     )}
 
@@ -4019,10 +4024,11 @@ export function DocumentJourney({
                         token &&
                         (() => {
                           const planHash = verifyPartyMatch.originalSha256
+                          // Same agreement only by id/slug — never fingerprint (PDF reuse).
                           const sameDoc =
                             doc &&
-                            (doc.slug === verifyPartyMatch.slug ||
-                              doc.fingerprint === planHash)
+                            (doc.id === verifyPartyMatch.id ||
+                              doc.slug === verifyPartyMatch.slug)
                           const sigs = sameDoc
                             ? doc!.source.signatures
                             : verifyPartyMatch.signatures
@@ -4034,6 +4040,7 @@ export function DocumentJourney({
                               className="signed-document-view signed-document-view--primary"
                               file={verifyFile}
                               fingerprint={planHash}
+                              documentId={verifyPartyMatch.id}
                               authToken={token}
                               revealPrivate
                               documentAnnotations={
@@ -4053,10 +4060,10 @@ export function DocumentJourney({
                           verifyOutcome.matches[0] ??
                           null
                         if (!primary || primary.signatures.length === 0) return null
+                        // Same agreement only by id/slug — never fingerprint (PDF reuse).
                         const sameDoc =
                           doc &&
-                          (doc.slug === primary.slug ||
-                            doc.fingerprint === primary.originalSha256)
+                          (doc.id === primary.id || doc.slug === primary.slug)
                         return (
                           <SignaturesPanel
                             signatures={
@@ -4069,6 +4076,7 @@ export function DocumentJourney({
                             }
                             authToken={token}
                             fingerprint={primary.originalSha256}
+                            documentId={primary.id}
                           />
                         )
                       })()}

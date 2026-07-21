@@ -7,13 +7,22 @@ import { normalizeAddress } from './addresses.js'
 import {
   getDocumentById,
   getPartiesForDocument,
-  getPlacementPlan,
   getSignaturesForDocument,
+  resolvePlacementPlan,
   upsertPlacementPlan,
   type PlacementFillBatchRecord,
   type PlacementPlanRecord,
 } from './db.js'
 import { canRevealParticipantDetails } from './documents.js'
+
+/** Require a real agreement id — plans are document-scoped (same PDF may have many). */
+function requireDocumentId(documentId: string | null | undefined): string {
+  const id = documentId?.trim()
+  if (!id) {
+    throw new Error('documentId is required for placement plans')
+  }
+  return id
+}
 
 /** Keep in sync with client `MAX_CONSTRUCTION_PEOPLE`. */
 const MAX_PEOPLE = 10
@@ -317,7 +326,7 @@ function canRevealFillPayload(
   if (!viewerAddress) return false
   const me = normalizeAddress(viewerAddress)
   if (rec.creatorAddress && normalizeAddress(rec.creatorAddress) === me) return true
-  if (!rec.documentId) return false
+  if (!rec.documentId || rec.documentId.startsWith('legacy:')) return false
   const doc = getDocumentById(rec.documentId)
   if (!doc) return false
   const parties = getPartiesForDocument(doc.id)
@@ -403,7 +412,11 @@ export function saveDraftPlan(input: {
   const sanitized = sanitizePlanInput(input.plan, input.originalSha256)
   if (!sanitized.ok) throw new Error(sanitized.error)
 
-  const existing = getPlacementPlan(input.originalSha256)
+  const documentId = requireDocumentId(input.documentId)
+  const existing = resolvePlacementPlan({
+    originalSha256: input.originalSha256,
+    documentId,
+  })
   if (existing?.status === 'locked') {
     throw new Error('Placements are locked and cannot be edited')
   }
@@ -422,7 +435,7 @@ export function saveDraftPlan(input: {
   const now = Date.now()
   const rec: PlacementPlanRecord = {
     originalSha256: plan.pdfSha256,
-    documentId: input.documentId ?? existing?.documentId ?? null,
+    documentId,
     creatorAddress: publisher,
     status: 'draft',
     planJson: JSON.stringify(planToPublic(plan)),
@@ -453,9 +466,13 @@ export function unlockPlan(input: {
   if (!/^[a-f0-9]{64}$/.test(sha)) {
     throw new Error('Valid originalSha256 required')
   }
-  const existing = getPlacementPlan(sha)
+  const documentId = requireDocumentId(input.documentId)
+  const existing = resolvePlacementPlan({
+    originalSha256: sha,
+    documentId,
+  })
   if (!existing) {
-    throw new Error('No placement plan for this PDF hash')
+    throw new Error('No placement plan for this agreement')
   }
   const publisher = normalizeAddress(input.creatorAddress)
   if (
@@ -471,9 +488,8 @@ export function unlockPlan(input: {
   if ((existing.fillBatches ?? []).length > 0) {
     throw new Error('Cannot edit placements after someone has filled fields')
   }
-  const docId = input.documentId ?? existing.documentId
-  if (docId) {
-    const signatures = getSignaturesForDocument(docId)
+  if (!documentId.startsWith('legacy:')) {
+    const signatures = getSignaturesForDocument(documentId)
     if (signatures.length > 0) {
       throw new Error('Cannot edit placements after someone has signed')
     }
@@ -494,7 +510,7 @@ export function unlockPlan(input: {
   const now = Date.now()
   const rec: PlacementPlanRecord = {
     originalSha256: sha,
-    documentId: docId ?? null,
+    documentId,
     creatorAddress: publisher,
     status: 'draft',
     planJson: JSON.stringify(planToPublic(plan)),
@@ -538,7 +554,11 @@ export function lockPlan(input: {
     throw new Error('Add at least one signature, initial, name, or text field before locking')
   }
 
-  const existing = getPlacementPlan(input.originalSha256)
+  const documentId = requireDocumentId(input.documentId)
+  const existing = resolvePlacementPlan({
+    originalSha256: input.originalSha256,
+    documentId,
+  })
   if (existing?.status === 'locked') {
     throw new Error('Placements are already locked')
   }
@@ -579,7 +599,7 @@ export function lockPlan(input: {
 
   const rec: PlacementPlanRecord = {
     originalSha256: plan.pdfSha256,
-    documentId: input.documentId ?? existing?.documentId ?? null,
+    documentId,
     creatorAddress: publisher,
     status: 'locked',
     planJson: JSON.stringify(planToPublic(plan)),
@@ -648,9 +668,14 @@ export function appendFillBatch(input: {
   framesHex?: string[]
   fills: Array<{ slotId: string; blobId: string; personSlotIndex: number }>
   blobIds: string[]
+  documentId?: string | null
 }): ReturnType<typeof recordToPublic> {
   const hash = input.originalSha256.toLowerCase()
-  const existing = getPlacementPlan(hash)
+  const documentId = requireDocumentId(input.documentId)
+  const existing = resolvePlacementPlan({
+    originalSha256: hash,
+    documentId,
+  })
   if (!existing || existing.status !== 'locked') {
     throw new Error('Placements must be locked before filling')
   }
@@ -685,7 +710,7 @@ export function appendFillBatch(input: {
   }
 
   // Authorize: wallet may fill only for a roster party they own or an open slot.
-  if (existing.documentId) {
+  if (existing.documentId && !existing.documentId.startsWith('legacy:')) {
     const doc = getDocumentById(existing.documentId)
     if (doc) {
       const parties = getPartiesForDocument(doc.id)
@@ -794,9 +819,12 @@ export function appendFillBatch(input: {
 
 export function getPlanPublic(
   originalSha256: string,
-  options?: { viewerAddress?: string | null },
+  options?: { viewerAddress?: string | null; documentId?: string | null },
 ) {
-  const rec = getPlacementPlan(originalSha256)
+  const rec = resolvePlacementPlan({
+    originalSha256,
+    documentId: options?.documentId,
+  })
   if (!rec) return null
   const revealFillPayload = canRevealFillPayload(rec, options?.viewerAddress)
   return recordToPublic(rec, { revealFillPayload })

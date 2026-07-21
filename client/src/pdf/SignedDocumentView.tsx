@@ -216,6 +216,8 @@ export interface SignedDocumentViewProps {
   file: File
   /** PDF fingerprint (sha256 hex) used to load placement fills. */
   fingerprint: string | null | undefined
+  /** Agreement id — required when the same PDF is used on multiple agreements. */
+  documentId?: string | null
   /** Session token — required to unlock fill wire frames / private images. */
   authToken?: string | null
   /**
@@ -241,6 +243,7 @@ type LoadState = 'idle' | 'loading' | 'ready' | 'plain'
 export function SignedDocumentView({
   file,
   fingerprint,
+  documentId = null,
   authToken = null,
   revealPrivate = false,
   documentAnnotations = null,
@@ -295,7 +298,7 @@ export function SignedDocumentView({
           return
         }
 
-        const planRes = await api.getPlacementPlan(hash, authToken)
+        const planRes = await api.getPlacementPlan(hash, authToken, { documentId })
         if (cancelled) return
 
         const slots: PlacementSlot[] = (planRes.plan?.slots ?? []).map(s => ({
@@ -417,7 +420,7 @@ export function SignedDocumentView({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sigKey/partyKey/legacyKey stabilize array props
-  }, [file, fingerprint, authToken, revealPrivate, sigKey, partyKey, legacyKey])
+  }, [file, fingerprint, documentId, authToken, revealPrivate, sigKey, partyKey, legacyKey])
 
   const handlePrint = async () => {
     setPrintError(null)

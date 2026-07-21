@@ -141,9 +141,18 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  getPlacementPlan: (sha256: string, token?: string | null) =>
-    request<{
+  getPlacementPlan: (
+    sha256: string,
+    token?: string | null,
+    opts?: { documentId?: string | null },
+  ) => {
+    const q =
+      opts?.documentId && opts.documentId.trim()
+        ? `?documentId=${encodeURIComponent(opts.documentId.trim())}`
+        : ''
+    return request<{
       originalSha256: string
+      documentId?: string | null
       status: 'draft' | 'locked'
       planRoot: string | null
       batch0Root: string | null
@@ -202,9 +211,10 @@ export const api = {
         /** Present only when fillPayloadRevealed. */
         framesHex?: string[]
       }>
-    }>(`/api/placement-plans/${sha256.toLowerCase()}`, {
+    }>(`/api/placement-plans/${sha256.toLowerCase()}${q}`, {
       headers: token ? withAuth(token) : undefined,
-    }),
+    })
+  },
 
   appendPlacementFill: (
     token: string,
@@ -217,6 +227,8 @@ export const api = {
       framesHex?: string[]
       fills: Array<{ slotId: string; blobId: string; personSlotIndex: number }>
       blobIds: string[]
+      /** Required when the same PDF is used on multiple agreements. */
+      documentId?: string
     },
   ) =>
     request<{
