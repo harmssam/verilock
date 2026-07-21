@@ -484,8 +484,23 @@ export function SignerFillView({
       if (sharedInk.imageDataUrl) signatureImageDataUrl = sharedInk.imageDataUrl
     }
 
+    // Prefer full signature for the party image. Never fall back to initials PNG when a
+    // signature path exists (pad may omit imageDataUrl even though path is present).
     const inkPath = signaturePath ?? initialPath
-    const imageDataUrl = signatureImageDataUrl ?? initialImageDataUrl
+    let imageDataUrl: string | undefined
+    if (signaturePath) {
+      imageDataUrl = signatureImageDataUrl
+      if (!imageDataUrl && signaturePath.strokes?.length) {
+        try {
+          const { pathToPngDataUrl } = await import('../signatureHandoff/crypto')
+          imageDataUrl = pathToPngDataUrl(signaturePath)
+        } catch {
+          /* submit path may re-rasterize inkPath */
+        }
+      }
+    } else {
+      imageDataUrl = initialImageDataUrl
+    }
 
     if (fills.length === 0) {
       setSubmitting(true)

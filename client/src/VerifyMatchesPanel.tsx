@@ -152,6 +152,7 @@ export function VerifyMatchesPanel({
                   compact
                   revealPrivate={canRevealParticipantDetails(match, walletAddress)}
                   authToken={authToken}
+                  fingerprint={match.originalSha256}
                 />
               )}
               {deletable && onDelete && (
