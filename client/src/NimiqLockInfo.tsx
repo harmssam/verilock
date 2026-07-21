@@ -12,7 +12,7 @@ export function NimiqLockInfo({ onOpenPricing }: NimiqLockInfoProps) {
     <div className="card nimiq-info-card">
       <h2 className="nimiq-info-title">
         <Shield className="nimiq-info-title-icon" size={18} strokeWidth={2.25} aria-hidden />
-        Sealing with Nimiq
+        Locking with Nimiq
       </h2>
       <p className="muted nimiq-info-lead">
         VeriLock uses the Nimiq blockchain to permanently record your document&apos;s fingerprint. Your
@@ -49,13 +49,13 @@ export function NimiqLockInfo({ onOpenPricing }: NimiqLockInfoProps) {
                   <strong>Nimiq wallet</strong> — Nimiq Pay on mobile, or Nimiq Hub on desktop.
                 </li>
                 <li>
-                  <strong>NIM balance</strong> — for the seal fee below.
+                  <strong>NIM balance</strong> — for the lock fee below.
                 </li>
                 <li>
                   <strong>Document on your device</strong> — the same file every signer uses.
                 </li>
                 <li>
-                  <strong>All required signatures</strong> — sealing starts once everyone has signed.
+                  <strong>All required signatures</strong> — locking starts once everyone has signed.
                 </li>
               </ul>
             </section>

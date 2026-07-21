@@ -45,7 +45,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Nimiq fits that job. I needed a timestamped, tamper-evident record anyone can check independently. Mini apps and wallet integration meant a real flow inside Nimiq Pay: connect, sign, and seal without the usual web3 maze. Your wallet is your identity. The chain is the proof. No extra gatekeeper just to reach the network.',
+      text: 'Nimiq fits that job. I needed a timestamped, tamper-evident record anyone can check independently. Mini apps and wallet integration meant a real flow inside Nimiq Pay: connect, sign, and lock on the blockchain without the usual web3 maze. Your wallet is your identity. The chain is the proof. No extra gatekeeper just to reach the network.',
     },
     {
       type: 'h2',
@@ -56,17 +56,17 @@ export const post: BlogPost = {
       items: [
         'Fingerprint your PDF locally in the browser.',
         'Collect wallet-backed signatures from everyone involved.',
-        'Seal the hash on-chain when you are ready.',
+        'Lock the hash on-chain when you are ready.',
         'Anyone with a copy can verify later: no account, no upload, no "trust us."',
       ],
     },
     {
       type: 'p',
-      text: 'Just your Nimiq wallet when you need to sign or seal. Verifiers can check integrity without one.',
+      text: 'Just your Nimiq wallet when you need to sign or lock on the blockchain. Verifiers can check integrity without one.',
     },
     {
       type: 'p',
-      text: 'Sign together. Prove forever. Through the end of July, a permanent Nimiq seal is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
+      text: 'Sign together. Prove forever. Through the end of July, a permanent Nimiq on-chain lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
     },
   ],
 }

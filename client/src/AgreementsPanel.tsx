@@ -70,7 +70,7 @@ export function AgreementsPanel({
     const creator = isDocumentCreator(doc, address)
     const isActive = doc.id === activeDocId
 
-    const showSealButton = view.cta === 'Seal now' && onSeal && creator
+    const showSealButton = view.cta === 'Lock now' && onSeal && creator
 
     return (
       <div
@@ -102,7 +102,7 @@ export function AgreementsPanel({
             className="btn btn-primary agreement-seal-btn"
             onClick={() => onSeal(doc.slug)}
           >
-            Seal now
+            Lock now
           </button>
         )}
       </div>

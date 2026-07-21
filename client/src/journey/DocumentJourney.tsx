@@ -1487,12 +1487,12 @@ export function DocumentJourney({
             const solo = signedDoc.signingProgress.required <= 1
             setLockMessage(
               solo
-                ? 'Signature complete. Continue to seal.'
-                : 'All signatures collected. Continue to seal.',
+                ? 'Signature complete. Continue to lock.'
+                : 'All signatures collected. Continue to lock.',
             )
           } else {
             setLockMessage(
-              'Your signature is recorded. Invite co-signers below, then seal when everyone has signed.',
+              'Your signature is recorded. Invite co-signers below, then lock when everyone has signed.',
             )
           }
         }
@@ -1943,7 +1943,7 @@ export function DocumentJourney({
     if (!token || !address || !doc) return
     if (!doc.directSeal && !allSigned(doc)) {
       setLocalError(
-        `${signedCount(doc)} of ${requiredCount(doc)} signatures collected — remaining signers must sign before sealing.`,
+        `${signedCount(doc)} of ${requiredCount(doc)} signatures collected — remaining signers must sign before locking on the blockchain.`,
       )
       return
     }
@@ -1979,7 +1979,7 @@ export function DocumentJourney({
     if (!token || !doc) return
     if (!doc.directSeal && !allSigned(doc)) {
       setLocalError(
-        `${signedCount(doc)} of ${requiredCount(doc)} signatures collected — remaining signers must sign before sealing.`,
+        `${signedCount(doc)} of ${requiredCount(doc)} signatures collected — remaining signers must sign before locking on the blockchain.`,
       )
       return
     }
@@ -2075,7 +2075,7 @@ export function DocumentJourney({
         try {
           const { document } = await api.getDocument(m.slug, token)
           if (document.status === 'locked') {
-            openError = `"${document.title}" is already sealed. Use Verify a document to check integrity.`
+            openError = `"${document.title}" is already locked on the blockchain. Use Verify a document to check integrity.`
             continue
           }
           // If wallet connected, prefer a doc this wallet can still sign
@@ -2250,7 +2250,7 @@ export function DocumentJourney({
                     ? doc?.sealed
                       ? 'Your signature is on this agreement. Review parties and recorded ink below. Drop the same file you signed to see the organizer’s field layout (the PDF never left anyone’s device).'
                       : (activeStage?.blurb ??
-                        'Your fields and wallet signature are recorded. Review them below; the creator seals when everyone has finished.')
+                        'Your fields and wallet signature are recorded. Review them below; the creator locks when everyone has finished.')
                     : step === 'done'
                       ? 'Keep your file. Drop a copy below anytime to verify the fingerprint.'
                       : activeStage?.blurb}
@@ -2680,9 +2680,9 @@ export function DocumentJourney({
                           <Check size={18} strokeWidth={2.5} />
                           {role === 'creator'
                             ? requiredCount(doc) <= 1
-                              ? 'Signature complete. Continue to seal'
-                              : 'All parties signed. Continue to seal'
-                            : 'Thanks, your part is complete. The creator seals the agreement on Nimiq.'}
+                              ? 'Signature complete. Continue to lock'
+                              : 'All parties signed. Continue to lock'
+                            : 'Thanks, your part is complete. The creator locks the agreement on the blockchain.'}
                         </div>
                       ) : (
                         <>
@@ -3420,7 +3420,7 @@ export function DocumentJourney({
                               disabled={busy}
                             />
                             <span className="muted" style={{ fontSize: '0.78rem' }}>
-                              We only use this to tell you the agreement is ready to seal. Never
+                              We only use this to tell you the agreement is ready to lock. Never
                               required.
                             </span>
                           </label>
@@ -3548,7 +3548,7 @@ export function DocumentJourney({
                             {busy ? (
                               <>
                                 <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                                Sealing on Nimiq…
+                                Locking on Nimiq…
                               </>
                             ) : (
                               <>
@@ -3562,8 +3562,8 @@ export function DocumentJourney({
                           {!inNimiqPay && !nimiq && (
                             <p className="muted journey-seal-hint" style={{ margin: 0 }}>
                               {isMobileDevice()
-                                ? 'Sealing works best inside Nimiq Pay. In the browser, this seal uses Nimiq Hub — keep VeriLock open until you return and the on-chain proof is confirmed.'
-                                : 'Sealing redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the on-chain proof is confirmed. Or buy credits with card (or NIM at half the card rate) above to seal without another wallet payment.'}
+                                ? 'Locking works best inside Nimiq Pay. In the browser, this lock uses Nimiq Hub — keep VeriLock open until you return and the on-chain proof is confirmed.'
+                                : 'Locking redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the on-chain proof is confirmed. Or buy credits with card (or NIM at half the card rate) above to lock without another wallet payment.'}
                             </p>
                           )}
                         </>
@@ -3751,7 +3751,7 @@ export function DocumentJourney({
                         <Check size={18} strokeWidth={2.5} />
                       )}
                       <div>
-                        <strong>{doc.sealed ? 'Sealed.' : 'Complete.'}</strong>
+                        <strong>{doc.sealed ? 'Locked.' : 'Complete.'}</strong>
                         <p className="muted">
                           {doc.sealed ? (
                             <>

@@ -6,7 +6,7 @@ export const post: BlogPost = {
   slug: 'blockchain-pdf-signature-verification',
   title: 'Blockchain PDF Signature Verification',
   description:
-    'What verification actually checks: matching fingerprints, party signatures, and a permanent on-chain seal.',
+    'What verification actually checks: matching fingerprints, party signatures, and a permanent on-chain lock.',
   date: '2026-07-07',
   tags: ['guide', 'verify'],
   coverImage: cover,
@@ -19,13 +19,13 @@ export const post: BlogPost = {
   body: [
     {
       type: 'p',
-      text: 'Blockchain PDF verification usually means two checks: who signed, and whether the file still matches what was sealed. VeriLock keeps those clear and separate from the private document content.',
+      text: 'Blockchain PDF verification usually means two checks: who signed, and whether the file still matches what was locked on the blockchain. VeriLock keeps those clear and separate from the private document content.',
     },
     {
       type: 'figure',
       src: cover,
       alt: 'Two matching abstract fingerprints with a verification glow',
-      caption: 'A match means the bytes you hold are still the sealed document.',
+      caption: 'A match means the bytes you hold are still the locked document.',
     },
     {
       type: 'h2',
@@ -33,15 +33,15 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Every PDF has a SHA-256 fingerprint of its exact bytes. Edit a fee, date, or name, and the hash changes. Signing and sealing both refer to that fingerprint.',
+      text: 'Every PDF has a SHA-256 fingerprint of its exact bytes. Edit a fee, date, or name, and the hash changes. Signing and locking both refer to that fingerprint.',
     },
     {
       type: 'h2',
-      text: 'What the seal adds',
+      text: 'What locking on the blockchain adds',
     },
     {
       type: 'p',
-      text: 'Sealing publishes the fingerprint on Nimiq. VeriLock cannot quietly delete that chain record. Parties sign with wallets; public viewers see redacted signature details.',
+      text: 'Locking publishes the fingerprint on Nimiq. VeriLock cannot quietly delete that chain record. Parties sign with wallets; public viewers see redacted signature details.',
     },
     {
       type: 'h2',
@@ -52,13 +52,13 @@ export const post: BlogPost = {
       items: [
         'Start from the PDF you were given, not a screenshot.',
         'Re-hash it in VeriLock\'s verify flow.',
-        'Confirm the fingerprint matches the sealed agreement.',
-        'Optionally open the seal transaction on a Nimiq explorer.',
+        'Confirm the fingerprint matches the locked agreement.',
+        'Optionally open the lock transaction on a Nimiq explorer.',
       ],
     },
     {
       type: 'p',
-      text: 'Private file. Public proof. Check integrity anytime, and seal new agreements for 50 NIM through the end of July (promo ends August 1).',
+      text: 'Private file. Public proof. Check integrity anytime, and lock on the blockchain new agreements for 50 NIM through the end of July (promo ends August 1).',
     },
   ],
 }

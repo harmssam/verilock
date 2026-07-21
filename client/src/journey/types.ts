@@ -48,14 +48,14 @@ export const CREATOR_STAGES: JourneyStage[] = [
     label: 'Sign',
     verb: 'Sign your fields on the document',
     blurb:
-      'If you are a signer, fill in your applicable fields on the document, then sign. After you sign, invite any co-signers here before sealing.',
+      'If you are a signer, fill in your applicable fields on the document, then sign. After you sign, invite any co-signers here before locking on the blockchain.',
     privacyNote: 'You prove you hold these bytes - still no upload.',
   },
   {
     id: 'seal',
-    label: 'Seal',
-    verb: 'Lock on Nimiq',
-    blurb: 'One Nimiq transaction anchors the fingerprint forever (seal fee applies).',
+    label: 'Lock',
+    verb: 'Lock on the blockchain',
+    blurb: 'One Nimiq transaction locks the fingerprint forever (a small network fee applies).',
     privacyNote: 'The chain stores a hash string - never the document.',
   },
   {
@@ -84,7 +84,7 @@ export const SIGNER_STAGES: JourneyStage[] = [
     label: 'Done',
     verb: 'Your signature is recorded',
     blurb:
-      'Review who signed and your recorded signature below. To see the field layout on the document, drop the same file you signed (VeriLock never stores the PDF). The creator seals on Nimiq when everyone is finished.',
+      'Review who signed and your recorded signature below. To see the field layout on the document, drop the same file you signed (VeriLock never stores the PDF). The creator locks it on the blockchain when everyone is finished.',
     privacyNote: 'Keep your document. Anyone can re-check the fingerprint later.',
   },
 ]
@@ -95,7 +95,8 @@ export const VERIFIER_STAGES: JourneyStage[] = [
     id: 'verify',
     label: 'Verify',
     verb: 'Check a document anytime',
-    blurb: 'Drop a copy of a sealed document to prove its fingerprint still matches on-chain.',
+    blurb:
+      'Drop a copy of a locked document to prove its fingerprint still matches the blockchain record.',
     privacyNote: 'Verification needs no wallet and never uploads the file.',
   },
 ]

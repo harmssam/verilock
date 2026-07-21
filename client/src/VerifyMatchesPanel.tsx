@@ -10,7 +10,7 @@ function formatTimestamp(value: number | null): string {
 }
 
 function formatStatus(status: string): string {
-  return status === 'locked' ? 'Sealed on-chain' : status.replace(/_/g, ' ')
+  return status === 'locked' ? 'Locked on-chain' : status.replace(/_/g, ' ')
 }
 
 interface VerifyMatchesPanelProps {
@@ -40,7 +40,7 @@ export function VerifyMatchesPanel({
         <p className="verify-matches-intro muted">
           This fingerprint matches {matches.length} agreements on VeriLock. Compare dates and IDs below
           {matches.some(match => match.status === 'locked')
-            ? ' — prefer a sealed on-chain record when one exists.'
+            ? ' — prefer a locked on-chain record when one exists.'
             : '.'}
         </p>
       )}
@@ -79,7 +79,7 @@ export function VerifyMatchesPanel({
                   <dd>{formatTimestamp(match.createdAt)}</dd>
                 </div>
                 <div>
-                  <dt>{match.status === 'locked' ? 'Sealed' : 'Last updated'}</dt>
+                  <dt>{match.status === 'locked' ? 'Locked' : 'Last updated'}</dt>
                   <dd>{formatTimestamp(match.lockedAt ?? match.createdAt)}</dd>
                 </div>
                 <div>
@@ -119,7 +119,7 @@ export function VerifyMatchesPanel({
                     )}
                   </button>
                   <p className="muted verify-match-delete-hint">
-                    You created this agreement and it is not sealed yet. Deletion cannot be undone.
+                    You created this agreement and it is not locked yet. Deletion cannot be undone.
                   </p>
                 </div>
               )}

@@ -26,7 +26,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
       </header>
 
       <nav className="security-toc" aria-label="On this page">
-        <a href="#what-is-sealed">What is sealed</a>
+        <a href="#what-is-locked">What is locked on the blockchain</a>
         <a href="#what-stays-local">What stays local</a>
         <a href="#wallets">Wallets</a>
         <a href="#on-chain">On-chain record</a>
@@ -54,16 +54,16 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
         </div>
       </div>
 
-      <section id="what-is-sealed" className="security-section">
-        <h2>What is sealed</h2>
+      <section id="what-is-locked" className="security-section">
+        <h2>What is locked on the blockchain</h2>
         <p>
-          A seal records the <strong>SHA-256 fingerprint</strong> of the document bytes you chose — a fixed-length
-          digest computed in your browser. When parties co-sign, the agreement record ties wallet
-          signatures to that fingerprint. Sealing on Nimiq anchors the hash so anyone can compare a later
+          An on-chain lock records the <strong>SHA-256 fingerprint</strong> of the document bytes you chose — a
+          fixed-length digest computed in your browser. When parties co-sign, the agreement record ties wallet
+          signatures to that fingerprint. Locking on Nimiq anchors the hash so anyone can compare a later
           copy of the file against what was locked.
         </p>
         <p>
-          The seal is about <strong>integrity of the bytes</strong> (is this the same file?) and{' '}
+          The lock is about <strong>integrity of the bytes</strong> (is this the same file?) and{' '}
           <strong>who signed with which wallet</strong>. It is not a cloud copy of your document.
         </p>
       </section>
@@ -81,7 +81,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
         <h2>What wallets prove</h2>
         <p>
           Connecting a Nimiq wallet proves <strong>control of an address</strong> used as identity for
-          create, sign, and seal steps. The wallet does not receive your document bytes through VeriLock. Signing
+          create, sign, and lock on the blockchain steps. The wallet does not receive your document bytes through VeriLock. Signing
           records intent from that address against the agreement fingerprint, not custody of the file on our
           servers.
         </p>
@@ -90,7 +90,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
       <section id="on-chain" className="security-section">
         <h2>What the chain stores</h2>
         <p>
-          A sealed agreement results in a Nimiq transaction that anchors the document fingerprint (and related
+          A locked agreement results in a Nimiq transaction that anchors the document fingerprint (and related
           attestation details shown in the app). That on-chain record is public on Nimiq and is not something
           VeriLock can erase. It does <strong>not</strong> include the document itself.
         </p>
@@ -99,9 +99,9 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
       <section id="verify" className="security-section">
         <h2>How anyone verifies</h2>
         <p>
-          Verification re-hashes a local copy of the document in the browser and checks it against sealed
+          Verification re-hashes a local copy of the document in the browser and checks it against locked
           fingerprints (via invite link, lookup, or your agreements). <strong>No wallet is required</strong>{' '}
-          for a basic integrity check. Matching means the bytes match the sealed fingerprint; it does not
+          for a basic integrity check. Matching means the bytes match the locked fingerprint; it does not
           mean VeriLock holds a copy of the file.
         </p>
       </section>
@@ -114,7 +114,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
           <li>Title, type, party roles, wallet addresses, and signature status</li>
           <li>Optional notes and signature images you submit when signing</li>
           <li>Session data for wallet login (address, short-lived token)</li>
-          <li>Attestation references after seal (e.g. transaction hash)</li>
+          <li>Attestation references after locking (e.g. transaction hash)</li>
         </ul>
         <p>
           Full detail lives in our{' '}
@@ -142,7 +142,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
           <li>We do not claim DocuSign-equivalent e-sign product classes (SES / AES / QES) here.</li>
           <li>We do not display SOC 2, ISO, HIPAA, or similar badges without real certifications.</li>
           <li>
-            A matching fingerprint proves byte integrity against a seal; court outcomes depend on your
+            A matching fingerprint proves byte integrity against an on-chain lock; court outcomes depend on your
             jurisdiction and counsel — not on a marketing badge.
           </li>
         </ul>
@@ -153,11 +153,11 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
         <div className="security-footer-actions">
           {onCreate ? (
             <button type="button" className="security-btn security-btn--primary" onClick={onCreate}>
-              Create &amp; seal
+              Create &amp; lock
             </button>
           ) : (
             <a className="security-btn security-btn--primary" href="/?intent=creator">
-              Create &amp; seal
+              Create &amp; lock
             </a>
           )}
           {onVerify ? (

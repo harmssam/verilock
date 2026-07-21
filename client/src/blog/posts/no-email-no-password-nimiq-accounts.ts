@@ -64,7 +64,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'This model aligns with our core promise. Your PDF stays on your device. We calculate a local SHA-256 fingerprint. We do not upload your file. We only seal the hash on the blockchain. Your identity operates with the same permanence.',
+      text: 'This model aligns with our core promise. Your PDF stays on your device. We calculate a local SHA-256 fingerprint. We do not upload your file. We only lock that fingerprint on the blockchain. Your identity works the same way: proof without a shared secret.',
     },
     {
       type: 'h2',
@@ -85,18 +85,18 @@ export const post: BlogPost = {
     },
     {
       type: 'h2',
-      text: 'Sealing With Confidence',
+      text: 'Locking With Confidence',
     },
     {
       type: 'p',
-      text: 'This architecture ensures your signatures become permanent records. Your wallet creates a signature when you sign a document. We then place a seal on the Nimiq blockchain. Anyone can verify the integrity later. They can re-hash the candidate PDF against the sealed record. Verification does not require a wallet.',
+      text: 'This architecture ensures your signatures become permanent records. Your wallet creates a signature when you sign a document. We then lock the document fingerprint on the Nimiq blockchain. Anyone can check later whether a copy still matches — no wallet required for that check.',
     },
     {
       type: 'figure',
       src: verify,
       alt: 'Laptop showing a green verification complete check while a physical wallet sits unused on the desk',
       caption:
-        'Verification confirms the file has not changed since the seal. Checking integrity does not require a wallet.',
+        'This check confirms the file still matches the version locked on the blockchain. You do not need a wallet to verify.',
     },
     {
       type: 'p',
@@ -104,7 +104,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Seals list at 1000 NIM each. Our July promo offers 95% off, reducing the fee to 50 NIM. This offer ends August 1. Visit Pricing for current rates and credit packs.',
+      text: 'Locking a fingerprint lists at 1000 NIM. Our July promo offers 95% off, reducing the fee to 50 NIM. This offer ends August 1. Visit Pricing for current rates and credit packs.',
     },
   ],
 }

@@ -6,7 +6,7 @@ export const post: BlogPost = {
   slug: 'private-signatures-public-proof',
   title: 'Private Signatures, Public Proof',
   description:
-    'Share links can prove a sealed fingerprint without dumping every co-signer\'s name and signature image on the open web. Parties unlock private presentation with their wallet.',
+    'Share links can prove a locked fingerprint without dumping every co-signer\'s name and signature image on the open web. Parties unlock private presentation with their wallet.',
   date: '2026-07-09',
   tags: ['feature', 'privacy'],
   coverImage: cover,
@@ -20,12 +20,12 @@ export const post: BlogPost = {
   body: [
     {
       type: 'p',
-      text: 'A share link is useful only if it does not overshare. VeriLock separates two jobs: prove that a sealed fingerprint exists and still matches a PDF, and present who signed with which wallet and optional signature image. Public viewers get the integrity story. Parties who belong on the agreement can unlock richer signature presentation after they connect.',
+      text: 'A share link is useful only if it does not overshare. VeriLock separates two jobs: prove that a locked fingerprint exists and still matches a PDF, and present who signed with which wallet and optional signature image. Public viewers get the integrity story. Parties who belong on the agreement can unlock richer signature presentation after they connect.',
     },
     {
       type: 'figure',
       src: cover,
-      alt: 'Document half in fog with a bright public seal',
+      alt: 'Document half in fog with a bright public on-chain lock',
       caption: 'Prove the hash in public. Keep signature presentation for people who should see it.',
     },
     {
@@ -36,13 +36,13 @@ export const post: BlogPost = {
       type: 'ul',
       items: [
         'That an agreement record exists for a fingerprint.',
-        'Whether a seal on Nimiq is present for that hash.',
+        'Whether a lock on Nimiq is present for that hash.',
         'Enough structure to run verify: drop the PDF, re-hash locally, compare.',
       ],
     },
     {
       type: 'p',
-      text: 'The chain still stores only the hash string when you seal, not the file. Verification never needs a wallet. Anyone with the sealed PDF and a way to look up the agreement can check integrity.',
+      text: 'The chain still stores only the hash string when you lock it on the blockchain, not the file. Verification never needs a wallet. Anyone with the locked PDF and a way to look up the agreement can check integrity.',
     },
     {
       type: 'h2',
@@ -62,7 +62,7 @@ export const post: BlogPost = {
     },
     {
       type: 'note',
-      text: 'Redaction is about presentation in the product UI, not about hiding the on-chain hash. Anyone who already has the sealed PDF can still re-hash it and compare to a public seal record. Do not put secrets in a PDF if you plan to share that same file widely.',
+      text: 'Redaction is about presentation in the product UI, not about hiding the on-chain hash. Anyone who already has the locked PDF can still re-hash it and compare to a public on-chain lock record. Do not put secrets in a PDF if you plan to share that same file widely.',
     },
     {
       type: 'h2',
@@ -74,7 +74,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Share carefully, seal when ready, verify anytime. Through the end of July, a permanent Nimiq seal is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
+      text: 'Share carefully, lock when ready, verify anytime. Through the end of July, a permanent Nimiq on-chain lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
     },
   ],
 }

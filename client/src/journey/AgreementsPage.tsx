@@ -271,7 +271,7 @@ export function AgreementsPage({
               {items.map(doc => {
                 const view = getAgreementView(doc, address)
                 const creator = isDocumentCreator(doc, address)
-                const preferSeal = view.cta === 'Seal now' && creator
+                const preferSeal = view.cta === 'Lock now' && creator
                 const canCancel = canDeleteDocument(doc, address)
                 const cancelling = cancellingId === doc.id
                 return (
@@ -311,7 +311,7 @@ export function AgreementsPage({
                         {preferSeal ? (
                           <>
                             <Lock size={15} strokeWidth={2.25} aria-hidden />
-                            Seal now
+                            Lock now
                           </>
                         ) : view.cta === 'Sign now' ? (
                           <>

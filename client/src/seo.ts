@@ -14,7 +14,7 @@ const TITLE_SUFFIX = ` · ${SITE_NAME}`
 
 export const PAGE_META = {
   home: {
-    title: `${SITE_NAME} — Sign Documents & Seal Hashes on Nimiq`,
+    title: `${SITE_NAME} — Sign Documents & Lock Proof on Nimiq`,
     description:
       'Sign documents together (PDF or image) and permanently anchor fingerprints on the Nimiq blockchain. Your file never leaves your device — verify integrity anytime without a wallet.',
     path: '/',
@@ -22,37 +22,37 @@ export const PAGE_META = {
   pricing: {
     title: `Pricing${TITLE_SUFFIX}`,
     description:
-      'One flat Nimiq seal fee locks your signed document fingerprint on-chain forever. Your file stays on your device — only its SHA-256 hash is recorded.',
+      'One flat fee locks your signed document fingerprint on the Nimiq blockchain forever. Your file stays on your device — only its SHA-256 hash is recorded.',
     path: '/pricing',
   },
   privacy: {
     title: `Privacy Policy${TITLE_SUFFIX}`,
     description:
-      'How VeriLock handles your data: files stay on your device, only document fingerprints and signing metadata are stored, and sealed hashes remain public on Nimiq.',
+      'How VeriLock handles your data: files stay on your device, only document fingerprints and signing metadata are stored, and locked hashes remain public on Nimiq.',
     path: '/privacy',
   },
   security: {
     title: `Security & Integrity${TITLE_SUFFIX}`,
     description:
-      'How VeriLock protects documents: local SHA-256 fingerprinting, wallet identity, on-chain hash seals on Nimiq, and verification without uploading your file. No invented certifications.',
+      'How VeriLock protects documents: local SHA-256 fingerprinting, wallet identity, locking fingerprints on Nimiq, and verification without uploading your file. No invented certifications.',
     path: '/security',
   },
   support: {
     title: `Support${TITLE_SUFFIX}`,
     description:
-      'Contact VeriLock support about signing, sealing, verification, or billing. Your file stays on your device — describe the issue without attaching files.',
+      'Contact VeriLock support about signing, locking, verification, or billing. Your file stays on your device — describe the issue without attaching files.',
     path: '/support',
   },
   blog: {
     title: `Blog${TITLE_SUFFIX}`,
     description:
-      'Guides on what VeriLock is, how fingerprinting and Nimiq seals work, private document signing, wallet-optional verification, and product updates.',
+      'Guides on what VeriLock is, how fingerprinting and on-chain locks work, private document signing, wallet-optional verification, and product updates.',
     path: '/blog',
   },
   verify: {
     title: `Verify a Document${TITLE_SUFFIX}`,
     description:
-      'Check whether a document matches a sealed VeriLock agreement. Fingerprint your file locally in the browser — no wallet required.',
+      'Check whether a document matches a locked VeriLock agreement. Fingerprint your file locally in the browser — no wallet required.',
     path: '/',
   },
   agreements: {
@@ -69,7 +69,7 @@ export const PAGE_META = {
   },
   document: {
     title: `Agreement${TITLE_SUFFIX}`,
-    description: 'Review, sign, or seal a VeriLock agreement.',
+    description: 'Review, sign, or lock a VeriLock agreement on the blockchain.',
     noindex: true,
     path: '/',
   },
@@ -197,7 +197,7 @@ export function documentPageMeta(title: string, role: 'sign' | 'verify'): PageMe
   const verb = role === 'verify' ? 'Verify' : 'Sign'
   return {
     title: `${title} · ${verb} on ${SITE_NAME}`,
-    description: `${verb} "${title}" on VeriLock. Fingerprint your document locally, collect Nimiq wallet signatures, and seal the document hash on-chain.`,
+    description: `${verb} "${title}" on VeriLock. Fingerprint your document locally, collect Nimiq wallet signatures, and lock the document hash on-chain.`,
     path: undefined,
     noindex: true,
   }

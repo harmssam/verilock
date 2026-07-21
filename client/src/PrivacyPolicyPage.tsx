@@ -94,7 +94,7 @@ export function PrivacyPolicyPage() {
       <section className="privacy-policy-section">
         <h3>Deletion</h3>
         <p className="muted">
-          Document creators can delete incomplete agreements from the app. Once a document is sealed on the
+          Document creators can delete incomplete agreements from the app. Once a document is locked on the
           Nimiq blockchain, the on-chain fingerprint remains public even if server-side metadata is removed.
         </p>
       </section>

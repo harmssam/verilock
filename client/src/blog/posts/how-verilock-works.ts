@@ -8,7 +8,7 @@ export const post: BlogPost = {
   slug: 'how-verilock-works',
   title: 'How VeriLock Works',
   description:
-    'Create a digital fingerprint for your PDF, gather signatures, and seal the record on the blockchain. Verify changes later without complex tools.',
+    'Create a digital fingerprint for your PDF, gather signatures, and lock the record on the blockchain. Verify changes later without complex tools.',
   date: '2026-07-13',
   tags: ['guide', 'verify'],
   coverImage: cover,
@@ -22,7 +22,7 @@ export const post: BlogPost = {
   body: [
     {
       type: 'p',
-      text: 'VeriLock follows a simple four-step loop. First, create a fingerprint of your PDF on your own device. Next, collect signatures from everyone who must agree. Then, seal that fingerprint on the Nimiq blockchain. Finally, verify any file later to ensure it has not changed.',
+      text: 'VeriLock follows a simple four-step loop. First, create a fingerprint of your PDF on your own device. Next, collect signatures from everyone who must agree. Then, lock that fingerprint on the Nimiq blockchain. Finally, verify any file later to ensure it has not changed.',
     },
     {
       type: 'quote',
@@ -30,14 +30,14 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'This process never puts your full document on a public ledger. Sealing freezes an integrity claim. Verification is the same math run again on any copy you still hold.',
+      text: 'This process never puts your full document on a public ledger. Locking freezes an integrity claim. Verification is the same math run again on any copy you still hold.',
     },
     {
       type: 'figure',
       src: flow,
       layout: 'full',
       alt: 'Four stations on a linen desk: fingerprinted PDF, pens for signing, stamp and archive folder, laptop with a green check',
-      caption: 'One clear path: local fingerprint, multi-party sign, on-chain seal, and easy verify.',
+      caption: 'One clear path: local fingerprint, multi-party sign, on-chain lock, and easy verify.',
     },
     {
       type: 'h2',
@@ -77,11 +77,11 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'When the group is ready, you seal the record. Sealing publishes the document fingerprint to the Nimiq blockchain. You pay a small fee in NIM or use a prepaid credit. Once sealed, the record is permanent. It is not owned by any single private database. Anyone can check the anchored hash independently.',
+      text: 'When the group is ready, you lock the record. Locking publishes the document fingerprint to the Nimiq blockchain. You pay a small fee in NIM or use a prepaid credit. Once locked, the record is permanent. It is not owned by any single private database. Anyone can check the anchored hash independently.',
     },
     {
       type: 'quote',
-      text: 'Only seal when the group stops changing the file. Sealing freezes the integrity claim.',
+      text: 'Only lock when the group stops changing the file. Locking freezes the integrity claim.',
     },
     {
       type: 'p',
@@ -100,11 +100,11 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Verification is simple math that you can run again. Take a PDF, create its fingerprint locally, and compare it to the sealed record. A match means your bytes are identical to the sealed document. A mismatch means something changed, even if the filename looks familiar.',
+      text: 'Verification is simple math that you can run again. Take a PDF, create its fingerprint locally, and compare it to the locked record. A match means your bytes are identical to the locked document. A mismatch means something changed, even if the filename looks familiar.',
     },
     {
       type: 'p',
-      text: 'Basic verification does not require a wallet. Parties can connect if they need private signature details. Creators sealing or buying credits need a wallet. Pure checks to see if a file is still the sealed PDF do not.',
+      text: 'Basic verification does not require a wallet. Parties can connect if they need private signature details. Creators locking or buying credits need a wallet. Pure checks to see if a file is still the locked PDF do not.',
     },
     {
       type: 'h2',
@@ -115,7 +115,7 @@ export const post: BlogPost = {
       items: [
         'On your device: The full PDF bytes you sign and keep.',
         'In the workflow: Title, fingerprints, and party metadata needed to reopen the agreement.',
-        'On Nimiq: The sealed fingerprint record and related on-chain proof.',
+        'On Nimiq: The locked fingerprint record and related on-chain proof.',
         'Not on-chain: The full contract text as a public file.',
       ],
     },
@@ -127,14 +127,14 @@ export const post: BlogPost = {
       type: 'ul',
       items: [
         'Signing different exports of the same PDF. Export settings can change the bytes.',
-        'Sealing too early, then editing the file and expecting the old seal to cover the new bytes.',
+        'Locking too early, then editing the file and expecting the old on-chain lock to cover the new bytes.',
         'Treating a hash match as proof of legal authority or document origin.',
         'Assuming verification explains which word changed. Hashes detect change but do not show specific edits.',
       ],
     },
     {
       type: 'note',
-      text: 'VeriLock helps you coordinate signatures and prove the sealed fingerprint later. It is not legal advice about enforceability, and it is not a scanner for unsealed files.',
+      text: 'VeriLock helps you coordinate signatures and prove the locked fingerprint later. It is not legal advice about enforceability, and it is not a scanner for unlocked files.',
     },
     {
       type: 'h2',
@@ -142,11 +142,11 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'On the home screen, pick Create & seal to start, I was invited to co-sign, or Verify a PDF to check a sealed file. For a shorter walkthrough of signing only, see How to Sign a PDF with Blockchain. For the product definition and limits, see What is VeriLock.',
+      text: 'On the home screen, pick Create & lock to start, I was invited to co-sign, or Verify a PDF to check a locked file. For a shorter walkthrough of signing only, see How to Sign a PDF with Blockchain. For the product definition and limits, see What is VeriLock.',
     },
     {
       type: 'p',
-      text: 'Ready to lock a fingerprint? Through the end of July, a permanent Nimiq seal is 50 NIM. This is 95% off the 1000 NIM list price. The promo ends August 1.',
+      text: 'Ready to lock a fingerprint? Through the end of July, a permanent Nimiq on-chain lock is 50 NIM. This is 95% off the 1000 NIM list price. The promo ends August 1.',
     },
     {
       type: 'p',
