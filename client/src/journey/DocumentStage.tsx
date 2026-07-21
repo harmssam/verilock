@@ -169,7 +169,9 @@ export function DocumentStage({
   }
 
   let caption: string
-  if (sealed) caption = 'Anchored on Nimiq'
+  // Sealed status + explorer live in the verify/match banner (“Anchored on Nimiq · View…”)
+  // — keep this caption about the local file, not a second chain line.
+  if (sealed) caption = 'Local fingerprint matches the locked record'
   else if (needsLocalCopy) {
     caption = 'Drop or browse to select the matching file'
   } else if (localCopyRequired && hasLocalFile && localCopyMatches === false) {

@@ -94,10 +94,9 @@ export const VERIFIER_STAGES: JourneyStage[] = [
   {
     id: 'verify',
     label: 'Verify',
-    verb: 'Check a document anytime',
-    blurb:
-      'Drop a copy of a locked document to prove its fingerprint still matches the blockchain record.',
-    privacyNote: 'Verification needs no wallet and never uploads the file.',
+    verb: 'Check a document',
+    blurb: 'Drop a locked document. We fingerprint it locally and match the on-chain record.',
+    privacyNote: 'The file stays on this device — only the fingerprint is checked.',
   },
 ]
 

@@ -2697,6 +2697,16 @@ a.hash-chip.text-link:focus-visible {
   color: var(--lr-text, var(--text, #0f172a));
 }
 
+/* “Anchored on Nimiq · View on-chain attestation” as one chain line */
+.result-banner-chain {
+  font-weight: 650;
+  color: var(--mint-deep, #0f766e);
+}
+
+.result-banner-chain .inline-link {
+  font-weight: 650;
+}
+
 .result-banner--ok .mono,
 .result-banner--locked .mono {
   color: var(--mint-deep, #0f766e);
