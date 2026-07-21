@@ -35,6 +35,8 @@ interface SignaturesPanelProps {
    * incorrectly be initials from older clients).
    */
   fingerprint?: string | null
+  /** Agreement id — required when the same PDF is used on multiple agreements. */
+  documentId?: string | null
 }
 
 function PrivateSignatureImage({
@@ -100,12 +102,15 @@ async function loadSignatureInkFromPlacementFills(input: {
   fingerprint: string
   authToken: string
   parties: DocumentParty[]
+  documentId?: string | null
 }): Promise<Map<string, string>> {
   const out = new Map<string, string>()
   const hash = input.fingerprint.toLowerCase()
   if (!/^[a-f0-9]{64}$/.test(hash)) return out
 
-  const planRes = await api.getPlacementPlan(hash, input.authToken)
+  const planRes = await api.getPlacementPlan(hash, input.authToken, {
+    documentId: input.documentId,
+  })
   if (!planRes.fillPayloadRevealed) return out
 
   const slots: PlacementSlot[] = (planRes.plan?.slots ?? []).map(s => ({
@@ -219,6 +224,7 @@ export function SignaturesPanel({
   revealPrivate = true,
   authToken,
   fingerprint = null,
+  documentId = null,
 }: SignaturesPanelProps) {
   const [fillInkByParty, setFillInkByParty] = useState<Map<string, string>>(() => new Map())
   const partyKey = parties
@@ -237,6 +243,7 @@ export function SignaturesPanel({
           fingerprint,
           authToken,
           parties,
+          documentId,
         })
         if (!cancelled) setFillInkByParty(map)
       } catch {
@@ -248,7 +255,7 @@ export function SignaturesPanel({
     }
     // partyKey stabilizes parties array identity
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [revealPrivate, authToken, fingerprint, partyKey])
+  }, [revealPrivate, authToken, fingerprint, documentId, partyKey])
 
   if (signatures.length === 0) return null
 

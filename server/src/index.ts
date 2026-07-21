@@ -1098,9 +1098,19 @@ app.get('/api/placement-plans/:sha256', publicReadLimit, (req, res) => {
     return
   }
   const viewer = optionalViewerAddress(req)
-  const plan = getPlanPublic(sha, { viewerAddress: viewer })
+  // Prefer agreement id so the same PDF can have many independent plans.
+  const documentIdRaw = req.query.documentId
+  const documentId =
+    typeof documentIdRaw === 'string' && documentIdRaw.trim()
+      ? documentIdRaw.trim()
+      : null
+  const plan = getPlanPublic(sha, { viewerAddress: viewer, documentId })
   if (!plan) {
-    res.status(404).json({ error: 'No placement plan for this PDF hash' })
+    res.status(404).json({
+      error: documentId
+        ? 'No placement plan for this agreement'
+        : 'No placement plan for this PDF hash',
+    })
     return
   }
   res.json(plan)
@@ -1130,6 +1140,8 @@ app.post(
       framesHex?: string[]
       fills?: Array<{ slotId: string; blobId: string; personSlotIndex: number }>
       blobIds?: string[]
+      /** Required when the same PDF fingerprint is used on multiple agreements. */
+      documentId?: string
     }
     const address = res.locals.address as string
     try {
@@ -1143,6 +1155,7 @@ app.post(
         framesHex: body.framesHex,
         fills: Array.isArray(body.fills) ? body.fills : [],
         blobIds: Array.isArray(body.blobIds) ? body.blobIds : [],
+        documentId: body.documentId?.trim() || null,
       })
       res.status(201).json(result)
     } catch (err) {
