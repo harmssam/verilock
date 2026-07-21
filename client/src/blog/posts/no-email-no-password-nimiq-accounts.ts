@@ -5,14 +5,14 @@ const verify = '/blog/no-email-no-password-nimiq-accounts-verify.jpg'
 
 export const post: BlogPost = {
   slug: 'no-email-no-password-nimiq-accounts',
-  title: 'No Email, No Password: How VeriLock Accounts Work',
+  title: 'No Email, No VeriLock Password: How Accounts Work',
   description:
-    'VeriLock replaces email and passwords with Nimiq wallet keys. Learn how this cryptographic approach secures your identity and keeps data on your device.',
+    'VeriLock has no email or site password. Your Nimiq wallet is the account. Learn how wallet keys replace traditional logins and keep identity on your device.',
   date: '2026-07-19',
   tags: ['guide', 'privacy'],
   coverImage: cover,
   coverAlt:
-    'Light mint graphic: crossed-out email and password fields next to a wallet-identity card with a hexagonal V mark, captioned “Your key is the account”',
+    'Light mint graphic: crossed-out email and password fields next to a wallet-identity card with the VeriLock lock mark. Headline: No email. No VeriLock password. Your Nimiq wallet is your VeriLock account.',
   relatedSlugs: [
     'how-verilock-works',
     'what-is-verilock',
@@ -21,11 +21,11 @@ export const post: BlogPost = {
   body: [
     {
       type: 'p',
-      text: 'Your email inbox is a security liability. Passwords are frequently compromised. VeriLock removes these vulnerabilities entirely. There is no sign in with Google. There is no Microsoft account. We store no email addresses on our servers. Your account exists solely as a cryptographic key pair.',
+      text: 'Your email inbox is a security liability. Site passwords are frequently compromised. VeriLock does not use either. There is no sign in with Google. There is no Microsoft account. We store no email addresses on our servers. Your account is the cryptographic key pair behind your Nimiq wallet.',
     },
     {
       type: 'p',
-      text: 'This key pair lives on the Nimiq network. It is the actual mechanism that grants access. When you connect your wallet, you prove ownership of your identity. You do not share secrets. You simply verify your presence.',
+      text: 'When you connect that wallet, you prove ownership of the address. You do not hand VeriLock a shared secret. The private key stays on your device. Only the public address is used to load your history and sign.',
     },
     {
       type: 'h2',
@@ -42,29 +42,34 @@ export const post: BlogPost = {
     {
       type: 'figure',
       src: cover,
-      alt: 'Email and password fields struck through beside a wallet identity card: private key stays on device',
-      caption: 'No inbox, no password vault. Your Nimiq wallet key is the account; only the public address is shared.',
+      alt: 'Email and password fields struck through beside a wallet identity card with the VeriLock mark: private key stays on device',
+      caption:
+        'No inbox, no VeriLock password. Your Nimiq wallet is the account; only the public address is shared.',
     },
     {
       type: 'h2',
-      text: 'Why Remove Email and Passwords?',
+      text: 'Why Remove Email and Site Passwords?',
     },
     {
       type: 'p',
-      text: 'We removed these options to enforce security and privacy. Email inboxes are frequent targets. Passwords are often weak or reused. Eliminating them removes the attack surface.',
+      text: 'We removed these options to enforce security and privacy. Email inboxes are frequent targets. Site passwords are often weak or reused. Eliminating them removes that attack surface on VeriLock.',
     },
     {
       type: 'ul',
       items: [
         'No central database of emails to steal',
-        'No passwords to reset or forget',
+        'No VeriLock password to reset or forget',
         'No SMS codes to intercept',
         'Full control remains with the user',
       ],
     },
     {
       type: 'p',
-      text: 'This model aligns with our core promise. Your PDF stays on your device. We calculate a local SHA-256 fingerprint. We do not upload your file. We only lock that fingerprint on the blockchain. Your identity works the same way: proof without a shared secret.',
+      text: 'Nimiq Hub or Pay may still use a local unlock on your device. That protects the wallet keystore. It is not a VeriLock site password, and we never receive it.',
+    },
+    {
+      type: 'p',
+      text: 'This model aligns with our core promise. Your PDF stays on your device. We calculate a local SHA-256 fingerprint. We do not upload your file. We only lock that fingerprint on the blockchain. Your identity works the same way: proof without a shared secret on our servers.',
     },
     {
       type: 'h2',
@@ -72,11 +77,11 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Connect the same wallet to return. The system reads your public address. It instantly loads the agreement history associated with that address. There is no waiting for an email link. There is no two-factor delay.',
+      text: 'Connect the same wallet to return. The system reads your public address. It instantly loads the agreement history associated with that address. There is no waiting for an email link. There is no two-factor delay from us.',
     },
     {
       type: 'note',
-      text: 'Losing your wallet seed phrase means losing access to your account history. There is no password reset button. Guard your keys carefully.',
+      text: 'Losing your wallet seed phrase means losing access to your account history. There is no VeriLock password reset button. Guard your keys carefully.',
     },
     {
       type: 'quote',
