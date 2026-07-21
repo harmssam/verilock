@@ -12,7 +12,7 @@ export const post: BlogPost = {
   tags: ['guide', 'privacy'],
   coverImage: cover,
   coverAlt:
-    'Light mint graphic: crossed-out email and password fields next to a wallet-identity card with the VeriLock lock mark. Headline: No email. No VeriLock password. Your Nimiq wallet is your VeriLock account.',
+    'Light mint graphic: crossed-out email and password fields next to a wallet-identity card. Copy: Connect with a Nimiq wallet, not an email or a site password.',
   relatedSlugs: [
     'how-verilock-works',
     'what-is-verilock',
