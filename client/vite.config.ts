@@ -101,6 +101,14 @@ export default defineConfig({
   build: {
     outDir: 'dist-build',
     emptyOutDir: true,
+    /*
+     * Vite 8 defaults cssMinify to lightningcss, which collapses dual
+     * backdrop-filter / -webkit-backdrop-filter to only the -webkit- form.
+     * Chromium needs the unprefixed property, so frosted header/path glass
+     * works in dev (unminified) and on Safari, but not on production Chrome.
+     * esbuild keeps both declarations. Revisit when lightningcss#695 lands.
+     */
+    cssMinify: 'esbuild',
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
