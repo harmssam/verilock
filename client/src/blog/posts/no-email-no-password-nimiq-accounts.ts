@@ -44,7 +44,7 @@ export const post: BlogPost = {
       src: cover,
       alt: 'Email and password fields struck through beside a wallet identity card with the VeriLock mark: private key stays on device',
       caption:
-        'No inbox, no VeriLock password. Your Nimiq wallet is the account; only the public address is shared.',
+        'No email, no site password. Your Nimiq wallet is the account; only the public address is shared.',
     },
     {
       type: 'h2',
