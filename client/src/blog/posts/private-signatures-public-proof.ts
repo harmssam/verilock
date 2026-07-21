@@ -62,7 +62,7 @@ export const post: BlogPost = {
     },
     {
       type: 'note',
-      text: 'Redaction is about presentation in the product UI, not about hiding the on-chain hash. Anyone who already has the locked PDF can still re-hash it and compare to a public on-chain lock record. Do not put secrets in a PDF if you plan to share that same file widely.',
+      text: 'Redaction is about presentation in the product UI, not about hiding the on-chain hash. Anyone who already has the locked PDF can still re-hash it and compare to the public blockchain record. Do not put secrets in a PDF if you plan to share that same file widely.',
     },
     {
       type: 'h2',
@@ -70,7 +70,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Share invite links with co-signers and send them the exact PDF. After seal, you can point someone at verify without giving them a full roster of private presentation. For your own history of created and signed work, open Agreements after login. The list is scoped to your wallet, not the public internet.',
+      text: 'Share invite links with co-signers and send them the exact PDF. After you lock the proof on the blockchain, you can point someone at verify without giving them a full roster of private presentation. For your own history of created and signed work, open Agreements after login. The list is scoped to your wallet, not the public internet.',
     },
     {
       type: 'p',

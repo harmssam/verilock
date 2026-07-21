@@ -73,7 +73,7 @@ export const post: BlogPost = {
     },
     {
       type: 'h2',
-      text: '3. Seal (Permanent Record)',
+      text: '3. Lock (Permanent Record)',
     },
     {
       type: 'p',

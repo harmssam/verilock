@@ -47,7 +47,7 @@ export const post: BlogPost = {
         'Choose a prepaid pack (typical sizes span small multi-lock packs up through larger ones).',
         'Pay with NIM from the wallet, or with card when card checkout is available.',
         'After purchase, the header can show your balance so focus stays on documents.',
-        'At lock time, spend a credit or pay NIM for the current fee, depending on balance and flow.',
+        'When you lock on the blockchain, spend a credit or pay NIM for the current fee, depending on balance and flow.',
       ],
     },
     {
