@@ -42,7 +42,7 @@ export const post: BlogPost = {
     {
       type: 'figure',
       src: cover,
-      alt: 'Email and password fields struck through beside a wallet identity card — private key stays on device',
+      alt: 'Email and password fields struck through beside a wallet identity card: private key stays on device',
       caption: 'No inbox, no password vault. Your Nimiq wallet key is the account; only the public address is shared.',
     },
     {
@@ -89,7 +89,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'This architecture ensures your signatures become permanent records. Your wallet creates a signature when you sign a document. We then lock the document fingerprint on the Nimiq blockchain. Anyone can check later whether a copy still matches — no wallet required for that check.',
+      text: 'This architecture ensures your signatures become permanent records. Your wallet creates a signature when you sign a document. We then lock the document fingerprint on the Nimiq blockchain. Anyone can check later whether a copy still matches. No wallet is required for that check.',
     },
     {
       type: 'figure',

@@ -6,16 +6,17 @@ Journey SPA blog under `/blog`. Content lives in `client/src/blog/posts/`. UI in
 
 - Calm, technical, trust-focused, product-led
 - Short sentences; privacy and permanence as design facts, not hype
-- Prefer: sign, seal, fingerprint, permanent record, stays on your device, verify
+- Prefer: sign, **lock on the blockchain**, fingerprint, permanent record, stays on your device, verify
+- Avoid seal-as-a-verb in reader copy (“seal the hash”, “when you seal”, “after seal”). Say lock / lock on the blockchain / locked.
 - Avoid: legal overclaims (legally binding / court-admissible unless counsel-approved), moon language, absolute security claims
-- **No internal codenames in reader copy.** Do not write "Journey", "Journey Edition", or "Journey home". Say "home screen", "Create & seal", "I was invited", "Verify a PDF", or "the app".
+- **No internal codenames in reader copy.** Do not write "Journey", "Journey Edition", or "Journey home". Say "home screen", "Create & lock", "I was invited", "Verify a PDF", or "the app".
 
 ## Hard rules
 
 1. **No em dashes** (`—` / U+2014). Use commas, periods, or hyphens.
 2. **You are already on verilock.online.** Do not write "try it on verilock.online", "open verilock.online", or similar site-name CTAs. Readers are already on the product site.
-3. **End-of-post CTA:** advertise the **current seal promo / fee**, not a generic "try the product" line. Soft internal paths only (Pricing, Verify, Agreements, home create flow) if you need a next step.
-4. **Do not invent fees.** Read live numbers from `client/src/shared/sealPricing.ts` (and Pricing UI). As of July 2026: list **1000 NIM**, July promo **95% off → 50 NIM**, **promo ends August 1** (`isJulyPromoActive`: calendar month === July).
+3. **End-of-post CTA:** advertise the **current lock promo / fee**, not a generic "try the product" line. Soft internal paths only (Pricing, Verify, Agreements, home create flow) if you need a next step.
+4. **Do not invent fees.** Read live numbers from `client/src/sealPricing.ts` (and Pricing UI). As of July 2026: list **1000 NIM**, July promo **95% off → 50 NIM**, **promo ends August 1** (`isJulyPromoActive`: calendar month === July).
 5. Feature post **dates** should match git ship days when advertising product work.
 6. After adding a post: register in `posts.ts`, add cover (and any body images) under `client/public/blog/`, add URL to `client/public/sitemap.xml`.
 
@@ -69,7 +70,7 @@ Do not generate 3 decorative concept shots per post. If the body figure is only 
 
 ### Choose the medium (in this order)
 
-1. **Journey UI screenshot / crop** — best for product-true posts (verify match, path picker, seal step). Real pixels beat AI chrome.
+1. **Product UI screenshot / crop** — best for product-true posts (verify match, path picker, lock step). Real pixels beat AI chrome.
 2. **Code-built diagram** (SVG or HTML → export) — best for labeled flows, compare tables, "what lives where." Exact text stays readable. Prefer this over generative diagrams.
 3. **Generative editorial still** — only for covers and rare scenario moments where photography-like restraint works. One subject, quiet light, no magic.
 
@@ -207,8 +208,8 @@ Mood: ordinary professional verification, accessible and calm.
 
 Use copy like:
 
-- "Through the end of July, a permanent Nimiq seal is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1."
-- "Ready to lock a fingerprint? Seals are 50 NIM through July."
+- "Through the end of July, a permanent Nimiq on-chain lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1."
+- "Ready to lock a fingerprint on the blockchain? 50 NIM through July."
 
 Article footer button should point at **Pricing** (or home create), with promo-aware label, not "Try it on verilock.online."
 
@@ -243,7 +244,7 @@ Do not stack every figure as full width. Prefer one full process image, then a s
 Link related guides into these when relevant:
 
 - `what-is-verilock` — product definition and limits
-- `how-verilock-works` — fingerprint → sign → seal → verify
+- `how-verilock-works` — fingerprint → sign → lock → verify
 
 ## Layout
 

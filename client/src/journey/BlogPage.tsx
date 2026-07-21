@@ -15,7 +15,7 @@ interface BlogPageProps {
   path: string
   onOpenIndex: () => void
   onOpenPost: (slug: string) => void
-  /** Prefer pricing so CTAs advertise seal fee / promo without leaving the site. */
+  /** Prefer pricing so CTAs advertise lock fee / promo without leaving the site. */
   onPricing: () => void
 }
 
@@ -262,10 +262,11 @@ function BlogPostView({
       <RelatedPosts post={post} onOpenPost={onOpenPost} />
       <div className="blog-cta">
         <p className="muted blog-cta-note">
-          Through July, permanent seals are 50 NIM (95% off list). Promo ends August 1.
+          Through July, locking a fingerprint on the blockchain is 50 NIM (95% off list). Promo ends
+          August 1.
         </p>
         <button type="button" className="btn btn-primary" onClick={onPricing}>
-          See seal pricing
+          See pricing
         </button>
       </div>
     </article>
