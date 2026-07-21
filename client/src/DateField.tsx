@@ -19,14 +19,14 @@ const MONTHS = [
   'December',
 ] as const
 
-function toIsoDate(date: Date): string {
+export function toIsoDate(date: Date): string {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
 
-function parseIsoDate(value: string): Date | null {
+export function parseIsoDate(value: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
   const [y, m, d] = value.split('-').map(Number)
   const date = new Date(y!, m! - 1, d)
@@ -34,7 +34,7 @@ function parseIsoDate(value: string): Date | null {
   return date
 }
 
-function formatDisplay(value: string): string {
+export function formatDisplayDate(value: string): string {
   const date = parseIsoDate(value)
   if (!date) return ''
   return date.toLocaleDateString(undefined, {
@@ -42,6 +42,39 @@ function formatDisplay(value: string): string {
     day: 'numeric',
     year: 'numeric',
   })
+}
+
+/** ISO today in local timezone. */
+export function todayIsoDate(): string {
+  return toIsoDate(new Date())
+}
+
+/**
+ * Parse free-text or ISO into YYYY-MM-DD, or null if not a date.
+ * Used when reopening a filled date field on the document.
+ */
+export function parseFlexibleDateToIso(raw: string): string | null {
+  const t = raw.trim()
+  if (!t) return null
+  if (parseIsoDate(t)) return t
+  const ms = Date.parse(t)
+  if (!Number.isFinite(ms)) return null
+  const d = new Date(ms)
+  if (Number.isNaN(d.getTime())) return null
+  return toIsoDate(d)
+}
+
+/** Field label from Arrange (e.g. "Date", "Signing date") → date picker UI. */
+export function isDateFieldLabel(label: string | undefined | null): boolean {
+  const t = (label ?? '').trim().toLowerCase()
+  if (!t) return false
+  return (
+    t === 'date' ||
+    t.startsWith('date ') ||
+    t.endsWith(' date') ||
+    t.includes(' date ') ||
+    /^sign(ing)?\s*date$/.test(t)
+  )
 }
 
 function compareIso(a: string, b: string): number {
@@ -78,6 +111,8 @@ interface DateFieldProps {
   min?: string
   max?: string
   disabled?: boolean
+  /** Dark shell (default) or light panels (e.g. sign modal). */
+  tone?: 'dark' | 'light'
 }
 
 export function DateField({
@@ -87,6 +122,7 @@ export function DateField({
   min,
   max,
   disabled,
+  tone = 'dark',
 }: DateFieldProps) {
   const fieldId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -94,7 +130,7 @@ export function DateField({
   const [popoverPos, setPopoverPos] = useState<null | { top: number; left: number; width: number }>(null)
 
   const selected = parseIsoDate(value)
-  const todayIso = toIsoDate(new Date())
+  const todayIso = todayIsoDate()
   const [viewYear, setViewYear] = useState(selected?.getFullYear() ?? new Date().getFullYear())
   const [viewMonth, setViewMonth] = useState(selected?.getMonth() ?? new Date().getMonth())
 
@@ -239,7 +275,16 @@ export function DateField({
   const years = yearRange(min, max, viewYear)
 
   return (
-    <div ref={rootRef} className={`date-field${open ? ' date-field--open' : ''}`}>
+    <div
+      ref={rootRef}
+      className={[
+        'date-field',
+        open ? 'date-field--open' : '',
+        tone === 'light' ? 'date-field--light' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <button
         id={fieldId}
         type="button"
@@ -247,11 +292,12 @@ export function DateField({
         disabled={disabled}
         aria-haspopup="dialog"
         aria-expanded={open}
+        title="Change date"
         onClick={() => setOpen(current => !current)}
       >
         <Calendar className="date-field-icon" size={18} strokeWidth={2} aria-hidden />
         <span className={value ? 'date-field-value' : 'date-field-placeholder'}>
-          {value ? formatDisplay(value) : placeholder}
+          {value ? formatDisplayDate(value) : placeholder}
         </span>
       </button>
 

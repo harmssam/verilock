@@ -204,6 +204,23 @@
   padding: 0.65rem 0.75rem;
 }
 
+.signer-fill-date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.signer-fill-date-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* Let the calendar popover escape the modal panel */
+.signer-fill-modal-panel.is-date {
+  overflow: visible;
+}
+
 /*
  * Full-viewport overlay (always portaled to document.body).
  * Flex-center the panel so it sits in the middle of the window, not a scrolled parent.

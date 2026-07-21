@@ -2892,6 +2892,13 @@ a.hash-chip.text-link:focus-visible {
   color: #fbbf24;
 }
 
+.doc-card-empty-sub--hint {
+  max-width: 14rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #64748b;
+}
+
 .doc-card-match-badge {
   display: inline-flex;
   align-items: center;

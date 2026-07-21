@@ -156,8 +156,37 @@ export function newSlotId(): string {
   return `slot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 }
 
+/** Max people on one construction plan (Arrange). Keep in sync with server placementPlans. */
+export const MAX_CONSTRUCTION_PEOPLE = 10
+export const MIN_CONSTRUCTION_PEOPLE = 1
+
+/** Stable palette for person chips / slots (cycles if ever needed beyond length). */
+/**
+ * Person chip / slot colors — spaced around the hue wheel so neighbors stay distinct
+ * on light UI (no two teals, no amber+orange pair, no rose+pink+fuchsia pile-up).
+ */
+export const PERSON_COLORS = [
+  '#0f766e', // 1 deep teal
+  '#b45309', // 2 amber
+  '#1d4ed8', // 3 blue
+  '#7c3aed', // 4 violet (was too close to #1 when teal)
+  '#be123c', // 5 rose
+  '#15803d', // 6 green
+  '#92400e', // 7 brown
+  '#db2777', // 8 pink
+  '#0369a1', // 9 ocean (darker sky; not the same family as #3)
+  '#a16207', // 10 gold
+] as const
+
+export function personColor(slotIndex: number): string {
+  return PERSON_COLORS[(Math.max(1, slotIndex) - 1) % PERSON_COLORS.length]!
+}
+
 export function defaultPeople(count: number): ConstructionPerson[] {
-  const n = Math.max(1, Math.min(4, Math.floor(count)))
+  const n = Math.max(
+    MIN_CONSTRUCTION_PEOPLE,
+    Math.min(MAX_CONSTRUCTION_PEOPLE, Math.floor(count)),
+  )
   return Array.from({ length: n }, (_, i) => ({
     slotIndex: i + 1,
     displayName: `Person ${i + 1}`,

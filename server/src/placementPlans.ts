@@ -15,8 +15,9 @@ import {
 } from './db.js'
 import { canRevealParticipantDetails } from './documents.js'
 
-const MAX_PEOPLE = 4
-const MAX_SLOTS = 40
+/** Keep in sync with client `MAX_CONSTRUCTION_PEOPLE`. */
+const MAX_PEOPLE = 10
+const MAX_SLOTS = 80
 const MAX_NAME = 80
 
 function q(n: unknown, digits = 4): number {
