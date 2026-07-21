@@ -168,6 +168,21 @@ async function loadVerifyDetails(
   return details.sort((a, b) => (b.lockedAt ?? b.createdAt) - (a.lockedAt ?? a.createdAt))
 }
 
+/** True when this wallet is creator/party/signer on a verify match (or server revealed details). */
+function isPartyToVerifyMatch(
+  match: VerifyResult,
+  walletAddress: string | null,
+): boolean {
+  if (match.participantDetailsRevealed === true) return true
+  if (!walletAddress) return false
+  const me = normalizeAddress(walletAddress)
+  if (normalizeAddress(match.creatorAddress) === me) return true
+  if (match.signatures.some(s => normalizeAddress(s.signerAddress) === me)) return true
+  return match.parties.some(
+    p => p.walletAddress && normalizeAddress(p.walletAddress) === me,
+  )
+}
+
 export function DocumentJourney({
   wallet,
   navEpoch = 0,
@@ -674,6 +689,16 @@ export function DocumentJourney({
     doc && canRevealParticipantDetails(doc.source, address),
   )
   const canCancelCurrent = Boolean(doc && canDeleteDocument(doc.source, address))
+
+  /** Verify path: fingerprint match settled (used to slim header + drop redundant lists). */
+  const verifyMatched = verifyOutcome.kind === 'match'
+  const verifyPartyMatch = useMemo(() => {
+    if (!verifyMatched || verifyOutcome.kind !== 'match') return null
+    return (
+      verifyOutcome.matches.find(m => isPartyToVerifyMatch(m, address)) ?? null
+    )
+  }, [verifyMatched, verifyOutcome, address])
+  const verifyPartyView = Boolean(verifyMatched && token && verifyPartyMatch)
 
   const activeStage =
     pathStages.find(s => s.id === step) ??
@@ -2262,9 +2287,11 @@ export function DocumentJourney({
                 <p className="action-kicker">
                   {step === 'done' && role !== 'signer'
                     ? 'Complete'
-                    : activeStage && stepIndex >= 0
-                      ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label}`
-                      : 'Action'}
+                    : step === 'verify' && verifyMatched
+                      ? 'Verify'
+                      : activeStage && stepIndex >= 0
+                        ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label}`
+                        : 'Action'}
                 </p>
                 <h3>
                   {step === 'done' && role === 'signer'
@@ -2273,7 +2300,12 @@ export function DocumentJourney({
                       : (activeStage?.verb ?? 'Your signature is recorded')
                     : step === 'done'
                       ? 'Agreement sealed'
-                      : activeStage?.verb ?? 'Continue'}
+                      : step === 'verify' && verifyMatched
+                        ? verifyOutcome.kind === 'match' &&
+                          verifyOutcome.matches.some(m => m.status === 'locked')
+                          ? 'Match confirmed — locked on Nimiq'
+                          : 'Fingerprint matches'
+                        : activeStage?.verb ?? 'Continue'}
                 </h3>
                 <p className="muted action-blurb">
                   {step === 'done' && role === 'signer'
@@ -2283,10 +2315,16 @@ export function DocumentJourney({
                         'Your fields and wallet signature are recorded. Review them below; the creator locks when everyone has finished.')
                     : step === 'done'
                       ? 'Keep your file. Drop a copy below anytime to verify the fingerprint.'
-                      : activeStage?.blurb}
+                      : step === 'verify' && verifyMatched
+                        ? verifyPartyView
+                          ? 'Your local file matches. Open the signed document and recorded ink below.'
+                          : 'Your local file matches a VeriLock record. Details below.'
+                        : activeStage?.blurb}
                 </p>
               </div>
-              {activeStage && !(step === 'done' && role === 'creator') && (
+              {activeStage &&
+                !(step === 'done' && role === 'creator') &&
+                !(step === 'verify' && verifyMatched) && (
                 <p className="action-privacy">
                   <Shield size={14} strokeWidth={2.25} aria-hidden />
                   {activeStage.privacyNote}
@@ -3624,22 +3662,23 @@ export function DocumentJourney({
                             {doc.sealed ? (
                               <>
                                 This agreement is locked on Nimiq. Your wallet signature and page
-                                fields are part of the record
-                                {doc.source.attestation?.explorerUrl ? (
-                                  <>
-                                    {' '}
-                                    ·{' '}
-                                    <a
-                                      className="inline-link"
-                                      href={doc.source.attestation.explorerUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      View on explorer
-                                    </a>
-                                  </>
-                                ) : null}
-                                .
+                                fields are part of the record.{' '}
+                                <span className="result-banner-chain">
+                                  Anchored on Nimiq
+                                  {doc.source.attestation?.explorerUrl ? (
+                                    <>
+                                      {' · '}
+                                      <a
+                                        className="inline-link"
+                                        href={doc.source.attestation.explorerUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        View on-chain attestation
+                                      </a>
+                                    </>
+                                  ) : null}
+                                </span>
                               </>
                             ) : allSigned(doc) || doc.readyToLock ? (
                               <>
@@ -3770,18 +3809,25 @@ export function DocumentJourney({
                                   Drop any copy of <em>{doc.fileName}</em> to check integrity.
                                 </>
                               )}
-                              {doc.source.attestation?.explorerUrl ? (
+                              {doc.sealed ? (
                                 <>
                                   {' '}
-                                  ·{' '}
-                                  <a
-                                    className="inline-link"
-                                    href={doc.source.attestation.explorerUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                  >
-                                    View on explorer
-                                  </a>
+                                  <span className="result-banner-chain">
+                                    Anchored on Nimiq
+                                    {doc.source.attestation?.explorerUrl ? (
+                                      <>
+                                        {' · '}
+                                        <a
+                                          className="inline-link"
+                                          href={doc.source.attestation.explorerUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                        >
+                                          View on-chain attestation
+                                        </a>
+                                      </>
+                                    ) : null}
+                                  </span>
                                 </>
                               ) : null}
                             </>
@@ -3806,18 +3852,26 @@ export function DocumentJourney({
                     </button>
                   )}
 
-                  {/* Parties only: roster names. Public verify gets address+time below. */}
+                  {/*
+                    Done (not signer) without a live verify match: party roster only when we
+                    are not about to show Recorded signatures (avoids name+address twice).
+                  */}
                   {doc &&
                     !doc.directSeal &&
                     role !== 'signer' &&
                     revealParticipantPrivate &&
-                    (step === 'done' || (step === 'verify' && doc.sealed)) && (
-                    <PartyList doc={doc} revealNames={revealParticipantPrivate} />
-                  )}
+                    step === 'done' &&
+                    !verifyMatched &&
+                    doc.source.signatures.length === 0 && (
+                      <PartyList doc={doc} revealNames={revealParticipantPrivate} />
+                    )}
+
+                  {/* Pre-match sealed doc: one signatures list (not PartyList + panel). */}
                   {doc &&
                     role !== 'signer' &&
                     doc.source.signatures.length > 0 &&
-                    (step === 'done' || (step === 'verify' && doc.sealed)) && (
+                    (step === 'done' || (step === 'verify' && doc.sealed)) &&
+                    !verifyMatched && (
                       <SignaturesPanel
                         signatures={doc.source.signatures}
                         parties={doc.source.parties}
@@ -3826,28 +3880,9 @@ export function DocumentJourney({
                       />
                     )}
 
-                  {/* Invitees on Done have their own review UI above — skip the bare verify drop. */}
+                  {/* Drop zone until a party match replaces it with the signed PDF. */}
                   {(step === 'verify' || (step === 'done' && role !== 'signer')) &&
-                    !(
-                      verifyFile &&
-                      verifyOutcome.kind === 'match' &&
-                      token &&
-                      address &&
-                      verifyOutcome.matches.some(m => {
-                        if (m.participantDetailsRevealed === true) return true
-                        const me = normalizeAddress(address)
-                        if (normalizeAddress(m.creatorAddress) === me) return true
-                        if (
-                          m.signatures.some(s => normalizeAddress(s.signerAddress) === me)
-                        ) {
-                          return true
-                        }
-                        return m.parties.some(
-                          p =>
-                            p.walletAddress && normalizeAddress(p.walletAddress) === me,
-                        )
-                      })
-                    ) && (
+                    !verifyPartyView && (
                     <DocumentStage
                       step={step}
                       doc={doc}
@@ -3857,49 +3892,8 @@ export function DocumentJourney({
                     />
                   )}
 
-                  {/* Involved party with a match: compact file control under the signed PDF. */}
                   {(step === 'verify' || (step === 'done' && role !== 'signer')) &&
-                    verifyFile &&
-                    verifyOutcome.kind === 'match' &&
-                    token &&
-                    address &&
-                    verifyOutcome.matches.some(m => {
-                      if (m.participantDetailsRevealed === true) return true
-                      const me = normalizeAddress(address)
-                      if (normalizeAddress(m.creatorAddress) === me) return true
-                      if (m.signatures.some(s => normalizeAddress(s.signerAddress) === me)) {
-                        return true
-                      }
-                      return m.parties.some(
-                        p => p.walletAddress && normalizeAddress(p.walletAddress) === me,
-                      )
-                    }) && (
-                      <div className="verify-file-bar">
-                        <span className="muted verify-file-bar-label">
-                          Local file: <strong>{verifyFile.name}</strong>
-                        </span>
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          onClick={() => {
-                            setVerifyFile(null)
-                            setVerifyOutcome({ kind: 'idle' })
-                            verifyCacheRef.current = null
-                          }}
-                        >
-                          Choose a different file
-                        </button>
-                      </div>
-                    )}
-
-                  {(step === 'verify' || (step === 'done' && role !== 'signer')) &&
-                    !(
-                      verifyFile &&
-                      verifyOutcome.kind === 'match' &&
-                      token &&
-                      address &&
-                      verifyOutcome.matches.some(m => m.participantDetailsRevealed === true)
-                    ) && (
+                    !verifyMatched && (
                     <p className="muted" style={{ margin: 0 }}>
                       We hash the file locally, then look up sealed fingerprints on the server.
                     </p>
@@ -3955,8 +3949,14 @@ export function DocumentJourney({
                     <>
                       {(() => {
                         const lockedMatch =
-                          verifyOutcome.matches.find(m => m.status === 'locked') ?? null
+                          verifyOutcome.matches.find(m => m.status === 'locked') ??
+                          null
                         const anyLocked = Boolean(lockedMatch)
+                        const explorer =
+                          verifyOutcome.explorerUrl ||
+                          lockedMatch?.attestation?.explorerUrl ||
+                          null
+                        // Header already says match confirmed — keep this banner tight.
                         return (
                           <div
                             className={`result-banner result-banner--ok${
@@ -3970,49 +3970,37 @@ export function DocumentJourney({
                               <ShieldCheck size={18} strokeWidth={2.5} aria-hidden />
                             )}
                             <div>
-                              <strong>
-                                {anyLocked
-                                  ? verifyOutcome.matches.length === 1
-                                    ? 'Match confirmed — locked on Nimiq'
-                                    : `Match confirmed — locked on Nimiq (${verifyOutcome.matches.length} records)`
-                                  : verifyOutcome.matches.length === 1
-                                    ? 'Fingerprint matches this agreement'
-                                    : `Fingerprint matches ${verifyOutcome.matches.length} agreements`}
-                              </strong>
-                              {verifyOutcome.title ? ` · ${verifyOutcome.title}` : ''}
-                              {anyLocked ? (
-                                <p className="result-banner-detail muted">
-                                  Your local copy matches the sealed fingerprint. This agreement is
-                                  permanently anchored on the blockchain
-                                  {lockedMatch?.lockedAt
-                                    ? ` (${new Date(lockedMatch.lockedAt).toLocaleString()})`
-                                    : ''}
-                                  . No wallet required.
-                                </p>
+                              {verifyOutcome.title ? (
+                                <strong>{verifyOutcome.title}</strong>
                               ) : (
-                                <p className="result-banner-detail muted">
-                                  Fingerprint matches a VeriLock record that is not locked on-chain
-                                  yet.
-                                </p>
+                                <strong>
+                                  {anyLocked
+                                    ? 'Locked on Nimiq'
+                                    : 'Match found (not locked yet)'}
+                                </strong>
                               )}
                               <p className="result-banner-meta">
-                                {verifyOutcome.fileName} ·{' '}
                                 <code className="mono">{verifyOutcome.fingerprint}</code>
+                                {lockedMatch?.lockedAt
+                                  ? ` · ${new Date(lockedMatch.lockedAt).toLocaleString()}`
+                                  : null}
                               </p>
-                              {(verifyOutcome.explorerUrl || lockedMatch?.attestation?.explorerUrl) && (
-                                <p className="result-banner-meta">
-                                  <a
-                                    className="inline-link"
-                                    href={
-                                      verifyOutcome.explorerUrl ||
-                                      lockedMatch?.attestation?.explorerUrl ||
-                                      '#'
-                                    }
-                                    target="_blank"
-                                    rel="noreferrer"
-                                  >
-                                    View on-chain attestation
-                                  </a>
+                              {anyLocked && (
+                                <p className="result-banner-meta result-banner-chain">
+                                  <span>Anchored on Nimiq</span>
+                                  {explorer ? (
+                                    <>
+                                      {' · '}
+                                      <a
+                                        className="inline-link"
+                                        href={explorer}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        View on-chain attestation
+                                      </a>
+                                    </>
+                                  ) : null}
                                 </p>
                               )}
                             </div>
@@ -4020,45 +4008,23 @@ export function DocumentJourney({
                         )
                       })()}
 
-                      {/* Involved party: full PDF with signatures (same surface as create/sign). */}
-                      {verifyFile &&
+                      {/* Involved party: full PDF with page fields. */}
+                      {verifyPartyView &&
+                        verifyFile &&
+                        verifyPartyMatch &&
                         token &&
                         (() => {
-                          // Prefer server reveal flag; also allow local wallet match so a
-                          // just-connected party still qualifies while details refresh.
-                          const partyMatch =
-                            verifyOutcome.matches.find(m => {
-                              if (m.participantDetailsRevealed === true) return true
-                              if (!address) return false
-                              const me = normalizeAddress(address)
-                              if (normalizeAddress(m.creatorAddress) === me) return true
-                              if (
-                                m.signatures.some(
-                                  s => normalizeAddress(s.signerAddress) === me,
-                                )
-                              ) {
-                                return true
-                              }
-                              return m.parties.some(
-                                p =>
-                                  p.walletAddress &&
-                                  normalizeAddress(p.walletAddress) === me,
-                              )
-                            }) ?? null
-                          if (!partyMatch) return null
-                          // Placement plans are indexed by original PDF hash (not final/lock hash).
-                          const planHash = partyMatch.originalSha256
-                          // Prefer full document payload when it matches (images unlocked).
-                          const sigs =
+                          const planHash = verifyPartyMatch.originalSha256
+                          const sameDoc =
                             doc &&
-                            (doc.slug === partyMatch.slug || doc.fingerprint === planHash)
-                              ? doc.source.signatures
-                              : partyMatch.signatures
-                          const partyList =
-                            doc &&
-                            (doc.slug === partyMatch.slug || doc.fingerprint === planHash)
-                              ? doc.source.parties
-                              : partyMatch.parties
+                            (doc.slug === verifyPartyMatch.slug ||
+                              doc.fingerprint === planHash)
+                          const sigs = sameDoc
+                            ? doc!.source.signatures
+                            : verifyPartyMatch.signatures
+                          const partyList = sameDoc
+                            ? doc!.source.parties
+                            : verifyPartyMatch.parties
                           return (
                             <SignedDocumentView
                               className="signed-document-view signed-document-view--primary"
@@ -4067,11 +4033,7 @@ export function DocumentJourney({
                               authToken={token}
                               revealPrivate
                               documentAnnotations={
-                                doc &&
-                                (doc.slug === partyMatch.slug ||
-                                  doc.fingerprint === planHash)
-                                  ? doc.source.annotations
-                                  : null
+                                sameDoc ? doc!.source.annotations : null
                               }
                               signatures={sigs}
                               parties={partyList}
@@ -4079,7 +4041,54 @@ export function DocumentJourney({
                           )
                         })()}
 
-                      {verifyOutcome.matches.length > 0 ? (
+                      {/* One signatures list for the primary match (not PartyList + panel + matches). */}
+                      {(() => {
+                        const primary =
+                          verifyPartyMatch ??
+                          verifyOutcome.matches.find(m => m.status === 'locked') ??
+                          verifyOutcome.matches[0] ??
+                          null
+                        if (!primary || primary.signatures.length === 0) return null
+                        const sameDoc =
+                          doc &&
+                          (doc.slug === primary.slug ||
+                            doc.fingerprint === primary.originalSha256)
+                        return (
+                          <SignaturesPanel
+                            signatures={
+                              sameDoc ? doc!.source.signatures : primary.signatures
+                            }
+                            parties={sameDoc ? doc!.source.parties : primary.parties}
+                            revealPrivate={
+                              Boolean(verifyPartyView) ||
+                              canRevealParticipantDetails(primary, address)
+                            }
+                            authToken={token}
+                          />
+                        )
+                      })()}
+
+                      {verifyPartyView && verifyFile && (
+                        <div className="verify-file-bar">
+                          <span className="muted verify-file-bar-label">
+                            Local file: <strong>{verifyFile.name}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => {
+                              setVerifyFile(null)
+                              setVerifyOutcome({ kind: 'idle' })
+                              verifyCacheRef.current = null
+                            }}
+                          >
+                            Choose a different file
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Multi-match: pick among records. Single match: skip heavy card (banner + sigs enough). */}
+                      {verifyOutcome.matches.length > 1 ? (
                         <div className="journey-verify-details">
                           <VerifyMatchesPanel
                             matches={verifyOutcome.matches}
@@ -4089,6 +4098,8 @@ export function DocumentJourney({
                             highlightSlug={verifyOutcome.matches[0]?.slug}
                             walletAddress={address}
                             authToken={token}
+                            hideSignatures
+                            hideLockedCallout
                           />
                           <div className="journey-verify-actions">
                             {verifyOutcome.matches.map(m => (
@@ -4100,31 +4111,17 @@ export function DocumentJourney({
                                   window.history.pushState({}, '', `/d/${m.slug}`)
                                   void (async () => {
                                     try {
-                                      const { document } = await api.getDocument(m.slug, token)
+                                      const { document } = await api.getDocument(
+                                        m.slug,
+                                        token,
+                                      )
                                       setActiveFromSeal(document)
                                       setSharedAck(true)
                                       setRole(
-                                        document.status === 'locked' ? 'verifier' : 'signer',
+                                        document.status === 'locked'
+                                          ? 'verifier'
+                                          : 'signer',
                                       )
-                                      if (document.status === 'locked') {
-                                        setVerifyOutcome(prev =>
-                                          prev.kind === 'match'
-                                            ? prev
-                                            : {
-                                                kind: 'match',
-                                                fingerprint: shortHash(
-                                                  document.finalSha256 ??
-                                                    document.originalSha256,
-                                                ),
-                                                fileName:
-                                                  document.originalFilename ?? document.title,
-                                                title: document.title,
-                                                explorerUrl:
-                                                  document.attestation?.explorerUrl,
-                                                matches: verifyOutcome.matches,
-                                              },
-                                        )
-                                      }
                                       window.scrollTo({ top: 0, behavior: 'smooth' })
                                     } catch (err) {
                                       setLocalError(
@@ -4141,12 +4138,7 @@ export function DocumentJourney({
                             ))}
                           </div>
                         </div>
-                      ) : (
-                        <p className="muted" style={{ margin: 0 }}>
-                          Match found - loading agreement details failed. Try the document link
-                          from the creator, or refresh.
-                        </p>
-                      )}
+                      ) : null}
                     </>
                   )}
 

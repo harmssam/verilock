@@ -417,8 +417,12 @@ export function SignerFillView({
     setLocalError(null)
     const fills: SignerFillResult['fills'] = []
     let printedName: string | undefined
-    let inkPath: SignaturePathData | undefined
-    let imageDataUrl: string | undefined
+    /** Full signature stroke only — never overwrite with initials. */
+    let signaturePath: SignaturePathData | undefined
+    let signatureImageDataUrl: string | undefined
+    /** Initials as last-resort wallet image when the plan has no signature box. */
+    let initialPath: SignaturePathData | undefined
+    let initialImageDataUrl: string | undefined
 
     for (const slot of myFillable) {
       if (isServerFilled(slot.id)) continue
@@ -443,8 +447,17 @@ export function SignerFillView({
           personSlotIndex,
           payload: { kind: 'ink', path: draft.path },
         })
-        inkPath = draft.path
-        if (draft.imageDataUrl) imageDataUrl = draft.imageDataUrl
+        // Bug fix: looping signature then initial used to leave initials as the
+        // recorded party image in SignaturesPanel (last ink wins). Prefer signature.
+        if (slot.kind === 'signature') {
+          signaturePath = draft.path
+          if (draft.imageDataUrl) signatureImageDataUrl = draft.imageDataUrl
+        } else if (slot.kind === 'initial') {
+          if (!initialPath) {
+            initialPath = draft.path
+            if (draft.imageDataUrl) initialImageDataUrl = draft.imageDataUrl
+          }
+        }
       } else {
         const t = draft.text.trim()
         if (!t) {
@@ -464,6 +477,15 @@ export function SignerFillView({
         if (slot.kind === 'name' && !printedName) printedName = t
       }
     }
+
+    // Shared full signature is authoritative when present (covers reuse across boxes).
+    if (sharedInk?.path?.strokes?.length) {
+      signaturePath = sharedInk.path
+      if (sharedInk.imageDataUrl) signatureImageDataUrl = sharedInk.imageDataUrl
+    }
+
+    const inkPath = signaturePath ?? initialPath
+    const imageDataUrl = signatureImageDataUrl ?? initialImageDataUrl
 
     if (fills.length === 0) {
       setSubmitting(true)

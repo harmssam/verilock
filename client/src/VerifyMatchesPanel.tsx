@@ -21,6 +21,10 @@ interface VerifyMatchesPanelProps {
   authToken?: string | null
   deletingId?: string | null
   onDelete?: (match: VerifyResult) => void
+  /** When true, omit embedded signatures (parent already shows one list). */
+  hideSignatures?: boolean
+  /** When true, omit sealed callout (parent banner already covers lock + explorer). */
+  hideLockedCallout?: boolean
 }
 
 export function VerifyMatchesPanel({
@@ -31,6 +35,8 @@ export function VerifyMatchesPanel({
   authToken = null,
   deletingId = null,
   onDelete,
+  hideSignatures = false,
+  hideLockedCallout = false,
 }: VerifyMatchesPanelProps) {
   if (matches.length === 0) return null
 
@@ -78,7 +84,7 @@ export function VerifyMatchesPanel({
               </div>
               <h3 className="verify-match-title">{match.title}</h3>
 
-              {locked && (
+              {locked && !hideLockedCallout && (
                 <div className="verify-match-locked-callout" role="status">
                   <Lock size={18} strokeWidth={2.25} aria-hidden />
                   <div>
@@ -86,14 +92,15 @@ export function VerifyMatchesPanel({
                     <p>
                       Your local file matches this agreement&apos;s fingerprint. The hash is
                       permanently locked on-chain
-                      {match.lockedAt
-                        ? ` · ${formatTimestamp(match.lockedAt)}`
-                        : ''}
+                      {match.lockedAt ? ` · ${formatTimestamp(match.lockedAt)}` : ''}.
+                    </p>
+                    <p className="verify-match-chain">
+                      <span>Anchored on Nimiq</span>
                       {explorerUrl ? (
                         <>
                           {' · '}
                           <a href={explorerUrl} target="_blank" rel="noreferrer">
-                            View attestation
+                            View on-chain attestation
                             <ExternalLink
                               size={12}
                               strokeWidth={2.25}
@@ -107,7 +114,6 @@ export function VerifyMatchesPanel({
                           </a>
                         </>
                       ) : null}
-                      . No wallet required to verify integrity.
                     </p>
                   </div>
                 </div>
@@ -139,7 +145,7 @@ export function VerifyMatchesPanel({
                   </dd>
                 </div>
               </dl>
-              {match.signatures.length > 0 && (
+              {!hideSignatures && match.signatures.length > 0 && (
                 <SignaturesPanel
                   signatures={match.signatures}
                   parties={match.parties}
