@@ -6,19 +6,19 @@ import './PdfAnnotator.css'
 interface PdfReconstructorProps {
   file: File
   annotations: PdfAnnotation[]
-  /** CSS target width for each page (default 560) */
+  /** CSS target width for each page (default 640 — matches signing surface). */
   pageWidth?: number
   className?: string
 }
 
 /**
  * Reconstruct a sealed view: original local document + server annotations overlaid.
- * Positions use normalized coords. Supports PDF and single-page images.
+ * Uses the same stage chrome as PlacementEditor / SignerFillView.
  */
 export function PdfReconstructor({
   file,
   annotations,
-  pageWidth = 560,
+  pageWidth = 640,
   className,
 }: PdfReconstructorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -55,13 +55,14 @@ export function PdfReconstructor({
           if (cancelled || !containerRef.current) return
           const wrap = document.createElement('div')
           wrap.className = 'pdf-annotator-page-wrap'
-          wrap.style.marginBottom = '1rem'
+          wrap.style.width = `${rendered.cssWidth}px`
+          wrap.style.marginBottom = pageNum < surface.pageCount ? '1rem' : '0'
           wrap.appendChild(rendered.canvas)
           containerRef.current.appendChild(wrap)
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Could not reconstruct document view')
+          setError(err instanceof Error ? err.message : 'Could not open document view')
         }
       } finally {
         surface?.destroy()
@@ -76,19 +77,24 @@ export function PdfReconstructor({
   }, [file, annotations, pageWidth])
 
   return (
-    <div className={className ?? 'pdf-annotator'}>
-      {loading && <p className="pdf-annotator-hint">Reconstructing sealed view…</p>}
+    <div className={className ?? 'pdf-annotator signed-doc-recon'}>
+      {loading && <p className="pdf-annotator-hint">Opening document…</p>}
       {error && (
         <p className="pdf-annotator-error" role="alert">
           {error}
         </p>
       )}
-      <div ref={containerRef} />
+      <div className="pdf-annotator-stage signed-doc-recon-stage">
+        <div ref={containerRef} />
+        {!loading && !error && pageCount === 0 && (
+          <p className="pdf-annotator-hint muted">No pages to display.</p>
+        )}
+      </div>
       {!loading && !error && pageCount > 0 && (
         <p className="pdf-annotator-hint muted">
           {pageCount} page{pageCount === 1 ? '' : 's'}
           {annotations.length > 0
-            ? ' · local file + recorded signatures and fields'
+            ? ' · local file with signatures and fields on the page'
             : ' · local file'}
         </p>
       )}

@@ -1793,6 +1793,30 @@ a.exp-account-menu-full:focus-visible {
   gap: 0.75rem;
 }
 
+/* After party verify match: compact local-file row under signed PDF */
+.verify-file-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
+  background: rgba(13, 148, 136, 0.04);
+}
+
+.verify-file-bar-label {
+  font-size: 0.84rem;
+  line-height: 1.35;
+  min-width: 0;
+}
+
+.verify-file-bar-label strong {
+  color: var(--lr-text, var(--text, #0f172a));
+  word-break: break-all;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -2589,7 +2613,7 @@ a.hash-chip.text-link:focus-visible {
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.8rem;
-  color: var(--mint);
+  color: var(--mint-deep, #0f766e);
 }
 
 .done-banner,
@@ -2642,9 +2666,40 @@ a.hash-chip.text-link:focus-visible {
 }
 
 .result-banner--ok {
-  background: rgba(94, 234, 212, 0.1);
-  border: 1px solid rgba(94, 234, 212, 0.3);
-  color: var(--mint);
+  background: rgba(13, 148, 136, 0.08);
+  border: 1px solid rgba(13, 148, 136, 0.28);
+  color: var(--mint-deep, #0f766e);
+}
+
+.result-banner--locked {
+  background:
+    linear-gradient(135deg, rgba(13, 148, 136, 0.12), rgba(101, 163, 13, 0.06));
+  border-color: rgba(13, 148, 136, 0.4);
+  box-shadow: 0 0 0 1px rgba(13, 148, 136, 0.06);
+}
+
+.result-banner--locked strong {
+  color: var(--mint-deep, #0f766e);
+  font-size: 0.95rem;
+}
+
+.result-banner-detail {
+  margin: 0.35rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--lr-muted, var(--text-muted, #4b5c6b));
+}
+
+.result-banner-meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--lr-text, var(--text, #0f172a));
+}
+
+.result-banner--ok .mono,
+.result-banner--locked .mono {
+  color: var(--mint-deep, #0f766e);
 }
 
 .result-banner--bad {
@@ -3088,8 +3143,10 @@ a.hash-chip.text-link:focus-visible {
 .verify-result-card {
   padding: 0.9rem 1rem;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(125, 211, 252, 0.35);
-  background: linear-gradient(135deg, rgba(125, 211, 252, 0.1), rgba(94, 234, 212, 0.06));
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
+  background: #ffffff;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  color: var(--lr-text, var(--text, #0f172a));
 }
 
 .verify-result-head {
@@ -3097,7 +3154,7 @@ a.hash-chip.text-link:focus-visible {
   align-items: center;
   gap: 0.45rem;
   margin-bottom: 0.45rem;
-  color: var(--sky);
+  color: var(--mint-deep, #0f766e);
 }
 
 .verify-result-card p {
@@ -5374,9 +5431,10 @@ a.hash-chip.text-link:focus-visible {
 }
 
 .verify-result-card {
-  background: linear-gradient(135deg, rgba(13, 148, 136, 0.08), rgba(13, 148, 136, 0.03));
-    border-color: rgba(13, 148, 136, 0.28);
-    color: var(--lr-text);
+  background: #ffffff;
+  border-color: var(--lr-line, rgba(15, 23, 42, 0.1));
+  color: var(--lr-text);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
 }
 
 /* Post-seal / verify “review”: match cards were dark glass → muddy grey slabs */
@@ -5395,6 +5453,20 @@ a.hash-chip.text-link:focus-visible {
   background: rgba(13, 148, 136, 0.08);
     border-color: rgba(13, 148, 136, 0.28);
     color: var(--mint-deep, #0f766e);
+}
+
+.result-banner--locked {
+  background:
+    linear-gradient(135deg, rgba(13, 148, 136, 0.12), rgba(101, 163, 13, 0.06));
+  border-color: rgba(13, 148, 136, 0.4);
+}
+
+.result-banner-detail {
+  color: var(--lr-muted);
+}
+
+.result-banner-meta {
+  color: var(--lr-text);
 }
 
 .result-banner--bad {
