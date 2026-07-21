@@ -1,0 +1,32 @@
+.signed-document-view {
+  margin: 0.75rem 0 0;
+  padding: 0.9rem 0 0;
+  border-top: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
+}
+
+.signed-document-view-head {
+  margin: 0 0 0.75rem;
+}
+
+.signed-document-view-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--lr-text, var(--text, #0f172a));
+}
+
+.signed-document-view-lead {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.signed-document-view-note {
+  margin: 0.65rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.signed-document-view-recon.pdf-annotator {
+  margin-top: 0.35rem;
+}

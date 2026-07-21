@@ -82,7 +82,9 @@ import { formatFileSize } from './PdfDropZone'
 import { SignaturePad } from './SignaturePad'
 import { SignOnMobileModal, isLikelyMobileViewport } from './SignOnMobileModal'
 import { StageRail } from './StageRail'
+import { CancelAgreementModal } from './CancelAgreementModal'
 import { PlacementEditor } from '../pdf/PlacementEditor'
+import { SignedDocumentView } from '../pdf/SignedDocumentView'
 import { SignerFillView, type SignerFillResult } from '../pdf/SignerFillView'
 import {
   buildFillBatch,
@@ -262,6 +264,10 @@ export function DocumentJourney({
   const [creditsRefresh, setCreditsRefresh] = useState(0)
   /** Deep-link /d/ or /v/ slug that does not resolve on the server. */
   const [missingDeepLink, setMissingDeepLink] = useState<string | null>(null)
+  /** Creator cancel confirmation (in-progress, no signatures yet). */
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancelBusy, setCancelBusy] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
   const fileSizeByDocIdRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
@@ -958,7 +964,9 @@ export function DocumentJourney({
       return
     }
 
-    const fileKey = `${verifyFile.name}:${verifyFile.size}:${verifyFile.lastModified}`
+    // Include session in cache key so connecting as a party re-fetches private details.
+    const fileOnlyKey = `${verifyFile.name}:${verifyFile.size}:${verifyFile.lastModified}`
+    const fileKey = `${fileOnlyKey}:${token ?? ''}`
     const cached = verifyCacheRef.current
     if (cached?.key === fileKey) {
       setVerifyOutcome(cached.outcome)
@@ -966,7 +974,14 @@ export function DocumentJourney({
     }
 
     const runId = ++verifyRunIdRef.current
-    setVerifyOutcome({ kind: 'hashing' })
+    // Same file, new session: keep match UI while private details upgrade.
+    const upgradingAuth =
+      cached != null &&
+      cached.key.startsWith(`${fileOnlyKey}:`) &&
+      cached.outcome.kind === 'match'
+    if (!upgradingAuth) {
+      setVerifyOutcome({ kind: 'hashing' })
+    }
     setLocalError(null)
 
     void (async () => {
@@ -1293,7 +1308,7 @@ export function DocumentJourney({
     let cancelled = false
     setPlanLoadState('loading')
     void api
-      .getPlacementPlan(doc.fingerprint)
+      .getPlacementPlan(doc.fingerprint, token)
       .then(r => {
         if (cancelled) return
         if (!r.plan) {
@@ -1347,7 +1362,7 @@ export function DocumentJourney({
     return () => {
       cancelled = true
     }
-  }, [doc?.id, doc?.fingerprint])
+  }, [doc?.id, doc?.fingerprint, token])
 
   /**
    * Seed a draft plan only after we know the server has none (create / arrange path).
@@ -1625,7 +1640,7 @@ export function DocumentJourney({
               lastBatchRoot ||
               planRoot ||
               '0000000000000000000000000000000000000000000000000000000000000000'
-            const live = await api.getPlacementPlan(hash)
+            const live = await api.getPlacementPlan(hash, token)
             batchIndex = (live.fillBatchCount ?? 0) + 1
             prev = live.lastBatchRoot || live.batch0Root || live.planRoot || prev
             known = new Set(live.knownBlobIds ?? [])
@@ -1910,17 +1925,29 @@ export function DocumentJourney({
     }
   }
 
-  /** Creator-only: cancel before anyone has signed. */
-  const cancelCurrentAgreement = async () => {
+  /** Creator-only: open cancel confirm (before anyone has signed). */
+  const requestCancelCurrentAgreement = () => {
     if (!token || !doc || !canDeleteDocument(doc.source, address)) return
-    const ok = window.confirm(
-      `Cancel “${doc.title}”? This removes the agreement permanently. Only possible before anyone signs.`,
-    )
-    if (!ok) return
+    setCancelError(null)
+    setCancelModalOpen(true)
+  }
+
+  const closeCancelModal = () => {
+    if (cancelBusy) return
+    setCancelModalOpen(false)
+    setCancelError(null)
+  }
+
+  /** Creator-only: cancel after modal confirm. */
+  const confirmCancelCurrentAgreement = async () => {
+    if (!token || !doc || !canDeleteDocument(doc.source, address)) return
+    setCancelBusy(true)
     setBusy(true)
+    setCancelError(null)
     setLocalError(null)
     try {
       await api.deleteDocument(token, doc.id)
+      setCancelModalOpen(false)
       setDoc(null)
       setSharedAck(false)
       setSignFile(null)
@@ -1933,8 +1960,11 @@ export function DocumentJourney({
       window.history.pushState({}, '', '/')
       setLockMessage(null)
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'Could not cancel agreement')
+      const message = err instanceof Error ? err.message : 'Could not cancel agreement'
+      setCancelError(message)
+      setLocalError(message)
     } finally {
+      setCancelBusy(false)
       setBusy(false)
     }
   }
@@ -2596,11 +2626,11 @@ export function DocumentJourney({
                   {canCancelCurrent && (
                     <button
                       type="button"
-                      className={`btn btn-ghost${busy ? ' btn--busy' : ''}`}
-                      disabled={busy}
-                      onClick={() => void cancelCurrentAgreement()}
+                      className={`btn btn-ghost${busy || cancelBusy ? ' btn--busy' : ''}`}
+                      disabled={busy || cancelBusy}
+                      onClick={requestCancelCurrentAgreement}
                     >
-                      {busy ? (
+                      {cancelBusy ? (
                         <>
                           <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
                           Cancelling…
@@ -2666,9 +2696,9 @@ export function DocumentJourney({
                       {canCancelCurrent && role === 'creator' && (
                         <button
                           type="button"
-                          className={`btn btn-ghost${busy ? ' btn--busy' : ''}`}
-                          disabled={busy}
-                          onClick={() => void cancelCurrentAgreement()}
+                          className={`btn btn-ghost${busy || cancelBusy ? ' btn--busy' : ''}`}
+                          disabled={busy || cancelBusy}
+                          onClick={requestCancelCurrentAgreement}
                         >
                           <Trash2 size={16} strokeWidth={2.25} aria-hidden />
                           Cancel agreement
@@ -3650,11 +3680,10 @@ export function DocumentJourney({
                           aria-labelledby="signer-review-layout-title"
                         >
                           <header className="signatures-config-head">
-                            <h3 id="signer-review-layout-title">Designed document layout</h3>
+                            <h3 id="signer-review-layout-title">Signed document</h3>
                             <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-                              The organizer placed signature and initial boxes on the PDF. VeriLock
-                              never hosts the file — drop the same document you signed to see that
-                              layout. Your ink appears under Recorded signatures above.
+                              Drop the same file you signed to see signatures, initials, and text
+                              fields on the page. Read only — the file never leaves this device.
                             </p>
                           </header>
                           <DocumentStage
@@ -3687,41 +3716,14 @@ export function DocumentJourney({
                                 document the creator shared (<strong>{doc.fileName}</strong>).
                               </div>
                             )}
-                          {hasVerifiedLocalPdf &&
-                            planLoadState === 'loading' && (
-                              <div className="result-banner result-banner--ok">
-                                <LoaderCircle
-                                  className="btn-spinner"
-                                  size={16}
-                                  strokeWidth={2.5}
-                                />
-                                Loading field layout…
-                              </div>
-                            )}
-                          {hasVerifiedLocalPdf &&
-                            constructionPlan &&
-                            planLoadState === 'ready' &&
-                            (signFile || pdfFile) && (
-                              <PlacementEditor
-                                file={(signFile ?? pdfFile)!}
-                                plan={
-                                  constructionPlan.status === 'locked'
-                                    ? constructionPlan
-                                    : { ...constructionPlan, status: 'locked' }
-                                }
-                                onChange={() => {
-                                  /* review only */
-                                }}
-                                disabled
-                                reviewMode
-                                filledSlotIds={filledSlotIds}
-                              />
-                            )}
-                          {hasVerifiedLocalPdf && planLoadState === 'none' && (
-                            <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-                              No field layout is stored for this fingerprint (it may have been signed
-                              without placement boxes). Your wallet signature is still recorded above.
-                            </p>
+                          {hasVerifiedLocalPdf && (signFile || pdfFile) && (
+                            <SignedDocumentView
+                              file={(signFile ?? pdfFile)!}
+                              fingerprint={doc.fingerprint}
+                              authToken={token}
+                              revealPrivate={revealParticipantPrivate}
+                              documentAnnotations={doc.source.annotations}
+                            />
                           )}
                         </section>
                       )}
@@ -3801,9 +3803,11 @@ export function DocumentJourney({
                     </button>
                   )}
 
+                  {/* Parties only: roster names. Public verify gets address+time below. */}
                   {doc &&
                     !doc.directSeal &&
                     role !== 'signer' &&
+                    revealParticipantPrivate &&
                     (step === 'done' || (step === 'verify' && doc.sealed)) && (
                     <PartyList doc={doc} revealNames={revealParticipantPrivate} />
                   )}
@@ -3912,6 +3916,52 @@ export function DocumentJourney({
                         </div>
                       </div>
 
+                      {/* Involved party: show full signed document (local file + ink/text). */}
+                      {verifyFile &&
+                        FEATURES.pdfAnnotationUi &&
+                        token &&
+                        (() => {
+                          // Prefer server reveal flag; also allow local wallet match so a
+                          // just-connected party still qualifies while details refresh.
+                          const partyMatch =
+                            verifyOutcome.matches.find(m => {
+                              if (m.participantDetailsRevealed === true) return true
+                              if (!address) return false
+                              const me = normalizeAddress(address)
+                              if (normalizeAddress(m.creatorAddress) === me) return true
+                              if (
+                                m.signatures.some(
+                                  s => normalizeAddress(s.signerAddress) === me,
+                                )
+                              ) {
+                                return true
+                              }
+                              return m.parties.some(
+                                p =>
+                                  p.walletAddress &&
+                                  normalizeAddress(p.walletAddress) === me,
+                              )
+                            }) ?? null
+                          if (!partyMatch) return null
+                          // Placement plans are indexed by original PDF hash (not final/lock hash).
+                          const planHash = partyMatch.originalSha256
+                          return (
+                            <SignedDocumentView
+                              file={verifyFile}
+                              fingerprint={planHash}
+                              authToken={token}
+                              revealPrivate
+                              documentAnnotations={
+                                doc &&
+                                (doc.slug === partyMatch.slug ||
+                                  doc.fingerprint === planHash)
+                                  ? doc.source.annotations
+                                  : null
+                              }
+                            />
+                          )
+                        })()}
+
                       {verifyOutcome.matches.length > 0 ? (
                         <div className="journey-verify-details">
                           <VerifyMatchesPanel
@@ -4016,6 +4066,14 @@ export function DocumentJourney({
         role={role}
         open={howOpen}
         onToggle={() => setHowOpen(v => !v)}
+      />
+
+      <CancelAgreementModal
+        document={cancelModalOpen && doc ? doc.source : null}
+        busy={cancelBusy}
+        error={cancelError}
+        onClose={closeCancelModal}
+        onConfirm={() => void confirmCancelCurrentAgreement()}
       />
 
       {/*

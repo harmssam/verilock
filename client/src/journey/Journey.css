@@ -2199,7 +2199,7 @@ a.hash-chip.text-link:focus-visible {
 }
 
 .agreements-page-cancel:hover:not(:disabled) {
-  color: #fecdd3;
+  color: #b91c1c;
   background: rgba(251, 113, 133, 0.1);
 }
 
@@ -2214,6 +2214,229 @@ a.hash-chip.text-link:focus-visible {
 
   .agreements-page-cta {
     width: 100%;
+  }
+}
+
+/* ── Cancel agreement confirm modal ── */
+
+.cancel-agreement-layer {
+  z-index: 240;
+}
+
+.cancel-agreement-backdrop {
+  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(6px) saturate(0.7);
+  -webkit-backdrop-filter: blur(6px) saturate(0.7);
+}
+
+.cancel-agreement-modal {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  width: min(24.5rem, 100%);
+  max-height: min(88dvh, 40rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.05rem 1.1rem 1.1rem;
+  border-radius: var(--radius-md, 14px);
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
+  background: #ffffff;
+  box-shadow:
+    0 22px 48px rgba(15, 23, 42, 0.14),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+  color: var(--lr-text, var(--text, #0f172a));
+  text-align: left;
+  animation: exp-pop 0.18s ease;
+}
+
+.cancel-agreement-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+
+.cancel-agreement-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 12px;
+  color: #b91c1c;
+  background: rgba(251, 113, 133, 0.12);
+  border: 1px solid rgba(251, 113, 133, 0.28);
+}
+
+.cancel-agreement-head-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cancel-agreement-title {
+  margin: 0.1rem 0 0.3rem;
+  font-family: var(--font-display, inherit);
+  font-size: 1.12rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--lr-text, var(--text, #0f172a));
+}
+
+.cancel-agreement-lead {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.cancel-agreement-close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin: -0.15rem -0.2rem 0 0;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lr-muted, var(--text-muted, #4b5c6b));
+  cursor: pointer;
+}
+
+.cancel-agreement-close:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--lr-text, var(--text, #0f172a));
+}
+
+.cancel-agreement-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancel-agreement-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
+  background: rgba(15, 23, 42, 0.025);
+}
+
+.cancel-agreement-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.55rem;
+  min-width: 0;
+}
+
+.cancel-agreement-doc-title {
+  min-width: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.cancel-agreement-type {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
+  color: var(--lr-muted, var(--text-muted, #4b5c6b));
+}
+
+.cancel-agreement-filename,
+.cancel-agreement-meta {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.cancel-agreement-filename-value {
+  color: var(--lr-text, var(--text, #0f172a));
+  word-break: break-all;
+}
+
+.cancel-agreement-bullets {
+  margin: 0;
+  padding: 0 0 0 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--lr-muted, var(--text-muted, #4b5c6b));
+}
+
+.cancel-agreement-bullets li::marker {
+  color: rgba(185, 28, 28, 0.55);
+}
+
+.cancel-agreement-error {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(251, 113, 133, 0.35);
+  background: rgba(251, 113, 133, 0.08);
+  color: #9f1239;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.cancel-agreement-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+.cancel-agreement-actions .btn {
+  min-height: 2.4rem;
+}
+
+.cancel-agreement-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #9f1239;
+  background: rgba(251, 113, 133, 0.12);
+  border: 1px solid rgba(251, 113, 133, 0.4);
+}
+
+.cancel-agreement-confirm:hover:not(:disabled) {
+  color: #881337;
+  background: rgba(251, 113, 133, 0.2);
+  border-color: rgba(251, 113, 133, 0.55);
+}
+
+.cancel-agreement-confirm:focus-visible {
+  outline: 2px solid rgba(185, 28, 28, 0.45);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .cancel-agreement-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .cancel-agreement-actions .btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 

@@ -70,6 +70,21 @@
   transition: color 0.15s ease, text-decoration-color 0.15s ease;
 }
 
+.signatures-panel-address--primary {
+  font-weight: 650;
+  font-size: 0.95rem;
+  color: var(--lr-text, var(--text, #0f172a));
+  font-variant-numeric: tabular-nums;
+}
+
+.signatures-panel-item--public {
+  align-items: center;
+}
+
+.signatures-panel--public .signatures-panel-meta {
+  gap: 0.15rem;
+}
+
 .signatures-panel-address:hover,
 .signatures-panel-address:focus-visible {
   color: var(--lr-accent, var(--mint, #0d9488));

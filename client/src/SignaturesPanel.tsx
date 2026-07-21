@@ -88,27 +88,49 @@ export function SignaturesPanel({
   const partyById = new Map(parties.map(party => [party.id, party]))
   const showPrivate = revealPrivate
 
+  // Public / non-party: address + signed-at only (no names, roles, or ink).
+  if (!showPrivate) {
+    return (
+      <div
+        className={`signatures-panel signatures-panel--public${compact ? ' signatures-panel--compact' : ''}`}
+      >
+        <h3 className="signatures-panel-title">Signatures on this agreement</h3>
+        <ul className="signatures-panel-list">
+          {signatures.map(sig => {
+            const signedAt = new Date(sig.signedAt).toLocaleString()
+            return (
+              <li key={sig.id} className="signatures-panel-item signatures-panel-item--public">
+                <div className="signatures-panel-meta">
+                  <a
+                    className="signatures-panel-address signatures-panel-address--primary"
+                    href={buildNimiqAddressExplorerUrl(sig.signerAddress)}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={sig.signerAddress}
+                  >
+                    {shortAddress(sig.signerAddress)}
+                  </a>
+                  <span className="muted">{signedAt}</span>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    )
+  }
+
   return (
     <div className={`signatures-panel${compact ? ' signatures-panel--compact' : ''}`}>
-      <h3 className="signatures-panel-title">
-        {showPrivate ? 'Recorded signatures' : 'Signatures on this agreement'}
-      </h3>
-      {!showPrivate && (
-        <p className="muted signatures-panel-privacy-note">
-          Signer names and signature images are private. If you created this agreement or signed it,
-          connect with that same Nimiq wallet to unlock the full details.
-        </p>
-      )}
+      <h3 className="signatures-panel-title">Recorded signatures</h3>
       <ul className="signatures-panel-list">
         {signatures.map(sig => {
           const party = partyById.get(sig.partyId)
           const role = party ? formatPartyRole(party.role) : 'Signer'
           const signedAt = new Date(sig.signedAt).toLocaleString()
-          const name =
-            showPrivate && party?.displayName?.trim() ? party.displayName.trim() : null
+          const name = party?.displayName?.trim() ? party.displayName.trim() : null
           const label = name ?? role
-          const imageUrl = showPrivate ? sig.imageUrl : null
-          const hasHiddenImage = !showPrivate && Boolean(sig.hasImage ?? sig.imageUrl)
+          const imageUrl = sig.imageUrl ?? null
 
           return (
             <li key={sig.id} className="signatures-panel-item">
@@ -128,18 +150,8 @@ export function SignaturesPanel({
                   {' · '}
                   {signedAt}
                 </span>
-                {showPrivate && sig.signatureType === 'typed' && !imageUrl && (
+                {sig.signatureType === 'typed' && !imageUrl && (
                   <span className="signatures-panel-typed">Typed acknowledgment</span>
-                )}
-                {hasHiddenImage && (
-                  <span className="signatures-panel-typed">
-                    Signature image private — connect as a party to view
-                  </span>
-                )}
-                {!showPrivate && sig.signatureType === 'typed' && !hasHiddenImage && (
-                  <span className="signatures-panel-typed">
-                    Signed — name private until you connect as a party
-                  </span>
                 )}
               </div>
               {imageUrl && authToken ? (

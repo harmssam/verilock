@@ -86,7 +86,10 @@ export function PdfReconstructor({
       <div ref={containerRef} />
       {!loading && !error && pageCount > 0 && (
         <p className="pdf-annotator-hint muted">
-          {pageCount} page{pageCount === 1 ? '' : 's'} · local file + server overlays
+          {pageCount} page{pageCount === 1 ? '' : 's'}
+          {annotations.length > 0
+            ? ' · local file + recorded signatures and fields'
+            : ' · local file'}
         </p>
       )}
     </div>

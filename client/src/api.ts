@@ -141,7 +141,7 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  getPlacementPlan: (sha256: string) =>
+  getPlacementPlan: (sha256: string, token?: string | null) =>
     request<{
       originalSha256: string
       status: 'draft' | 'locked'
@@ -181,11 +181,30 @@ export const api = {
       } | null
       hasBatch0Frames: boolean
       batch0FrameCount: number
+      /** Present only for creator / parties — wire frames for reconstruction. */
+      batch0FramesHex?: string[]
       fillBatchCount?: number
       lastBatchRoot?: string | null
       filledSlotIds?: string[]
       knownBlobIds?: string[]
-    }>(`/api/placement-plans/${sha256.toLowerCase()}`),
+      /** True when fill wire frames are included for this viewer. */
+      fillPayloadRevealed?: boolean
+      fillBatches?: Array<{
+        batchIndex: number
+        batchRoot: string
+        prevRoot: string
+        personSlotIndex: number
+        signerAddress: string
+        blobIds: string[]
+        fills: Array<{ slotId: string; blobId: string; personSlotIndex: number }>
+        createdAt: number
+        frameCount: number
+        /** Present only when fillPayloadRevealed. */
+        framesHex?: string[]
+      }>
+    }>(`/api/placement-plans/${sha256.toLowerCase()}`, {
+      headers: token ? withAuth(token) : undefined,
+    }),
 
   appendPlacementFill: (
     token: string,

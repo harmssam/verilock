@@ -174,12 +174,20 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
   next()
 }
 
-/** Optional session for public reads — never 401s; attaches address when token is valid. */
+/**
+ * Optional session for public reads — never 401s.
+ * Only returns an address for a *verified* wallet login (challenge alone is not enough),
+ * so private fields (names, ink images, placement fill frames) cannot be unlocked by
+ * POSTing /auth/challenge as a public creator/signer address.
+ * When SKIP_CHAIN_VERIFY is on (non-production only), any live session counts.
+ */
 function optionalViewerAddress(req: express.Request): string | null {
   const token = req.headers.authorization?.replace('Bearer ', '')?.trim()
   if (!token) return null
   const session = getSession(token)
-  return session?.address ?? null
+  if (!session) return null
+  if (!session.verified && !SKIP_CHAIN_VERIFY) return null
+  return session.address
 }
 
 function requireVerifiedWallet(
@@ -1077,7 +1085,11 @@ app.post(
   },
 )
 
-/** Public read of placement plan structure (no frames body — hashes + geometry only). */
+/**
+ * Placement plan structure (hashes + geometry). When the viewer is the plan
+ * creator or a document party/signee (optional Bearer session), fill wire
+ * frames are included so the client can reconstruct a signed document view.
+ */
 app.get('/api/placement-plans/:sha256', publicReadLimit, (req, res) => {
   if (pdfLabDisabled(res)) return
   const sha = routeParam(req.params.sha256).toLowerCase()
@@ -1085,7 +1097,8 @@ app.get('/api/placement-plans/:sha256', publicReadLimit, (req, res) => {
     res.status(400).json({ error: 'Valid sha256 required' })
     return
   }
-  const plan = getPlanPublic(sha)
+  const viewer = optionalViewerAddress(req)
+  const plan = getPlanPublic(sha, { viewerAddress: viewer })
   if (!plan) {
     res.status(404).json({ error: 'No placement plan for this PDF hash' })
     return
