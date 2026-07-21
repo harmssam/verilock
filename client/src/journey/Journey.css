@@ -2041,7 +2041,198 @@ a.hash-chip.text-link:focus-visible {
   justify-content: space-between;
   gap: 0.85rem;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.agreements-page-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-bottom: 1.1rem;
+}
+
+.agreements-page-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 28rem;
+}
+
+.agreements-page-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--text-muted);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.agreements-page-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 2.25rem 0.6rem 2.35rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.agreements-page-search-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.9;
+}
+
+.agreements-page-search-input:hover {
+  border-color: rgba(15, 23, 42, 0.18);
+}
+
+.agreements-page-search-input:focus {
+  border-color: rgba(13, 148, 136, 0.55);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+/* Hide native clear on search inputs — we provide our own */
+.agreements-page-search-input::-webkit-search-cancel-button,
+.agreements-page-search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.agreements-page-search-clear {
+  position: absolute;
+  right: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.agreements-page-search-clear:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--text);
+}
+
+.agreements-page-search-clear:focus-visible {
+  outline: 2px solid rgba(13, 148, 136, 0.45);
+  outline-offset: 1px;
+}
+
+.agreements-page-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.agreements-page-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem 0.35rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: #ffffff;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.agreements-page-chip:hover {
+  border-color: rgba(13, 148, 136, 0.35);
+  color: var(--text);
+}
+
+.agreements-page-chip:focus-visible {
+  outline: 2px solid rgba(13, 148, 136, 0.45);
+  outline-offset: 2px;
+}
+
+.agreements-page-chip--active {
+  border-color: rgba(13, 148, 136, 0.45);
+  background: rgba(13, 148, 136, 0.1);
+  color: var(--mint-deep, #0f766e);
+}
+
+.agreements-page-chip-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.2rem;
+  padding: 0.08rem 0.32rem;
+  border-radius: var(--radius-pill);
+  background: rgba(15, 23, 42, 0.05);
+  border: 1px solid transparent;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+}
+
+.agreements-page-chip--active .agreements-page-chip-count {
+  background: rgba(13, 148, 136, 0.14);
+}
+
+.agreements-page-no-match {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.35rem 0 0.5rem;
+}
+
+.agreements-page-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.85rem;
+  margin-top: 0.55rem;
+}
+
+.agreements-page-more-meta {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.agreements-page-more-btn {
+  font-size: 0.82rem;
+}
+
+.agreements-page-cap-note {
+  margin: 1rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.agreements-page .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .agreements-page-header h2 {
