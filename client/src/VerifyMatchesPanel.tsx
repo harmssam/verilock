@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react'
+import { ExternalLink, Lock, Trash2 } from 'lucide-react'
 import { canDeleteDocument, canRevealParticipantDetails } from './agreements'
 import { DocumentNotesPanel } from './DocumentNotesPanel'
 import { SignaturesPanel } from './SignaturesPanel'
@@ -38,7 +38,8 @@ export function VerifyMatchesPanel({
     <div className="verify-matches">
       {matches.length > 1 && (
         <p className="verify-matches-intro muted">
-          This fingerprint matches {matches.length} agreements on VeriLock. Compare dates and IDs below
+          This fingerprint matches {matches.length} agreements on VeriLock. Compare dates and IDs
+          below
           {matches.some(match => match.status === 'locked')
             ? ' — prefer a locked on-chain record when one exists.'
             : '.'}
@@ -47,14 +48,25 @@ export function VerifyMatchesPanel({
       <ul className="verify-matches-list">
         {matches.map(match => {
           const highlighted = highlightSlug === match.slug
+          const locked = match.status === 'locked'
           const deletable = canDeleteDocument(match, walletAddress)
+          const explorerUrl = match.attestation?.explorerUrl ?? null
           return (
             <li
               key={match.id}
-              className={`verify-match-card${highlighted ? ' verify-match-card--highlighted' : ''}`}
+              className={[
+                'verify-match-card',
+                highlighted ? 'verify-match-card--highlighted' : '',
+                locked ? 'verify-match-card--locked' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
             >
               <div className="verify-match-lead">
-                <span className={`verify-match-status verify-match-status--${match.status}`}>
+                <span
+                  className={`verify-match-status verify-match-status--${match.status}`}
+                >
+                  {locked ? <Lock size={12} strokeWidth={2.5} aria-hidden /> : null}
                   {formatStatus(match.status)}
                 </span>
                 {match.originalFilename && (
@@ -65,6 +77,42 @@ export function VerifyMatchesPanel({
                 )}
               </div>
               <h3 className="verify-match-title">{match.title}</h3>
+
+              {locked && (
+                <div className="verify-match-locked-callout" role="status">
+                  <Lock size={18} strokeWidth={2.25} aria-hidden />
+                  <div>
+                    <strong>Sealed on the Nimiq blockchain</strong>
+                    <p>
+                      Your local file matches this agreement&apos;s fingerprint. The hash is
+                      permanently locked on-chain
+                      {match.lockedAt
+                        ? ` · ${formatTimestamp(match.lockedAt)}`
+                        : ''}
+                      {explorerUrl ? (
+                        <>
+                          {' · '}
+                          <a href={explorerUrl} target="_blank" rel="noreferrer">
+                            View attestation
+                            <ExternalLink
+                              size={12}
+                              strokeWidth={2.25}
+                              aria-hidden
+                              style={{
+                                display: 'inline',
+                                verticalAlign: '-0.1em',
+                                marginLeft: '0.2rem',
+                              }}
+                            />
+                          </a>
+                        </>
+                      ) : null}
+                      . No wallet required to verify integrity.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {documentTypeUsesNotes(match.type) &&
                 typeof match.metadata?.notes === 'string' && (
                   <DocumentNotesPanel notes={match.metadata.notes} compact />
@@ -79,7 +127,7 @@ export function VerifyMatchesPanel({
                   <dd>{formatTimestamp(match.createdAt)}</dd>
                 </div>
                 <div>
-                  <dt>{match.status === 'locked' ? 'Locked' : 'Last updated'}</dt>
+                  <dt>{locked ? 'Locked on-chain' : 'Last updated'}</dt>
                   <dd>{formatTimestamp(match.lockedAt ?? match.createdAt)}</dd>
                 </div>
                 <div>

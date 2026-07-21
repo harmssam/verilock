@@ -1,6 +1,6 @@
 .signed-document-view {
-  margin: 0.75rem 0 0;
-  padding: 0.9rem 0 0;
+  margin: 0.25rem 0 0;
+  padding: 0.95rem 0 0;
   border-top: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
 }
 
@@ -10,15 +10,16 @@
 
 .signed-document-view-title {
   margin: 0 0 0.35rem;
-  font-size: 0.95rem;
-  font-weight: 650;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
   color: var(--lr-text, var(--text, #0f172a));
 }
 
 .signed-document-view-lead {
   margin: 0;
-  font-size: 0.82rem;
-  line-height: 1.4;
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .signed-document-view-note {
@@ -27,6 +28,26 @@
   line-height: 1.4;
 }
 
-.signed-document-view-recon.pdf-annotator {
+.signed-document-view-recon.pdf-annotator,
+.signed-document-view-recon.signed-doc-recon {
   margin-top: 0.35rem;
+}
+
+/* Same scrollable stage as PlacementEditor / SignerFillView */
+.signed-doc-recon-stage.pdf-annotator-stage {
+  max-height: min(75vh, 820px);
+  background: #f1f5f9;
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
+  border-radius: 12px;
+}
+
+/* Standalone signed view (not only under a border-top) */
+.signed-document-view--primary {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.signed-document-view--primary .signed-document-view-title {
+  font-size: 1.05rem;
 }
