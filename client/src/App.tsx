@@ -847,7 +847,7 @@ export function App() {
           </button>
           <a
             className="lr-footer-link"
-            href="https://github.com/harmssam/verilock-offline"
+            href="https://github.com/clevertech-os/verilock-offline"
             target="_blank"
             rel="noopener noreferrer"
           >
