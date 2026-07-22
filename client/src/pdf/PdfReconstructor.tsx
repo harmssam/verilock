@@ -126,9 +126,24 @@ export const PdfReconstructor = forwardRef<PdfReconstructorHandle, PdfReconstruc
   },
 )
 
+const PRINT_ROOT_ID = 'verilock-print-root'
+const PRINT_STYLE_ID = 'verilock-print-style'
+
+function waitForImage(img: HTMLImageElement): Promise<void> {
+  return new Promise(resolve => {
+    if (img.complete && img.naturalWidth > 0) {
+      resolve()
+      return
+    }
+    img.onload = () => resolve()
+    img.onerror = () => resolve()
+  })
+}
+
 /**
  * Open a print dialog with the rendered page canvases (signatures already painted).
- * Uses a temporary window so shell chrome is not printed.
+ * Prints from the current window (no pop-up) so mobile Safari/Chrome work —
+ * window.open print sheets are blocked or unusable on many phones.
  */
 export async function printRenderedPages(
   pagesRoot: HTMLElement | null,
@@ -146,85 +161,112 @@ export async function printRenderedPages(
     }
   })
 
-  const safeTitle = title.replace(/[<>&"]/g, '')
-  const w = window.open('', '_blank', 'noopener,noreferrer')
-  if (!w) throw new Error('Pop-up blocked — allow pop-ups to print')
+  // Drop leftovers if a prior print was interrupted.
+  document.getElementById(PRINT_ROOT_ID)?.remove()
+  document.getElementById(PRINT_STYLE_ID)?.remove()
 
-  const pagesHtml = dataUrls
-    .map(
-      (src, i) =>
-        `<img class="print-page" src="${src}" alt="Page ${i + 1}" />`,
-    )
-    .join('\n')
-
-  w.document.open()
-  w.document.write(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>${safeTitle}</title>
-  <style>
-    @page { margin: 10mm; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #fff;
-      color: #0f172a;
+  const style = document.createElement('style')
+  style.id = PRINT_STYLE_ID
+  style.textContent = `
+    /* Keep the print root out of the interactive UI until the print sheet opens. */
+    #${PRINT_ROOT_ID} {
+      position: fixed !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100% !important;
+      height: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      z-index: -1 !important;
     }
-    .print-page {
-      display: block;
-      width: 100%;
-      max-width: 100%;
-      height: auto;
-      margin: 0 auto;
-      page-break-after: always;
-      break-after: page;
+    @media print {
+      @page { margin: 10mm; }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+      /* Hide app chrome; only the signed pages go to the printer. */
+      body > *:not(#${PRINT_ROOT_ID}) {
+        display: none !important;
+      }
+      #${PRINT_ROOT_ID} {
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        z-index: auto !important;
+        background: #fff !important;
+        color: #0f172a !important;
+      }
+      #${PRINT_ROOT_ID} .print-page {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        margin: 0 auto !important;
+        page-break-after: always;
+        break-after: page;
+      }
+      #${PRINT_ROOT_ID} .print-page:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
     }
-    .print-page:last-child {
-      page-break-after: auto;
-      break-after: auto;
-    }
-  </style>
-</head>
-<body>
-${pagesHtml}
-</body>
-</html>`)
-  w.document.close()
+  `
+  document.head.appendChild(style)
 
-  const imgs = Array.from(w.document.images)
-  await Promise.all(
-    imgs.map(
-      img =>
-        new Promise<void>(resolve => {
-          if (img.complete) {
-            resolve()
-            return
-          }
-          img.onload = () => resolve()
-          img.onerror = () => resolve()
-        }),
-    ),
-  )
+  const root = document.createElement('div')
+  root.id = PRINT_ROOT_ID
+  root.setAttribute('aria-hidden', 'true')
 
-  // Let the layout settle before the dialog.
+  dataUrls.forEach((src, i) => {
+    const img = document.createElement('img')
+    img.className = 'print-page'
+    img.src = src
+    img.alt = `Page ${i + 1}`
+    root.appendChild(img)
+  })
+  document.body.appendChild(root)
+
+  await Promise.all(Array.from(root.querySelectorAll('img')).map(waitForImage))
+
+  // Let layout settle before the system print UI.
   await new Promise<void>(r => {
     window.setTimeout(r, 50)
   })
 
-  w.focus()
-  w.print()
-  // Leave the window open so the user can cancel/reprint; close after print if supported.
-  const closeSoon = () => {
-    try {
-      w.close()
-    } catch {
-      /* ignore */
-    }
+  const previousTitle = document.title
+  const safeTitle = title.replace(/[<>&"]/g, '').trim()
+  if (safeTitle) document.title = safeTitle
+
+  let cleaned = false
+  const cleanup = () => {
+    if (cleaned) return
+    cleaned = true
+    document.title = previousTitle
+    root.remove()
+    style.remove()
+    window.removeEventListener('afterprint', onAfterPrint)
   }
-  if ('onafterprint' in w) {
-    w.addEventListener('afterprint', closeSoon, { once: true })
-  } else {
-    window.setTimeout(closeSoon, 1000)
+  const onAfterPrint = () => cleanup()
+  window.addEventListener('afterprint', onAfterPrint)
+
+  try {
+    window.print()
+  } catch (err) {
+    cleanup()
+    throw err instanceof Error ? err : new Error('Could not open print')
   }
+
+  // iOS Safari often never fires afterprint; always tear down eventually.
+  window.setTimeout(cleanup, 60_000)
 }
