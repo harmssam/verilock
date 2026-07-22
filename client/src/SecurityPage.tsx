@@ -108,7 +108,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
           Prefer a fully open-source tool that never talks to this site? Use{' '}
           <a
             className="security-inline-link"
-            href="https://github.com/harmssam/verilock-offline"
+            href="https://github.com/clevertech-os/verilock-offline"
             target="_blank"
             rel="noopener noreferrer"
           >
