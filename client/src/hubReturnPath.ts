@@ -1,4 +1,9 @@
 const HUB_RETURN_PATH_KEY = 'verilock-hub-return-path'
+/**
+ * Survives leaving Safari/Chrome into the Nimiq Pay app WebView (sessionStorage
+ * does not). Used when `nimiqpay://miniapp?url=` only loads the site origin.
+ */
+const PAY_RETURN_PATH_KEY = 'verilock-pay-return-path'
 
 export function saveHubReturnPath(): void {
   if (typeof window === 'undefined') return
@@ -28,6 +33,101 @@ export function consumeHubReturnPath(): string | null {
     // ignore
   }
   return path
+}
+
+/** Path+query only (e.g. `/d/slug?party=…`) for post–Nimiq Pay restore. */
+export function savePayReturnPath(path?: string): void {
+  if (typeof window === 'undefined') return
+  const next =
+    path ?? `${window.location.pathname}${window.location.search}${window.location.hash}`
+  // Never stash bare home — nothing useful to restore.
+  if (!next || next === '/' || next === '') return
+  try {
+    localStorage.setItem(PAY_RETURN_PATH_KEY, next)
+  } catch {
+    // ignore
+  }
+}
+
+export function readPayReturnPath(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return localStorage.getItem(PAY_RETURN_PATH_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function clearPayReturnPath(): void {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.removeItem(PAY_RETURN_PATH_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+export function consumePayReturnPath(): string | null {
+  const path = readPayReturnPath()
+  if (!path) return null
+  clearPayReturnPath()
+  return path
+}
+
+/**
+ * If Nimiq Pay (or a cold open) landed on `/` but we had an invite/deep link
+ * pending, restore it before React routes the shell.
+ * Safe to call once at boot; only rewrites when currently on home.
+ */
+export function restorePayReturnPathIfNeeded(): string | null {
+  if (typeof window === 'undefined') return null
+  const pending = readPayReturnPath()
+  if (!pending) return null
+
+  // Absolute URL in storage (legacy) → path+search only
+  let path = pending
+  try {
+    if (/^https?:\/\//i.test(pending)) {
+      const u = new URL(pending)
+      path = `${u.pathname}${u.search}${u.hash}`
+    }
+  } catch {
+    /* keep raw */
+  }
+
+  if (!path.startsWith('/')) {
+    clearPayReturnPath()
+    return null
+  }
+
+  const pathOnly = path.split(/[?#]/)[0] ?? path
+  // Only restore known app routes (never arbitrary paths).
+  if (
+    !documentSlugFromPath(pathOnly) &&
+    !verifySlugFromPath(pathOnly) &&
+    !isAgreementsPath(pathOnly) &&
+    !isPricingPath(pathOnly) &&
+    !isSignMobilePath(pathOnly)
+  ) {
+    clearPayReturnPath()
+    return null
+  }
+
+  const current = window.location.pathname
+  // Already on a document/verify deep link — drop stale pending.
+  if (documentSlugFromPath(current) || verifySlugFromPath(current)) {
+    clearPayReturnPath()
+    return null
+  }
+
+  // Home (or unknown) after Pay open: re-apply invite path.
+  if (current === '/' || current === '') {
+    clearPayReturnPath()
+    window.history.replaceState(window.history.state, '', path)
+    return path
+  }
+
+  return null
 }
 
 export function documentSlugFromPath(path: string): string | null {

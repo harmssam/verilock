@@ -12,7 +12,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { isValidNimiqAddress, normalizeAddress, shortAddress } from '../addresses'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
@@ -37,7 +37,7 @@ import { sha256Hex, shortHash } from '../pdf/hashPdf'
 import { prepareSignatureImageUpload } from '../signatureImage'
 import { isMobileDevice } from '../nimiq'
 import { SealPricingDisplay } from '../SealPricingDisplay'
-import { canShareFiles, shareInviteWithPdf } from '../shareInvite'
+import { canShareFiles, isValidEmailAddress, shareInviteWithPdf } from '../shareInvite'
 import {
   formatPartyRole,
   isPlaceholderPartyName,
@@ -226,6 +226,12 @@ export function DocumentJourney({
   const [creatorNotifyEmail, setCreatorNotifyEmail] = useState(
     () => loadCreateFormCache()?.creatorNotifyEmail ?? '',
   )
+  /** Last successfully saved ready-to-lock notify address ('' = cleared/none). */
+  const [notifyEmailSavedValue, setNotifyEmailSavedValue] = useState<string | null>(null)
+  const [notifyEmailBusy, setNotifyEmailBusy] = useState(false)
+  const [notifyEmailError, setNotifyEmailError] = useState<string | null>(null)
+  const [notifyEmailFlashSaved, setNotifyEmailFlashSaved] = useState(false)
+  const notifyEmailFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [docType, setDocType] = useState<DocumentType>(
     () => loadCreateFormCache()?.docType ?? 'contract',
   )
@@ -261,13 +267,27 @@ export function DocumentJourney({
   const [pickedPartyId, setPickedPartyId] = useState<string | null>(null)
   /** partyId → last invite send status for UI feedback */
   const [inviteSendBusyId, setInviteSendBusyId] = useState<string | null>(null)
+  /** Transient notes (link copied, share sheet, …) — not the durable email-sent badge. */
   const [inviteSendNote, setInviteSendNote] = useState<Record<string, string>>({})
-  /** Floating reminder after any successful invite email (PDF is never attached). */
-  const [inviteToast, setInviteToast] = useState<{
+  /**
+   * partyId → last successful invite email (session-persisted so the signers
+   * list keeps showing “Invite emailed” after the handoff modal closes).
+   */
+  const [inviteEmailSent, setInviteEmailSent] = useState<
+    Record<string, { email: string; sentAt: number }>
+  >({})
+  /**
+   * Post-invite handoff help: email or copy-link.
+   * Stays open until the user dismisses (no auto-timeout — easy to miss).
+   */
+  const [inviteHandoff, setInviteHandoff] = useState<{
     key: number
+    /** Who / which person this is for (display name). */
     contactLabel: string
+    /** Email path vs personal-link copy. */
+    mode: 'email' | 'link'
   } | null>(null)
-  const inviteToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inviteHandoffPrimaryRef = useRef<HTMLButtonElement>(null)
   const [emailSendEnabled, setEmailSendEnabled] = useState(false)
   const [verifyFile, setVerifyFile] = useState<File | null>(null)
   const [verifyOutcome, setVerifyOutcome] = useState<VerifyOutcome>({ kind: 'idle' })
@@ -415,16 +435,13 @@ export function DocumentJourney({
         if (isCreator) {
           setRole('creator')
           saveJourneyIntent('creator')
-          const { signed, required } = document.signingProgress
-          // Solo agreements must re-open on share (Signatures) so co-signers can still
-          // be added — do not auto-ack just because the creator already signed.
-          // Multi incomplete: treat as invite-sent so polling/share banner works.
+          const { required } = document.signingProgress
+          // Solo agreements re-open on share so co-signers can still be added.
+          // Do NOT auto-ack multi-party mid-invite — that hides the invite form
+          // behind “All set!” before any invites were sent. Waiting room only after
+          // explicit “All set — wait for co-signers”.
           // preferSeal / agreements “seal now” skips share intentionally.
-          setSharedAck(
-            preferSeal ||
-              required === 0 ||
-              (required > 1 && signed > 0),
-          )
+          setSharedAck(preferSeal || required === 0)
         } else {
           // /d/:slug is the invite path — land on signer flow (connect → sign), not verify.
           // Unclaimed co-signers may not match canRevealParticipantDetails until they sign.
@@ -609,17 +626,69 @@ export function DocumentJourney({
     return naturalStep
   }, [stepHold, naturalStep, canHoldStep])
 
-  // Keep the viewport at the top when advancing (or stepping back) between stages.
-  const prevStepRef = useRef<JourneyStepId | null>(null)
+  /**
+   * Anchor for “where do I act next?” — stage rail + action dock.
+   * Sticky shell header uses scroll-margin-top so the title isn’t hidden under the nav.
+   */
+  const stepFocusRef = useRef<HTMLDivElement>(null)
+  const scrollRafRef = useRef<number | null>(null)
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /** Scroll the current stage chrome into view (window + sticky-header offset via CSS). */
+  const scrollToJourneyAction = useCallback((behavior: ScrollBehavior = 'auto') => {
+    if (typeof window === 'undefined') return
+
+    const run = () => {
+      const focus = stepFocusRef.current
+      if (focus) {
+        focus.scrollIntoView({ block: 'start', inline: 'nearest', behavior })
+        return
+      }
+      window.scrollTo({ top: 0, left: 0, behavior })
+      window.document.documentElement.scrollTop = 0
+      window.document.body.scrollTop = 0
+    }
+
+    // Cancel any in-flight scroll scheduling (rapid step changes / double calls).
+    if (scrollRafRef.current != null) {
+      cancelAnimationFrame(scrollRafRef.current)
+      scrollRafRef.current = null
+    }
+    if (scrollTimerRef.current != null) {
+      clearTimeout(scrollTimerRef.current)
+      scrollTimerRef.current = null
+    }
+
+    // Double rAF: wait until React has committed the new step’s DOM.
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = requestAnimationFrame(() => {
+        scrollRafRef.current = null
+        run()
+        // Late layout (PDF stage / placement editor unmount) — nudge once more.
+        scrollTimerRef.current = setTimeout(() => {
+          scrollTimerRef.current = null
+          run()
+        }, 80)
+      })
+    })
+  }, [])
+
   useEffect(() => {
+    return () => {
+      if (scrollRafRef.current != null) cancelAnimationFrame(scrollRafRef.current)
+      if (scrollTimerRef.current != null) clearTimeout(scrollTimerRef.current)
+    }
+  }, [])
+
+  // Keep the viewport on the active stage when advancing or stepping back.
+  const prevStepRef = useRef<JourneyStepId | null>(null)
+  useLayoutEffect(() => {
     const prev = prevStepRef.current
     prevStepRef.current = step
-    if (prev == null || prev === step) return
-    if (typeof window === 'undefined') return
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
-    window.document.documentElement.scrollTop = 0
-    window.document.body.scrollTop = 0
-  }, [step])
+    // First paint after mount still jumps so deep links / remounts aren’t mid-page.
+    if (prev === step) return
+    scrollToJourneyAction('auto')
+  }, [step, scrollToJourneyAction])
 
   useEffect(() => {
     if (stepHold && !canHoldStep(stepHold, naturalStep)) {
@@ -631,13 +700,13 @@ export function DocumentJourney({
     (id: JourneyStepId) => {
       if (id === naturalStep) {
         setStepHold(null)
-        return
-      }
-      if (canHoldStep(id, naturalStep)) {
+      } else if (canHoldStep(id, naturalStep)) {
         setStepHold(id)
       }
+      // Rail click: step may already match hold/natural — force scroll anyway.
+      scrollToJourneyAction('smooth')
     },
-    [naturalStep, canHoldStep],
+    [naturalStep, canHoldStep, scrollToJourneyAction],
   )
 
   // Quiet refresh while creator waits for co-signers (invite on Arrange or Sign).
@@ -661,6 +730,67 @@ export function DocumentJourney({
     const id = window.setInterval(tick, 12_000)
     return () => window.clearInterval(id)
   }, [role, doc, step, token, setActiveFromSeal])
+
+  // Restore “invite emailed” badges for this agreement (session-scoped).
+  useEffect(() => {
+    if (!doc?.id || typeof sessionStorage === 'undefined') {
+      setInviteEmailSent({})
+      return
+    }
+    try {
+      const raw = sessionStorage.getItem(`verilock-invite-sent:${doc.id}`)
+      if (!raw) {
+        setInviteEmailSent({})
+        return
+      }
+      const parsed = JSON.parse(raw) as Record<string, { email?: string; sentAt?: number }>
+      const next: Record<string, { email: string; sentAt: number }> = {}
+      for (const [partyId, row] of Object.entries(parsed)) {
+        if (row?.email && typeof row.email === 'string') {
+          next[partyId] = {
+            email: row.email,
+            sentAt: typeof row.sentAt === 'number' ? row.sentAt : Date.now(),
+          }
+        }
+      }
+      setInviteEmailSent(next)
+      // Prefill email fields for resend when we restored session badges.
+      if (doc && Object.keys(next).length > 0) {
+        const unsigned = doc.parties.filter(x => x.required && !x.signed)
+        setCoSignerEmails(prev => {
+          const emails = [...prev]
+          let changed = false
+          unsigned.forEach((party, i) => {
+            const sent = next[party.id]
+            if (!sent) return
+            while (emails.length <= i) emails.push('')
+            if (!emails[i]?.trim()) {
+              emails[i] = sent.email
+              changed = true
+            }
+          })
+          return changed ? emails : prev
+        })
+      }
+    } catch {
+      setInviteEmailSent({})
+    }
+  }, [doc?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- hydrate once per agreement
+
+  /** Record a successful invite email and persist for this agreement’s session. */
+  const markInviteEmailSent = useCallback((docId: string, partyId: string, email: string) => {
+    setInviteEmailSent(prev => {
+      const next = { ...prev, [partyId]: { email, sentAt: Date.now() } }
+      try {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.setItem(`verilock-invite-sent:${docId}`, JSON.stringify(next))
+        }
+      } catch {
+        /* private mode / quota */
+      }
+      return next
+    })
+  }, [])
 
   // Seed share-step cosigner draft from the live document once per agreement.
   useEffect(() => {
@@ -1095,6 +1225,14 @@ export function DocumentJourney({
     autoTitleFromFileRef.current = null
     setCreatorName('')
     setCreatorNotifyEmail('')
+    setNotifyEmailSavedValue(null)
+    setNotifyEmailBusy(false)
+    setNotifyEmailError(null)
+    setNotifyEmailFlashSaved(false)
+    if (notifyEmailFlashTimerRef.current) {
+      clearTimeout(notifyEmailFlashTimerRef.current)
+      notifyEmailFlashTimerRef.current = null
+    }
     setDocType('contract')
     setCoSignerNames([''])
     setCoSignerEmails([''])
@@ -1115,6 +1253,9 @@ export function DocumentJourney({
     setPageFieldsConfirmed(false)
     setPlacementStatus(null)
     setPickedPartyId(null)
+    setInviteSendBusyId(null)
+    setInviteSendNote({})
+    setInviteEmailSent({})
     setVerifyFile(null)
     setVerifyOutcome({ kind: 'idle' })
     verifyCacheRef.current = null
@@ -1195,7 +1336,7 @@ export function DocumentJourney({
       // Standalone fallback (no shell track title update)
       window.history.pushState({}, '', '/?intent=verifier')
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollToJourneyAction('smooth')
   }
 
   const createDoc = async () => {
@@ -1234,6 +1375,8 @@ export function DocumentJourney({
       setPageFieldsConfirmed(false)
       window.history.pushState({}, '', `/d/${document.slug}`)
       void clearCreatePdfDraftState()
+      // Step advances to Arrange — bring the next actions into view.
+      scrollToJourneyAction('auto')
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Create failed')
     } finally {
@@ -1241,11 +1384,28 @@ export function DocumentJourney({
     }
   }
 
-  const copyText = async (text: string, notePartyId?: string): Promise<boolean> => {
+  const dismissInviteHandoff = useCallback(() => {
+    setInviteHandoff(null)
+  }, [])
+
+  const showInviteHandoffHelp = useCallback(
+    (contactLabel: string, mode: 'email' | 'link' = 'email') => {
+      setInviteHandoff({ key: Date.now(), contactLabel, mode })
+    },
+    [],
+  )
+
+  const copyText = async (
+    text: string,
+    notePartyId?: string,
+    contactLabel?: string,
+  ): Promise<boolean> => {
     try {
       await navigator.clipboard.writeText(text)
       if (notePartyId) {
         setInviteSendNote(prev => ({ ...prev, [notePartyId]: 'Link copied' }))
+        // Same file-handoff reminder as after invite email — user must act on it.
+        showInviteHandoffHelp(contactLabel?.trim() || 'your co-signer', 'link')
       }
       return true
     } catch {
@@ -1254,24 +1414,24 @@ export function DocumentJourney({
     }
   }
 
-  const showInviteSentToast = useCallback((contactLabel: string) => {
-    if (inviteToastTimerRef.current) {
-      clearTimeout(inviteToastTimerRef.current)
-      inviteToastTimerRef.current = null
-    }
-    setInviteToast({ key: Date.now(), contactLabel })
-    // Long enough to read the PDF handoff reminder
-    inviteToastTimerRef.current = setTimeout(() => {
-      setInviteToast(null)
-      inviteToastTimerRef.current = null
-    }, 10000)
-  }, [])
-
+  // Trap focus / Escape while the handoff help dialog is open.
   useEffect(() => {
-    return () => {
-      if (inviteToastTimerRef.current) clearTimeout(inviteToastTimerRef.current)
+    if (!inviteHandoff) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        dismissInviteHandoff()
+      }
     }
-  }, [])
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', onKey)
+    window.setTimeout(() => inviteHandoffPrimaryRef.current?.focus(), 0)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [inviteHandoff, dismissInviteHandoff])
 
   /** Mobile: system share sheet (iMessage, WhatsApp, …) with personal link + local PDF when allowed. */
   const sharePersonInvite = async (opts: {
@@ -1521,9 +1681,10 @@ export function DocumentJourney({
           setSharedAck(true)
           setLockMessage(null)
         } else {
-          // Creator: advance past Arrange. Solo/complete → seal; multi → stay on Sign to invite.
-          setSharedAck(true)
+          // Creator: multi incomplete → keep invite form open (do not hide behind “All set!”).
+          // Ready-to-lock / solo: ack so we skip waiting-room chrome on seal.
           if (signedDoc.signingProgress.readyToLock) {
+            setSharedAck(true)
             const solo = signedDoc.signingProgress.required <= 1
             setLockMessage(
               solo
@@ -1531,20 +1692,15 @@ export function DocumentJourney({
                 : 'All signatures collected. Continue to lock.',
             )
           } else {
+            setSharedAck(false)
             setLockMessage(
               'Your signature is recorded. Invite co-signers below, then lock when everyone has signed.',
             )
           }
         }
-        // Sign form is mid-page; after success the UI swaps to done/share and the old
-        // scroll offset lands near the bottom. Snap to top so the confirmation is visible.
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => {
-            window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
-            window.document.documentElement.scrollTop = 0
-            window.document.body.scrollTop = 0
-          })
-        })
+        // Sign form is mid-page; after success the UI swaps to invite/seal/done.
+        // Scroll to the stage chrome so the next action is obvious.
+        scrollToJourneyAction('auto')
         return true
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Sign failed'
@@ -1831,6 +1987,8 @@ export function DocumentJourney({
         `Layout saved · ${saved.slotCount} boxes · ${asLabel} · root ${shortHash(saved.planRoot ?? planRoot)}`,
       )
       setStepHold(null)
+      // Step advances to Sign / Invite — scroll to the dock (user was mid-PDF).
+      scrollToJourneyAction('auto')
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Could not save placements')
     } finally {
@@ -1844,6 +2002,7 @@ export function DocumentJourney({
     signHash,
     creatorNotifyEmail,
     setActiveFromSeal,
+    scrollToJourneyAction,
   ])
 
   /** Re-open placements for editing (before anyone fills fields or signs). */
@@ -1904,19 +2063,30 @@ export function DocumentJourney({
     }
   }, [token, doc, constructionPlan, pdfHash, signHash])
 
-  /** Mark invite as sent, or solo “continue to seal” (share is after creator sign). */
-  const acknowledgeShare = () => {
+  /**
+   * Creator finished inviting (or saved a notify email) — show the “all set / wait”
+   * screen instead of the long invite form.
+   */
+  const acknowledgeShare = useCallback(() => {
     setSharedAck(true)
-  }
+    scrollToJourneyAction('smooth')
+  }, [scrollToJourneyAction])
+
+  /** Return from the waiting screen to manage invites / notification email. */
+  const reopenInviteSetup = useCallback(() => {
+    setSharedAck(false)
+    scrollToJourneyAction('smooth')
+  }, [scrollToJourneyAction])
 
   /**
    * Persist cosigner count + optional names from the share-step Signatures UI.
    * Called automatically when party count changes or names blur — no Save button.
+   * Ready-to-lock notify email is saved separately (see saveNotifyEmail) so it can
+   * show explicit “Saved” feedback without the full cosigner busy state.
    */
   const applyCosigners = async (overrides?: {
     requiredSignatures?: number
     coSignerNames?: string[]
-    notifyEmail?: string
   }) => {
     if (!token || !doc) return
     const total = Math.max(
@@ -1924,8 +2094,6 @@ export function DocumentJourney({
       Math.min(10, overrides?.requiredSignatures ?? requiredSigners),
     )
     const names = overrides?.coSignerNames ?? coSignerNames
-    const notifyRaw =
-      overrides?.notifyEmail !== undefined ? overrides.notifyEmail : creatorNotifyEmail
     setBusy(true)
     setLocalError(null)
     try {
@@ -1935,14 +2103,6 @@ export function DocumentJourney({
         coSignerNames: names.slice(0, others).map(n => n.trim()),
       })
       setActiveFromSeal(document, doc.fileSize)
-      if (FEATURES.emailNotifyUi) {
-        const email = total > 1 && notifyRaw.trim() ? notifyRaw.trim() : null
-        try {
-          await api.setDocumentNotifyEmail(token, doc.id, email)
-        } catch {
-          /* non-fatal — cosigners already saved */
-        }
-      }
       // Expanding beyond solo: stay on share for invites (sharedAck resets for multi wait).
       if (total > 1) setSharedAck(false)
     } catch (err) {
@@ -1951,6 +2111,50 @@ export function DocumentJourney({
       setBusy(false)
     }
   }
+
+  /** Save optional “email me when everyone has signed” with visible success feedback. */
+  const saveNotifyEmail = async () => {
+    if (!token || !doc || !FEATURES.emailNotifyUi) return
+    const raw = creatorNotifyEmail.trim()
+    if (raw && !isValidEmailAddress(raw)) {
+      setNotifyEmailError('Enter a valid email address')
+      setNotifyEmailFlashSaved(false)
+      return
+    }
+    if (requiredCount(doc) <= 1 && requiredSigners <= 1) {
+      setNotifyEmailError('Add at least one co-signer before setting a notification email')
+      return
+    }
+    setNotifyEmailBusy(true)
+    setNotifyEmailError(null)
+    setLocalError(null)
+    try {
+      const email = raw || null
+      await api.setDocumentNotifyEmail(token, doc.id, email)
+      setNotifyEmailSavedValue(raw)
+      setCreatorNotifyEmail(raw)
+      setNotifyEmailFlashSaved(true)
+      if (notifyEmailFlashTimerRef.current) clearTimeout(notifyEmailFlashTimerRef.current)
+      notifyEmailFlashTimerRef.current = setTimeout(() => {
+        notifyEmailFlashTimerRef.current = null
+        setNotifyEmailFlashSaved(false)
+      }, 4000)
+      // Stay on the invite form — waiting room is explicit via “All set — wait for co-signers”.
+    } catch (err) {
+      setNotifyEmailError(
+        err instanceof Error ? err.message : 'Could not save notification email',
+      )
+      setNotifyEmailFlashSaved(false)
+    } finally {
+      setNotifyEmailBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (notifyEmailFlashTimerRef.current) clearTimeout(notifyEmailFlashTimerRef.current)
+    }
+  }, [])
 
   /** Creator-only: open cancel confirm (before anyone has signed). */
   const requestCancelCurrentAgreement = () => {
@@ -2248,6 +2452,11 @@ export function DocumentJourney({
 
       {step !== 'welcome' && (
         <>
+          {/*
+            Scroll target when the rail advances: stage labels + action title/CTAs.
+            scroll-margin-top clears the sticky shell header.
+          */}
+          <div ref={stepFocusRef} className="journey-step-focus">
           {role && (
             <StageRail
               role={role}
@@ -2449,7 +2658,7 @@ export function DocumentJourney({
                         maxLength={MAX_DOCUMENT_NOTES_LENGTH}
                       />
                       <span className="muted" style={{ fontSize: '0.78rem' }}>
-                        Visible to signers. Do not paste secrets or full contract text.
+                        Visible to signers. Do not paste sensitive information or the full contract.
                       </span>
                     </label>
                   )}
@@ -3143,6 +3352,88 @@ export function DocumentJourney({
               {/* Invite co-signers: Arrange (organizer-only) or Sign (after creator signed). */}
               {doc && showInvitePhase && role === 'creator' && (step === 'share' || step === 'sign') && (
                 <div className="action-stack">
+                  {/* Waiting room after invites / notify-email save — clear “come back later”. */}
+                  {sharedAck &&
+                  (requiredCount(doc) > 1 || inviteeSlotCount > 0) &&
+                  !allSigned(doc) ? (
+                    <section
+                      className="invite-all-set"
+                      aria-labelledby="invite-all-set-title"
+                    >
+                      <div className="invite-all-set-hero" aria-hidden>
+                        <span className="invite-all-set-icon">
+                          <Check size={28} strokeWidth={2.5} />
+                        </span>
+                      </div>
+                      <h3 id="invite-all-set-title" className="invite-all-set-title">
+                        All set!
+                      </h3>
+                      <p className="invite-all-set-lead">
+                        Come back here when everyone has signed to continue and{' '}
+                        <strong>lock the agreement</strong> on the blockchain.
+                      </p>
+                      {notifyEmailSavedValue && notifyEmailSavedValue.trim() !== '' ? (
+                        <p className="invite-all-set-notify" role="status">
+                          <MailCheck size={16} strokeWidth={2.25} aria-hidden />
+                          <span>
+                            We&apos;ll also email{' '}
+                            <strong>{notifyEmailSavedValue}</strong> when the last signature
+                            lands — you can still return anytime to check progress.
+                          </span>
+                        </p>
+                      ) : (
+                        <p className="invite-all-set-notify invite-all-set-notify--muted">
+                          This page updates as people sign. You don&apos;t need to leave it open.
+                        </p>
+                      )}
+
+                      <div className="progress-bar-wrap invite-all-set-progress">
+                        <div className="progress-bar-meta">
+                          <span>
+                            Signatures {signedCount(doc)}/{requiredCount(doc)}
+                          </span>
+                          <span className="muted">{doc.title}</span>
+                        </div>
+                        <div className="progress-bar-track">
+                          <div
+                            className="progress-bar-fill"
+                            style={{
+                              width: `${
+                                requiredCount(doc)
+                                  ? (signedCount(doc) / requiredCount(doc)) * 100
+                                  : 0
+                              }%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <PartyList
+                        doc={doc}
+                        revealNames={revealParticipantPrivate}
+                        inviteEmailByPartyId={inviteEmailSent}
+                      />
+
+                      <div className="invite-all-set-actions">
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={reopenInviteSetup}
+                        >
+                          Manage invites
+                        </button>
+                        {onHome ? (
+                          <button type="button" className="btn btn-ghost" onClick={onHome}>
+                            Back to home
+                          </button>
+                        ) : null}
+                      </div>
+                      <p className="muted invite-all-set-foot">
+                        Reminder: co-signers need the signing link <em>and</em> the same agreement
+                        file (VeriLock never hosts the PDF).
+                      </p>
+                    </section>
+                  ) : (
                   <section className="signatures-config" aria-labelledby="signatures-config-title">
                     <header className="signatures-config-head">
                       <h3 id="signatures-config-title">Invite co-signers</h3>
@@ -3165,7 +3456,11 @@ export function DocumentJourney({
                       </div>
                     </div>
 
-                    <PartyList doc={doc} revealNames={revealParticipantPrivate} />
+                    <PartyList
+                      doc={doc}
+                      revealNames={revealParticipantPrivate}
+                      inviteEmailByPartyId={inviteEmailSent}
+                    />
 
                     {role === 'creator' && !doc.sealed && (
                       <div className="signatures-config-form">
@@ -3192,8 +3487,20 @@ export function DocumentJourney({
                               void applyCosigners({
                                 requiredSignatures: n,
                                 coSignerNames: nextNames,
-                                notifyEmail: n <= 1 ? '' : creatorNotifyEmail,
                               })
+                              if (n <= 1) {
+                                setNotifyEmailSavedValue(null)
+                                setNotifyEmailError(null)
+                                setNotifyEmailFlashSaved(false)
+                                // Clear server-side ready-to-seal notify (no longer multi-party).
+                                if (FEATURES.emailNotifyUi && token && doc) {
+                                  void api
+                                    .setDocumentNotifyEmail(token, doc.id, null)
+                                    .catch(() => {
+                                      /* non-fatal */
+                                    })
+                                }
+                              }
                             }}
                             disabled={busy}
                           >
@@ -3227,29 +3534,49 @@ export function DocumentJourney({
                                   p.displayName?.trim() ||
                                   p.roleLabel ||
                                   `Person ${index + 1}`
+                                const emailed = inviteEmailSent[p.id]
                                 const emailVal = coSignerEmails[index] ?? ''
                                 const sending = inviteSendBusyId === p.id
                                 const note = inviteSendNote[p.id]
                                 return (
                                   <div
                                     key={p.id}
-                                    className="field-stack share-cosigner-fields"
-                                    style={{
-                                      padding: '0.65rem 0.75rem',
-                                      border: '1px solid var(--border, #e2e8f0)',
-                                      borderRadius: 10,
-                                      background: '#f8fafc',
-                                    }}
+                                    className={[
+                                      'field-stack share-cosigner-fields',
+                                      emailed ? 'share-cosigner-fields--invited' : '',
+                                    ]
+                                      .filter(Boolean)
+                                      .join(' ')}
                                   >
-                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                                      {label}
-                                      {p.signed ? (
-                                        <span className="muted" style={{ fontWeight: 500 }}>
-                                          {' '}
-                                          · signed
+                                    <div className="share-cosigner-head">
+                                      <div className="share-cosigner-title">
+                                        {label}
+                                        {p.signed ? (
+                                          <span className="muted share-cosigner-title-meta">
+                                            {' '}
+                                            · signed
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                      {emailed && !p.signed ? (
+                                        <span
+                                          className="share-cosigner-sent-badge"
+                                          title={`Invite email sent to ${emailed.email}`}
+                                        >
+                                          <MailCheck size={13} strokeWidth={2.5} aria-hidden />
+                                          Invite emailed
                                         </span>
                                       ) : null}
                                     </div>
+                                    {emailed && !p.signed ? (
+                                      <p className="share-cosigner-sent-detail" role="status">
+                                        Sent to <strong>{emailed.email}</strong>
+                                        {note && !note.startsWith('Invite sent')
+                                          ? ` · ${note}`
+                                          : null}
+                                        . You can resend if they need another link.
+                                      </p>
+                                    ) : null}
                                     {p.walletAddress && (
                                       <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
                                         {shortAddress(p.walletAddress)}
@@ -3282,7 +3609,7 @@ export function DocumentJourney({
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                                       <button
                                         type="button"
-                                        className={`btn btn-primary${sending ? ' btn--busy' : ''}`}
+                                        className={`btn ${emailed ? 'btn-secondary' : 'btn-primary'}${sending ? ' btn--busy' : ''}`}
                                         disabled={
                                           busy ||
                                           p.signed ||
@@ -3294,7 +3621,9 @@ export function DocumentJourney({
                                         title={
                                           !emailSendEnabled
                                             ? 'Invite email is off until Resend is enabled on the server'
-                                            : undefined
+                                            : emailed
+                                              ? `Resend invite to ${emailVal.trim() || emailed.email}`
+                                              : undefined
                                         }
                                         onClick={() => {
                                           if (!token || !doc) return
@@ -3313,11 +3642,12 @@ export function DocumentJourney({
                                               to,
                                             })
                                             .then(() => {
+                                              markInviteEmailSent(doc.id, p.id, to)
                                               setInviteSendNote(prev => ({
                                                 ...prev,
                                                 [p.id]: `Invite sent to ${to}`,
                                               }))
-                                              showInviteSentToast(label)
+                                              showInviteHandoffHelp(label, 'email')
                                             })
                                             .catch(err => {
                                               setLocalError(
@@ -3338,6 +3668,8 @@ export function DocumentJourney({
                                             />
                                             Sending…
                                           </>
+                                        ) : emailed ? (
+                                          'Resend invite email'
                                         ) : (
                                           'Send invite email'
                                         )}
@@ -3365,7 +3697,7 @@ export function DocumentJourney({
                                         type="button"
                                         className="btn btn-secondary"
                                         disabled={busy || p.signed}
-                                        onClick={() => void copyText(personLink, p.id)}
+                                        onClick={() => void copyText(personLink, p.id, label)}
                                       >
                                         Copy personal link
                                       </button>
@@ -3376,26 +3708,12 @@ export function DocumentJourney({
                                         RESEND_ENABLED). You can still copy the personal link.
                                       </p>
                                     )}
-                                    {note && (
-                                      <p
-                                        style={{
-                                          margin: 0,
-                                          fontSize: '0.8rem',
-                                          color: '#0f766e',
-                                          fontWeight: 500,
-                                        }}
-                                      >
+                                    {note && !emailed ? (
+                                      <p className="share-cosigner-note" role="status">
                                         {note}
                                       </p>
-                                    )}
-                                    <code
-                                      style={{
-                                        fontSize: '0.7rem',
-                                        wordBreak: 'break-all',
-                                        display: 'block',
-                                        color: '#475569',
-                                      }}
-                                    >
+                                    ) : null}
+                                    <code className="share-cosigner-link mono">
                                       {personLink}
                                     </code>
                                   </div>
@@ -3472,28 +3790,109 @@ export function DocumentJourney({
                         )}
 
                         {FEATURES.emailNotifyUi && requiredSigners > 1 && (
-                          <label className="field">
-                            <span className="field-label">
+                          <div className="field notify-email-field">
+                            <span className="field-label" id="notify-email-label">
                               Email when everyone has signed (optional)
                             </span>
-                            <input
-                              type="email"
-                              value={creatorNotifyEmail}
-                              onChange={e => setCreatorNotifyEmail(e.target.value)}
-                              onBlur={() => {
-                                if (requiredCount(doc) > 1) {
-                                  void applyCosigners({ notifyEmail: creatorNotifyEmail })
+                            <div className="notify-email-row">
+                              <input
+                                type="email"
+                                value={creatorNotifyEmail}
+                                onChange={e => {
+                                  setCreatorNotifyEmail(e.target.value)
+                                  setNotifyEmailError(null)
+                                  setNotifyEmailFlashSaved(false)
+                                }}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    void saveNotifyEmail()
+                                  }
+                                }}
+                                placeholder="you@example.com"
+                                autoComplete="email"
+                                disabled={busy || notifyEmailBusy}
+                                aria-labelledby="notify-email-label"
+                                aria-invalid={notifyEmailError ? true : undefined}
+                                aria-describedby="notify-email-hint"
+                              />
+                              <button
+                                type="button"
+                                className={`btn ${
+                                  notifyEmailFlashSaved ||
+                                  (notifyEmailSavedValue !== null &&
+                                    creatorNotifyEmail.trim() === notifyEmailSavedValue &&
+                                    creatorNotifyEmail.trim() !== '')
+                                    ? 'btn-secondary'
+                                    : 'btn-primary'
+                                }${notifyEmailBusy ? ' btn--busy' : ''}`}
+                                disabled={
+                                  busy ||
+                                  notifyEmailBusy ||
+                                  // No-op when empty and nothing saved yet
+                                  (creatorNotifyEmail.trim() === '' &&
+                                    (notifyEmailSavedValue == null ||
+                                      notifyEmailSavedValue === '')) ||
+                                  // Already saved this exact value
+                                  (notifyEmailSavedValue !== null &&
+                                    creatorNotifyEmail.trim() === notifyEmailSavedValue &&
+                                    !notifyEmailFlashSaved)
                                 }
-                              }}
-                              placeholder="you@example.com"
-                              autoComplete="email"
-                              disabled={busy}
-                            />
-                            <span className="muted" style={{ fontSize: '0.78rem' }}>
+                                onClick={() => void saveNotifyEmail()}
+                              >
+                                {notifyEmailBusy ? (
+                                  <>
+                                    <LoaderCircle
+                                      className="btn-spinner"
+                                      size={16}
+                                      strokeWidth={2.5}
+                                    />
+                                    Saving…
+                                  </>
+                                ) : notifyEmailFlashSaved ||
+                                  (notifyEmailSavedValue !== null &&
+                                    creatorNotifyEmail.trim() === notifyEmailSavedValue &&
+                                    creatorNotifyEmail.trim() !== '') ? (
+                                  <>
+                                    <Check size={16} strokeWidth={2.5} aria-hidden />
+                                    Saved
+                                  </>
+                                ) : creatorNotifyEmail.trim() === '' &&
+                                  notifyEmailSavedValue ? (
+                                  'Clear email'
+                                ) : (
+                                  'Save email'
+                                )}
+                              </button>
+                            </div>
+                            <span id="notify-email-hint" className="muted notify-email-hint">
                               We only use this to tell you the agreement is ready to lock. Never
-                              required.
+                              required. Press <strong>Save email</strong> so we store it.
                             </span>
-                          </label>
+                            {notifyEmailError ? (
+                              <p className="notify-email-error" role="alert">
+                                {notifyEmailError}
+                              </p>
+                            ) : null}
+                            {notifyEmailFlashSaved &&
+                            notifyEmailSavedValue &&
+                            notifyEmailSavedValue.trim() !== '' ? (
+                              <p className="notify-email-saved" role="status">
+                                <Check size={14} strokeWidth={2.5} aria-hidden />
+                                Saved — we&apos;ll email{' '}
+                                <strong>{notifyEmailSavedValue}</strong> when everyone has signed.
+                              </p>
+                            ) : null}
+                            {!notifyEmailFlashSaved &&
+                            notifyEmailSavedValue &&
+                            notifyEmailSavedValue.trim() !== '' &&
+                            creatorNotifyEmail.trim() === notifyEmailSavedValue ? (
+                              <p className="notify-email-saved notify-email-saved--quiet" role="status">
+                                <Check size={14} strokeWidth={2.5} aria-hidden />
+                                Notification set for <strong>{notifyEmailSavedValue}</strong>
+                              </p>
+                            ) : null}
+                          </div>
                         )}
 
                         {busy && (
@@ -3509,30 +3908,24 @@ export function DocumentJourney({
                         )}
                       </div>
                     )}
-                  </section>
 
-                  {(requiredCount(doc) > 1 || inviteeSlotCount > 0) && (
-                    <>
-                      {sharedAck ? (
-                        <div className="result-banner result-banner--ok">
-                          <Check size={18} strokeWidth={2.5} />
-                          Waiting for co-signers. This view updates when they sign; you can seal
-                          when everyone has finished.
-                        </div>
-                      ) : (
+                    {(requiredCount(doc) > 1 || inviteeSlotCount > 0) && (
+                      <div className="invite-setup-finish">
                         <button
                           type="button"
-                          className="btn btn-secondary"
+                          className="btn btn-primary btn-lg"
                           onClick={acknowledgeShare}
                         >
-                          I&apos;ve shared the invite
+                          All set — wait for co-signers
                         </button>
-                      )}
-                      <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                        Use each card above to email or share a personal link. Hand off the document
-                        separately (or via mobile Share when the OS includes the file).
-                      </p>
-                    </>
+                        <p className="muted invite-setup-finish-note">
+                          Use each card above to email or share a personal link. Hand off the
+                          document file separately (VeriLock never hosts it). When you&apos;re done
+                          inviting, continue to the waiting screen.
+                        </p>
+                      </div>
+                    )}
+                  </section>
                   )}
                 </div>
               )}
@@ -4135,7 +4528,7 @@ export function DocumentJourney({
                                           ? 'verifier'
                                           : 'signer',
                                       )
-                                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                                      scrollToJourneyAction('smooth')
                                     } catch (err) {
                                       setLocalError(
                                         err instanceof Error
@@ -4181,6 +4574,7 @@ export function DocumentJourney({
               )}
             </div>
           </section>
+          </div>
         </>
       )}
 
@@ -4199,43 +4593,83 @@ export function DocumentJourney({
       />
 
       {/*
-        Portal to body: .lr-view-blend uses transform, which traps position:fixed
-        and hid this toast under the scroll container.
+        Portal to body: .lr-view-blend uses transform, which traps position:fixed.
+        No auto-dismiss — stays until Got it (easy to miss when it vanished after ~10s).
       */}
-      {inviteToast &&
+      {inviteHandoff &&
         typeof document !== 'undefined' &&
         createPortal(
           <div
-            key={inviteToast.key}
-            className="invite-sent-toast"
-            role="status"
-            aria-live="polite"
+            key={inviteHandoff.key}
+            className="invite-handoff-modal-layer"
+            role="presentation"
           >
-            <span className="invite-sent-toast-icon" aria-hidden>
-              <MailCheck size={22} strokeWidth={2.25} />
-            </span>
-            <div className="invite-sent-toast-body">
-              <strong>Email sent — file not attached</strong>
-              <p>
-                Send the agreement file to{' '}
-                <span className="invite-sent-toast-contact">{inviteToast.contactLabel}</span>{' '}
-                yourself (email, Messages, Drive…). VeriLock only sends the signing link.
-              </p>
-            </div>
             <button
               type="button"
-              className="invite-sent-toast-dismiss"
-              aria-label="Dismiss"
-              onClick={() => {
-                if (inviteToastTimerRef.current) {
-                  clearTimeout(inviteToastTimerRef.current)
-                  inviteToastTimerRef.current = null
-                }
-                setInviteToast(null)
-              }}
+              className="invite-handoff-modal-backdrop"
+              aria-label="Close"
+              onClick={dismissInviteHandoff}
+            />
+            <div
+              className="invite-handoff-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="invite-handoff-title"
             >
-              <X size={16} strokeWidth={2.25} aria-hidden />
-            </button>
+              <header className="invite-handoff-modal-head">
+                <span className="invite-handoff-modal-icon" aria-hidden>
+                  <MailCheck size={22} strokeWidth={2.25} />
+                </span>
+                <button
+                  type="button"
+                  className="invite-handoff-modal-close"
+                  aria-label="Close"
+                  onClick={dismissInviteHandoff}
+                >
+                  <X size={18} strokeWidth={2.25} aria-hidden />
+                </button>
+              </header>
+              <h3 id="invite-handoff-title" className="invite-handoff-modal-title">
+                {inviteHandoff.mode === 'email'
+                  ? 'Email sent — file not attached'
+                  : 'Link copied — send the file too'}
+              </h3>
+              <p className="invite-handoff-modal-body">
+                {inviteHandoff.mode === 'email' ? (
+                  <>
+                    We only emailed the signing link to{' '}
+                    <span className="invite-handoff-contact">{inviteHandoff.contactLabel}</span>.
+                    VeriLock never attaches or hosts the agreement file.
+                  </>
+                ) : (
+                  <>
+                    The personal signing link for{' '}
+                    <span className="invite-handoff-contact">{inviteHandoff.contactLabel}</span>{' '}
+                    is on your clipboard. Paste it into Messages, email, or chat.
+                  </>
+                )}
+              </p>
+              <p className="invite-handoff-modal-body invite-handoff-modal-body--emphasis">
+                You still need to send the agreement file to the remaining parties so they can
+                open it and sign. Co-signers must use that exact file — the fingerprint has to
+                match.
+              </p>
+              <ul className="invite-handoff-modal-steps">
+                <li>Share the signing link with each co-signer</li>
+                <li>Send the same agreement file with it (attachment or separate share)</li>
+                <li>They open the link, connect a wallet, and choose that file</li>
+              </ul>
+              <div className="invite-handoff-modal-actions">
+                <button
+                  ref={inviteHandoffPrimaryRef}
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={dismissInviteHandoff}
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
           </div>,
           document.body,
         )}
@@ -4247,14 +4681,17 @@ export function DocumentJourney({
 function PartyList({
   doc,
   revealNames = true,
+  inviteEmailByPartyId,
 }: {
   doc: JourneyDoc
   /** When false, hide display names (public share viewers). */
   revealNames?: boolean
+  /** partyId → last invite email sent from this browser session. */
+  inviteEmailByPartyId?: Record<string, { email: string; sentAt: number }>
 }) {
   if (doc.directSeal || doc.parties.length === 0) return null
   return (
-    <ul className="party-list">
+    <ul className="party-list" aria-label="Signers">
       {doc.parties.map(p => {
         // Avoid "Creator · NQ… · NQ…" when display name is just the short address.
         const showName =
@@ -4262,9 +4699,12 @@ function PartyList({
           Boolean(p.displayName) &&
           p.displayName !== p.walletShort &&
           !/^NQ[1-9A-HJ-NP-Z]{2,}…[1-9A-HJ-NP-Z]{4}$/i.test(p.displayName ?? '')
+        const invited = !p.signed ? inviteEmailByPartyId?.[p.id] : undefined
         let statusNote: string | null = null
         if (p.signed) {
           statusNote = p.walletShort
+        } else if (invited) {
+          statusNote = `invite emailed to ${invited.email}`
         } else if (p.walletShort) {
           statusNote = `${p.walletShort} · awaiting signature`
         } else {
@@ -4273,15 +4713,28 @@ function PartyList({
         return (
           <li
             key={p.id}
-            className={p.signed ? 'party-list-item party-list-item--done' : 'party-list-item'}
+            className={[
+              'party-list-item',
+              p.signed ? 'party-list-item--done' : '',
+              invited ? 'party-list-item--invited' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
           >
             <span className="party-list-check" aria-hidden>
-              {p.signed ? <Check size={14} strokeWidth={2.5} /> : null}
+              {p.signed ? (
+                <Check size={14} strokeWidth={2.5} />
+              ) : invited ? (
+                <MailCheck size={13} strokeWidth={2.5} />
+              ) : null}
             </span>
-            <div>
+            <div className="party-list-copy">
               <strong>{p.roleLabel}</strong>
               {showName ? <span className="muted"> · {p.displayName}</span> : null}
               {statusNote ? <span className="muted"> · {statusNote}</span> : null}
+              {invited ? (
+                <span className="party-list-invite-pill">Invite emailed</span>
+              ) : null}
             </div>
           </li>
         )

@@ -1494,6 +1494,14 @@ a.exp-account-menu-full:focus-visible {
   color: var(--text-muted);
 }
 
+/*
+ * Scroll target when the journey advances a stage (DocumentJourney stepFocusRef).
+ * Offset clears the sticky shell header + safe-area so the rail title isn’t clipped.
+ */
+.journey-step-focus {
+  scroll-margin-top: calc(4.75rem + env(safe-area-inset-top, 0px));
+}
+
 /* Stage rail */
 
 .stage-rail {
@@ -2793,6 +2801,203 @@ a.hash-chip.text-link:focus-visible {
   border-top: 1px solid var(--border);
 }
 
+/* Finish invite setup → waiting room */
+.invite-setup-finish {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.invite-setup-finish .btn-lg {
+  width: 100%;
+}
+
+.invite-setup-finish-note {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+/* “All set” waiting room after invites / notify-email save */
+.invite-all-set {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+  padding: 1.35rem 1.2rem 1.25rem;
+  border-radius: 14px;
+  border: 1px solid rgba(13, 148, 136, 0.28);
+  background:
+    linear-gradient(180deg, rgba(13, 148, 136, 0.08) 0%, rgba(255, 255, 255, 0.96) 42%),
+    #ffffff;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
+  text-align: center;
+}
+
+.invite-all-set-hero {
+  display: flex;
+  justify-content: center;
+}
+
+.invite-all-set-icon {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 999px;
+  background: rgba(13, 148, 136, 0.14);
+  color: #0f766e;
+  box-shadow: 0 0 0 6px rgba(13, 148, 136, 0.06);
+}
+
+.invite-all-set-title {
+  margin: 0;
+  font-family: var(--font-display, inherit);
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+
+.invite-all-set-lead {
+  margin: 0 auto;
+  max-width: 26rem;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.invite-all-set-lead strong {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.invite-all-set-notify {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  border-radius: 10px;
+  border: 1px solid rgba(13, 148, 136, 0.28);
+  background: rgba(13, 148, 136, 0.08);
+  color: #0f766e;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.invite-all-set-notify svg {
+  flex-shrink: 0;
+  margin-top: 0.12rem;
+}
+
+.invite-all-set-notify strong {
+  font-weight: 700;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.invite-all-set-notify--muted {
+  border-color: rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.03);
+  color: #64748b;
+}
+
+.invite-all-set-progress {
+  text-align: left;
+}
+
+.invite-all-set .party-list {
+  text-align: left;
+}
+
+.invite-all-set-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.invite-all-set-actions .btn {
+  min-width: 9rem;
+}
+
+.invite-all-set-foot {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+/* Ready-to-lock notification email — explicit Save + success state */
+.notify-email-field {
+  gap: 0.4rem;
+}
+
+.notify-email-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.45rem;
+}
+
+.notify-email-row input[type='email'] {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.notify-email-row .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.notify-email-hint {
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.notify-email-error {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.notify-email-saved {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0.15rem 0 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(13, 148, 136, 0.3);
+  background: rgba(13, 148, 136, 0.08);
+  color: #0f766e;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.notify-email-saved svg {
+  flex-shrink: 0;
+  margin-top: 0.12rem;
+}
+
+.notify-email-saved strong {
+  font-weight: 700;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.notify-email-saved--quiet {
+  background: rgba(13, 148, 136, 0.05);
+  border-color: rgba(13, 148, 136, 0.18);
+}
+
 .seal-summary p {
   margin: 0 0 0.35rem;
 }
@@ -2956,6 +3161,11 @@ a.hash-chip.text-link:focus-visible {
   border-color: rgba(94, 234, 212, 0.28);
 }
 
+.party-list-item--invited:not(.party-list-item--done) {
+  background: rgba(13, 148, 136, 0.07);
+  border-color: rgba(13, 148, 136, 0.28);
+}
+
 .party-list-check {
   flex-shrink: 0;
   width: 1.35rem;
@@ -2973,6 +3183,111 @@ a.hash-chip.text-link:focus-visible {
   background: rgba(94, 234, 212, 0.18);
   border-color: rgba(94, 234, 212, 0.45);
   color: var(--mint);
+}
+
+.party-list-item--invited:not(.party-list-item--done) .party-list-check {
+  background: rgba(13, 148, 136, 0.12);
+  border-color: rgba(13, 148, 136, 0.4);
+  color: var(--mint-deep, #0f766e);
+}
+
+.party-list-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.35rem;
+  min-width: 0;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.party-list-invite-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.15rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(13, 148, 136, 0.35);
+  background: rgba(13, 148, 136, 0.1);
+  color: #0f766e;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Per-person invite card (Sign step) */
+.share-cosigner-fields {
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.share-cosigner-fields--invited {
+  border-color: rgba(13, 148, 136, 0.35);
+  background: color-mix(in srgb, #0d9488 6%, #ffffff);
+  box-shadow: inset 0 0 0 1px rgba(13, 148, 136, 0.08);
+}
+
+.share-cosigner-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.65rem;
+}
+
+.share-cosigner-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text, #0f172a);
+}
+
+.share-cosigner-title-meta {
+  font-weight: 500;
+}
+
+.share-cosigner-sent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(13, 148, 136, 0.35);
+  background: rgba(13, 148, 136, 0.1);
+  color: #0f766e;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.share-cosigner-sent-detail {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #0f766e;
+}
+
+.share-cosigner-sent-detail strong {
+  font-weight: 700;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.share-cosigner-note {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #0f766e;
+}
+
+.share-cosigner-link {
+  font-size: 0.7rem !important;
+  word-break: break-all;
+  display: block;
+  color: #475569;
 }
 
 .party-status {
@@ -5023,108 +5338,169 @@ a.hash-chip.text-link:focus-visible {
   }
 }
 
-/* ── Invite-sent toast (bottom center, portaled to body after Resend invite) ── */
+/* ── Invite handoff help modal (portaled; stays until Got it) ── */
 
-.invite-sent-toast {
+.invite-handoff-modal-layer {
   position: fixed;
-  left: 50%;
-  bottom: max(1.35rem, env(safe-area-inset-bottom, 0px));
-  /* Above sticky header (backdrop-filter) and dock; below login sheet (200) was wrong when trapped */
+  inset: 0;
   z-index: 400;
   display: flex;
-  align-items: flex-start;
-  gap: 0.8rem;
-  width: min(28rem, calc(100vw - 1.5rem));
-  padding: 1rem 0.95rem 1rem 1.05rem;
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, #0d9488 35%, #e2e8f0);
-  background: #ffffff;
-  box-shadow:
-    0 18px 48px rgba(15, 23, 42, 0.2),
-    0 4px 14px rgba(15, 23, 42, 0.1);
-  transform: translateX(-50%);
-  animation: invite-toast-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
-  pointer-events: auto;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding:
+    max(0.75rem, env(safe-area-inset-top, 0px))
+    max(0.75rem, env(safe-area-inset-right, 0px))
+    max(0.75rem, env(safe-area-inset-bottom, 0px))
+    max(0.75rem, env(safe-area-inset-left, 0px));
+  pointer-events: none;
+  animation: invite-handoff-fade 0.22s ease both;
 }
 
-.invite-sent-toast-icon {
-  flex-shrink: 0;
+.invite-handoff-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  cursor: default;
+  pointer-events: auto;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(6px) saturate(0.75);
+  -webkit-backdrop-filter: blur(6px) saturate(0.75);
+}
+
+.invite-handoff-modal {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  width: min(24rem, 100%);
+  max-height: min(88dvh, 36rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+  padding: 1.15rem 1.2rem 1.25rem;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #ffffff;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+  color: #0f172a;
+  text-align: left;
+  animation: invite-handoff-rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.invite-handoff-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.invite-handoff-modal-icon {
   display: grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 999px;
   background: color-mix(in srgb, #0d9488 12%, #f0fdfa);
   color: #0f766e;
-}
-
-.invite-sent-toast-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.invite-sent-toast-body strong {
-  display: block;
-  font-size: 0.92rem;
-  font-weight: 700;
-  color: #0f172a;
-  letter-spacing: -0.01em;
-  margin-bottom: 0.15rem;
-}
-
-.invite-sent-toast-body p {
-  margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.45;
-  color: #475569;
-}
-
-.invite-sent-toast-contact {
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.invite-sent-toast-dismiss {
   flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  margin: -0.15rem -0.1rem 0 0;
+}
+
+.invite-handoff-modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin: -0.25rem -0.35rem 0 0;
   padding: 0;
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #94a3b8;
+  color: #64748b;
   cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
 }
 
-.invite-sent-toast-dismiss:hover {
+.invite-handoff-modal-close:hover {
   background: #f1f5f9;
+  color: #0f766e;
+}
+
+.invite-handoff-modal-title {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display, inherit);
+  font-size: 1.12rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.invite-handoff-modal-body {
+  margin: 0 0 0.65rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
   color: #475569;
 }
 
-.invite-sent-toast-dismiss:focus-visible {
-  outline: 2px solid #0d9488;
-  outline-offset: 1px;
+.invite-handoff-modal-body--emphasis {
+  color: #0f172a;
+  font-weight: 550;
 }
 
-@keyframes invite-toast-in {
+.invite-handoff-contact {
+  font-weight: 650;
+  color: #0f172a;
+}
+
+.invite-handoff-modal-steps {
+  margin: 0 0 1.15rem;
+  padding-left: 1.2rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.invite-handoff-modal-steps li + li {
+  margin-top: 0.3rem;
+}
+
+.invite-handoff-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.invite-handoff-modal-actions .btn {
+  width: 100%;
+}
+
+@keyframes invite-handoff-fade {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(0.85rem) scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes invite-handoff-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.65rem) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .invite-sent-toast {
+  .invite-handoff-modal-layer,
+  .invite-handoff-modal {
     animation: none;
   }
 }

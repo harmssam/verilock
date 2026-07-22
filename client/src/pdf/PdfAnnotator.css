@@ -94,13 +94,15 @@
   box-shadow: 0 4px 24px rgb(15 23 42 / 12%);
   background: #fff;
   user-select: none;
-  /* Default: finger pan scrolls the stage (critical on iPad).
-     .is-tool-active locks pan while placing so taps don't scroll away. */
+  /* Finger pan scrolls the stage (critical on phone/iPad). Keep pan enabled even
+     while a place tool is active — placement uses tap (pointerup without drag),
+     not pointerdown, so scrolling and placing can coexist. */
   touch-action: pan-x pan-y;
 }
 
 .pdf-annotator-page-wrap.is-tool-active {
-  touch-action: none;
+  /* Crosshair only; do not set touch-action:none (that blocked mobile pan). */
+  cursor: crosshair;
 }
 
 .pdf-annotator-page-wrap canvas {

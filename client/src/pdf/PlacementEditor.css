@@ -146,13 +146,99 @@
   font-size: 0.875rem;
 }
 
-.placement-editor-count select {
+.placement-editor-count {
   margin-left: auto;
-  font-size: 0.8125rem;
-  padding: 0.2rem 0.4rem;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.placement-editor-count-label {
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--muted, #64748b);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.placement-people-stepper {
+  display: inline-flex;
+  align-items: stretch;
   border: 1px solid var(--border, #cbd5e1);
+  border-radius: 8px;
   background: #fff;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgb(15 23 42 / 4%);
+}
+
+.placement-people-stepper-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 1.85rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-right: 1px solid var(--border, #e2e8f0);
+  background: #f8fafc;
+  color: #0f172a;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.placement-people-stepper-btn:last-child {
+  border-right: none;
+  border-left: 1px solid var(--border, #e2e8f0);
+}
+
+.placement-people-stepper-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: var(--person-color, #0f766e);
+}
+
+.placement-people-stepper-btn:focus-visible {
+  outline: 2px solid var(--person-color, #0f766e);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.placement-people-stepper-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.placement-people-stepper-input {
+  width: 2.35rem;
+  margin: 0;
+  padding: 0.28rem 0.15rem;
+  border: none;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  line-height: 1.2;
+  /* Hide native number spinners if UA maps inputMode oddly */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.placement-people-stepper-input:focus {
+  outline: none;
+  background: color-mix(in srgb, var(--person-color, #0f766e) 6%, #fff);
+}
+
+.placement-people-stepper-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.placement-people-stepper-input::-webkit-outer-spin-button,
+.placement-people-stepper-input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
 }
 
 /*

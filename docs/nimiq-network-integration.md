@@ -84,7 +84,9 @@ if (isNimiqPayHost() || window.nimiq) return 'nimiq-pay'
 return 'hub'
 ```
 
-**Opening in Nimiq Pay:** `nimiqpay://miniapp?url=<origin>` ([Mini Apps — Sharing](https://www.nimiq.dev/mini-apps)). VeriLock only assigns this scheme on mobile (`launchNimiqPayMiniApp`).
+**Opening in Nimiq Pay:** `nimiqpay://miniapp?url=<https-url>` ([Mini Apps — Sharing](https://www.nimiq.dev/mini-apps)).
+
+VeriLock uses the **full invite URL** (path + query, e.g. `/d/:slug?party=`) so Pay does not drop the user on home. Before launch we also stash the path in **localStorage** (`verilock-pay-return-path`) and restore it on boot if Pay only loaded the origin. Scheme is only assigned on mobile (`launchNimiqPayMiniApp`). Invite emails include both a browser link and a Pay deeplink.
 
 ---
 

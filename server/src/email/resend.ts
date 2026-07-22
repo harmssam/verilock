@@ -71,3 +71,12 @@ export async function sendTransactionalEmail(input: SendEmailInput): Promise<Sen
 export function documentDeepLink(slug: string): string {
   return `${appPublicUrl()}/d/${slug}`
 }
+
+/**
+ * Nimiq Pay mini-app deeplink for a full HTTPS page (invite path + query).
+ * Protocol: `nimiqpay://miniapp?url=<encoded https url>`
+ * @see https://www.nimiq.dev/mini-apps — Sharing Your Mini App
+ */
+export function nimiqPayMiniAppDeepLink(httpsUrl: string): string {
+  return `nimiqpay://miniapp?url=${encodeURIComponent(httpsUrl)}`
+}
