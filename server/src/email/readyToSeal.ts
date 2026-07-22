@@ -3,7 +3,7 @@ import {
   getDocumentNotifyEmail,
   markReadyToSealEmailSent,
 } from '../db.js'
-import { documentDeepLink, sendTransactionalEmail } from './resend.js'
+import { agreementsDeepLink, sendTransactionalEmail } from './resend.js'
 
 function escapeHtml(value: string): string {
   return value
@@ -29,13 +29,14 @@ export async function notifyCreatorReadyToSeal(documentId: string): Promise<void
       return
     }
 
-    const link = documentDeepLink(doc.slug)
-    const subject = `All signed — seal "${doc.title}" on VeriLock`
+    // My Agreements (not /d/…) — document deep links open the “I was invited” signer flow.
+    const link = agreementsDeepLink()
+    const subject = `All signed — lock "${doc.title}" on VeriLock`
     const text = [
       'Hi,',
       '',
       `Everyone has signed "${doc.title}" on VeriLock.`,
-      'Open the link below to seal the fingerprint on the Nimiq blockchain.',
+      'Open My agreements below, then lock the fingerprint on the Nimiq blockchain.',
       '',
       link,
       '',
@@ -50,8 +51,8 @@ export async function notifyCreatorReadyToSeal(documentId: string): Promise<void
       <div style="font-family:system-ui,sans-serif;line-height:1.5;color:#0f172a;max-width:560px">
         <p>Hi,</p>
         <p>Everyone has signed <strong>${safeTitle}</strong> on VeriLock.</p>
-        <p>Open the agreement and complete the on-chain seal when you are ready:</p>
-        <p><a href="${link}" style="display:inline-block;padding:12px 18px;background:#0d9488;color:#fff;text-decoration:none;border-radius:999px;font-weight:600">Seal on Nimiq</a></p>
+        <p>Open <strong>My agreements</strong> and complete the on-chain lock when you are ready:</p>
+        <p><a href="${link}" style="display:inline-block;padding:12px 18px;background:#0d9488;color:#fff;text-decoration:none;border-radius:999px;font-weight:600">Open My agreements</a></p>
         <p style="font-size:14px;color:#475569">Or paste this link:<br/><a href="${link}">${link}</a></p>
         <p style="font-size:13px;color:#64748b">VeriLock never hosts your PDF — keep your local copy.</p>
         <p style="font-size:12px;color:#94a3b8">VeriLock · Sign together. Prove forever.</p>

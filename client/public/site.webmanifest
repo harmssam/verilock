@@ -1,7 +1,7 @@
 {
   "name": "VeriLock",
   "short_name": "VeriLock",
-  "description": "Sign documents and seal document hashes on the Nimiq blockchain.",
+  "description": "Sign documents and lock document fingerprints on the Nimiq blockchain.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0d112e",

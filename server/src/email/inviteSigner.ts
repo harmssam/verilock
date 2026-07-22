@@ -74,7 +74,7 @@ export async function sendPartyInviteEmail(input: {
   }
 
   if (doc.status === 'locked') {
-    return { ok: false, status: 400, error: 'This agreement is already sealed' }
+    return { ok: false, status: 400, error: 'This agreement is already locked' }
   }
 
   let to: string

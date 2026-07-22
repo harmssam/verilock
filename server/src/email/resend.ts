@@ -72,6 +72,11 @@ export function documentDeepLink(slug: string): string {
   return `${appPublicUrl()}/d/${slug}`
 }
 
+/** Full agreements list — preferred after signatures (not the invite /d/ path). */
+export function agreementsDeepLink(): string {
+  return `${appPublicUrl()}/agreements`
+}
+
 /**
  * Nimiq Pay mini-app deeplink for a full HTTPS page (invite path + query).
  * Protocol: `nimiqpay://miniapp?url=<encoded https url>`
