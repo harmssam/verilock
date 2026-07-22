@@ -7,7 +7,7 @@ import {
   processLenientHubRedirect,
   type HubLockRedirectResult,
 } from './hubSealRedirect'
-import { saveHubReturnPath } from './hubReturnPath'
+import { saveHubReturnPath, savePayReturnPath } from './hubReturnPath'
 import { clearStaleHubRpcStateIfIdle, getHubReturnUrl } from './hubRedirectParse'
 import { peekHubRedirectInUrl, RPC_ID_SEARCH_PARAM } from './sealRecovery'
 import { sealError, sealLog, sealWarn } from './sealDebug'
@@ -845,13 +845,33 @@ export async function connectViaHub(
   }
 }
 
+/**
+ * Build a Nimiq Pay mini-app target URL.
+ * Prefer full path+query (invite `/d/:slug?party=…`) so Pay opens the agreement,
+ * not just the site origin/home. Origin-only was dropping signing deep links.
+ *
+ * Docs show `nimiqpay://miniapp?url=your-app.com`; full HTTPS URLs with path are
+ * accepted by the Pay WebView in practice. We still stash the path in localStorage
+ * (`savePayReturnPath`) so a origin-only load can restore the invite.
+ */
 export function normalizeMiniAppUrl(appUrl: string): string {
   try {
-    const parsed = new URL(appUrl)
-    return parsed.origin
+    const base =
+      typeof window !== 'undefined' ? window.location.href : 'https://verilock.online/'
+    const parsed = new URL(appUrl, base)
+    // Path + query only (no hash) — SPA deep links use pathname/search.
+    const path = parsed.pathname === '/' ? '' : parsed.pathname
+    const search = parsed.search || ''
+    return `${parsed.origin}${path}${search}`
   } catch {
     return appUrl.replace(/\/+$/, '')
   }
+}
+
+/** Current page as a mini-app URL (invite deep link when on /d/…). */
+export function currentMiniAppUrl(): string {
+  if (typeof window === 'undefined') return 'https://verilock.online'
+  return `${window.location.origin}${window.location.pathname}${window.location.search}`
 }
 
 export const NIMIQ_PAY_IOS_URL = 'https://apps.apple.com/us/app/nimiq-pay/id6471844738'
@@ -871,9 +891,13 @@ export function isMobileDevice(): boolean {
 }
 
 export function getMiniAppWebUrl(appUrl?: string): string {
-  return normalizeMiniAppUrl(appUrl ?? window.location.origin)
+  return normalizeMiniAppUrl(appUrl ?? currentMiniAppUrl())
 }
 
+/**
+ * `nimiqpay://miniapp?url=<https url>`
+ * @see https://www.nimiq.dev/mini-apps — Sharing Your Mini App
+ */
 export function nimiqPayDeepLink(appUrl: string): string {
   const target = normalizeMiniAppUrl(appUrl)
   return `nimiqpay://miniapp?url=${encodeURIComponent(target)}`
@@ -885,7 +909,16 @@ export type NimiqPayLaunchResult = 'already-in-pay' | 'launched' | 'unavailable'
 export function launchNimiqPayMiniApp(appUrl?: string): NimiqPayLaunchResult {
   if (isNimiqPayHost()) return 'already-in-pay'
   if (!isMobileDevice()) return 'unavailable'
-  window.location.assign(nimiqPayDeepLink(appUrl ?? window.location.origin))
+  const target = appUrl ?? currentMiniAppUrl()
+  // Persist path for restore if Pay only loads the origin (sessionStorage is lost).
+  try {
+    const parsed = new URL(normalizeMiniAppUrl(target), window.location.origin)
+    const path = `${parsed.pathname}${parsed.search}`
+    if (path && path !== '/') savePayReturnPath(path)
+  } catch {
+    savePayReturnPath()
+  }
+  window.location.assign(nimiqPayDeepLink(target))
   return 'launched'
 }
 
@@ -895,7 +928,7 @@ export function openNimiqPayMiniApp(appUrl?: string): void {
 }
 
 export async function copyNimiqPayDeepLink(appUrl?: string): Promise<string> {
-  const link = nimiqPayDeepLink(appUrl ?? window.location.origin)
+  const link = nimiqPayDeepLink(appUrl ?? currentMiniAppUrl())
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(link)
   }

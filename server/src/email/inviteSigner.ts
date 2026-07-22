@@ -6,7 +6,7 @@ import { getPartiesForDocument, getPartyById } from '../db.js'
 import { normalizeAddress } from '../addresses.js'
 import { sanitizeNotifyEmail } from '../security.js'
 import { appPublicUrl, isResendSendEnabled } from './config.js'
-import { documentDeepLink, sendTransactionalEmail } from './resend.js'
+import { documentDeepLink, nimiqPayMiniAppDeepLink, sendTransactionalEmail } from './resend.js'
 
 function escapeHtml(value: string): string {
   return value
@@ -108,6 +108,11 @@ export async function sendPartyInviteEmail(input: {
 
   const base = documentDeepLink(doc.slug)
   const link = `${base}${base.includes('?') ? '&' : '?'}party=${encodeURIComponent(party.id)}`
+  // HTTPS bridge with openPay=1 — email clients often block nimiqpay:// schemes.
+  // Client strips the flag, stashes the path, then launches Nimiq Pay with the full URL.
+  const payHttpsBridge = `${link}${link.includes('?') ? '&' : '?'}openPay=1`
+  // Native scheme (plain-text + clients that allow it), full invite path in url=.
+  const payNativeLink = nimiqPayMiniAppDeepLink(link)
   const personName = party.displayName?.trim() || 'there'
   const organizerName = resolveOrganizerName(doc)
   const safePerson = escapeHtml(personName)
@@ -127,12 +132,18 @@ export async function sendPartyInviteEmail(input: {
     '',
     `${organizerName} has requested you sign “${doc.title}” on VeriLock.`,
     '',
-    'Open your personal signing link (keeps you on the correct person):',
+    'Open in your browser (Nimiq Hub login works here):',
     link,
+    '',
+    'Or open in the Nimiq Pay app (best on phone — installs Pay if needed via the site first):',
+    payHttpsBridge,
+    '',
+    'Nimiq Pay direct link (if your mail app allows custom schemes):',
+    payNativeLink,
     '',
     walletNote,
     '',
-    'Important: VeriLock never hosts or emails the PDF. Use the exact PDF file the organizer shared with you, then open the link above to match the fingerprint and sign.',
+    'Important: VeriLock never hosts or emails the PDF. Use the exact PDF file the organizer shared with you, then open a link above to match the fingerprint and sign.',
     '',
     '—',
     'VeriLock · Sign together. Prove forever.',
@@ -159,11 +170,30 @@ export async function sendPartyInviteEmail(input: {
               <p style="margin:0 0 16px;font-size:16px;">
                 <strong>${safeOrganizer}</strong> has requested you sign <strong>${safeTitle}</strong> on VeriLock.
               </p>
-              <p style="margin:0 0 20px;text-align:center;">
-                <a href="${link}"
-                   style="display:inline-block;padding:14px 22px;background:#0d9488;color:#ffffff;text-decoration:none;border-radius:999px;font-weight:600;font-size:15px;">
-                  Open your signing link
-                </a>
+              <p style="margin:0 0 10px;font-size:14px;color:#475569;text-align:center;">
+                Choose how you want to open your personal signing link:
+              </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 12px;">
+                <tr>
+                  <td align="center" style="padding:0 0 10px;">
+                    <a href="${link}"
+                       style="display:inline-block;padding:14px 22px;background:#0d9488;color:#ffffff;text-decoration:none;border-radius:999px;font-weight:600;font-size:15px;">
+                      Open in browser
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:0 0 8px;">
+                    <a href="${payHttpsBridge}"
+                       style="display:inline-block;padding:14px 22px;background:#ffffff;color:#0f766e;text-decoration:none;border-radius:999px;font-weight:600;font-size:15px;border:2px solid #0d9488;">
+                      Open in Nimiq Pay
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 16px;font-size:12px;color:#64748b;text-align:center;line-height:1.45;">
+                <strong>Browser</strong> uses Nimiq Hub in Safari/Chrome.
+                <strong>Nimiq Pay</strong> opens this agreement inside the Pay app (phone).
               </p>
               <p style="margin:0 0 12px;font-size:14px;color:#475569;">
                 ${escapeHtml(walletNote)}
@@ -177,7 +207,7 @@ export async function sendPartyInviteEmail(input: {
               <div style="padding:14px 16px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
                 <p style="margin:0;font-size:13px;color:#64748b;line-height:1.45;">
                   <strong style="color:#0f172a;">Your PDF stays private.</strong>
-                  VeriLock never hosts or emails the document file. Use the exact PDF the organizer shared with you, then open the link to match its fingerprint and complete your fields.
+                  VeriLock never hosts or emails the document file. Use the exact PDF the organizer shared with you, then open a link above to match its fingerprint and complete your fields.
                 </p>
               </div>
             </td>

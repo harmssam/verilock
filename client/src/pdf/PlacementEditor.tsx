@@ -6,6 +6,8 @@
 import {
   AlignLeft,
   Check,
+  Minus,
+  Plus,
   Square,
   Trash2,
   Type,
@@ -193,6 +195,12 @@ export function PlacementEditor({
   const [placeError, setPlaceError] = useState<string | null>(null)
   /** Optional label on fillable text fields (e.g. "Date", "Printed name"). */
   const [textFieldLabel, setTextFieldLabel] = useState('')
+  /**
+   * Draft digits while typing the people count (null = show committed people.length).
+   * Allows clearing the field mid-edit without snapping back to 1 immediately.
+   */
+  const [peopleCountDraft, setPeopleCountDraft] = useState<string | null>(null)
+  const peopleCountInputRef = useRef<HTMLInputElement>(null)
   const [placing, setPlacing] = useState<{ type: Tool; x: number; y: number } | null>(null)
   const dragRef = useRef<{
     id: string
@@ -202,6 +210,18 @@ export function PlacementEditor({
     origY: number
     moved: boolean
   } | null>(null)
+  /**
+   * Place tools wait for pointerup. On mobile, pointerdown alone would drop a box
+   * while the user is still trying to pan/scroll the PDF stage.
+   */
+  const placeGestureRef = useRef<{
+    pointerId: number
+    startClientX: number
+    startClientY: number
+    cancelled: boolean
+  } | null>(null)
+  /** Finger/mouse movement above this = pan/scroll, not a place tap. */
+  const PLACE_TAP_SLOP_PX = 12
   const [dragTick, setDragTick] = useState(0)
 
   const people = plan.people.length > 0 ? plan.people : defaultPeople(1)
@@ -311,31 +331,92 @@ export function PlacementEditor({
     [patchPlan],
   )
 
-  const setPeopleCount = (n: number) => {
-    const count = Math.max(MIN_CONSTRUCTION_PEOPLE, Math.min(MAX_CONSTRUCTION_PEOPLE, n))
-    const next: ConstructionPerson[] = []
-    for (let i = 1; i <= count; i++) {
-      const existing = people.find(p => p.slotIndex === i)
-      next.push(
-        existing ?? {
-          slotIndex: i,
-          displayName: `Person ${i}`,
-        },
+  const setPeopleCount = useCallback(
+    (n: number) => {
+      // Only whole numbers; anything > max → max, anything < min → min.
+      const raw = Number.isFinite(n) ? Math.trunc(n) : MIN_CONSTRUCTION_PEOPLE
+      const count = Math.max(
+        MIN_CONSTRUCTION_PEOPLE,
+        Math.min(MAX_CONSTRUCTION_PEOPLE, raw),
       )
+      setPeopleCountDraft(null)
+      patchPlan(p => {
+        const current = p.people.length > 0 ? p.people : defaultPeople(1)
+        if (count === current.length) return p
+        const next: ConstructionPerson[] = []
+        for (let i = 1; i <= count; i++) {
+          const existing = current.find(x => x.slotIndex === i)
+          next.push(
+            existing ?? {
+              slotIndex: i,
+              displayName: `Person ${i}`,
+            },
+          )
+        }
+        const cs = p.creatorSigningAs
+        return {
+          ...p,
+          people: next,
+          slots: p.slots.filter(s => next.some(x => x.slotIndex === s.personSlotIndex)),
+          creatorSigningAs: cs != null && cs > count ? null : cs ?? null,
+        }
+      })
+      setActivePerson(prev => {
+        if (prev != null && prev > count) {
+          setTool('select')
+          setPlacing(null)
+          return null
+        }
+        return prev
+      })
+    },
+    [patchPlan],
+  )
+
+  const commitPeopleCountDraft = () => {
+    if (peopleCountDraft == null) return
+    const trimmed = peopleCountDraft.trim()
+    if (trimmed === '') {
+      setPeopleCount(MIN_CONSTRUCTION_PEOPLE)
+      return
     }
-    const cs = plan.creatorSigningAs
-    patchPlan(p => ({
-      ...p,
-      people: next,
-      slots: p.slots.filter(s => next.some(x => x.slotIndex === s.personSlotIndex)),
-      creatorSigningAs: cs != null && cs > count ? null : cs ?? null,
-    }))
-    if (activePerson != null && activePerson > count) {
-      setActivePerson(null)
-      setTool('select')
-      setPlacing(null)
-    }
+    const n = Number.parseInt(trimmed, 10)
+    setPeopleCount(Number.isFinite(n) ? n : MIN_CONSTRUCTION_PEOPLE)
   }
+
+  const onPeopleCountInputChange = (raw: string) => {
+    // Digits only (no signs, decimals, or letters).
+    // Draft-only — do not commit plan until blur/Enter/+/-/wheel.
+    // Live-committing each digit (e.g. typing "10") briefly set count=1 and
+    // deleted persons 2–N and their placement boxes.
+    let digits = raw.replace(/\D/g, '')
+    if (digits !== '') {
+      const n = Number.parseInt(digits, 10)
+      if (Number.isFinite(n) && n > MAX_CONSTRUCTION_PEOPLE) {
+        digits = String(MAX_CONSTRUCTION_PEOPLE)
+      }
+    }
+    setPeopleCountDraft(digits)
+  }
+
+  // Wheel on the count field steps ±1. Use a non-passive listener so we can
+  // preventDefault (React's onWheel is often passive and cannot block page scroll).
+  useEffect(() => {
+    const el = peopleCountInputRef.current
+    if (!el || editDisabled || locked) return
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY === 0) return
+      e.preventDefault()
+      const step = e.deltaY < 0 ? 1 : -1
+      const draft = peopleCountDraft
+      const base =
+        draft != null && draft !== '' ? Number.parseInt(draft, 10) : people.length
+      const current = Number.isFinite(base) ? base : people.length
+      setPeopleCount(current + step)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [editDisabled, locked, people.length, peopleCountDraft, setPeopleCount])
 
   const renamePerson = (slotIndex: number, displayName: string) => {
     setPeople(
@@ -552,9 +633,16 @@ export function PlacementEditor({
         setPlaceError('Select a person first, then place their boxes.')
         return
       }
-      e.preventDefault()
+      // Do not place or preventDefault here — mobile needs pointerdown+move to
+      // scroll the stage. Place only on a short pointerup (see onStagePointerUp).
       const p = pointerToLocal(e)
-      placeAt(p.x, p.y)
+      placeGestureRef.current = {
+        pointerId: e.pointerId,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        cancelled: false,
+      }
+      setPlacing({ type: tool, x: p.x, y: p.y })
       return
     }
     if (e.target === wrapRef.current || e.target === canvasRef.current) {
@@ -563,7 +651,20 @@ export function PlacementEditor({
   }
 
   const onStagePointerMove = (e: React.PointerEvent) => {
-    if (!toolsDisabled && tool !== 'select') {
+    const placeGesture = placeGestureRef.current
+    if (placeGesture && placeGesture.pointerId === e.pointerId) {
+      const dist = Math.hypot(
+        e.clientX - placeGesture.startClientX,
+        e.clientY - placeGesture.startClientY,
+      )
+      if (dist > PLACE_TAP_SLOP_PX) {
+        placeGesture.cancelled = true
+        setPlacing(null)
+      }
+    }
+
+    // Ghost follows pointer only for true hover / stationary tap preview — not while panning.
+    if (!toolsDisabled && tool !== 'select' && !placeGesture?.cancelled) {
       const p = pointerToLocal(e)
       setPlacing({ type: tool, x: p.x, y: p.y })
     }
@@ -590,6 +691,32 @@ export function PlacementEditor({
     if (slot && (slot.kind === 'checkmark' || slot.kind === 'cross')) {
       toggleMarkSlot(drag.id)
     }
+  }
+
+  const onStagePointerUp = (e: React.PointerEvent) => {
+    const placeGesture = placeGestureRef.current
+    if (placeGesture && placeGesture.pointerId === e.pointerId) {
+      placeGestureRef.current = null
+      if (
+        !placeGesture.cancelled &&
+        !editDisabled &&
+        !toolsDisabled &&
+        tool !== 'select'
+      ) {
+        const p = pointerToLocal(e)
+        placeAt(p.x, p.y)
+      }
+    }
+    endDrag()
+  }
+
+  const onStagePointerCancel = (e: React.PointerEvent) => {
+    const placeGesture = placeGestureRef.current
+    if (placeGesture && placeGesture.pointerId === e.pointerId) {
+      placeGestureRef.current = null
+      setPlacing(null)
+    }
+    endDrag()
   }
 
   const startItemDrag = (e: React.PointerEvent, id: string) => {
@@ -661,20 +788,74 @@ export function PlacementEditor({
           <UserRound size={16} strokeWidth={2.25} aria-hidden />
           <strong>People who sign</strong>
           {!locked && (
-            <label className="placement-editor-count">
-              <span className="visually-hidden">How many people</span>
-              <select
-                value={people.length}
-                disabled={editDisabled}
-                onChange={e => setPeopleCount(Number(e.target.value))}
+            <div className="placement-editor-count">
+              <span className="placement-editor-count-label" id="placement-people-count-label">
+                Signers
+              </span>
+              <div
+                className="placement-people-stepper"
+                role="group"
+                aria-labelledby="placement-people-count-label"
               >
-                {Array.from({ length: MAX_CONSTRUCTION_PEOPLE }, (_, i) => i + 1).map(n => (
-                  <option key={n} value={n}>
-                    {n} {n === 1 ? 'person' : 'people'}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <button
+                  type="button"
+                  className="placement-people-stepper-btn"
+                  disabled={editDisabled || people.length <= MIN_CONSTRUCTION_PEOPLE}
+                  onClick={() => setPeopleCount(people.length - 1)}
+                  aria-label="Fewer signers"
+                  title="Fewer signers"
+                >
+                  <Minus size={14} strokeWidth={2.5} aria-hidden />
+                </button>
+                <input
+                  ref={peopleCountInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="placement-people-stepper-input"
+                  value={peopleCountDraft ?? String(people.length)}
+                  disabled={editDisabled}
+                  onChange={e => onPeopleCountInputChange(e.target.value)}
+                  onBlur={commitPeopleCountDraft}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      ;(e.currentTarget as HTMLInputElement).blur()
+                    }
+                    if (e.key === 'ArrowUp') {
+                      e.preventDefault()
+                      const base =
+                        peopleCountDraft != null && peopleCountDraft !== ''
+                          ? Number.parseInt(peopleCountDraft, 10)
+                          : people.length
+                      setPeopleCount((Number.isFinite(base) ? base : people.length) + 1)
+                    }
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault()
+                      const base =
+                        peopleCountDraft != null && peopleCountDraft !== ''
+                          ? Number.parseInt(peopleCountDraft, 10)
+                          : people.length
+                      setPeopleCount((Number.isFinite(base) ? base : people.length) - 1)
+                    }
+                  }}
+                  aria-label={`Number of signers (${MIN_CONSTRUCTION_PEOPLE}–${MAX_CONSTRUCTION_PEOPLE})`}
+                  title={`${MIN_CONSTRUCTION_PEOPLE}–${MAX_CONSTRUCTION_PEOPLE} people. Scroll or use + / −.`}
+                />
+                <button
+                  type="button"
+                  className="placement-people-stepper-btn"
+                  disabled={editDisabled || people.length >= MAX_CONSTRUCTION_PEOPLE}
+                  onClick={() => setPeopleCount(people.length + 1)}
+                  aria-label="More signers"
+                  title="More signers"
+                >
+                  <Plus size={14} strokeWidth={2.5} aria-hidden />
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
@@ -1021,8 +1202,8 @@ export function PlacementEditor({
       {!locked && !reviewMode && activePerson != null && (
         <p className="placement-editor-hint placement-editor-hint--design" role="status">
           <strong>Designing, not signing.</strong> These boxes mark where people will sign later.
-          No ink or wallet signature is collected on this step. Check and X boxes start empty — click
-          a placed box to toggle the mark.
+          No ink or wallet signature is collected on this step. Tap to place a field; drag to pan the
+          page. Check and X boxes start empty — click a placed box to toggle the mark.
         </p>
       )}
       {reviewMode && (
@@ -1055,10 +1236,12 @@ export function PlacementEditor({
             style={{ width: cssSize.width }}
             onPointerDown={onStagePointerDown}
             onPointerMove={onStagePointerMove}
-            onPointerUp={endDrag}
-            onPointerCancel={endDrag}
+            onPointerUp={onStagePointerUp}
+            onPointerCancel={onStagePointerCancel}
             onPointerLeave={() => {
-              if (tool !== 'select') setPlacing(null)
+              // Clear hover ghost only; keep an in-flight place gesture until up/cancel
+              // so a finger that briefly leaves the page wrap mid-tap still places.
+              if (tool !== 'select' && !placeGestureRef.current) setPlacing(null)
             }}
           >
             <canvas ref={canvasRef} />

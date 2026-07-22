@@ -333,7 +333,11 @@ export function App() {
     rememberJourneyPath()
     setScreen('blog')
     const next = slug ? `/blog/${slug}` : '/blog'
+    // pushState does not re-render React. When already on screen === 'blog',
+    // setScreen('blog') is a no-op — bump navEpoch so BlogPage re-reads pathname
+    // (index ↔ post and post ↔ post would otherwise stick on the old view).
     pushShellUrl(next)
+    setNavEpoch(n => n + 1)
     scrollShellTop()
   }, [rememberJourneyPath])
 
@@ -595,12 +599,19 @@ export function App() {
             </div>
           </button>
 
-          <div className="lr-header-actions">
-            {/* Logged-in: Agreements nav. */}
+          <div
+            className={[
+              'lr-header-actions',
+              wallet.account ? 'lr-header-actions--connected' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {/* Logged-in: Agreements nav (hidden on narrow — also in AccountMenu). */}
             {wallet.account && (
               <button
                 type="button"
-                className={`lr-nav${screen === 'agreements' ? ' lr-nav--active' : ''}`}
+                className={`lr-nav lr-nav--agreements${screen === 'agreements' ? ' lr-nav--active' : ''}`}
                 onClick={goAgreements}
                 aria-current={screen === 'agreements' ? 'page' : undefined}
               >
@@ -614,7 +625,7 @@ export function App() {
             {!(wallet.account && creditBalance != null && Number.isFinite(creditBalance)) && (
               <button
                 type="button"
-                className={`lr-nav${screen === 'pricing' ? ' lr-nav--active' : ''}`}
+                className={`lr-nav lr-nav--pricing${screen === 'pricing' ? ' lr-nav--active' : ''}`}
                 onClick={goPricing}
                 aria-current={screen === 'pricing' ? 'page' : undefined}
               >

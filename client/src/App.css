@@ -285,6 +285,9 @@
   align-items: center;
   gap: 0.65rem;
   min-width: 0;
+  /* Yield space to nav/account before items collide on narrow screens. */
+  flex: 1 1 auto;
+  max-width: 100%;
   padding: 0;
   border: none;
   background: none;
@@ -327,6 +330,9 @@
   letter-spacing: -0.03em;
   color: var(--lr-text);
   line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lr-brand-tag {
@@ -343,7 +349,9 @@
   flex-wrap: nowrap;
   gap: 0.25rem;
   min-width: 0;
-  flex: 1 1 auto;
+  /* Prefer shrinking the brand over crushing nav labels into each other. */
+  flex: 0 1 auto;
+  max-width: min(100%, 28rem);
 }
 
 .lr-nav {
@@ -1515,9 +1523,24 @@ html {
   }
 }
 
-/* Narrow: no wrap under brand; Security → footer only */
+/*
+ * Narrow header collapse (footer keeps Blog / Security):
+ *  ≤720: hide Security; when logged in, hide Agreements + Pricing (AccountMenu)
+ *  ≤560: hide Blog; tighter brand + account chip
+ *  ≤400: hide wordmark if still cramped (mark alone is enough to go home)
+ */
 @media (max-width: 720px) {
   .lr-nav--security {
+    display: none;
+  }
+
+  /*
+   * Signed-in: Agreements + Pricing already live in AccountMenu (and credits chip);
+   * Blog remains in the footer. Drop the desktop links so address + credits fit.
+   */
+  .lr-header-actions--connected .lr-nav--agreements,
+  .lr-header-actions--connected .lr-nav--pricing,
+  .lr-header-actions--connected .lr-nav--blog {
     display: none;
   }
 
@@ -1532,6 +1555,7 @@ html {
 
   .lr-header-actions {
     gap: 0.15rem;
+    max-width: none;
   }
 
   .lr-nav {
@@ -1545,8 +1569,16 @@ html {
     display: none;
   }
 
+  /* Footer still has Blog */
+  .lr-nav--blog {
+    display: none;
+  }
+
   .lr-brand {
     gap: 0.45rem;
+    /* Cap brand so account cluster always has room on phones */
+    flex: 0 1 auto;
+    max-width: min(42vw, 9.5rem);
   }
 
   .lr-brand-mark {
@@ -1559,6 +1591,31 @@ html {
     font-size: 0.7rem;
   }
 
+  .lr-header .exp-account-cluster {
+    gap: 0.28rem;
+  }
+
+  .lr-header .exp-account-trigger {
+    max-width: 7.25rem;
+    padding: 0.38rem 0.5rem;
+    font-size: 0.7rem;
+    gap: 0.28rem;
+  }
+
+  .lr-header .exp-account-addr {
+    max-width: 5.25rem;
+  }
+
+  .lr-header .exp-credits-chip {
+    padding: 0.34rem 0.45rem;
+    font-size: 0.68rem;
+  }
+
+  .lr-header .exp-connect-btn.btn-primary {
+    font-size: 0.74rem !important;
+    padding: 0.45rem 0.7rem !important;
+  }
+
   .lr-path-main {
     gap: 0.55rem;
     padding: 0.85rem 0.9rem 0.95rem;
@@ -1566,8 +1623,21 @@ html {
 }
 
 @media (max-width: 400px) {
-  /* Footer still has Blog; keep Pricing + Account as the only header actions */
-  .lr-nav--blog {
+  .lr-brand-text {
     display: none;
+  }
+
+  .lr-brand {
+    max-width: none;
+    flex: 0 0 auto;
+  }
+
+  .lr-header .exp-account-trigger {
+    max-width: 6.5rem;
+    padding: 0.34rem 0.42rem;
+  }
+
+  .lr-header .exp-account-addr {
+    max-width: 4.6rem;
   }
 }

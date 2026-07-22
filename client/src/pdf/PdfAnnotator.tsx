@@ -80,6 +80,14 @@ export function PdfAnnotator({
     origX: number
     origY: number
   } | null>(null)
+  /** Place on pointerup unless the gesture moved (mobile pan/scroll). */
+  const placeGestureRef = useRef<{
+    pointerId: number
+    startClientX: number
+    startClientY: number
+    cancelled: boolean
+  } | null>(null)
+  const PLACE_TAP_SLOP_PX = 12
   const [dragTick, setDragTick] = useState(0)
 
   const counts = useMemo(() => countByType(annotations), [annotations])
@@ -299,17 +307,21 @@ export function PdfAnnotator({
     }
   }
 
+  const isPlaceTool =
+    tool === 'signature' || tool === 'text' || tool === 'checkmark' || tool === 'cross'
+
   const onStagePointerDown = (e: React.PointerEvent) => {
     if (disabled) return
-    if (
-      tool === 'signature' ||
-      tool === 'text' ||
-      tool === 'checkmark' ||
-      tool === 'cross'
-    ) {
-      e.preventDefault()
+    if (isPlaceTool) {
+      // Wait for pointerup so pan/scroll on mobile does not drop a mark.
       const p = pointerToLocal(e)
-      placeAt(p.x, p.y)
+      placeGestureRef.current = {
+        pointerId: e.pointerId,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        cancelled: false,
+      }
+      setPlacing({ type: tool, x: p.x, y: p.y })
       return
     }
     // select empty space
@@ -319,7 +331,18 @@ export function PdfAnnotator({
   }
 
   const onStagePointerMove = (e: React.PointerEvent) => {
-    if (tool === 'signature' || tool === 'text' || tool === 'checkmark' || tool === 'cross') {
+    const placeGesture = placeGestureRef.current
+    if (placeGesture && placeGesture.pointerId === e.pointerId) {
+      const dist = Math.hypot(
+        e.clientX - placeGesture.startClientX,
+        e.clientY - placeGesture.startClientY,
+      )
+      if (dist > PLACE_TAP_SLOP_PX) {
+        placeGesture.cancelled = true
+        setPlacing(null)
+      }
+    }
+    if (isPlaceTool && !placeGesture?.cancelled) {
       const p = pointerToLocal(e)
       setPlacing({ type: tool, x: p.x, y: p.y })
     }
@@ -341,6 +364,27 @@ export function PdfAnnotator({
 
   const endDrag = () => {
     dragRef.current = null
+  }
+
+  const onStagePointerUp = (e: React.PointerEvent) => {
+    const placeGesture = placeGestureRef.current
+    if (placeGesture && placeGesture.pointerId === e.pointerId) {
+      placeGestureRef.current = null
+      if (!placeGesture.cancelled && !disabled && isPlaceTool) {
+        const p = pointerToLocal(e)
+        placeAt(p.x, p.y)
+      }
+    }
+    endDrag()
+  }
+
+  const onStagePointerCancel = (e: React.PointerEvent) => {
+    const placeGesture = placeGestureRef.current
+    if (placeGesture && placeGesture.pointerId === e.pointerId) {
+      placeGestureRef.current = null
+      setPlacing(null)
+    }
+    endDrag()
   }
 
   const startItemDrag = (e: React.PointerEvent, id: string) => {
@@ -474,15 +518,10 @@ export function PdfAnnotator({
             style={{ width: cssSize.width }}
             onPointerDown={onStagePointerDown}
             onPointerMove={onStagePointerMove}
-            onPointerUp={endDrag}
-            onPointerCancel={endDrag}
+            onPointerUp={onStagePointerUp}
+            onPointerCancel={onStagePointerCancel}
             onPointerLeave={() => {
-              if (
-                tool === 'signature' ||
-                tool === 'text' ||
-                tool === 'checkmark' ||
-                tool === 'cross'
-              ) {
+              if (isPlaceTool && !placeGestureRef.current) {
                 setPlacing(null)
               }
             }}

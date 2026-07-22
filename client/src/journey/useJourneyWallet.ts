@@ -356,7 +356,8 @@ export function useJourneyWallet(): UseJourneyWalletResult {
           // true by default for desktop Hub reliability — do not gate Pay on that flag.
           if (isMobileDevice() && !explicitHubRedirect) {
             setWalletStatus('Opening Nimiq Pay…')
-            const appUrl = window.location.origin
+            // Full path+query so invite /d/:slug?party= survives Pay open (not just origin → home).
+            const appUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`
             const payResult = launchNimiqPayMiniApp(appUrl)
             if (payResult === 'already-in-pay') return
             if (payResult === 'launched') {
