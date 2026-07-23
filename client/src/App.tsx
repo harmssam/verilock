@@ -20,6 +20,7 @@ import {
 import { applyPageMeta, blogPostMeta, journeyPathMeta, PAGE_META, type PageMeta } from './seo'
 import { blogSlugFromPath, getPostBySlug } from './blog'
 import type { SealDocument } from './types'
+import { AppLink } from './AppLink'
 import { PricePage } from './PricePage'
 import { PrivacyPolicyPage } from './PrivacyPolicyPage'
 import { SecurityPage } from './SecurityPage'
@@ -585,7 +586,7 @@ export function App() {
 
       <header className="lr-header">
         <div className="lr-header-inner">
-          <button type="button" className="lr-brand" onClick={goJourney} aria-label="VeriLock home">
+          <AppLink to="/" onClick={goJourney} className="lr-brand" aria-label="VeriLock home">
             <img
               className="lr-brand-mark"
               src="/verilock-mark.png"
@@ -597,7 +598,7 @@ export function App() {
               <span className="lr-brand-name">VeriLock</span>
               <span className="lr-brand-tag">Sign together. Prove forever.</span>
             </div>
-          </button>
+          </AppLink>
 
           <div
             className={[
@@ -609,46 +610,46 @@ export function App() {
           >
             {/* Logged-in: Agreements nav (hidden on narrow — also in AccountMenu). */}
             {wallet.account && (
-              <button
-                type="button"
-                className={`lr-nav lr-nav--agreements${screen === 'agreements' ? ' lr-nav--active' : ''}`}
+              <AppLink
+                to="/agreements"
                 onClick={goAgreements}
+                className={`lr-nav lr-nav--agreements${screen === 'agreements' ? ' lr-nav--active' : ''}`}
                 aria-current={screen === 'agreements' ? 'page' : undefined}
               >
                 Agreements
-              </button>
+              </AppLink>
             )}
             {/*
               Credits chip (AccountMenu) already opens Pricing when balance is known.
               Hide Pricing nav when credits chip already covers it.
             */}
             {!(wallet.account && creditBalance != null && Number.isFinite(creditBalance)) && (
-              <button
-                type="button"
-                className={`lr-nav lr-nav--pricing${screen === 'pricing' ? ' lr-nav--active' : ''}`}
+              <AppLink
+                to="/pricing"
                 onClick={goPricing}
+                className={`lr-nav lr-nav--pricing${screen === 'pricing' ? ' lr-nav--active' : ''}`}
                 aria-current={screen === 'pricing' ? 'page' : undefined}
               >
                 Pricing
-              </button>
+              </AppLink>
             )}
-            <button
-              type="button"
-              className={`lr-nav lr-nav--blog${screen === 'blog' ? ' lr-nav--active' : ''}`}
+            <AppLink
+              to="/blog"
               onClick={() => goBlog()}
+              className={`lr-nav lr-nav--blog${screen === 'blog' ? ' lr-nav--active' : ''}`}
               aria-current={screen === 'blog' ? 'page' : undefined}
             >
               Blog
-            </button>
+            </AppLink>
             {/* Desktop only: on narrow viewports Security lives in the footer (prod parity, less crowding). */}
-            <button
-              type="button"
-              className={`lr-nav lr-nav--security${screen === 'security' ? ' lr-nav--active' : ''}`}
+            <AppLink
+              to="/security"
               onClick={goSecurity}
+              className={`lr-nav lr-nav--security${screen === 'security' ? ' lr-nav--active' : ''}`}
               aria-current={screen === 'security' ? 'page' : undefined}
             >
               Security
-            </button>
+            </AppLink>
             <AccountMenu
               account={wallet.account}
               connecting={wallet.connecting}
@@ -688,9 +689,9 @@ export function App() {
         screen === 'pdf' ||
         screen === 'pdf-lab' ||
         screen === 'not-found') && (
-        <button type="button" className="lr-back" onClick={goJourney}>
+        <AppLink to="/" onClick={goJourney} className="lr-back">
           ← Back to home
-        </button>
+        </AppLink>
       )}
 
       {screen === 'blog' && (
@@ -818,34 +819,34 @@ export function App() {
           Your wallet is your identity; the chain is the proof.
         </p>
         <div className="lr-footer-links">
-          <button
-            type="button"
+          <AppLink
+            to="/blog"
             className={`lr-footer-link${screen === 'blog' ? ' lr-footer-link--active' : ''}`}
             onClick={() => goBlog()}
           >
             Blog
-          </button>
-          <button
-            type="button"
+          </AppLink>
+          <AppLink
+            to="/security"
             className={`lr-footer-link${screen === 'security' ? ' lr-footer-link--active' : ''}`}
             onClick={goSecurity}
           >
             Security
-          </button>
-          <button
-            type="button"
+          </AppLink>
+          <AppLink
+            to="/privacy"
             className={`lr-footer-link${screen === 'privacy' ? ' lr-footer-link--active' : ''}`}
             onClick={goPrivacy}
           >
             Privacy Policy
-          </button>
-          <button
-            type="button"
+          </AppLink>
+          <AppLink
+            to="/support"
             className={`lr-footer-link${screen === 'support' ? ' lr-footer-link--active' : ''}`}
             onClick={goSupport}
           >
             Support
-          </button>
+          </AppLink>
           <a
             className="lr-footer-link"
             href="https://github.com/clevertech-os/verilock-offline"

@@ -11,6 +11,7 @@ import {
   type AgreementBucket,
 } from './agreements'
 import { documentTypeLabel, type SealDocument } from './types'
+import { AppLink } from './AppLink'
 import './AgreementsPanel.css'
 
 interface AgreementsPanelProps {
@@ -77,7 +78,7 @@ export function AgreementsPanel({
         key={doc.id}
         className={`agreement-item${isActive ? ' agreement-item--active' : ''}`}
       >
-        <button type="button" className="agreement-item-open" onClick={() => onOpen(doc.slug)}>
+        <AppLink to={`/d/${doc.slug}`} className="agreement-item-open" onClick={() => onOpen(doc.slug)}>
           <div className="agreement-item-main">
             <div className="agreement-item-title-row">
               <strong>{doc.title}</strong>
@@ -95,7 +96,7 @@ export function AgreementsPanel({
             <span className="muted agreement-item-detail">{view.detail}</span>
             {!showSealButton && <span className="agreement-item-cta">{view.cta} →</span>}
           </div>
-        </button>
+        </AppLink>
         {showSealButton && (
           <button
             type="button"

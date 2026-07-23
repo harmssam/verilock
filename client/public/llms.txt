@@ -1,0 +1,47 @@
+# VeriLock
+> Sign documents together. Lock proof on the Nimiq blockchain. Your file never leaves your device.
+
+## Key Pages
+- Home: https://verilock.online/ — Sign, invite co-signers, lock a permanent proof
+- Pricing: https://verilock.online/pricing — Free to sign, one-time fee to lock
+- Security: https://verilock.online/security — How VeriLock keeps documents private
+- Blog: https://verilock.online/blog — Guides, comparisons, and product updates
+- Support: https://verilock.online/support — Contact and help
+- Privacy: https://verilock.online/privacy — Privacy policy
+
+## What VeriLock Does
+1. Fingerprint a document locally — the file never leaves your device.
+2. Invite co-signers via a link; they sign with their Nimiq wallet.
+3. Lock the final fingerprint on the Nimiq blockchain as a permanent integrity proof.
+4. Anyone can verify later by fingerprinting their copy — no wallet required.
+
+## Core Features
+- Local document fingerprinting (SHA-256) — files never uploaded to a server.
+- Multi-party Nimiq wallet signatures with cryptographic binding.
+- On-chain document fingerprint locking via Nimiq blockchain transactions.
+- Public verification — drop any file to check if it matches a locked proof.
+- Nimiq Pay integration for one-time seal credits (no subscription required).
+- Optional ready-to-seal email notifications for signers.
+- Offline verifier (open-source): https://github.com/clevertech-os/verilock-offline
+
+## Blog Posts
+- /blog/docusign-vs-hellosign-vs-verilock — DocuSign vs HelloSign vs VeriLock comparison
+- /blog/no-email-no-password-nimiq-accounts — How wallet-based accounts work
+- /blog/what-is-verilock — What VeriLock is and why it exists
+- /blog/how-verilock-works — Technical walkthrough of fingerprinting and locking
+- /blog/prepaid-credits-for-seals — How prepaid seal credits work
+- /blog/wallet-scoped-agreements-history — Per-wallet agreement history
+- /blog/private-signatures-public-proof — Why signatures stay private, proof stays public
+- /blog/how-to-verify-signed-pdf-without-a-wallet — Verification without Nimiq
+- /blog/tamper-proof-pdf-verification — How tamper-proof verification works
+- /blog/how-to-sign-pdf-with-blockchain — Step-by-step blockchain PDF signing
+- /blog/blockchain-pdf-signature-verification — Blockchain verification explained
+- /blog/secure-online-pdf-signing-for-agreements — Secure signing workflow
+- /blog/is-this-the-same-file — File integrity checking explained
+
+## Tech Stack
+- TypeScript SPA (Vite + React) for the signing interface
+- Node.js/Express backend for session management and Nimiq RPC
+- Nimiq blockchain for proof anchoring
+- Cloudflare for CDN and DNS
+- Railway for hosting

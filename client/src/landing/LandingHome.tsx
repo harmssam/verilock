@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { formatBlogDate, getAllPosts } from '../blog'
 import { formatSealFeeNim, getSealPricing } from '../sealPricing'
 import type { PathRole } from '../journey/types'
+import { AppLink } from '../AppLink'
 import { LandingHowItWorks } from './LandingHowItWorks'
 import {
   formatObjectPosition,
@@ -151,14 +152,14 @@ export function LandingHome({
             Secondary jumps to path picker for co-signers and verifiers.
           */}
           <div className="lr-hero-ctas">
-            <button
-              type="button"
+            <AppLink
+              to="/?intent=creator"
               className="lr-cta lr-cta--primary"
               onClick={() => onPickRole('creator')}
             >
               Create &amp; lock
               <ArrowRight size={16} strokeWidth={2.25} aria-hidden />
-            </button>
+            </AppLink>
             <a className="lr-cta lr-cta--ghost" href="#lr-paths">
               Sign or verify
             </a>
@@ -235,8 +236,8 @@ export function LandingHome({
             const place = PATH_PLACEMENTS.card[path.role]
             return (
               <div key={path.role} className="lr-path-wrap" role="listitem">
-                <button
-                  type="button"
+                <AppLink
+                  to={`/?intent=${path.role}`}
                   className={`lr-path lr-path--${path.role}`}
                   onClick={() => onPickRole(path.role)}
                 >
@@ -263,7 +264,7 @@ export function LandingHome({
                     </span>
                     <ChevronRight className="lr-path-go" size={20} strokeWidth={1.5} aria-hidden />
                   </span>
-                </button>
+                </AppLink>
               </div>
             )
           })}
@@ -283,14 +284,14 @@ export function LandingHome({
               </h2>
             </div>
             {onOpenBlogIndex && (
-              <button type="button" className="lr-blog-latest-all" onClick={onOpenBlogIndex}>
+              <AppLink to="/blog" className="lr-blog-latest-all" onClick={onOpenBlogIndex}>
                 All posts
                 <ArrowRight size={14} strokeWidth={2.25} aria-hidden />
-              </button>
+              </AppLink>
             )}
           </div>
-          <button
-            type="button"
+          <AppLink
+            to={`/blog/${latestPost.slug}`}
             className="lr-blog-latest-card"
             onClick={() => onOpenBlogPost(latestPost.slug)}
           >
@@ -318,7 +319,7 @@ export function LandingHome({
                 <ArrowRight size={15} strokeWidth={2.25} aria-hidden />
               </span>
             </span>
-          </button>
+          </AppLink>
         </section>
       )}
     </div>
