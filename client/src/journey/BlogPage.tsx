@@ -9,6 +9,8 @@ import {
   type BlogPost,
   type BlogTag,
 } from '../blog'
+import { AppLink } from '../AppLink'
+import { formatSealFeeNim, getSealPricing } from '../sealPricing'
 import './BlogPage.css'
 
 interface BlogPageProps {
@@ -114,10 +116,10 @@ function RelatedPosts({
       <ul className="blog-related-grid">
         {related.map(r => (
           <li key={r.slug}>
-            <button type="button" className="blog-related-card" onClick={() => onOpenPost(r.slug)}>
+            <AppLink to={`/blog/${r.slug}`} className="blog-related-card" onClick={() => onOpenPost(r.slug)}>
               <img src={r.coverImage} alt="" loading="lazy" decoding="async" />
               <span className="blog-related-card-title">{r.title}</span>
-            </button>
+            </AppLink>
           </li>
         ))}
       </ul>
@@ -141,8 +143,8 @@ function BlogIndex({ onOpenPost }: { onOpenPost: (slug: string) => void }) {
       </header>
 
       {featured ? (
-        <button
-          type="button"
+        <AppLink
+          to={`/blog/${featured.slug}`}
           className="blog-featured"
           onClick={() => onOpenPost(featured.slug)}
         >
@@ -162,15 +164,15 @@ function BlogIndex({ onOpenPost }: { onOpenPost: (slug: string) => void }) {
             <span className="blog-featured-title">{featured.title}</span>
             <span className="blog-featured-desc muted">{featured.description}</span>
           </div>
-        </button>
+        </AppLink>
       ) : null}
 
       {spotlight.length > 0 ? (
         <ul className="blog-spotlight">
           {spotlight.map(post => (
             <li key={post.slug}>
-              <button
-                type="button"
+              <AppLink
+                to={`/blog/${post.slug}`}
                 className="blog-spotlight-card"
                 onClick={() => onOpenPost(post.slug)}
               >
@@ -183,7 +185,7 @@ function BlogIndex({ onOpenPost }: { onOpenPost: (slug: string) => void }) {
                 </div>
                 <span className="blog-spotlight-title">{post.title}</span>
                 <span className="blog-spotlight-desc muted">{post.description}</span>
-              </button>
+              </AppLink>
             </li>
           ))}
         </ul>
@@ -202,21 +204,37 @@ function BlogIndex({ onOpenPost }: { onOpenPost: (slug: string) => void }) {
           <ul className="blog-archive-list">
             {archive.map(post => (
               <li key={post.slug}>
-                <button
-                  type="button"
+                <AppLink
+                  to={`/blog/${post.slug}`}
                   className="blog-archive-row"
                   onClick={() => onOpenPost(post.slug)}
                 >
                   <time dateTime={post.date}>{formatBlogDate(post.date)}</time>
                   <CategoryLabel tags={post.tags} />
                   <span className="blog-archive-row-title">{post.title}</span>
-                </button>
+                </AppLink>
               </li>
             ))}
           </ul>
         </div>
       ) : null}
     </section>
+  )
+}
+
+function PricingCTAMessage() {
+  const pricing = getSealPricing()
+  if (pricing.promoActive && pricing.promoLabel && pricing.promoEndsLabel) {
+    return (
+      <p className="muted blog-cta-note">
+        {formatSealFeeNim(pricing.feeNim)} per lock ({pricing.promoLabel}). {pricing.promoEndsLabel}.
+      </p>
+    )
+  }
+  return (
+    <p className="muted blog-cta-note">
+      Lock a document fingerprint on the blockchain for {formatSealFeeNim(pricing.feeNim)}.
+    </p>
   )
 }
 
@@ -237,9 +255,9 @@ function BlogPostView({
 
   return (
     <article className="blog-page blog-page--post" aria-labelledby="blog-post-title">
-      <button type="button" className="blog-back" onClick={onOpenIndex}>
+      <AppLink to="/blog" className="blog-back" onClick={onOpenIndex}>
         ← All posts
-      </button>
+      </AppLink>
       <div className="blog-meta-row">
         <CategoryLabel tags={post.tags} />
         <time dateTime={post.date} className="blog-post-date">
@@ -261,13 +279,10 @@ function BlogPostView({
       <BlogPostBody body={post.body} />
       <RelatedPosts post={post} onOpenPost={onOpenPost} />
       <div className="blog-cta">
-        <p className="muted blog-cta-note">
-          Through July, locking a fingerprint on the blockchain is 50 NIM (95% off list). Promo ends
-          August 1.
-        </p>
-        <button type="button" className="btn btn-primary" onClick={onPricing}>
+        <PricingCTAMessage />
+        <AppLink to="/pricing" className="btn btn-primary" onClick={onPricing}>
           See pricing
-        </button>
+        </AppLink>
       </div>
     </article>
   )
@@ -289,9 +304,9 @@ function BlogNotFound({
           <code className="mono">{path}</code>
         </p>
       ) : null}
-      <button type="button" className="btn btn-primary" onClick={onOpenIndex}>
+      <AppLink to="/blog" className="btn btn-primary" onClick={onOpenIndex}>
         Back to blog
-      </button>
+      </AppLink>
     </section>
   )
 }

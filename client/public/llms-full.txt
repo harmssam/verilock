@@ -1,0 +1,155 @@
+# VeriLock — Full Documentation for AI Crawlers
+
+## Overview
+
+VeriLock is a browser-based document signing application that permanently anchors document fingerprints on the Nimiq blockchain. Unlike DocuSign, HelloSign, or Adobe Sign, VeriLock **never uploads your document to a server**. The file stays on your device. Only a cryptographic fingerprint (SHA-256 hash) and signature proofs are stored.
+
+### The Core Promise
+1. **Your file never leaves your device.** Fingerprinting happens locally in the browser.
+2. **Sign together.** Invite co-signers; each signs with their Nimiq wallet.
+3. **Prove forever.** The final fingerprint is locked on the Nimiq blockchain. Anyone can verify it later — no wallet, no account, no subscription.
+
+## Pages
+
+### Home (`/`)
+The landing page. Three paths:
+- **Create & Lock** — Start a new agreement, upload a PDF/image, fingerprint it, invite co-signers, lock the proof.
+- **I was invited** — Sign an existing document via an invite link.
+- **Verify a file** — Drop any file to check if its fingerprint matches a locked proof on-chain.
+
+### Pricing (`/pricing`)
+- Signing is free. No subscription.
+- Locking a proof on the Nimiq blockchain costs a one-time fee (paid in NIM via Nimiq Pay or prepaid credits).
+- Prepaid credit packs available for frequent users.
+
+### Security (`/security`)
+Documents are fingerprinted client-side with SHA-256. Only the hash and signature metadata leave the device. No document content is ever uploaded. The backend stores only session metadata, public keys, and signatures.
+
+### Blog (`/blog`)
+Technical guides, product updates, and comparison articles. Client-side rendered SPA with server-side deep-link support.
+
+### Support (`/support`)
+Contact form with Cloudflare Turnstile spam protection. Optional email notification for support replies.
+
+### Privacy (`/privacy`)
+Privacy policy detailing data handling, cookie usage, and Nimiq blockchain interaction.
+
+## Architecture
+
+### Client (SPA)
+- **React 19 + TypeScript** with Vite bundling
+- **Nimiq Hub** integration for wallet-based authentication and signing
+- **Nimiq Pay** for one-time seal payments
+- Client-side SHA-256 fingerprinting via Web Crypto API
+- PDF rendering with signature placement planning
+- Journey flow: path picker → document upload → co-signer invite → signing → lock
+
+### Server (Node.js/Express)
+- Session management and document metadata storage
+- SQLite database for sessions, documents, and attestations
+- Nimiq JSON-RPC client for blockchain interactions
+- Rate limiting per IP and per wallet
+- Cloudflare Turnstile verification for support contact
+- Optional Resend email integration for signer notifications
+- Stripe integration for prepaid credit purchases
+
+### Blockchain Layer (Nimiq)
+- Document fingerprints anchored via Nimiq transactions
+- Each lock transaction includes the document hash and signer public keys
+- Public verification reads the on-chain proof and compares against a local file's fingerprint
+- Transaction explorer link for each locked document
+
+## Blog Posts (Complete List)
+
+### DocuSign vs HelloSign vs VeriLock: Choosing an E-Signature Tool
+- **Date:** 2026-07-21
+- **Slug:** docusign-vs-hellosign-vs-verilock
+- **Tags:** guide
+- Comparison of DocuSign, HelloSign (Dropbox Sign), and VeriLock across privacy, pricing, and signing models.
+
+### No Email, No VeriLock Password: How Accounts Work
+- **Date:** 2026-07-19
+- **Slug:** no-email-no-password-nimiq-accounts
+- **Tags:** guide
+- How Nimiq wallet keys replace traditional logins and keep identity on-device.
+
+### What Is VeriLock?
+- **Date:** 2026-07-13
+- **Slug:** what-is-verilock
+- **Tags:** guide
+- Introduction to VeriLock — what it is, why it was built, and who it's for.
+
+### How VeriLock Works
+- **Date:** 2026-07-13
+- **Slug:** how-verilock-works
+- **Tags:** guide
+- Technical walkthrough of document fingerprinting, multi-party signing, and blockchain locking.
+
+### Prepaid Credits for Permanent Seals
+- **Date:** 2026-07-10
+- **Slug:** prepaid-credits-for-seals
+- **Tags:** product
+- How prepaid seal credits work, pricing tiers, and Nimiq Pay integration.
+
+### Wallet-Scoped Agreement History
+- **Date:** 2026-07-09
+- **Slug:** wallet-scoped-agreements-history
+- **Tags:** feature
+- Per-wallet agreement history — see all documents linked to your Nimiq address.
+
+### Private Signatures, Public Proof
+- **Date:** 2026-07-09
+- **Slug:** private-signatures-public-proof
+- **Tags:** guide
+- Why signatures stay private but the integrity proof stays public and independently verifiable.
+
+### How to Verify a Signed PDF Without a Wallet
+- **Date:** 2026-07-09
+- **Slug:** how-to-verify-signed-pdf-without-a-wallet
+- **Tags:** guide
+- Step-by-step guide to verifying a locked document without any Nimiq wallet or crypto knowledge.
+
+### Tamper-Proof PDF Verification
+- **Date:** 2026-07-07
+- **Slug:** tamper-proof-pdf-verification
+- **Tags:** guide
+- How cryptographic hashing makes PDF tampering detectable down to a single bit.
+
+### How to Sign a PDF with Blockchain
+- **Date:** 2026-07-07
+- **Slug:** how-to-sign-pdf-with-blockchain
+- **Tags:** guide
+- Complete walkthrough of signing a PDF and anchoring its fingerprint on the Nimiq blockchain.
+
+### Blockchain PDF Signature Verification
+- **Date:** 2026-07-07
+- **Slug:** blockchain-pdf-signature-verification
+- **Tags:** guide
+- Technical deep-dive into how blockchain-based signature verification works.
+
+### Secure Online PDF Signing for Agreements
+- **Date:** 2026-07-07
+- **Slug:** secure-online-pdf-signing-for-agreements
+- **Tags:** guide
+- Best practices for secure online PDF signing in legal and business agreements.
+
+### Is This the Same File?
+- **Date:** 2026-07-06
+- **Slug:** is-this-the-same-file
+- **Tags:** guide
+- How file integrity checking works — comparing two files to determine if they're identical.
+
+## Key Differentiators vs Competitors
+
+- **No file upload.** DocuSign, HelloSign, and Adobe Sign all upload your PDF to their cloud. VeriLock fingerprints locally.
+- **No subscription.** Pay per-lock, not per-month. Prepaid credits available.
+- **Wallet-based identity.** No email/password account. Your Nimiq wallet is your identity.
+- **Independent verification.** Anyone can verify a locked document without creating an account, installing software, or owning crypto.
+- **On-chain proof.** The document fingerprint lives on the Nimiq blockchain — not in a company database that could disappear.
+
+## Open Source
+- **Offline verifier:** https://github.com/clevertech-os/verilock-offline — verify locked documents completely offline
+- **GitHub org:** https://github.com/clevertech-os
+
+## Social
+- X/Twitter: @VeriLockOnline (https://x.com/VeriLockOnline)
