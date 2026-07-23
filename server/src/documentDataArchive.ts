@@ -523,12 +523,14 @@ async function runArchiveDocumentDataOnChain(
     onChain = false
   }
 
-  // Full failure with no new or prior txs: refund this attempt so the user can retry.
+  // Full failure with zero hashes ever: refund this attempt so the user can retry.
+  // Never refund if any prior or current frame hash exists (partial on-chain work must stay paid).
+  const hadPriorHashes = priorHashes.length > 0 || priorKept.length > 0
   const refundCredits = alreadyPaid
     ? paidCredits ?? existing?.creditsCharged ?? credits
     : credits
 
-  if (!onChain && txHashes.length === 0) {
+  if (!onChain && txHashes.length === 0 && !hadPriorHashes) {
     if (!getLedgerByIdempotencyKey(refundKey(documentId, attempt))) {
       try {
         const refund = applyCreditDelta({
@@ -587,7 +589,11 @@ async function runArchiveDocumentDataOnChain(
   }
 }
 
-/** Lightweight summary for agreement list cards (creator view). */
+/**
+ * Lightweight summary for agreement list cards (creator view).
+ * Avoids packing frames / scanning full placement JSON on every /api/me load —
+ * expensive quote packing stays on GET/POST .../on-chain-data (modal open).
+ */
 export function dataArchiveSummaryForDocument(documentId: string): {
   onChain: boolean
   eligible: boolean
@@ -596,14 +602,92 @@ export function dataArchiveSummaryForDocument(documentId: string): {
   reason?: string
 } | null {
   try {
-    const q = quoteDocumentDataArchive(documentId)
-    if (!q.locked && !q.onChain && q.frameCount === 0) return null
+    const doc = getDocumentById(documentId)
+    if (!doc) return null
+
+    const existing = getDocumentDataArchive(documentId)
+    if (existing?.onChain) {
+      return {
+        onChain: true,
+        eligible: false,
+        frameCount: existing.frameCount,
+        credits: existing.creditsCharged || creditsForStreamTxCount(existing.frameCount),
+        reason: 'Signatures and fields are already stored on Nimiq',
+      }
+    }
+
+    // Resume / mid-flight: show cheap status from stored row without re-packing.
+    if (existing && existing.framesHex.length > 0 && existing.creditsCharged > 0) {
+      const locked = doc.status === 'locked'
+      const broadcastReady =
+        isAnnotationStreamBroadcastEnabled() && isServiceWalletConfigured()
+      const eligible =
+        locked && isCreditsEnabled() && broadcastReady && !existing.onChain
+      return {
+        onChain: false,
+        eligible,
+        frameCount: existing.frameCount || existing.framesHex.length,
+        credits:
+          existing.creditsCharged ||
+          creditsForStreamTxCount(existing.frameCount || existing.framesHex.length),
+        ...(eligible
+          ? {}
+          : {
+              reason: !locked
+                ? 'Lock the fingerprint first, then archive signatures on-chain'
+                : !isCreditsEnabled()
+                  ? 'Credits are not enabled'
+                  : !broadcastReady
+                    ? 'On-chain data broadcast is not configured'
+                    : existing.error || undefined,
+            }),
+      }
+    }
+
+    if (doc.status !== 'locked') return null
+
+    // Cheap eligibility: any placement frames or annotations without packing.
+    const plan = resolvePlacementPlan({
+      originalSha256: doc.originalSha256,
+      documentId,
+    })
+    let frameHint = 0
+    if (plan) {
+      frameHint += (plan.batch0FramesHex ?? []).filter(
+        h => typeof h === 'string' && /^[a-f0-9]{128}$/i.test(h),
+      ).length
+      for (const b of plan.fillBatches ?? []) {
+        frameHint += (b.framesHex ?? []).filter(
+          h => typeof h === 'string' && /^[a-f0-9]{128}$/i.test(h),
+        ).length
+      }
+    }
+    if (frameHint === 0 && Array.isArray(doc.annotations) && doc.annotations.length > 0) {
+      // Unknown exact pack size until modal quote; show as eligible with placeholder 0
+      // credits so UI still surfaces upsell — requestArchive loads the real quote.
+      frameHint = -1
+    }
+    if (frameHint === 0) return null
+
+    const creditsEnabled = isCreditsEnabled()
+    const broadcastReady =
+      isAnnotationStreamBroadcastEnabled() && isServiceWalletConfigured()
+    const eligible = creditsEnabled && broadcastReady
+    const frameCount = frameHint > 0 ? frameHint : 0
+    const credits = frameCount > 0 ? creditsForStreamTxCount(frameCount) : 0
+
     return {
-      onChain: q.onChain,
-      eligible: q.eligible,
-      frameCount: q.frameCount,
-      credits: q.credits,
-      ...(q.reason ? { reason: q.reason } : {}),
+      onChain: false,
+      eligible,
+      frameCount,
+      credits,
+      ...(eligible
+        ? {}
+        : {
+            reason: !creditsEnabled
+              ? 'Credits are not enabled'
+              : 'On-chain data broadcast is not configured',
+          }),
     }
   } catch {
     return null
