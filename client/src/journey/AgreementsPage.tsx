@@ -9,7 +9,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { shortAddress } from '../addresses'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
 import {
@@ -160,6 +160,8 @@ export function AgreementsPage({
   const [archiveBalance, setArchiveBalance] = useState<number | null>(null)
   const [archiveBusy, setArchiveBusy] = useState(false)
   const [archiveError, setArchiveError] = useState<string | null>(null)
+  /** Sync guard — React state alone can miss double-clicks before re-render. */
+  const archiveInFlightRef = useRef(false)
   const [query, setQuery] = useState('')
   const [bucketFilter, setBucketFilter] = useState<BucketFilter>('all')
   const [visibleByBucket, setVisibleByBucket] = useState<Partial<Record<AgreementBucket, number>>>(
@@ -273,6 +275,8 @@ export function AgreementsPage({
 
   const confirmArchive = async () => {
     if (!token || !pendingArchive) return
+    if (archiveInFlightRef.current) return
+    archiveInFlightRef.current = true
     setArchiveBusy(true)
     setArchiveError(null)
     try {
@@ -314,7 +318,16 @@ export function AgreementsPage({
       }
     } catch (err) {
       setArchiveError(err instanceof Error ? err.message : 'Could not archive data on-chain')
+      // Balance may have changed on failed charge/refund paths — best-effort refresh.
+      try {
+        const bal = await api.creditsBalance(token)
+        writeCreditsBalanceCache(token, bal.balance)
+        setArchiveBalance(bal.balance)
+      } catch {
+        /* ignore */
+      }
     } finally {
+      archiveInFlightRef.current = false
       setArchiveBusy(false)
     }
   }
@@ -539,8 +552,7 @@ export function AgreementsPage({
                     bucket === 'locked' &&
                     archive &&
                     !archive.onChain &&
-                    archive.eligible &&
-                    archive.credits > 0
+                    archive.eligible
                   const showArchiveDone = creator && archive?.onChain
                   return (
                     <li
@@ -601,10 +613,16 @@ export function AgreementsPage({
                             type="button"
                             className="btn btn-primary agreements-page-archive-btn"
                             onClick={() => void requestArchive(doc)}
-                            title={`Store signatures & fields on Nimiq (${formatDataArchiveCredits(archive.credits)})`}
+                            title={
+                              archive.credits > 0
+                                ? `Store signatures & fields on Nimiq (${formatDataArchiveCredits(archive.credits)})`
+                                : 'Store signatures & fields on Nimiq (quote on open)'
+                            }
                           >
                             <Database size={15} strokeWidth={2.25} aria-hidden />
-                            {`Store forever · ${formatDataArchiveCredits(archive.credits)}`}
+                            {archive.credits > 0
+                              ? `Store forever · ${formatDataArchiveCredits(archive.credits)}`
+                              : 'Store forever'}
                           </button>
                         )}
                         {canCancel && (

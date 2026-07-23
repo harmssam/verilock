@@ -521,13 +521,15 @@ app.post(
       const status =
         message.includes('Insufficient credits')
           ? 402
-          : message.includes('Only the creator') || message.includes('creator')
-            ? 403
-            : message.includes('must be locked')
-              ? 409
-              : message.includes('Too many')
-                ? 429
-                : 400
+          : message === 'Document not found'
+            ? 404
+            : message.includes('Only the creator')
+              ? 403
+              : message.includes('must be locked')
+                ? 409
+                : message.includes('Too many')
+                  ? 429
+                  : 400
       res.status(status).json({ error: message })
     }
   },
