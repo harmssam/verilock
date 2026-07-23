@@ -48,9 +48,9 @@ export function journeyConnectLabels(mode: JourneyConnectMode): {
     case 'pay-open':
       return { idle: 'Open in Nimiq Pay', busy: 'Opening…' }
     case 'hub-fallback':
-      return { idle: 'Continue with Nimiq Hub', busy: 'Redirecting to Hub…' }
+      return { idle: 'Continue with Nimiq Hub', busy: 'Opening Hub…' }
     case 'hub':
-      return { idle: 'Continue with Nimiq Hub', busy: 'Redirecting to Hub…' }
+      return { idle: 'Continue with Nimiq Hub', busy: 'Opening Hub…' }
   }
 }
 
@@ -69,8 +69,8 @@ export function journeyMobileChoiceLabels(): {
     payBusy: 'Opening…',
     payHint: 'Requires the Nimiq Pay app',
     hubIdle: 'Continue in browser',
-    hubBusy: 'Redirecting to Hub…',
-    hubHint: 'Nimiq Hub — no app install',
+    hubBusy: 'Opening Hub…',
+    hubHint: 'Nimiq Hub — one step, no app install',
     storesLabel: 'Get Nimiq Pay',
   }
 }
@@ -107,8 +107,8 @@ export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
         title: 'Login with Nimiq',
         about,
         steps: [
-          'Continue opens Nimiq Hub in this browser — no app install needed.',
-          'Choose or create a wallet, approve, and return signed in.',
+          'Continue opens Nimiq Hub once in this browser — no app install, no pop-up chain.',
+          'Pick or create a wallet, approve the sign-in, and return logged in.',
         ],
       }
   }

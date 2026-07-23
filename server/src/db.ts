@@ -244,11 +244,25 @@ export interface AttestationRecord {
   error: string | null
 }
 
-export function createSession(token: string, address: string, nonce: string, ttlMs: number): void {
+/**
+ * Create a login challenge session.
+ * Pass empty/`null` address for single-trip Hub login: address is bound from the
+ * signed public key on verify (no chooseAddress round-trip).
+ */
+export function createSession(
+  token: string,
+  address: string | null | undefined,
+  nonce: string,
+  ttlMs: number,
+): void {
   const now = Date.now()
+  const addr =
+    address == null || String(address).trim() === ''
+      ? ''
+      : normalizeAddress(address)
   db.prepare(
     'INSERT INTO sessions (token, address, nonce, public_key, verified, created_at, expires_at) VALUES (?, ?, ?, NULL, 0, ?, ?)',
-  ).run(token, normalizeAddress(address), nonce, now, now + ttlMs)
+  ).run(token, addr, nonce, now, now + ttlMs)
 }
 
 export function getSession(token: string): SessionRecord | null {
@@ -273,8 +287,25 @@ export function getSession(token: string): SessionRecord | null {
   }
 }
 
-export function markSessionVerified(token: string, publicKey: string): void {
-  db.prepare('UPDATE sessions SET public_key = ?, verified = 1 WHERE token = ?').run(publicKey, token)
+/**
+ * Mark session verified. Optionally bind/replace address (single-trip Hub login
+ * starts with empty address and sets it from the public key here).
+ */
+export function markSessionVerified(
+  token: string,
+  publicKey: string,
+  address?: string | null,
+): void {
+  if (address != null && String(address).trim() !== '') {
+    db.prepare(
+      'UPDATE sessions SET public_key = ?, verified = 1, address = ? WHERE token = ?',
+    ).run(publicKey, normalizeAddress(address), token)
+    return
+  }
+  db.prepare('UPDATE sessions SET public_key = ?, verified = 1 WHERE token = ?').run(
+    publicKey,
+    token,
+  )
 }
 
 export function purgeExpiredSessions(): number {
