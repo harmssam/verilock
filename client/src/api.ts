@@ -514,7 +514,61 @@ export const api = {
       packs: number[]
       stripeMinChargeCents: number
       creditsPerSeal: number
+      /** Txs per credit for multi-tx data archive (ceil). Default 10. */
+      framesPerDataArchiveCredit?: number
     }>('/api/credits/config'),
+
+  /** Quote multi-tx on-chain data archive (signatures / initials / text). Creator only. */
+  getOnChainDataQuote: (token: string, docId: string) =>
+    request<{
+      documentId: string
+      eligible: boolean
+      reason?: string
+      locked: boolean
+      onChain: boolean
+      frameCount: number
+      credits: number
+      framesPerCredit: number
+      source: 'placements' | 'annotations' | null
+      creditsCharged: number
+      txHashes: string[]
+      confirmedFrames: number
+      balance: number | null
+      broadcastReady: boolean
+      creditsEnabled: boolean
+      error?: string | null
+    }>(`/api/documents/${docId}/on-chain-data`, {
+      headers: withAuth(token),
+    }),
+
+  /**
+   * Spend credits and broadcast packed frames on Nimiq (forever data archive).
+   * Pricing: ceil(frameCount / 10) credits.
+   */
+  archiveOnChainData: (token: string, docId: string) =>
+    request<{
+      documentId: string
+      eligible: boolean
+      reason?: string
+      locked: boolean
+      onChain: boolean
+      frameCount: number
+      credits: number
+      framesPerCredit: number
+      source: 'placements' | 'annotations' | null
+      creditsCharged: number
+      txHashes: string[]
+      confirmedFrames: number
+      balance: number
+      broadcastReady: boolean
+      creditsEnabled: boolean
+      error?: string | null
+      broadcastError?: string
+      partialBroadcast?: boolean
+    }>(`/api/documents/${docId}/on-chain-data`, {
+      method: 'POST',
+      headers: withAuth(token),
+    }),
 
   creditsBalance: (token: string, options?: { syncStripe?: boolean }) =>
     request<{

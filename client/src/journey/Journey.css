@@ -2663,6 +2663,205 @@ a.hash-chip.text-link:focus-visible {
   }
 }
 
+/* ── Data archive upsell (store signatures/fields on Nimiq) ── */
+
+.data-archive-layer {
+  z-index: 240;
+}
+
+.data-archive-backdrop {
+  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(6px) saturate(0.7);
+  -webkit-backdrop-filter: blur(6px) saturate(0.7);
+}
+
+.data-archive-modal {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  width: min(26rem, 100%);
+  max-height: min(88dvh, 42rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.05rem 1.1rem 1.1rem;
+  border-radius: var(--radius-md, 14px);
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
+  background: #ffffff;
+  box-shadow:
+    0 22px 48px rgba(15, 23, 42, 0.14),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+  color: var(--lr-text, var(--text, #0f172a));
+  text-align: left;
+  animation: exp-pop 0.18s ease;
+}
+
+.data-archive-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+
+.data-archive-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 12px;
+  color: var(--mint-deep, #0f766e);
+  background: rgba(13, 148, 136, 0.1);
+  border: 1px solid rgba(13, 148, 136, 0.28);
+}
+
+.data-archive-head-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.data-archive-head-text h2 {
+  margin: 0.1rem 0 0.3rem;
+  font-family: var(--font-display, inherit);
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.data-archive-subtitle {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.data-archive-close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin: -0.15rem -0.2rem 0 0;
+  padding: 0;
+}
+
+.data-archive-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.data-archive-doc-title {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.data-archive-facts {
+  list-style: none;
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  border-radius: 12px;
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
+  background: rgba(15, 23, 42, 0.025);
+}
+
+.data-archive-facts li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.data-archive-fact-label {
+  font-weight: 650;
+  color: var(--lr-muted, var(--text-muted, #4b5c6b));
+}
+
+.data-archive-fact-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-archive-fact-value--cost {
+  font-weight: 700;
+  color: var(--mint-deep, #0f766e);
+}
+
+.data-archive-note {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.data-archive-error {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(251, 113, 133, 0.35);
+  background: rgba(251, 113, 133, 0.08);
+  color: #9f1239;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.data-archive-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.1rem;
+}
+
+.data-archive-actions .btn {
+  min-height: 2.4rem;
+}
+
+.agreements-page-item--archive {
+  border-color: rgba(13, 148, 136, 0.28);
+  background: rgba(13, 148, 136, 0.04);
+}
+
+.agreements-page-archive-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--mint-deep, #0f766e);
+  background: rgba(13, 148, 136, 0.1);
+  border: 1px solid rgba(13, 148, 136, 0.22);
+}
+
+.agreements-page-archive-btn {
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .data-archive-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .data-archive-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .journey-agreement-title {
   font-weight: 700;
   font-size: 0.92rem;

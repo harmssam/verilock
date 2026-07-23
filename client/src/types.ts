@@ -146,6 +146,20 @@ export interface SealDocument {
    * (viewer is creator or a signee). Omitted/false for public viewers.
    */
   participantDetailsRevealed?: boolean
+  /**
+   * Creator-only: multi-tx on-chain archive of signatures / initials / text.
+   * Null for non-creators or when there is nothing to surface.
+   */
+  dataArchive?: DocumentDataArchiveSummary | null
+}
+
+/** Lightweight status for the “store data forever” upsell on My Agreements. */
+export interface DocumentDataArchiveSummary {
+  onChain: boolean
+  eligible: boolean
+  frameCount: number
+  credits: number
+  reason?: string
 }
 
 export interface AttestationStatus {

@@ -1,4 +1,5 @@
 import {
+  Database,
   FilePlus,
   LoaderCircle,
   Lock,
@@ -23,9 +24,12 @@ import {
   type AgreementBucket,
 } from '../agreements'
 import { api } from '../api'
+import { writeCreditsBalanceCache } from '../creditsBalanceCache'
+import { formatDataArchiveCredits } from '../dataArchivePricing'
 import { shortHash } from '../pdf/hashPdf'
 import { documentTypeLabel, type SealDocument } from '../types'
 import { CancelAgreementModal } from './CancelAgreementModal'
+import { DataArchiveModal } from './DataArchiveModal'
 import {
   journeyLoginEntryLabels,
   journeyLoginNeedsSheet,
@@ -56,6 +60,8 @@ interface AgreementsPageProps {
   onConnect: (options?: JourneyConnectRequest) => void
   onOpen: (doc: SealDocument, preferSeal?: boolean) => void
   onCreate: () => void
+  /** Optional: send user to pricing when they need credits for data archive. */
+  onGetCredits?: () => void
 }
 
 function sortBucket(docs: SealDocument[], bucket: AgreementBucket): SealDocument[] {
@@ -140,6 +146,7 @@ export function AgreementsPage({
   onConnect,
   onOpen,
   onCreate,
+  onGetCredits,
 }: AgreementsPageProps) {
   const [documents, setDocuments] = useState<SealDocument[]>([])
   const [loading, setLoading] = useState(false)
@@ -147,6 +154,12 @@ export function AgreementsPage({
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [pendingCancel, setPendingCancel] = useState<SealDocument | null>(null)
   const [cancelError, setCancelError] = useState<string | null>(null)
+  const [pendingArchive, setPendingArchive] = useState<SealDocument | null>(null)
+  const [archiveFrameCount, setArchiveFrameCount] = useState(0)
+  const [archiveCredits, setArchiveCredits] = useState(0)
+  const [archiveBalance, setArchiveBalance] = useState<number | null>(null)
+  const [archiveBusy, setArchiveBusy] = useState(false)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [bucketFilter, setBucketFilter] = useState<BucketFilter>('all')
   const [visibleByBucket, setVisibleByBucket] = useState<Partial<Record<AgreementBucket, number>>>(
@@ -209,6 +222,100 @@ export function AgreementsPage({
       setError(message)
     } finally {
       setCancellingId(null)
+    }
+  }
+
+  const requestArchive = async (doc: SealDocument) => {
+    if (!token || !isDocumentCreator(doc, address)) return
+    setArchiveError(null)
+    setPendingArchive(doc)
+    // Prefer list summary; refresh quote for live balance + frame count.
+    const summary = doc.dataArchive
+    setArchiveFrameCount(summary?.frameCount ?? 0)
+    setArchiveCredits(summary?.credits ?? 0)
+    setArchiveBalance(null)
+    try {
+      const quote = await api.getOnChainDataQuote(token, doc.id)
+      setArchiveFrameCount(quote.frameCount)
+      setArchiveCredits(quote.credits)
+      setArchiveBalance(quote.balance)
+      if (quote.onChain) {
+        setDocuments(prev =>
+          prev.map(d =>
+            d.id === doc.id
+              ? {
+                  ...d,
+                  dataArchive: {
+                    onChain: true,
+                    eligible: false,
+                    frameCount: quote.frameCount,
+                    credits: quote.credits,
+                    reason: quote.reason,
+                  },
+                }
+              : d,
+          ),
+        )
+        setPendingArchive(null)
+      } else if (!quote.eligible && quote.reason) {
+        setArchiveError(quote.reason)
+      }
+    } catch (err) {
+      setArchiveError(err instanceof Error ? err.message : 'Could not load archive quote')
+    }
+  }
+
+  const closeArchiveModal = () => {
+    if (archiveBusy) return
+    setPendingArchive(null)
+    setArchiveError(null)
+  }
+
+  const confirmArchive = async () => {
+    if (!token || !pendingArchive) return
+    setArchiveBusy(true)
+    setArchiveError(null)
+    try {
+      const result = await api.archiveOnChainData(token, pendingArchive.id)
+      if (typeof result.balance === 'number') {
+        writeCreditsBalanceCache(token, result.balance)
+      }
+      setDocuments(prev =>
+        prev.map(d =>
+          d.id === pendingArchive.id
+            ? {
+                ...d,
+                dataArchive: {
+                  onChain: result.onChain,
+                  eligible: result.eligible,
+                  frameCount: result.frameCount,
+                  credits: result.credits,
+                  reason: result.reason,
+                },
+              }
+            : d,
+        ),
+      )
+      if (result.onChain) {
+        setPendingArchive(null)
+      } else if (result.partialBroadcast || (result.txHashes?.length ?? 0) > 0) {
+        // Progress saved server-side; user can resume without re-paying.
+        setArchiveError(
+          result.broadcastError ||
+            result.error ||
+            'Partial broadcast saved — click Archive again to resume remaining frames (no extra charge).',
+        )
+      } else {
+        setArchiveError(
+          result.broadcastError ||
+            result.error ||
+            'Could not broadcast data frames on-chain',
+        )
+      }
+    } catch (err) {
+      setArchiveError(err instanceof Error ? err.message : 'Could not archive data on-chain')
+    } finally {
+      setArchiveBusy(false)
     }
   }
 
@@ -426,12 +533,21 @@ export function AgreementsPage({
                   const preferSeal = view.cta === 'Lock now' && creator
                   const canCancel = canDeleteDocument(doc, address)
                   const cancelling = cancellingId === doc.id
+                  const archive = creator ? doc.dataArchive : null
+                  const showArchiveUpsell =
+                    creator &&
+                    bucket === 'locked' &&
+                    archive &&
+                    !archive.onChain &&
+                    archive.eligible &&
+                    archive.credits > 0
+                  const showArchiveDone = creator && archive?.onChain
                   return (
                     <li
                       key={doc.id}
                       className={`agreements-page-item${
                         bucket === 'ready_to_seal' ? ' agreements-page-item--seal' : ''
-                      }`}
+                      }${showArchiveUpsell ? ' agreements-page-item--archive' : ''}`}
                     >
                       <button
                         type="button"
@@ -453,6 +569,12 @@ export function AgreementsPage({
                           <code className="mono">{shortHash(doc.originalSha256)}</code>
                         </span>
                         <span className="agreements-page-headline">{view.headline}</span>
+                        {showArchiveDone && (
+                          <span className="agreements-page-archive-badge">
+                            <Database size={12} strokeWidth={2.5} aria-hidden />
+                            Data on-chain
+                          </span>
+                        )}
                       </button>
                       <div className="agreements-page-actions">
                         <button
@@ -474,6 +596,17 @@ export function AgreementsPage({
                             view.cta
                           )}
                         </button>
+                        {showArchiveUpsell && (
+                          <button
+                            type="button"
+                            className="btn btn-primary agreements-page-archive-btn"
+                            onClick={() => void requestArchive(doc)}
+                            title={`Store signatures & fields on Nimiq (${formatDataArchiveCredits(archive.credits)})`}
+                          >
+                            <Database size={15} strokeWidth={2.25} aria-hidden />
+                            {`Store forever · ${formatDataArchiveCredits(archive.credits)}`}
+                          </button>
+                        )}
                         {canCancel && (
                           <button
                             type="button"
@@ -535,6 +668,25 @@ export function AgreementsPage({
         error={cancelError}
         onClose={closeCancelModal}
         onConfirm={() => void confirmCancelAgreement()}
+      />
+
+      <DataArchiveModal
+        document={pendingArchive}
+        frameCount={archiveFrameCount}
+        credits={archiveCredits}
+        balance={archiveBalance}
+        busy={archiveBusy}
+        error={archiveError}
+        onClose={closeArchiveModal}
+        onConfirm={() => void confirmArchive()}
+        onGetCredits={
+          onGetCredits
+            ? () => {
+                closeArchiveModal()
+                onGetCredits()
+              }
+            : undefined
+        }
       />
     </section>
   )
