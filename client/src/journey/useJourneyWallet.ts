@@ -63,6 +63,12 @@ const PAY_INSTALL_HINT =
   'Nimiq Pay did not open. Install the app for the best experience, then try again — or continue with Nimiq Hub.'
 
 /**
+ * Module-level: one auto-connect attempt per full page load inside Nimiq Pay.
+ * Survives React StrictMode remounts; resets on real navigation/reload.
+ */
+let payHostAutoConnectStarted = false
+
+/**
  * Production wallet session for the journey SPA (Nimiq Pay + Hub).
  * Same auth API path as service A App - no demo addresses.
  */
@@ -88,6 +94,8 @@ export function useJourneyWallet(): UseJourneyWalletResult {
   const lockErrorRef = useRef<((err: Error) => Promise<void> | void) | null>(null)
   const deeplinkFallbackTimerRef = useRef<number | null>(null)
   const loginCanceledTimerRef = useRef<number | null>(null)
+  /** After explicit disconnect in Pay, do not immediately auto-login again. */
+  const skipPayAutoConnectRef = useRef(false)
 
   walletStatusRef.current = walletStatus
 
@@ -125,6 +133,8 @@ export function useJourneyWallet(): UseJourneyWalletResult {
   }, [clearLoginCanceledTimer])
 
   const disconnect = useCallback(() => {
+    // Stay logged out until the user taps Login (or reloads the mini app).
+    skipPayAutoConnectRef.current = true
     clearSession()
     setToken(null)
     setAddress(null)
@@ -421,6 +431,26 @@ export function useJourneyWallet(): UseJourneyWalletResult {
       showLoginCanceled,
     ],
   )
+
+  /**
+   * Inside Nimiq Pay: after boot, if there is no session, run Pay login once so
+   * opening verilock.online as a mini app lands logged in (approve dialogs only).
+   * Does not apply outside Pay; does not re-fire after explicit disconnect.
+   */
+  useEffect(() => {
+    if (!bootReady) return
+    if (!isNimiqPayHost()) return
+    if (token || loadSession()?.token) return
+    if (skipPayAutoConnectRef.current) return
+    if (payHostAutoConnectStarted) return
+    if (hubConnectInFlightRef.current || peekHubRedirectInUrl() || hasPendingHubRedirect()) {
+      return
+    }
+
+    payHostAutoConnectStarted = true
+    setInNimiqPay(true)
+    void connect()
+  }, [bootReady, token, connect])
 
   const account = address ? toJourneyAccount(address) : null
 
