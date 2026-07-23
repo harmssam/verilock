@@ -70,11 +70,18 @@ export interface SignDocumentBody {
 export const api = {
   health: () => request<{ ok: boolean; app: string; chainVerify: boolean; storageMode?: string }>('/api/health'),
 
-  challenge: (address: string) =>
-    request<{ token: string; nonce: string; address: string }>('/api/auth/challenge', {
+  /**
+   * Hub single-trip login: omit `address` so the server issues a pending session;
+   * Hub signMessage (no signer) lets the user pick a wallet and sign in one trip.
+   * Pay / legacy: pass the connected address.
+   */
+  challenge: (address?: string | null) =>
+    request<{ token: string; nonce: string; address: string | null }>('/api/auth/challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address }),
+      body: JSON.stringify(
+        address != null && String(address).trim() !== '' ? { address } : {},
+      ),
     }),
 
   verify: (

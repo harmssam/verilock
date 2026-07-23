@@ -235,7 +235,8 @@ export function useJourneyWallet(): UseJourneyWalletResult {
       })
 
       const hubSetup = await setupHubRedirectHandlers(
-        async addr => api.challenge(addr),
+        // Hub single-trip: no address. Legacy chooseAddress path may still pass one.
+        async addr => api.challenge(addr ?? undefined),
         async result => {
           try {
             const verified = await api.verify(result.token, {
@@ -467,7 +468,20 @@ export function useJourneyWallet(): UseJourneyWalletResult {
 
           hubConnectInFlightRef.current = true
           const preferRedirect = shouldUseHubRedirect(options)
-          await connectViaHub(async addr => api.challenge(addr), { preferRedirect })
+          // One Hub trip: signMessage without pre-picked address (pick + sign together).
+          // Redirect throws HUB_REDIRECT_MESSAGE; popup path returns signed result here.
+          const hubResult = await connectViaHub(
+            async addr => api.challenge(addr ?? undefined),
+            { preferRedirect },
+          )
+          const verified = await api.verify(hubResult.token, {
+            publicKey: hubResult.publicKey,
+            signature: hubResult.signature,
+            authScheme: 'hub',
+          })
+          hubConnectInFlightRef.current = false
+          applySession(hubResult.token, verified.address)
+          setWalletStatus(null)
           return
         }
 

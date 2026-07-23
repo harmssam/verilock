@@ -132,7 +132,7 @@ function completeLockRedirect(
  */
 export function processLenientHubRedirect(
   deps: HubRedirectDeps,
-  getChallenge: (address: string) => Promise<{ token: string; nonce: string }>,
+  getChallenge: (address?: string | null) => Promise<{ token: string; nonce: string }>,
   onComplete: (result: {
     address: string
     publicKey: string

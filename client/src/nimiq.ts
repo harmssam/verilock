@@ -543,7 +543,7 @@ const hubRedirectDeps = () => ({
 
 function registerHubEventHandlers(
   hub: HubApi,
-  getChallenge: (address: string) => Promise<{ token: string; nonce: string }>,
+  getChallenge: (address?: string | null) => Promise<{ token: string; nonce: string }>,
   onComplete: (result: {
     address: string
     publicKey: string
@@ -556,6 +556,11 @@ function registerHubEventHandlers(
   createBroadcastFallback?: BroadcastFallbackFactory,
   registerLockWork?: (work: Promise<void>) => void,
 ): void {
+  /**
+   * Legacy two-trip login (chooseAddress → signMessage). Still handled so an
+   * in-flight redirect from an older client can finish after deploy.
+   * New logins only emit SIGN_MESSAGE (single trip).
+   */
   hub.on(RequestType.CHOOSE_ADDRESS, async chosen => {
     try {
       const { address } = chosen as ChooseAddressResult
@@ -690,7 +695,7 @@ export type HubRedirectSetupResult = {
 
 /** Call on app load to finish Hub redirect login and lock round-trips. */
 export async function setupHubRedirectHandlers(
-  getChallenge: (address: string) => Promise<{ token: string; nonce: string }>,
+  getChallenge: (address?: string | null) => Promise<{ token: string; nonce: string }>,
   onComplete: (result: {
     address: string
     publicKey: string
@@ -794,8 +799,18 @@ export async function setupHubRedirectHandlers(
   }
 }
 
+/**
+ * Hub login in **one** Hub trip.
+ *
+ * Previously: chooseAddress → return → challenge → signMessage → return (two full
+ * redirects / two popups). Hub's signMessage without `signer` shows the address
+ * picker and signs in a single Keyguard flow — the pattern we want on verilock.online.
+ *
+ * Flow: server challenge (no address) → signMessage(nonce) → verify binds address
+ * from the public key.
+ */
 export async function connectViaHub(
-  getChallenge: (address: string) => Promise<{ token: string; nonce: string }>,
+  getChallenge: (address?: string | null) => Promise<{ token: string; nonce: string }>,
   options?: { preferRedirect?: boolean },
 ): Promise<{
   token: string
@@ -805,30 +820,30 @@ export async function connectViaHub(
   authScheme: 'hub'
 }> {
   const hub = getHubApi()
-
   const preferRedirect = options?.preferRedirect ?? true
+
+  clearStaleHubRpcStateIfIdle()
+  // Challenge without address — Hub will let the user pick a wallet when signing.
+  const { token, nonce } = await getChallenge(null)
+
   if (preferRedirect) {
-    clearStaleHubRpcStateIfIdle()
     saveHubReturnPath()
-    sealLog('hub:redirectChooseAddress', { returnUrl: getHubReturnUrl() })
-    const behavior = hubRedirectBehavior({ flow: 'login' })
-    await hub.chooseAddress(
-      { appName: APP_NAME },
-      behavior as Parameters<typeof hub.chooseAddress>[1],
+    sealLog('hub:redirectSignMessageLogin', { returnUrl: getHubReturnUrl() })
+    const behavior = hubRedirectBehavior({ token, flow: 'login' })
+    // No `signer` → Hub shows address selection + sign in one UI.
+    await hub.signMessage(
+      { appName: APP_NAME, message: nonce },
+      behavior as Parameters<typeof hub.signMessage>[1],
     )
     throw new Error(HUB_REDIRECT_MESSAGE)
   }
 
   try {
-    clearStaleHubRpcStateIfIdle()
-    sealLog('hub:popupChooseAddress')
-    const chosen = await hub.chooseAddress({ appName: APP_NAME })
-    const address = chosen.address
-    const { token, nonce } = await getChallenge(address)
+    sealLog('hub:popupSignMessageLogin')
     const signed = await hub.signMessage({
       appName: APP_NAME,
       message: nonce,
-      signer: address,
+      // omit signer → single popup: pick address + sign
     })
     return {
       token,

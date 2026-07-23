@@ -12,7 +12,7 @@ import express from 'express'
 import cors from 'cors'
 import { existsSync } from 'node:fs'
 import { v4 as uuid } from 'uuid'
-import { publicKeyBindingResult } from './auth-wallet.js'
+import { addressFromPublicKeyHex, publicKeyBindingResult } from './auth-wallet.js'
 import { normalizeAddress } from './addresses.js'
 import {
   createSession,
@@ -535,17 +535,25 @@ app.post(
   },
 )
 
+/**
+ * Issue a sign-in challenge.
+ * - With `address` (Pay / legacy): session is bound to that wallet up front.
+ * - Without `address` (Hub single-trip): Hub signMessage lets the user pick an
+ *   address and sign in one redirect; we bind the address from the public key
+ *   on verify. Avoids chooseAddress → return → signMessage → return (two trips).
+ */
 app.post('/api/auth/challenge', authChallengeLimit, (req, res) => {
   const { address } = req.body as { address?: string }
-  if (!address) {
-    res.status(400).json({ error: 'Address required' })
-    return
-  }
-  const normalized = normalizeAddress(address)
   const nonce = `VeriLock sign-in:${uuid()}:${Date.now()}`
   const token = uuid()
-  createSession(token, normalized, nonce, SESSION_TTL_MS)
-  res.json({ token, nonce, address: normalized })
+  if (address != null && String(address).trim() !== '') {
+    const normalized = normalizeAddress(address)
+    createSession(token, normalized, nonce, SESSION_TTL_MS)
+    res.json({ token, nonce, address: normalized })
+    return
+  }
+  createSession(token, null, nonce, SESSION_TTL_MS)
+  res.json({ token, nonce, address: null })
 })
 
 app.post('/api/auth/verify', authVerifyLimit, authMiddleware, async (req, res) => {
@@ -585,6 +593,21 @@ app.post('/api/auth/verify', authVerifyLimit, authMiddleware, async (req, res) =
     res.status(400).json({
       error: err instanceof Error ? err.message : 'Signature verification failed',
     })
+    return
+  }
+
+  // Single-trip Hub: session has no address yet — derive and bind from public key.
+  const pendingAddress = !session.address || String(session.address).trim() === ''
+  let resolvedAddress = session.address
+  if (pendingAddress) {
+    try {
+      resolvedAddress = addressFromPublicKeyHex(publicKey)
+    } catch {
+      res.status(401).json({ error: 'Invalid public key' })
+      return
+    }
+    markSessionVerified(token, publicKey, resolvedAddress)
+    res.json({ ok: true, address: resolvedAddress, verified: true })
     return
   }
 
