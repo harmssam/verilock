@@ -35,6 +35,19 @@ export function assertCreditsEnabled(): void {
   }
 }
 
+/** Nimiq data-frame txs per seal credit for on-chain data archive upsell. */
+export const FRAMES_PER_DATA_ARCHIVE_CREDIT = 10
+
+/**
+ * Credits charged for multi-tx data archive. 1 credit per 10 txs, rounded up.
+ * Examples: 1–10 → 1, 11–20 → 2, 51 → 6 (ceil(5.1)).
+ */
+export function creditsForStreamTxCount(txCount: number): number {
+  const n = Math.floor(Number(txCount))
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return Math.ceil(n / FRAMES_PER_DATA_ARCHIVE_CREDIT)
+}
+
 export function getCreditsPublicConfig() {
   return {
     enabled: isCreditsEnabled(),
@@ -45,6 +58,8 @@ export function getCreditsPublicConfig() {
     packs: getCreditPacks(),
     stripeMinChargeCents: getStripeMinChargeCents(),
     creditsPerSeal: 1 as const,
+    /** Txs per credit when archiving signatures/text on-chain (ceil). */
+    framesPerDataArchiveCredit: FRAMES_PER_DATA_ARCHIVE_CREDIT,
   }
 }
 

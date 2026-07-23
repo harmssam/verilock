@@ -69,7 +69,7 @@ This keeps SQLite (`verilock.db`) across deploys. PDF files are not stored — o
 |----------|-------|
 | `NODE_ENV` | `production` |
 | `DATA_DIR` | `/data` |
-| `CORS_ORIGIN` | `https://verilock.online` (and any preview hosts) |
+| `CORS_ORIGIN` | `https://verilock.online` (and any preview hosts). `POST /api/verify/hash` is open-CORS for Offline companion lookup (hash only). |
 | `PUBLIC_APP_URL` | `https://verilock.online` (Stripe + absolute links) |
 | `APP_PUBLIC_URL` | `https://verilock.online` (email deep links) |
 | `NIMIQ_RPC_URL` | `https://rpc.nimiqwatch.com` |

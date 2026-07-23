@@ -103,7 +103,27 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
 const app = express()
 applySecurityHeaders(app)
-app.use(cors({ origin: CORS_ORIGIN }))
+// Global CORS is restricted to product origins. Offline-companion routes are open
+// so VeriLock Offline (desktop + GitHub Pages) can look up hashes, load agreement
+// metadata/layouts, complete Nimiq Hub login (challenge/verify), and fetch ink when
+// authorized. Never receives document file bytes. Route-aware so preflight is not blocked.
+app.use((req, res, next) => {
+  const path = req.path
+  const method = req.method
+  const openOfflineCompanion =
+    path === '/api/verify/hash' ||
+    path === '/api/auth/challenge' ||
+    path === '/api/auth/verify' ||
+    (method === 'GET' &&
+      (path === '/api/me' ||
+        path.startsWith('/api/verify/') ||
+        path.startsWith('/api/documents/') ||
+        path.startsWith('/api/placement-plans/')))
+  cors({
+    origin: openOfflineCompanion ? true : CORS_ORIGIN,
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  })(req, res, next)
+})
 
 // Stripe webhooks need the raw body for signature verification — register before json parser.
 const stripeWebhookLimit = rateLimit(60, 60_000)
@@ -141,6 +161,9 @@ const creditsBalanceLimit = rateLimit(120, 60_000)
 const publicReadLimit = rateLimit(60, 60_000)
 /** Multi-tx annotation stream broadcast — tight (service wallet cost). */
 const annotationStreamLimit = rateLimit(6, 60_000)
+/** Multi-tx data archive is expensive (service wallet + credits); keep tight. */
+const dataArchiveLimit = rateLimit(6, 60_000)
+const dataArchiveQuoteLimit = rateLimit(30, 60_000)
 // Hash verify is read-only and easy to double-fire from UI retries; allow a higher burst.
 const verifyHashLimit = rateLimit(60, 60_000)
 /** Public contact form — tight limit against spam floods. */
@@ -444,6 +467,68 @@ app.post(
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Pay with credit failed'
       res.status(lockErrorStatus(message)).json({ error: message })
+    }
+  },
+)
+
+/**
+ * Quote / status for multi-tx on-chain data archive (signatures, initials, text).
+ * Pricing: 1 credit per 10 Nimiq txs, rounded up. Creator only.
+ */
+app.get(
+  '/api/documents/:id/on-chain-data',
+  dataArchiveQuoteLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  async (req, res) => {
+    try {
+      const { quoteDocumentDataArchive } = await import('./documentDataArchive.js')
+      const { assertDocumentCreator } = await import('./documents.js')
+      const address = res.locals.address as string
+      const docId = routeParam(req.params.id)
+      assertDocumentCreator(docId, address)
+      res.json(quoteDocumentDataArchive(docId, address))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Quote failed'
+      const status =
+        message.includes('not found')
+          ? 404
+          : message.includes('Only the creator')
+            ? 403
+            : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
+
+/**
+ * Pay credits and broadcast packed annotation / placement frames on Nimiq.
+ * Reuses the multi-tx frame pipeline proven in the /pdf experiment.
+ */
+app.post(
+  '/api/documents/:id/on-chain-data',
+  dataArchiveLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  async (req, res) => {
+    try {
+      const { archiveDocumentDataOnChain } = await import('./documentDataArchive.js')
+      const address = res.locals.address as string
+      const result = await archiveDocumentDataOnChain(routeParam(req.params.id), address)
+      res.json(result)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'On-chain data archive failed'
+      const status =
+        message.includes('Insufficient credits')
+          ? 402
+          : message.includes('Only the creator') || message.includes('creator')
+            ? 403
+            : message.includes('must be locked')
+              ? 409
+              : message.includes('Too many')
+                ? 429
+                : 400
+      res.status(status).json({ error: message })
     }
   },
 )

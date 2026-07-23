@@ -735,6 +735,7 @@ export function App() {
           onConnect={connectPreservingPath}
           onOpen={openAgreement}
           onCreate={startCreate}
+          onGetCredits={goPricing}
         />
       )}
       {pdfLabEnabled && screen === 'pdf' && <PdfAnnotationJourney wallet={wallet} />}

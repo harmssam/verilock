@@ -41,6 +41,7 @@ import {
 } from './security.js'
 import { hashSignatureImage } from './signature-image.js'
 import { getSealPricing } from './sealPricing.js'
+import { dataArchiveSummaryForDocument } from './documentDataArchive.js'
 
 function slugFromId(id: string): string {
   return id.replace(/-/g, '').slice(0, 12)
@@ -218,6 +219,15 @@ export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOpti
     metadata: freshDoc.metadata,
     /** PDF overlay annotations (null when none / legacy documents). */
     annotations: freshDoc.annotations,
+    /**
+     * Optional upsell: multi-tx on-chain storage of signatures / fields.
+     * Creator-only (null for other viewers).
+     */
+    dataArchive:
+      options?.viewerAddress &&
+      normalizeAddress(freshDoc.creatorAddress) === normalizeAddress(options.viewerAddress)
+        ? dataArchiveSummaryForDocument(freshDoc.id)
+        : null,
     createdAt: freshDoc.createdAt,
     lockedAt: freshDoc.lockedAt,
     requiredSignatures: requiredCount,

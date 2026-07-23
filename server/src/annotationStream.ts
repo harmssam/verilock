@@ -689,14 +689,18 @@ export async function reconstructFromStoredOrChain(
   }
 }
 
-interface BroadcastResult {
+export interface BroadcastStreamResult {
   hashes: string[]
   confirmed: number
   partial: boolean
   error?: string
 }
 
-async function broadcastStreamFrames(frames: Buffer[]): Promise<BroadcastResult> {
+/**
+ * Broadcast pre-packed 64-byte frames via the service wallet (one basic tx each).
+ * Shared by annotation-stream experiment and paid document data-archive upsell.
+ */
+export async function broadcastStreamFrames(frames: Buffer[]): Promise<BroadcastStreamResult> {
   const { getServiceKeyPairForBroadcast, getServiceWalletAddress } = await import(
     './serviceWallet.js'
   )

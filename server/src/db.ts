@@ -899,6 +899,119 @@ export function getAnnotationStream(originalSha256: string): AnnotationStreamRec
   return row ? rowToAnnotationStream(row) : null
 }
 
+// ── Document data archives (paid multi-tx overlay storage on Nimiq) ─────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS document_data_archives (
+    document_id TEXT PRIMARY KEY,
+    original_sha256 TEXT NOT NULL,
+    source TEXT NOT NULL,
+    frame_count INTEGER NOT NULL DEFAULT 0,
+    credits_charged INTEGER NOT NULL DEFAULT 0,
+    frames_json TEXT NOT NULL DEFAULT '[]',
+    tx_hashes_json TEXT NOT NULL DEFAULT '[]',
+    on_chain INTEGER NOT NULL DEFAULT 0,
+    confirmed_frames INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_document_data_archives_sha
+    ON document_data_archives(original_sha256);
+`)
+
+export type DocumentDataArchiveSource = 'placements' | 'annotations'
+
+export interface DocumentDataArchiveRecord {
+  documentId: string
+  originalSha256: string
+  source: DocumentDataArchiveSource
+  frameCount: number
+  creditsCharged: number
+  framesHex: string[]
+  txHashes: string[]
+  onChain: boolean
+  confirmedFrames: number
+  error: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+function rowToDataArchive(row: Record<string, unknown>): DocumentDataArchiveRecord {
+  let framesHex: string[] = []
+  let txHashes: string[] = []
+  try {
+    framesHex = JSON.parse(String(row.frames_json ?? '[]')) as string[]
+  } catch {
+    framesHex = []
+  }
+  try {
+    txHashes = JSON.parse(String(row.tx_hashes_json ?? '[]')) as string[]
+  } catch {
+    txHashes = []
+  }
+  const sourceRaw = String(row.source ?? 'annotations')
+  const source: DocumentDataArchiveSource =
+    sourceRaw === 'placements' ? 'placements' : 'annotations'
+  return {
+    documentId: String(row.document_id),
+    originalSha256: String(row.original_sha256),
+    source,
+    frameCount: Number(row.frame_count ?? 0),
+    creditsCharged: Number(row.credits_charged ?? 0),
+    framesHex: Array.isArray(framesHex) ? framesHex : [],
+    txHashes: Array.isArray(txHashes) ? txHashes : [],
+    onChain: Boolean(row.on_chain),
+    confirmedFrames: Number(row.confirmed_frames ?? 0),
+    error: row.error != null ? String(row.error) : null,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+  }
+}
+
+export function getDocumentDataArchive(documentId: string): DocumentDataArchiveRecord | null {
+  const row = db
+    .prepare('SELECT * FROM document_data_archives WHERE document_id = ?')
+    .get(documentId) as Record<string, unknown> | undefined
+  return row ? rowToDataArchive(row) : null
+}
+
+export function upsertDocumentDataArchive(rec: DocumentDataArchiveRecord): void {
+  db.prepare(`
+    INSERT INTO document_data_archives (
+      document_id, original_sha256, source, frame_count, credits_charged,
+      frames_json, tx_hashes_json, on_chain, confirmed_frames, error, created_at, updated_at
+    ) VALUES (
+      @documentId, @originalSha256, @source, @frameCount, @creditsCharged,
+      @framesJson, @txHashesJson, @onChain, @confirmedFrames, @error, @createdAt, @updatedAt
+    )
+    ON CONFLICT(document_id) DO UPDATE SET
+      original_sha256 = excluded.original_sha256,
+      source = excluded.source,
+      frame_count = excluded.frame_count,
+      credits_charged = excluded.credits_charged,
+      frames_json = excluded.frames_json,
+      tx_hashes_json = excluded.tx_hashes_json,
+      on_chain = excluded.on_chain,
+      confirmed_frames = excluded.confirmed_frames,
+      error = excluded.error,
+      updated_at = excluded.updated_at
+  `).run({
+    documentId: rec.documentId,
+    originalSha256: rec.originalSha256.toLowerCase(),
+    source: rec.source,
+    frameCount: rec.frameCount,
+    creditsCharged: rec.creditsCharged,
+    framesJson: JSON.stringify(rec.framesHex),
+    txHashesJson: JSON.stringify(rec.txHashes),
+    onChain: rec.onChain ? 1 : 0,
+    confirmedFrames: rec.confirmedFrames,
+    error: rec.error,
+    createdAt: rec.createdAt,
+    updatedAt: rec.updatedAt,
+  })
+}
+
 // ── Placement construction plans (structure + roots only; no PDF / no ink) ─
 // Scoped per agreement (document_id PK). Same PDF fingerprint may have many plans.
 
