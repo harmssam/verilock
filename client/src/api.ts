@@ -544,14 +544,17 @@ export const api = {
       broadcastReady: boolean
       creditsEnabled: boolean
       error?: string | null
+      jobStatus: 'idle' | 'processing' | 'complete' | 'failed'
+      alreadyPaid: boolean
+      progressPercent: number
     }>(`/api/documents/${docId}/on-chain-data`, {
       headers: withAuth(token),
     }),
 
   /**
-   * Spend credits and broadcast packed frames on Nimiq (forever data archive).
-   * Pricing: ceil(frameCount / 10) credits.
-   * Optional notifyEmail: completion mail after success (Resend).
+   * Start paid multi-tx archive (returns quickly; work continues in background).
+   * Poll getOnChainDataQuote until jobStatus is complete | failed.
+   * alreadyPaid resumes are free. Optional notifyEmail on success.
    */
   archiveOnChainData: (
     token: string,
@@ -578,6 +581,10 @@ export const api = {
       broadcastError?: string
       partialBroadcast?: boolean
       notifyEmailQueued?: boolean
+      jobStatus: 'idle' | 'processing' | 'complete' | 'failed'
+      alreadyPaid: boolean
+      progressPercent: number
+      accepted?: boolean
     }>(`/api/documents/${docId}/on-chain-data`, {
       method: 'POST',
       headers: { ...withAuth(token), 'Content-Type': 'application/json' },

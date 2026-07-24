@@ -951,7 +951,18 @@ db.exec(`
     ON document_data_archives(original_sha256);
 `)
 
+/** job_status: idle | processing | complete | failed */
+const dataArchiveCols = db
+  .prepare('PRAGMA table_info(document_data_archives)')
+  .all() as Array<{ name: string }>
+if (!dataArchiveCols.some(c => c.name === 'job_status')) {
+  db.exec(
+    `ALTER TABLE document_data_archives ADD COLUMN job_status TEXT NOT NULL DEFAULT 'idle'`,
+  )
+}
+
 export type DocumentDataArchiveSource = 'placements' | 'annotations'
+export type DocumentDataArchiveJobStatus = 'idle' | 'processing' | 'complete' | 'failed'
 
 export interface DocumentDataArchiveRecord {
   documentId: string
@@ -964,8 +975,15 @@ export interface DocumentDataArchiveRecord {
   onChain: boolean
   confirmedFrames: number
   error: string | null
+  jobStatus: DocumentDataArchiveJobStatus
   createdAt: number
   updatedAt: number
+}
+
+function parseJobStatus(raw: unknown): DocumentDataArchiveJobStatus {
+  const s = String(raw ?? 'idle')
+  if (s === 'processing' || s === 'complete' || s === 'failed' || s === 'idle') return s
+  return 'idle'
 }
 
 function rowToDataArchive(row: Record<string, unknown>): DocumentDataArchiveRecord {
@@ -995,6 +1013,7 @@ function rowToDataArchive(row: Record<string, unknown>): DocumentDataArchiveReco
     onChain: Boolean(row.on_chain),
     confirmedFrames: Number(row.confirmed_frames ?? 0),
     error: row.error != null ? String(row.error) : null,
+    jobStatus: parseJobStatus(row.job_status),
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
   }
@@ -1008,13 +1027,16 @@ export function getDocumentDataArchive(documentId: string): DocumentDataArchiveR
 }
 
 export function upsertDocumentDataArchive(rec: DocumentDataArchiveRecord): void {
+  const jobStatus: DocumentDataArchiveJobStatus = rec.onChain
+    ? 'complete'
+    : rec.jobStatus || 'idle'
   db.prepare(`
     INSERT INTO document_data_archives (
       document_id, original_sha256, source, frame_count, credits_charged,
-      frames_json, tx_hashes_json, on_chain, confirmed_frames, error, created_at, updated_at
+      frames_json, tx_hashes_json, on_chain, confirmed_frames, error, job_status, created_at, updated_at
     ) VALUES (
       @documentId, @originalSha256, @source, @frameCount, @creditsCharged,
-      @framesJson, @txHashesJson, @onChain, @confirmedFrames, @error, @createdAt, @updatedAt
+      @framesJson, @txHashesJson, @onChain, @confirmedFrames, @error, @jobStatus, @createdAt, @updatedAt
     )
     ON CONFLICT(document_id) DO UPDATE SET
       original_sha256 = excluded.original_sha256,
@@ -1026,6 +1048,7 @@ export function upsertDocumentDataArchive(rec: DocumentDataArchiveRecord): void 
       on_chain = excluded.on_chain,
       confirmed_frames = excluded.confirmed_frames,
       error = excluded.error,
+      job_status = excluded.job_status,
       updated_at = excluded.updated_at
   `).run({
     documentId: rec.documentId,
@@ -1038,6 +1061,7 @@ export function upsertDocumentDataArchive(rec: DocumentDataArchiveRecord): void 
     onChain: rec.onChain ? 1 : 0,
     confirmedFrames: rec.confirmedFrames,
     error: rec.error,
+    jobStatus,
     createdAt: rec.createdAt,
     updatedAt: rec.updatedAt,
   })

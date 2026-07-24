@@ -266,8 +266,18 @@ export function AgreementsPage({
     try {
       const quote = await api.getOnChainDataQuote(token, doc.id)
       setArchiveFrameCount(quote.frameCount)
-      setArchiveCredits(quote.credits)
+      // alreadyPaid → show free resume in the modal (credits already held).
+      setArchiveCredits(quote.alreadyPaid ? 0 : quote.credits)
       setArchiveBalance(quote.balance)
+      if (quote.jobStatus === 'processing') {
+        // Job still running (e.g. after a prior 524) — show progress and poll.
+        setPendingArchive(doc)
+        setArchiveBusy(true)
+        setArchiveDone(false)
+        archiveModalOpenRef.current = true
+        void confirmArchive()
+        return
+      }
       if (quote.onChain) {
         setDocuments(prev =>
           prev.map(d =>
@@ -305,6 +315,37 @@ export function AgreementsPage({
     }
   }
 
+  const applyArchiveQuoteToDocs = useCallback(
+    (
+      docId: string,
+      quote: {
+        onChain: boolean
+        eligible: boolean
+        frameCount: number
+        credits: number
+        reason?: string
+      },
+    ) => {
+      setDocuments(prev =>
+        prev.map(d =>
+          d.id === docId
+            ? {
+                ...d,
+                dataArchive: {
+                  onChain: quote.onChain,
+                  eligible: quote.eligible,
+                  frameCount: quote.frameCount,
+                  credits: quote.credits,
+                  reason: quote.reason,
+                },
+              }
+            : d,
+        ),
+      )
+    },
+    [],
+  )
+
   const confirmArchive = async (options?: { notifyEmail?: string | null }) => {
     if (!token || !pendingArchive) return
     if (archiveInFlightRef.current) return
@@ -317,69 +358,118 @@ export function AgreementsPage({
     setArchiveDone(false)
     setArchiveError(null)
     try {
-      const result = await api.archiveOnChainData(token, docId, {
+      // Starts background job and returns quickly (avoids Cloudflare 524 on multi-tx).
+      const started = await api.archiveOnChainData(token, docId, {
         notifyEmail: options?.notifyEmail ?? null,
       })
-      if (typeof result.balance === 'number') {
-        writeCreditsBalanceCache(token, result.balance)
+      if (typeof started.balance === 'number') {
+        writeCreditsBalanceCache(token, started.balance)
+        setArchiveBalance(started.balance)
       }
-      setDocuments(prev =>
-        prev.map(d =>
-          d.id === docId
-            ? {
-                ...d,
-                dataArchive: {
-                  onChain: result.onChain,
-                  eligible: result.eligible,
-                  frameCount: result.frameCount,
-                  credits: result.credits,
-                  reason: result.reason,
-                },
-              }
-            : d,
-        ),
-      )
-      if (result.onChain) {
+      setArchiveFrameCount(started.frameCount || archiveFrameCount)
+      setArchiveCredits(started.alreadyPaid ? 0 : started.credits || archiveCredits)
+
+      if (started.onChain) {
+        applyArchiveQuoteToDocs(docId, started)
         setArchiveBusy(false)
         if (archiveModalOpenRef.current) {
           setArchiveDone(true)
           setPendingArchive(docSnapshot)
-        } else {
-          setArchiveDone(false)
         }
-      } else if (result.partialBroadcast || (result.txHashes?.length ?? 0) > 0) {
-        setArchiveBusy(false)
-        setArchiveError(
-          result.broadcastError ||
-            result.error ||
-            'Partial write saved — open Store forever again to finish (no extra charge).',
-        )
-        if (archiveModalOpenRef.current) {
-          setPendingArchive(docSnapshot)
-        }
-      } else {
-        setArchiveBusy(false)
-        setArchiveError(
-          result.broadcastError ||
-            result.error ||
-            'Could not write data to the Nimiq blockchain',
-        )
-        if (archiveModalOpenRef.current) {
-          setPendingArchive(docSnapshot)
-        }
+        return
       }
+
+      // Poll until complete / failed (or max ~8 minutes for large streams).
+      const deadline = Date.now() + 8 * 60_000
+      let last: typeof started | null = started
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 2000))
+        const quote = await api.getOnChainDataQuote(token, docId)
+        last = quote as typeof started
+        setArchiveFrameCount(quote.frameCount || archiveFrameCount)
+        if (typeof quote.balance === 'number') {
+          writeCreditsBalanceCache(token, quote.balance)
+          setArchiveBalance(quote.balance)
+        }
+        if (quote.onChain || quote.jobStatus === 'complete') {
+          applyArchiveQuoteToDocs(docId, quote)
+          setArchiveBusy(false)
+          if (archiveModalOpenRef.current) {
+            setArchiveDone(true)
+            setPendingArchive(docSnapshot)
+          }
+          return
+        }
+        if (quote.jobStatus === 'failed' && !quote.alreadyPaid) {
+          // Failed and refunded — show error.
+          applyArchiveQuoteToDocs(docId, quote)
+          setArchiveBusy(false)
+          setArchiveError(
+            quote.error ||
+              quote.reason ||
+              'Could not write data to the Nimiq blockchain (credits refunded if nothing was written)',
+          )
+          if (archiveModalOpenRef.current) setPendingArchive(docSnapshot)
+          return
+        }
+        if (quote.jobStatus === 'failed' && quote.alreadyPaid) {
+          // Partial — can resume free; stop busy and show resume message.
+          applyArchiveQuoteToDocs(docId, { ...quote, eligible: true })
+          setArchiveBusy(false)
+          setArchiveError(
+            quote.error ||
+              quote.reason ||
+              'Partial write saved. Click Store forever again to resume (no extra charge).',
+          )
+          if (archiveModalOpenRef.current) setPendingArchive(docSnapshot)
+          return
+        }
+        // Still processing — keep UI busy
+      }
+
+      // Timed out polling (job may still be running server-side).
+      applyArchiveQuoteToDocs(docId, last ?? started)
+      setArchiveBusy(false)
+      setArchiveError(
+        'Still writing in the background. Close this window and reopen Store forever later — if credits were charged, resume is free.',
+      )
+      if (archiveModalOpenRef.current) setPendingArchive(docSnapshot)
     } catch (err) {
       setArchiveBusy(false)
-      setArchiveError(err instanceof Error ? err.message : 'Could not archive data on-chain')
+      // 524 / network: job may still be running or already paid — refresh quote.
+      try {
+        const quote = await api.getOnChainDataQuote(token, docId)
+        if (typeof quote.balance === 'number') {
+          writeCreditsBalanceCache(token, quote.balance)
+          setArchiveBalance(quote.balance)
+        }
+        applyArchiveQuoteToDocs(docId, quote)
+        if (quote.onChain) {
+          if (archiveModalOpenRef.current) {
+            setArchiveDone(true)
+            setPendingArchive(docSnapshot)
+          }
+          return
+        }
+        if (quote.alreadyPaid || quote.jobStatus === 'processing') {
+          setArchiveError(
+            quote.jobStatus === 'processing'
+              ? 'Connection dropped while writing — work may still be running. Wait a minute, then open Store forever again (resume is free if already paid).'
+              : 'Request interrupted after credits were reserved. Click Store forever again to resume free of charge.',
+          )
+          if (archiveModalOpenRef.current) setPendingArchive(docSnapshot)
+          return
+        }
+      } catch {
+        /* ignore secondary failure */
+      }
+      setArchiveError(
+        err instanceof Error
+          ? err.message
+          : 'Could not start blockchain storage — check My agreements and try again',
+      )
       if (archiveModalOpenRef.current) {
         setPendingArchive(docSnapshot)
-      }
-      try {
-        const bal = await api.creditsBalance(token)
-        writeCreditsBalanceCache(token, bal.balance)
-        setArchiveBalance(bal.balance)
-      } catch {
-        /* ignore */
       }
     } finally {
       archiveInFlightRef.current = false

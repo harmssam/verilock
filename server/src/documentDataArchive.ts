@@ -240,6 +240,11 @@ export interface DataArchiveQuote {
   broadcastReady: boolean
   creditsEnabled: boolean
   error?: string | null
+  /** idle | processing | complete | failed — processing means server is writing in background. */
+  jobStatus: 'idle' | 'processing' | 'complete' | 'failed'
+  /** True when credits already spent and user can resume free of charge. */
+  alreadyPaid: boolean
+  progressPercent: number
 }
 
 export function quoteDocumentDataArchive(
@@ -264,6 +269,9 @@ export function quoteDocumentDataArchive(
       balance: null,
       broadcastReady: false,
       creditsEnabled: isCreditsEnabled(),
+      jobStatus: 'idle',
+      alreadyPaid: false,
+      progressPercent: 0,
     }
   }
 
@@ -277,11 +285,19 @@ export function quoteDocumentDataArchive(
       ? getCreditBalance(normalizeAddress(walletAddress))
       : null
 
+  // Detect paid-but-incomplete (e.g. Cloudflare 524 mid-job) so UI can resume free.
+  const spend = (() => {
+    try {
+      return resolveSpendAttempt(documentId)
+    } catch {
+      return { alreadyPaid: false, paidCredits: null as number | null, attempt: 0, key: '' }
+    }
+  })()
+
   let collected: CollectedFrames | null = null
   let collectError: string | undefined
   try {
-    // Quote shows live collect when not yet charged; after charge show pinned set.
-    if (existing?.framesHex?.length && existing.creditsCharged > 0) {
+    if (existing?.framesHex?.length && (existing.creditsCharged > 0 || spend.alreadyPaid)) {
       collected = {
         source: existing.source,
         framesHex: existing.framesHex,
@@ -300,11 +316,29 @@ export function quoteDocumentDataArchive(
   const credits = creditsForStreamTxCount(frameCount)
   const onChain = Boolean(existing?.onChain)
   const source = existing?.source ?? collected?.source ?? null
+  const inFlight = inflightArchives.has(documentId)
+  const jobStatus: DataArchiveQuote['jobStatus'] = onChain
+    ? 'complete'
+    : inFlight || existing?.jobStatus === 'processing'
+      ? 'processing'
+      : existing?.jobStatus === 'failed'
+        ? 'failed'
+        : 'idle'
+
+  const hashes = existing?.txHashes?.length ?? 0
+  const progressPercent = onChain
+    ? 100
+    : frameCount > 0
+      ? Math.min(99, Math.round((hashes / frameCount) * 100))
+      : 0
 
   let reason: string | undefined
   let eligible = false
   if (onChain) {
-    reason = 'Signatures and fields are already stored on Nimiq'
+    reason = 'Signatures and fields are already stored on the Nimiq blockchain'
+  } else if (jobStatus === 'processing') {
+    reason = 'Writing to the Nimiq blockchain in the background…'
+    eligible = false
   } else if (!locked) {
     reason = 'Lock the fingerprint first, then archive signatures on-chain'
   } else if (collectError) {
@@ -317,6 +351,12 @@ export function quoteDocumentDataArchive(
     reason = 'On-chain data broadcast is not configured'
   } else {
     eligible = true
+    if (spend.alreadyPaid && !onChain) {
+      reason =
+        hashes > 0
+          ? `Resume free — ${hashes}/${frameCount} frames already written (no extra charge)`
+          : 'Credits already reserved — resume storage free of charge'
+    }
   }
 
   return {
@@ -329,13 +369,16 @@ export function quoteDocumentDataArchive(
     credits,
     framesPerCredit: FRAMES_PER_DATA_ARCHIVE_CREDIT,
     source,
-    creditsCharged: existing?.creditsCharged ?? 0,
+    creditsCharged: existing?.creditsCharged ?? (spend.alreadyPaid ? spend.paidCredits ?? 0 : 0),
     txHashes: existing?.txHashes ?? [],
-    confirmedFrames: existing?.confirmedFrames ?? 0,
+    confirmedFrames: existing?.confirmedFrames ?? hashes,
     balance,
     broadcastReady,
     creditsEnabled,
     error: existing?.error ?? null,
+    jobStatus,
+    alreadyPaid: spend.alreadyPaid && !onChain,
+    progressPercent,
   }
 }
 
@@ -343,33 +386,42 @@ type ArchiveResult = DataArchiveQuote & {
   balance: number
   broadcastError?: string
   partialBroadcast?: boolean
+  /** True when work continues in the background (poll GET for completion). */
+  accepted?: boolean
 }
 
-/** Coalesce concurrent archive attempts for the same document. */
-const inflightArchives = new Map<string, Promise<ArchiveResult>>()
+/** In-process background jobs — one per document. */
+const inflightArchives = new Map<string, Promise<void>>()
+
+/** Optional completion emails requested at job start (key = documentId). */
+const pendingNotifyEmails = new Map<string, string>()
+
+export function registerArchiveNotifyEmail(documentId: string, email: string): void {
+  pendingNotifyEmails.set(documentId, email.trim().toLowerCase())
+}
+
+function fireArchiveNotifyEmail(documentId: string, frameCount: number, creditsCharged: number): void {
+  const to = pendingNotifyEmails.get(documentId)
+  if (!to) return
+  pendingNotifyEmails.delete(documentId)
+  void import('./email/dataArchiveComplete.js').then(({ notifyDataArchiveComplete }) =>
+    notifyDataArchiveComplete({
+      documentId,
+      to,
+      frameCount,
+      creditsCharged,
+    }),
+  )
+}
 
 /**
- * Charge credits (if not already paid) and broadcast packed frames on Nimiq.
- * Idempotent: re-broadcasts free of charge when credits were already spent.
- * Concurrent callers share one in-flight promise (no double spend / double tx).
+ * Charge credits (if needed), pin frames, start background multi-tx broadcast.
+ * Returns quickly so Cloudflare/proxy (∼100s) never 524s long archives.
+ * Client should poll GET .../on-chain-data until jobStatus is complete/failed.
+ *
+ * If credits were already spent (timeout after charge), resume is free.
  */
 export async function archiveDocumentDataOnChain(
-  documentId: string,
-  creatorAddress: string,
-): Promise<ArchiveResult> {
-  const existingPromise = inflightArchives.get(documentId)
-  if (existingPromise) return existingPromise
-
-  const run = runArchiveDocumentDataOnChain(documentId, creatorAddress).finally(() => {
-    if (inflightArchives.get(documentId) === run) {
-      inflightArchives.delete(documentId)
-    }
-  })
-  inflightArchives.set(documentId, run)
-  return run
-}
-
-async function runArchiveDocumentDataOnChain(
   documentId: string,
   creatorAddress: string,
 ): Promise<ArchiveResult> {
@@ -396,6 +448,16 @@ async function runArchiveDocumentDataOnChain(
     return {
       ...quoteDocumentDataArchive(documentId, address),
       balance: getCreditBalance(address),
+      accepted: false,
+    }
+  }
+
+  // Already running in this process — return current progress without double-start.
+  if (inflightArchives.has(documentId)) {
+    return {
+      ...quoteDocumentDataArchive(documentId, address),
+      balance: getCreditBalance(address),
+      accepted: true,
     }
   }
 
@@ -406,15 +468,12 @@ async function runArchiveDocumentDataOnChain(
     throw new Error('Nothing to charge for empty data archive')
   }
 
-  // Spend once per successful attempt. Partial broadcast keeps the charge; full
-  // failure refunds so the next attempt can charge again.
   const { attempt, alreadyPaid, key: spendIdem, paidCredits } = resolveSpendAttempt(documentId)
   let balance = getCreditBalance(address)
 
-  // If already paid, credits must match the pinned frame set (no free upgrades).
-  if (alreadyPaid && paidCredits != null && paidCredits < credits) {
+  if (alreadyPaid && paidCredits != null && paidCredits < credits && !(existing?.framesHex?.length)) {
     throw new Error(
-      `Paid ${paidCredits} credit(s) for this archive but ${credits} are required for ${frameCount} frames. Contact support or start a new agreement.`,
+      `Paid ${paidCredits} credit(s) for this archive but ${credits} are required for ${frameCount} frames.`,
     )
   }
 
@@ -438,104 +497,175 @@ async function runArchiveDocumentDataOnChain(
       }),
     })
     balance = spend.balance
+  }
 
-    // Pin frames immediately after charge so a crash mid-broadcast still resumes safely.
-    const nowPin = Date.now()
-    existing = {
+  const nowPin = Date.now()
+  const chargedCredits =
+    alreadyPaid && paidCredits != null ? paidCredits : credits
+  existing = {
+    documentId,
+    originalSha256: collected.originalSha256,
+    source: collected.source,
+    frameCount,
+    creditsCharged: chargedCredits,
+    framesHex: collected.framesHex,
+    txHashes: existing?.txHashes ?? [],
+    onChain: false,
+    confirmedFrames: existing?.confirmedFrames ?? 0,
+    error: null,
+    jobStatus: 'processing',
+    createdAt: existing?.createdAt ?? nowPin,
+    updatedAt: nowPin,
+  }
+  upsertDocumentDataArchive(existing)
+
+  // Background work — do not await (avoids 524 gateway timeouts on multi-tx).
+  const job = runBackgroundBroadcast({
+    documentId,
+    walletAddress: address,
+    collected,
+    attempt,
+    spendIdem,
+    chargedCredits,
+  }).finally(() => {
+    if (inflightArchives.get(documentId) === job) {
+      inflightArchives.delete(documentId)
+    }
+  })
+  inflightArchives.set(documentId, job)
+
+  return {
+    ...quoteDocumentDataArchive(documentId, address),
+    balance,
+    accepted: true,
+  }
+}
+
+async function runBackgroundBroadcast(input: {
+  documentId: string
+  walletAddress: string
+  collected: CollectedFrames
+  attempt: number
+  spendIdem: string
+  chargedCredits: number
+}): Promise<void> {
+  const { documentId, walletAddress, collected, attempt, chargedCredits } = input
+  const prior = getDocumentDataArchive(documentId)
+  const priorHashes = Array.isArray(prior?.txHashes) ? prior!.txHashes : []
+  const safeResume =
+    prior &&
+    prior.framesHex.length === collected.framesHex.length &&
+    framesContentHash(prior.framesHex) === collected.contentHash
+      ? Math.min(priorHashes.length, collected.framesHex.length)
+      : 0
+  const remainingHex = collected.framesHex.slice(safeResume)
+  let txHashes = safeResume > 0 ? priorHashes.slice(0, safeResume) : []
+
+  const persist = (patch: Partial<DocumentDataArchiveRecord>) => {
+    const cur = getDocumentDataArchive(documentId)
+    const base: DocumentDataArchiveRecord = cur ?? {
       documentId,
       originalSha256: collected.originalSha256,
       source: collected.source,
-      frameCount,
-      creditsCharged: credits,
+      frameCount: collected.frameCount,
+      creditsCharged: chargedCredits,
       framesHex: collected.framesHex,
-      txHashes: existing?.txHashes ?? [],
+      txHashes: [],
       onChain: false,
-      confirmedFrames: existing?.confirmedFrames ?? 0,
+      confirmedFrames: 0,
       error: null,
-      createdAt: existing?.createdAt ?? nowPin,
-      updatedAt: nowPin,
+      jobStatus: 'processing',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     }
-    upsertDocumentDataArchive(existing)
+    upsertDocumentDataArchive({
+      ...base,
+      framesHex: collected.framesHex,
+      creditsCharged: chargedCredits,
+      ...patch,
+      updatedAt: Date.now(),
+    })
   }
-
-  const now = Date.now()
-  // Resume: skip frames already broadcast on a prior partial attempt.
-  const priorHashes = Array.isArray(existing?.txHashes) ? existing!.txHashes : []
-  const resumeFrom = Math.min(
-    priorHashes.length,
-    collected.framesHex.length,
-  )
-  // Only trust prior hashes when frames match the pinned set length or content.
-  const safeResume =
-    existing &&
-    existing.framesHex.length === collected.framesHex.length &&
-    framesContentHash(existing.framesHex) === collected.contentHash
-      ? resumeFrom
-      : 0
-
-  const remainingHex = collected.framesHex.slice(safeResume)
-  const priorKept = safeResume > 0 ? priorHashes.slice(0, safeResume) : []
-
-  let txHashes: string[] = [...priorKept]
-  let confirmedFrames = existing?.confirmedFrames ?? 0
-  let onChain = false
-  let broadcastError: string | undefined
-  let partialBroadcast = false
 
   try {
     if (remainingHex.length === 0) {
-      // Already have hashes for every frame from a prior attempt.
-      txHashes = priorKept.length === collected.framesHex.length
-        ? priorKept
-        : priorHashes
       if (txHashes.length === collected.framesHex.length) {
-        onChain = true
-        confirmedFrames = Math.max(confirmedFrames, txHashes.length)
-      }
-    } else {
-      const frames = remainingHex.map(hex => Buffer.from(hex, 'hex'))
-      const result = await broadcastStreamFrames(frames)
-      txHashes = [...priorKept, ...result.hashes]
-      confirmedFrames = priorKept.length + result.confirmed
-      partialBroadcast = result.partial || txHashes.length < collected.framesHex.length
-
-      if (txHashes.length === collected.framesHex.length) {
-        onChain = true
-        if (result.confirmed < frames.length) {
-          partialBroadcast = true
-          broadcastError =
-            result.error ??
-            `Broadcast all ${collected.framesHex.length} frames; ${confirmedFrames} visible so far (mempool/RPC lag).`
-        }
-      } else if (txHashes.length > 0) {
-        partialBroadcast = true
-        onChain = false
-        broadcastError =
-          result.error ??
-          `Partial broadcast: ${txHashes.length}/${collected.framesHex.length} frames sent`
-      } else {
-        broadcastError = result.error ?? 'Broadcast produced no transaction hashes'
-        onChain = false
+        persist({
+          txHashes,
+          confirmedFrames: txHashes.length,
+          onChain: true,
+          jobStatus: 'complete',
+          error: null,
+        })
+        fireArchiveNotifyEmail(documentId, txHashes.length, chargedCredits)
+        return
       }
     }
-  } catch (err) {
-    broadcastError = err instanceof Error ? err.message : String(err)
-    onChain = false
-  }
 
-  // Full failure with zero hashes ever: refund this attempt so the user can retry.
-  // Never refund if any prior or current frame hash exists (partial on-chain work must stay paid).
-  const hadPriorHashes = priorHashes.length > 0 || priorKept.length > 0
-  const refundCredits = alreadyPaid
-    ? paidCredits ?? existing?.creditsCharged ?? credits
-    : credits
+    const frames = remainingHex.map(hex => Buffer.from(hex, 'hex'))
+    const result = await broadcastStreamFrames(frames, {
+      skipVisibilityWait: true,
+      interFrameDelayMs: 80,
+      onFrame: ({ hashes }) => {
+        // `hashes` is only this remaining batch; prepend any prior resumed hashes.
+        const all = [
+          ...(safeResume > 0 ? priorHashes.slice(0, safeResume) : []),
+          ...hashes,
+        ]
+        persist({
+          txHashes: all,
+          confirmedFrames: all.length,
+          onChain: false,
+          jobStatus: 'processing',
+          error: null,
+        })
+      },
+    })
 
-  if (!onChain && txHashes.length === 0 && !hadPriorHashes) {
+    const allHashes = [
+      ...(safeResume > 0 ? priorHashes.slice(0, safeResume) : []),
+      ...result.hashes,
+    ]
+    txHashes = allHashes
+
+    if (allHashes.length === collected.framesHex.length) {
+      persist({
+        txHashes: allHashes,
+        confirmedFrames: allHashes.length,
+        onChain: true,
+        jobStatus: 'complete',
+        error: result.error ?? null,
+      })
+      console.log('[data-archive] complete', {
+        documentId,
+        frames: allHashes.length,
+        credits: chargedCredits,
+      })
+      fireArchiveNotifyEmail(documentId, allHashes.length, chargedCredits)
+      return
+    }
+
+    if (allHashes.length > 0) {
+      // Partial — keep charge, leave idle so client can resume free.
+      persist({
+        txHashes: allHashes,
+        confirmedFrames: allHashes.length,
+        onChain: false,
+        jobStatus: 'failed',
+        error:
+          result.error ??
+          `Partial write: ${allHashes.length}/${collected.framesHex.length} frames — resume free of charge`,
+      })
+      return
+    }
+
+    // Zero hashes — refund so user is not stranded after 524 / wallet empty.
+    const refundCredits = chargedCredits
     if (!getLedgerByIdempotencyKey(refundKey(documentId, attempt))) {
       try {
-        const refund = applyCreditDelta({
+        applyCreditDelta({
           id: uuid(),
-          walletAddress: address,
+          walletAddress,
           delta: refundCredits,
           kind: 'refund_release',
           idempotencyKey: refundKey(documentId, attempt),
@@ -543,49 +673,70 @@ async function runArchiveDocumentDataOnChain(
           feeNimAtEvent: getSealFeeNim(),
           meta: JSON.stringify({
             kind: 'data_archive_refund',
-            reason: broadcastError ?? 'broadcast_failed',
+            reason: result.error ?? 'broadcast_failed_zero_hashes',
             attempt,
             credits: refundCredits,
           }),
         })
-        balance = refund.balance
+        console.log('[data-archive] refunded after zero-hash failure', {
+          documentId,
+          credits: refundCredits,
+        })
       } catch (refundErr) {
         console.error('[data-archive] refund failed', refundErr)
       }
     }
-  }
-
-  const charged =
-    Boolean(getLedgerByIdempotencyKey(spendIdem)) &&
-    !getLedgerByIdempotencyKey(refundKey(documentId, attempt))
-
-  const record: DocumentDataArchiveRecord = {
-    documentId,
-    originalSha256: collected.originalSha256,
-    source: collected.source,
-    frameCount,
-    creditsCharged: charged ? (paidCredits ?? credits) : 0,
-    framesHex: collected.framesHex,
-    txHashes,
-    onChain,
-    confirmedFrames,
-    error: broadcastError ?? null,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  }
-  upsertDocumentDataArchive(record)
-
-  if (!onChain && txHashes.length === 0) {
-    throw new Error(broadcastError ?? 'Could not broadcast data frames on-chain')
-  }
-
-  // Partial progress is a soft success: credits stay charged; client can retry to resume.
-  const quote = quoteDocumentDataArchive(documentId, address)
-  return {
-    ...quote,
-    balance,
-    ...(broadcastError ? { broadcastError } : {}),
-    ...(partialBroadcast ? { partialBroadcast: true } : {}),
+    persist({
+      txHashes: [],
+      confirmedFrames: 0,
+      onChain: false,
+      creditsCharged: 0,
+      jobStatus: 'failed',
+      error: result.error ?? 'Could not write data frames on-chain (credits refunded)',
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[data-archive] background job failed', { documentId, msg })
+    const cur = getDocumentDataArchive(documentId)
+    const hashes = cur?.txHashes ?? []
+    if (hashes.length === 0) {
+      if (!getLedgerByIdempotencyKey(refundKey(documentId, attempt))) {
+        try {
+          applyCreditDelta({
+            id: uuid(),
+            walletAddress,
+            delta: chargedCredits,
+            kind: 'refund_release',
+            idempotencyKey: refundKey(documentId, attempt),
+            refDocumentId: documentId,
+            feeNimAtEvent: getSealFeeNim(),
+            meta: JSON.stringify({
+              kind: 'data_archive_refund',
+              reason: msg,
+              attempt,
+            }),
+          })
+        } catch (refundErr) {
+          console.error('[data-archive] refund failed', refundErr)
+        }
+      }
+      persist({
+        txHashes: [],
+        confirmedFrames: 0,
+        onChain: false,
+        creditsCharged: 0,
+        jobStatus: 'failed',
+        error: `${msg} (credits refunded if no frames were written)`,
+      })
+    } else {
+      persist({
+        txHashes: hashes,
+        confirmedFrames: hashes.length,
+        onChain: false,
+        jobStatus: 'failed',
+        error: `${msg} — partial progress kept; resume free of charge`,
+      })
+    }
   }
 }
 
@@ -617,12 +768,18 @@ export function dataArchiveSummaryForDocument(documentId: string): {
     }
 
     // Resume / mid-flight: show cheap status from stored row without re-packing.
-    if (existing && existing.framesHex.length > 0 && existing.creditsCharged > 0) {
+    if (existing && existing.framesHex.length > 0 && (existing.creditsCharged > 0 || existing.jobStatus === 'processing')) {
       const locked = doc.status === 'locked'
       const broadcastReady =
         isAnnotationStreamBroadcastEnabled() && isServiceWalletConfigured()
+      const processing =
+        existing.jobStatus === 'processing' || inflightArchives.has(documentId)
       const eligible =
-        locked && isCreditsEnabled() && broadcastReady && !existing.onChain
+        locked &&
+        isCreditsEnabled() &&
+        broadcastReady &&
+        !existing.onChain &&
+        !processing
       return {
         onChain: false,
         eligible,
@@ -630,17 +787,21 @@ export function dataArchiveSummaryForDocument(documentId: string): {
         credits:
           existing.creditsCharged ||
           creditsForStreamTxCount(existing.frameCount || existing.framesHex.length),
-        ...(eligible
-          ? {}
-          : {
-              reason: !locked
-                ? 'Lock the fingerprint first, then archive signatures on-chain'
-                : !isCreditsEnabled()
-                  ? 'Credits are not enabled'
-                  : !broadcastReady
-                    ? 'On-chain data broadcast is not configured'
-                    : existing.error || undefined,
-            }),
+        ...(processing
+          ? { reason: 'Writing to the Nimiq blockchain…' }
+          : eligible
+            ? existing.creditsCharged > 0
+              ? { reason: 'Resume free — credits already reserved' }
+              : {}
+            : {
+                reason: !locked
+                  ? 'Lock the fingerprint first, then archive signatures on-chain'
+                  : !isCreditsEnabled()
+                    ? 'Credits are not enabled'
+                    : !broadcastReady
+                      ? 'On-chain data broadcast is not configured'
+                      : existing.error || undefined,
+              }),
       }
     }
 

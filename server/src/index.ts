@@ -531,8 +531,10 @@ app.post(
 
       const result = await archiveDocumentDataOnChain(docId, address)
 
+      // Completion email: if already complete, send now; if background job,
+      // attach notify email to fire when job finishes (poller path below).
       let notifyEmailQueued = false
-      if (notifyEmail && (result.onChain || (result.txHashes?.length ?? 0) > 0)) {
+      if (notifyEmail && result.onChain) {
         notifyEmailQueued = true
         void import('./email/dataArchiveComplete.js').then(({ notifyDataArchiveComplete }) =>
           notifyDataArchiveComplete({
@@ -542,6 +544,11 @@ app.post(
             creditsCharged: result.creditsCharged,
           }),
         )
+      } else if (notifyEmail && result.accepted) {
+        // Stash on archive error field is wrong — use in-memory map + complete hook.
+        notifyEmailQueued = true
+        const { registerArchiveNotifyEmail } = await import('./documentDataArchive.js')
+        registerArchiveNotifyEmail(docId, notifyEmail)
       }
 
       res.json({ ...result, notifyEmailQueued })
