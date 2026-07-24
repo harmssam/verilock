@@ -43,7 +43,7 @@ export async function notifyCreatorReadyToSeal(documentId: string): Promise<void
       'VeriLock never hosts your PDF — keep your local copy.',
       '',
       '—',
-      'VeriLock · Sign together. Prove forever.',
+      'VeriLock · Sign today. Prove forever.',
     ].join('\n')
 
     const safeTitle = escapeHtml(doc.title)
@@ -55,7 +55,7 @@ export async function notifyCreatorReadyToSeal(documentId: string): Promise<void
         <p><a href="${link}" style="display:inline-block;padding:12px 18px;background:#0d9488;color:#fff;text-decoration:none;border-radius:999px;font-weight:600">Open My agreements</a></p>
         <p style="font-size:14px;color:#475569">Or paste this link:<br/><a href="${link}">${link}</a></p>
         <p style="font-size:13px;color:#64748b">VeriLock never hosts your PDF — keep your local copy.</p>
-        <p style="font-size:12px;color:#94a3b8">VeriLock · Sign together. Prove forever.</p>
+        <p style="font-size:12px;color:#94a3b8">VeriLock · Sign today. Prove forever.</p>
       </div>
     `.trim()
 

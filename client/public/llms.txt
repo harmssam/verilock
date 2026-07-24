@@ -1,5 +1,5 @@
 # VeriLock
-> Sign documents together. Lock proof on the Nimiq blockchain. Your file never leaves your device.
+> Sign documents today. Lock proof on the Nimiq blockchain. Your file never leaves your device.
 
 ## Key Pages
 - Home: https://verilock.online/ — Sign, invite co-signers, lock a permanent proof

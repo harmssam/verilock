@@ -17,7 +17,14 @@ import {
   isSupportPath,
   saveHubReturnPath,
 } from './hubReturnPath'
-import { applyPageMeta, blogPostMeta, journeyPathMeta, PAGE_META, type PageMeta } from './seo'
+import {
+  applyPageMeta,
+  blogPostMeta,
+  journeyPathMeta,
+  PAGE_META,
+  SITE_TAGLINE,
+  type PageMeta,
+} from './seo'
 import { blogSlugFromPath, getPostBySlug } from './blog'
 import type { SealDocument } from './types'
 import { AppLink } from './AppLink'
@@ -596,7 +603,7 @@ export function App() {
             />
             <div className="lr-brand-text">
               <span className="lr-brand-name">VeriLock</span>
-              <span className="lr-brand-tag">Sign together. Prove forever.</span>
+              <span className="lr-brand-tag">{SITE_TAGLINE}</span>
             </div>
           </AppLink>
 
