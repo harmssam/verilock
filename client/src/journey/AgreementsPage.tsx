@@ -584,7 +584,7 @@ export function AgreementsPage({
                         {showArchiveDone && (
                           <span className="agreements-page-archive-badge">
                             <Database size={12} strokeWidth={2.5} aria-hidden />
-                            Data on-chain
+                            Data on blockchain
                           </span>
                         )}
                       </button>
@@ -615,8 +615,8 @@ export function AgreementsPage({
                             onClick={() => void requestArchive(doc)}
                             title={
                               archive.credits > 0
-                                ? `Store signatures & fields on Nimiq (${formatDataArchiveCredits(archive.credits)})`
-                                : 'Store signatures & fields on Nimiq (quote on open)'
+                                ? `Store signatures & fields on the Nimiq blockchain (${formatDataArchiveCredits(archive.credits)})`
+                                : 'Store signatures & fields on the Nimiq blockchain'
                             }
                           >
                             <Database size={15} strokeWidth={2.25} aria-hidden />

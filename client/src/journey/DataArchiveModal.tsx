@@ -1,15 +1,11 @@
 /**
- * Confirm paid multi-tx on-chain data archive (signatures, initials, text).
- * Pricing: 1 credit per 10 Nimiq txs, rounded up.
+ * Confirm paid on-chain data archive (signatures, initials, text).
+ * User-facing copy stays plain; pricing math stays server-side.
  */
 import { Database, LoaderCircle, X } from 'lucide-react'
 import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import {
-  formatDataArchiveCredits,
-  FRAMES_PER_DATA_ARCHIVE_CREDIT,
-} from '../dataArchivePricing'
-import { shortHash } from '../pdf/hashPdf'
+import { formatDataArchiveCredits } from '../dataArchivePricing'
 import type { SealDocument } from '../types'
 
 export interface DataArchiveModalProps {
@@ -27,7 +23,7 @@ export interface DataArchiveModalProps {
 
 export function DataArchiveModal({
   document: doc,
-  frameCount,
+  frameCount: _frameCount,
   credits,
   balance,
   busy = false,
@@ -92,10 +88,10 @@ export function DataArchiveModal({
             <Database size={22} strokeWidth={2} />
           </div>
           <div className="data-archive-head-text">
-            <h2 id={titleId}>Store data forever on Nimiq</h2>
+            <h2 id={titleId}>Store data forever on the Nimiq blockchain</h2>
             <p className="muted data-archive-subtitle">
-              Upgrade beyond the fingerprint lock — write signatures, initials, and
-              field text into permanent multi-tx storage on the blockchain.
+              Your fingerprint is already locked. Optionally store signatures,
+              initials, and field text permanently on the Nimiq blockchain too.
             </p>
           </div>
           <button
@@ -112,35 +108,13 @@ export function DataArchiveModal({
         <div id={descId} className="data-archive-body">
           <p className="data-archive-doc-title">
             <strong>{doc.title}</strong>
-            <span className="muted">
-              {' · '}
-              <code className="mono">{shortHash(doc.originalSha256)}</code>
-            </span>
           </p>
 
           <ul className="data-archive-facts">
             <li>
-              <span className="data-archive-fact-label">Transactions</span>
-              <span className="data-archive-fact-value">
-                {frameCount} × 64-byte Nimiq data frames
-              </span>
-            </li>
-            <li>
-              <span className="data-archive-fact-label">Pricing</span>
-              <span className="data-archive-fact-value">
-                1 credit per {FRAMES_PER_DATA_ARCHIVE_CREDIT} txs, rounded up
-              </span>
-            </li>
-            <li>
               <span className="data-archive-fact-label">Cost</span>
               <span className="data-archive-fact-value data-archive-fact-value--cost">
                 {creditLabel}
-                {frameCount > 0 && (
-                  <span className="muted">
-                    {' '}
-                    (ceil({frameCount}/{FRAMES_PER_DATA_ARCHIVE_CREDIT}))
-                  </span>
-                )}
               </span>
             </li>
             {balance != null && (
@@ -154,8 +128,8 @@ export function DataArchiveModal({
           </ul>
 
           <p className="muted data-archive-note">
-            The PDF stays on your devices. Only packed overlay data (paths, marks,
-            text) is written on-chain via VeriLock&apos;s service wallet.
+            The PDF never leaves your devices. Only signatures and form fields
+            are written to the Nimiq blockchain.
           </p>
 
           {error && (
@@ -199,12 +173,12 @@ export function DataArchiveModal({
                     strokeWidth={2.5}
                     aria-hidden
                   />
-                  Writing on-chain…
+                  Writing to blockchain…
                 </>
               ) : (
                 <>
                   <Database size={16} strokeWidth={2.25} aria-hidden />
-                  Archive for {creditLabel}
+                  Store forever · {creditLabel}
                 </>
               )}
             </button>
