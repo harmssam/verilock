@@ -159,9 +159,15 @@ export function AgreementsPage({
   const [archiveCredits, setArchiveCredits] = useState(0)
   const [archiveBalance, setArchiveBalance] = useState<number | null>(null)
   const [archiveBusy, setArchiveBusy] = useState(false)
+  const [archiveDone, setArchiveDone] = useState(false)
   const [archiveError, setArchiveError] = useState<string | null>(null)
+  const [archiveEmailAvailable, setArchiveEmailAvailable] = useState(false)
   /** Sync guard — React state alone can miss double-clicks before re-render. */
   const archiveInFlightRef = useRef(false)
+  /** Doc id being archived so background completion still updates the list. */
+  const archiveDocIdRef = useRef<string | null>(null)
+  /** False when user dismissed the modal while work continues in background. */
+  const archiveModalOpenRef = useRef(false)
   const [query, setQuery] = useState('')
   const [bucketFilter, setBucketFilter] = useState<BucketFilter>('all')
   const [visibleByBucket, setVisibleByBucket] = useState<Partial<Record<AgreementBucket, number>>>(
@@ -191,6 +197,24 @@ export function AgreementsPage({
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    let cancelled = false
+    void api
+      .features()
+      .then(f => {
+        if (cancelled) return
+        setArchiveEmailAvailable(
+          Boolean(f.emailNotifySendEnabled || f.emailNotifyConfigured || f.emailNotifyUi),
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setArchiveEmailAvailable(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Reset progressive reveal when search or status filter changes.
   useEffect(() => {
@@ -229,8 +253,11 @@ export function AgreementsPage({
 
   const requestArchive = async (doc: SealDocument) => {
     if (!token || !isDocumentCreator(doc, address)) return
+    if (archiveInFlightRef.current) return
     setArchiveError(null)
+    setArchiveDone(false)
     setPendingArchive(doc)
+    archiveModalOpenRef.current = true
     // Prefer list summary; refresh quote for live balance + frame count.
     const summary = doc.dataArchive
     setArchiveFrameCount(summary?.frameCount ?? 0)
@@ -258,6 +285,7 @@ export function AgreementsPage({
               : d,
           ),
         )
+        archiveModalOpenRef.current = false
         setPendingArchive(null)
       } else if (!quote.eligible && quote.reason) {
         setArchiveError(quote.reason)
@@ -268,25 +296,36 @@ export function AgreementsPage({
   }
 
   const closeArchiveModal = () => {
-    if (archiveBusy) return
+    archiveModalOpenRef.current = false
     setPendingArchive(null)
-    setArchiveError(null)
+    if (!archiveInFlightRef.current) {
+      setArchiveError(null)
+      setArchiveDone(false)
+      setArchiveBusy(false)
+    }
   }
 
-  const confirmArchive = async () => {
+  const confirmArchive = async (options?: { notifyEmail?: string | null }) => {
     if (!token || !pendingArchive) return
     if (archiveInFlightRef.current) return
+    const docId = pendingArchive.id
+    const docSnapshot = pendingArchive
     archiveInFlightRef.current = true
+    archiveDocIdRef.current = docId
+    archiveModalOpenRef.current = true
     setArchiveBusy(true)
+    setArchiveDone(false)
     setArchiveError(null)
     try {
-      const result = await api.archiveOnChainData(token, pendingArchive.id)
+      const result = await api.archiveOnChainData(token, docId, {
+        notifyEmail: options?.notifyEmail ?? null,
+      })
       if (typeof result.balance === 'number') {
         writeCreditsBalanceCache(token, result.balance)
       }
       setDocuments(prev =>
         prev.map(d =>
-          d.id === pendingArchive.id
+          d.id === docId
             ? {
                 ...d,
                 dataArchive: {
@@ -301,24 +340,40 @@ export function AgreementsPage({
         ),
       )
       if (result.onChain) {
-        setPendingArchive(null)
+        setArchiveBusy(false)
+        if (archiveModalOpenRef.current) {
+          setArchiveDone(true)
+          setPendingArchive(docSnapshot)
+        } else {
+          setArchiveDone(false)
+        }
       } else if (result.partialBroadcast || (result.txHashes?.length ?? 0) > 0) {
-        // Progress saved server-side; user can resume without re-paying.
+        setArchiveBusy(false)
         setArchiveError(
           result.broadcastError ||
             result.error ||
-            'Partial broadcast saved — click Archive again to resume remaining frames (no extra charge).',
+            'Partial write saved — open Store forever again to finish (no extra charge).',
         )
+        if (archiveModalOpenRef.current) {
+          setPendingArchive(docSnapshot)
+        }
       } else {
+        setArchiveBusy(false)
         setArchiveError(
           result.broadcastError ||
             result.error ||
-            'Could not broadcast data frames on-chain',
+            'Could not write data to the Nimiq blockchain',
         )
+        if (archiveModalOpenRef.current) {
+          setPendingArchive(docSnapshot)
+        }
       }
     } catch (err) {
+      setArchiveBusy(false)
       setArchiveError(err instanceof Error ? err.message : 'Could not archive data on-chain')
-      // Balance may have changed on failed charge/refund paths — best-effort refresh.
+      if (archiveModalOpenRef.current) {
+        setPendingArchive(docSnapshot)
+      }
       try {
         const bal = await api.creditsBalance(token)
         writeCreditsBalanceCache(token, bal.balance)
@@ -328,7 +383,9 @@ export function AgreementsPage({
       }
     } finally {
       archiveInFlightRef.current = false
-      setArchiveBusy(false)
+      if (archiveDocIdRef.current === docId) {
+        archiveDocIdRef.current = null
+      }
     }
   }
 
@@ -694,9 +751,11 @@ export function AgreementsPage({
         credits={archiveCredits}
         balance={archiveBalance}
         busy={archiveBusy}
+        done={archiveDone}
         error={archiveError}
+        emailNotifyAvailable={archiveEmailAvailable}
         onClose={closeArchiveModal}
-        onConfirm={() => void confirmArchive()}
+        onConfirm={opts => void confirmArchive(opts)}
         onGetCredits={
           onGetCredits
             ? () => {

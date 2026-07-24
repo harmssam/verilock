@@ -551,8 +551,13 @@ export const api = {
   /**
    * Spend credits and broadcast packed frames on Nimiq (forever data archive).
    * Pricing: ceil(frameCount / 10) credits.
+   * Optional notifyEmail: completion mail after success (Resend).
    */
-  archiveOnChainData: (token: string, docId: string) =>
+  archiveOnChainData: (
+    token: string,
+    docId: string,
+    body?: { notifyEmail?: string | null },
+  ) =>
     request<{
       documentId: string
       eligible: boolean
@@ -572,9 +577,11 @@ export const api = {
       error?: string | null
       broadcastError?: string
       partialBroadcast?: boolean
+      notifyEmailQueued?: boolean
     }>(`/api/documents/${docId}/on-chain-data`, {
       method: 'POST',
-      headers: withAuth(token),
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
     }),
 
   creditsBalance: (token: string, options?: { syncStripe?: boolean }) =>
