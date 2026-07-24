@@ -3632,6 +3632,19 @@ a.hash-chip.text-link:focus-visible {
 }
 
 /* Per-person invite card (Sign step) */
+.share-cosigner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.share-cosigner-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .share-cosigner-fields {
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--border, #e2e8f0);
