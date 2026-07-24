@@ -1,15 +1,19 @@
 /**
- * Confirm cancel/delete for an in-progress agreement (creator only, before any signatures).
+ * Confirm cancel (draft) or purge server copy (fully on-chain backed-up).
  * Portaled dialog — replaces native window.confirm.
  */
-import { AlertTriangle, LoaderCircle, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Database, LoaderCircle, Trash2, X } from 'lucide-react'
 import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { shortHash } from '../pdf/hashPdf'
 import { documentTypeLabel, type SealDocument } from '../types'
 
+export type CancelAgreementMode = 'cancel' | 'purge'
+
 export interface CancelAgreementModalProps {
   document: SealDocument | null
+  /** cancel = draft before signatures; purge = remove VeriLock metadata after on-chain backup */
+  mode?: CancelAgreementMode
   busy?: boolean
   error?: string | null
   onClose: () => void
@@ -18,6 +22,7 @@ export interface CancelAgreementModalProps {
 
 export function CancelAgreementModal({
   document: doc,
+  mode = 'cancel',
   busy = false,
   error = null,
   onClose,
@@ -54,6 +59,7 @@ export function CancelAgreementModal({
 
   if (!doc) return null
 
+  const isPurge = mode === 'purge'
   const filename = doc.originalFilename?.trim() || null
   const hashPreview = shortHash(doc.originalSha256)
 
@@ -70,22 +76,31 @@ export function CancelAgreementModal({
       />
       <div
         ref={panelRef}
-        className="cancel-agreement-modal"
+        className={`cancel-agreement-modal${isPurge ? ' cancel-agreement-modal--purge' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
       >
         <header className="cancel-agreement-head">
-          <div className="cancel-agreement-icon" aria-hidden>
-            <AlertTriangle size={20} strokeWidth={2.25} />
+          <div
+            className={`cancel-agreement-icon${isPurge ? ' cancel-agreement-icon--purge' : ''}`}
+            aria-hidden
+          >
+            {isPurge ? (
+              <Database size={20} strokeWidth={2.25} />
+            ) : (
+              <AlertTriangle size={20} strokeWidth={2.25} />
+            )}
           </div>
           <div className="cancel-agreement-head-text">
             <h2 id={titleId} className="cancel-agreement-title">
-              Cancel this agreement?
+              {isPurge ? 'Remove from VeriLock?' : 'Cancel this agreement?'}
             </h2>
             <p id={descId} className="muted cancel-agreement-lead">
-              This permanently removes the draft from VeriLock. Only possible before anyone signs.
+              {isPurge
+                ? 'Deletes VeriLock’s server copy of this agreement. Your fingerprint and stored data stay permanently on the Nimiq blockchain.'
+                : 'This permanently removes the draft from VeriLock. Only possible before anyone signs.'}
             </p>
           </div>
           <button
@@ -121,9 +136,20 @@ export function CancelAgreementModal({
         </div>
 
         <ul className="cancel-agreement-bullets">
-          <li>Co-signer invite links for this draft will stop working.</li>
-          <li>Your local document file is not deleted — only the VeriLock record.</li>
-          <li>This cannot be undone.</li>
+          {isPurge ? (
+            <>
+              <li>On-chain fingerprint lock remains public on Nimiq.</li>
+              <li>On-chain signatures and field data (if stored) remain on Nimiq.</li>
+              <li>VeriLock list entry, invites, and server metadata are removed.</li>
+              <li>Your local PDF is not deleted — only our app record.</li>
+            </>
+          ) : (
+            <>
+              <li>Co-signer invite links for this draft will stop working.</li>
+              <li>Your local document file is not deleted — only the VeriLock record.</li>
+              <li>This cannot be undone.</li>
+            </>
+          )}
         </ul>
 
         {error && (
@@ -139,7 +165,7 @@ export function CancelAgreementModal({
             onClick={onClose}
             disabled={busy}
           >
-            Keep agreement
+            {isPurge ? 'Keep on VeriLock' : 'Keep agreement'}
           </button>
           <button
             ref={confirmRef}
@@ -152,12 +178,12 @@ export function CancelAgreementModal({
             {busy ? (
               <>
                 <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
-                Cancelling…
+                {isPurge ? 'Removing…' : 'Cancelling…'}
               </>
             ) : (
               <>
                 <Trash2 size={16} strokeWidth={2.25} aria-hidden />
-                Yes, cancel agreement
+                {isPurge ? 'Remove from VeriLock' : 'Yes, cancel agreement'}
               </>
             )}
           </button>

@@ -457,6 +457,22 @@ export function deleteDocumentById(documentId: string): boolean {
     db.prepare('DELETE FROM signatures WHERE document_id = ?').run(id)
     db.prepare('DELETE FROM attestations WHERE document_id = ?').run(id)
     db.prepare('DELETE FROM document_parties WHERE document_id = ?').run(id)
+    // Placement plans + data-archive index rows (chain txs stay on Nimiq).
+    try {
+      db.prepare('DELETE FROM placement_plans WHERE document_id = ?').run(id)
+    } catch {
+      /* table may not exist in very old DBs */
+    }
+    try {
+      db.prepare('DELETE FROM document_data_archives WHERE document_id = ?').run(id)
+    } catch {
+      /* optional table */
+    }
+    try {
+      db.prepare('DELETE FROM credit_reservations WHERE document_id = ?').run(id)
+    } catch {
+      /* optional */
+    }
     db.prepare('DELETE FROM documents WHERE id = ?').run(id)
   })
 
