@@ -11,6 +11,7 @@ import { post as tamperProofPdfVerification } from './posts/tamper-proof-pdf-ver
 import { post as walletScopedAgreementsHistory } from './posts/wallet-scoped-agreements-history'
 import { post as whatIsVerilock } from './posts/what-is-verilock'
 
+import { post as chromeExtensionVerifyPdf } from './posts/chrome-extension-verify-pdf'
 import { post as docusignVsHellosignVsVerilock } from './posts/docusign-vs-hellosign-vs-verilock'
 import { post as noEmailNoPasswordNimiqAccounts } from './posts/no-email-no-password-nimiq-accounts'
 /** Retired slugs → canonical slug (merged or renamed posts). */
@@ -20,6 +21,7 @@ export const BLOG_SLUG_REDIRECTS: Record<string, string> = {
 
 /** All published posts. Sorted newest first at module load. */
 export const ALL_POSTS: BlogPost[] = [
+  chromeExtensionVerifyPdf,
   docusignVsHellosignVsVerilock,
   noEmailNoPasswordNimiqAccounts,
   whatIsVerilock,
