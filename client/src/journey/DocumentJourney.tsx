@@ -4683,11 +4683,6 @@ export function DocumentJourney({
                 open it and sign. Co-signers must use that exact file — the fingerprint has to
                 match.
               </p>
-              <ul className="invite-handoff-modal-steps">
-                <li>Share the signing link with each co-signer</li>
-                <li>Send the same agreement file with it (attachment or separate share)</li>
-                <li>They open the link, connect a wallet, and choose that file</li>
-              </ul>
               <div className="invite-handoff-modal-actions">
                 <button
                   ref={inviteHandoffPrimaryRef}
