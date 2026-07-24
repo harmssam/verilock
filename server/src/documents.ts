@@ -4,6 +4,7 @@ import {
   findDocumentsByHash,
   getDocumentById,
   getDocumentBySlug,
+  getDocumentDataArchive,
   getPartiesForDocument,
   getPartyById,
   getSignaturesForDocument,
@@ -955,13 +956,24 @@ export function deleteDocument(idOrSlug: string, requesterAddress: string): void
   if (normalizeAddress(doc.creatorAddress) !== normalizeAddress(requesterAddress)) {
     throw new Error('Only the creator can delete this agreement')
   }
-  if (doc.status === 'locked') {
-    throw new Error('Sealed agreements cannot be deleted')
-  }
   if (doc.status === 'locking') {
     throw new Error('Agreements being sealed cannot be deleted')
   }
-  // Only cancel before anyone has signed — protects partial multi-party work.
+
+  // Sealed + full data archive on Nimiq: allow purging VeriLock server copy only.
+  // Fingerprint and multi-tx archive remain on-chain permanently.
+  if (doc.status === 'locked') {
+    const archive = getDocumentDataArchive(doc.id)
+    if (!archive?.onChain) {
+      throw new Error(
+        'Sealed agreements can only be removed from VeriLock after signatures and fields are stored on the Nimiq blockchain',
+      )
+    }
+    deleteDocumentById(doc.id)
+    return
+  }
+
+  // Draft / in-progress: only cancel before anyone has signed.
   const signatures = getSignaturesForDocument(doc.id)
   if (signatures.length > 0) {
     throw new Error('Cannot cancel after a signature has been recorded')

@@ -1,4 +1,5 @@
 import {
+  CircleHelp,
   Database,
   FilePlus,
   LoaderCircle,
@@ -6,6 +7,7 @@ import {
   PenLine,
   Files,
   Search,
+  ShieldCheck,
   Trash2,
   X,
 } from 'lucide-react'
@@ -16,11 +18,13 @@ import {
   BUCKET_LABELS,
   BUCKET_ORDER,
   canDeleteDocument,
+  canPurgeServerCopy,
   countActionable,
   filterAgreements,
   getAgreementView,
   groupAgreements,
   isDocumentCreator,
+  isFullyOnChain,
   type AgreementBucket,
 } from '../agreements'
 import { api } from '../api'
@@ -28,7 +32,7 @@ import { writeCreditsBalanceCache } from '../creditsBalanceCache'
 import { formatDataArchiveCredits } from '../dataArchivePricing'
 import { shortHash } from '../pdf/hashPdf'
 import { documentTypeLabel, type SealDocument } from '../types'
-import { CancelAgreementModal } from './CancelAgreementModal'
+import { CancelAgreementModal, type CancelAgreementMode } from './CancelAgreementModal'
 import { DataArchiveModal } from './DataArchiveModal'
 import {
   journeyLoginEntryLabels,
@@ -153,6 +157,7 @@ export function AgreementsPage({
   const [error, setError] = useState<string | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [pendingCancel, setPendingCancel] = useState<SealDocument | null>(null)
+  const [cancelMode, setCancelMode] = useState<CancelAgreementMode>('cancel')
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [pendingArchive, setPendingArchive] = useState<SealDocument | null>(null)
   const [archiveFrameCount, setArchiveFrameCount] = useState(0)
@@ -224,6 +229,14 @@ export function AgreementsPage({
   const requestCancel = (doc: SealDocument) => {
     if (!token || !canDeleteDocument(doc, address)) return
     setCancelError(null)
+    setCancelMode('cancel')
+    setPendingCancel(doc)
+  }
+
+  const requestPurgeServer = (doc: SealDocument) => {
+    if (!token || !canPurgeServerCopy(doc, address)) return
+    setCancelError(null)
+    setCancelMode('purge')
     setPendingCancel(doc)
   }
 
@@ -231,10 +244,16 @@ export function AgreementsPage({
     if (cancellingId) return
     setPendingCancel(null)
     setCancelError(null)
+    setCancelMode('cancel')
   }
 
   const confirmCancelAgreement = async () => {
-    if (!token || !pendingCancel || !canDeleteDocument(pendingCancel, address)) return
+    if (!token || !pendingCancel) return
+    const allowed =
+      cancelMode === 'purge'
+        ? canPurgeServerCopy(pendingCancel, address)
+        : canDeleteDocument(pendingCancel, address)
+    if (!allowed) return
     setCancellingId(pendingCancel.id)
     setCancelError(null)
     setError(null)
@@ -242,8 +261,14 @@ export function AgreementsPage({
       await api.deleteDocument(token, pendingCancel.id)
       setDocuments(prev => prev.filter(d => d.id !== pendingCancel.id))
       setPendingCancel(null)
+      setCancelMode('cancel')
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Could not cancel agreement'
+      const message =
+        err instanceof Error
+          ? err.message
+          : cancelMode === 'purge'
+            ? 'Could not remove agreement from VeriLock'
+            : 'Could not cancel agreement'
       setCancelError(message)
       setError(message)
     } finally {
@@ -692,21 +717,31 @@ export function AgreementsPage({
                   const creator = isDocumentCreator(doc, address)
                   const preferSeal = view.cta === 'Lock now' && creator
                   const canCancel = canDeleteDocument(doc, address)
+                  const canPurge = canPurgeServerCopy(doc, address)
                   const cancelling = cancellingId === doc.id
                   const archive = creator ? doc.dataArchive : null
+                  const fullyOnChain = isFullyOnChain(doc)
+                  const fingerprintLocked =
+                    bucket === 'locked' ||
+                    doc.status === 'locked' ||
+                    doc.attestation?.status === 'confirmed'
                   const showArchiveUpsell =
                     creator &&
                     bucket === 'locked' &&
                     archive &&
                     !archive.onChain &&
                     archive.eligible
-                  const showArchiveDone = creator && archive?.onChain
                   return (
                     <li
                       key={doc.id}
-                      className={`agreements-page-item${
-                        bucket === 'ready_to_seal' ? ' agreements-page-item--seal' : ''
-                      }${showArchiveUpsell ? ' agreements-page-item--archive' : ''}`}
+                      className={[
+                        'agreements-page-item',
+                        bucket === 'ready_to_seal' ? 'agreements-page-item--seal' : '',
+                        showArchiveUpsell ? 'agreements-page-item--archive' : '',
+                        fullyOnChain ? 'agreements-page-item--backed-up' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
                     >
                       <button
                         type="button"
@@ -714,6 +749,14 @@ export function AgreementsPage({
                         onClick={() => onOpen(doc, preferSeal)}
                       >
                         <span className="agreements-page-title-row">
+                          {fullyOnChain && (
+                            <span
+                              className="agreements-page-backed-icon"
+                              title="Fingerprint and data stored on the Nimiq blockchain"
+                            >
+                              <ShieldCheck size={16} strokeWidth={2.25} aria-hidden />
+                            </span>
+                          )}
                           <strong className="agreements-page-title">{doc.title}</strong>
                           <span className="agreements-page-type">{documentTypeLabel(doc.type)}</span>
                         </span>
@@ -728,10 +771,18 @@ export function AgreementsPage({
                           <code className="mono">{shortHash(doc.originalSha256)}</code>
                         </span>
                         <span className="agreements-page-headline">{view.headline}</span>
-                        {showArchiveDone && (
-                          <span className="agreements-page-archive-badge">
-                            <Database size={12} strokeWidth={2.5} aria-hidden />
-                            Data on blockchain
+                        {fingerprintLocked && (
+                          <span className="agreements-page-tags">
+                            <span className="agreements-page-archive-badge agreements-page-archive-badge--lock">
+                              <Lock size={12} strokeWidth={2.5} aria-hidden />
+                              Fingerprint locked
+                            </span>
+                            {fullyOnChain && (
+                              <span className="agreements-page-archive-badge agreements-page-archive-badge--data">
+                                <Database size={12} strokeWidth={2.5} aria-hidden />
+                                Data on blockchain
+                              </span>
+                            )}
                           </span>
                         )}
                       </button>
@@ -771,6 +822,49 @@ export function AgreementsPage({
                               ? `Store forever · ${formatDataArchiveCredits(archive.credits)}`
                               : 'Store forever'}
                           </button>
+                        )}
+                        {canPurge && (
+                          <div className="agreements-page-purge-row">
+                            <button
+                              type="button"
+                              className={`btn btn-ghost agreements-page-purge${cancelling ? ' btn--busy' : ''}`}
+                              disabled={Boolean(cancellingId)}
+                              onClick={() => requestPurgeServer(doc)}
+                            >
+                              {cancelling ? (
+                                <>
+                                  <LoaderCircle
+                                    className="btn-spinner"
+                                    size={15}
+                                    strokeWidth={2.5}
+                                    aria-hidden
+                                  />
+                                  Removing…
+                                </>
+                              ) : (
+                                <>
+                                  <Trash2 size={15} strokeWidth={2.25} aria-hidden />
+                                  Remove from VeriLock
+                                </>
+                              )}
+                            </button>
+                            <details className="agreements-page-purge-help">
+                              <summary
+                                className="agreements-page-purge-help-btn"
+                                aria-label="What does Remove from VeriLock do?"
+                              >
+                                <CircleHelp size={15} strokeWidth={2.25} aria-hidden />
+                              </summary>
+                              <div className="agreements-page-purge-help-panel" role="note">
+                                <strong>What “Remove from VeriLock” does</strong>
+                                <p>
+                                  Drops the agreement from our server list / metadata. The Nimiq
+                                  fingerprint lock and multi-tx data stay on the blockchain
+                                  permanently. Your local PDF is not deleted.
+                                </p>
+                              </div>
+                            </details>
+                          </div>
                         )}
                         {canCancel && (
                           <button
@@ -829,6 +923,7 @@ export function AgreementsPage({
 
       <CancelAgreementModal
         document={pendingCancel}
+        mode={cancelMode}
         busy={Boolean(pendingCancel && cancellingId === pendingCancel.id)}
         error={cancelError}
         onClose={closeCancelModal}

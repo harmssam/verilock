@@ -94,6 +94,12 @@ button {
   cursor: pointer;
 }
 
+/* SEO-friendly <a> chrome (nav, CTAs, former buttons): no browser default underline.
+   Intentional content links re-enable via class (e.g. .text-link:hover, .inline-link). */
+a {
+  text-decoration: none;
+}
+
 #root {
   min-height: 100dvh;
   position: relative;

@@ -2964,6 +2964,41 @@ a.hash-chip.text-link:focus-visible {
   background: rgba(13, 148, 136, 0.04);
 }
 
+/* Fully backed up: fingerprint locked + signatures/fields on Nimiq */
+.agreements-page-item--backed-up {
+  border-color: rgba(13, 148, 136, 0.42);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(13, 148, 136, 0.1) 0%,
+      rgba(255, 255, 255, 0.98) 48%,
+      rgba(251, 191, 36, 0.06) 100%
+    );
+  box-shadow:
+    0 0 0 1px rgba(13, 148, 136, 0.08),
+    0 6px 18px rgba(13, 148, 136, 0.07);
+}
+
+.agreements-page-backed-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 8px;
+  color: var(--mint-deep, #0f766e);
+  background: rgba(13, 148, 136, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.28);
+}
+
+.agreements-page-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+
 .agreements-page-archive-badge {
   display: inline-flex;
   align-items: center;
@@ -2979,8 +3014,118 @@ a.hash-chip.text-link:focus-visible {
   border: 1px solid rgba(13, 148, 136, 0.22);
 }
 
+.agreements-page-tags .agreements-page-archive-badge {
+  margin-top: 0;
+}
+
+.agreements-page-archive-badge--lock {
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.1);
+  border-color: rgba(15, 118, 110, 0.22);
+}
+
+.agreements-page-archive-badge--data {
+  color: #b45309;
+  background: rgba(251, 191, 36, 0.16);
+  border-color: rgba(217, 119, 6, 0.28);
+}
+
 .agreements-page-archive-btn {
   white-space: nowrap;
+}
+
+.agreements-page-purge-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.15rem;
+}
+
+.agreements-page-purge {
+  color: var(--text-muted, #64748b);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.agreements-page-purge:hover:not(:disabled) {
+  color: #b91c1c;
+  background: rgba(251, 113, 133, 0.08);
+}
+
+.agreements-page-purge-help {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.agreements-page-purge-help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  list-style: none;
+}
+
+.agreements-page-purge-help-btn::-webkit-details-marker {
+  display: none;
+}
+
+.agreements-page-purge-help-btn:hover,
+.agreements-page-purge-help[open] > .agreements-page-purge-help-btn {
+  color: var(--mint-deep, #0f766e);
+  background: rgba(13, 148, 136, 0.1);
+}
+
+.agreements-page-purge-help-btn:focus-visible {
+  outline: 2px solid rgba(13, 148, 136, 0.45);
+  outline-offset: 1px;
+}
+
+.agreements-page-purge-help-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.35rem);
+  z-index: 5;
+  width: min(16.5rem, 70vw);
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(15, 23, 42, 0.1));
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+  color: var(--text, #0f172a);
+  text-align: left;
+}
+
+.agreements-page-purge-help-panel strong {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+
+.agreements-page-purge-help-panel p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-muted, #4b5c6b);
+  font-weight: 500;
+}
+
+.cancel-agreement-icon--purge {
+  color: var(--mint-deep, #0f766e);
+  background: rgba(13, 148, 136, 0.1);
+  border-color: rgba(13, 148, 136, 0.28);
+}
+
+.cancel-agreement-modal--purge .cancel-agreement-bullets li::marker {
+  color: rgba(13, 148, 136, 0.55);
 }
 
 @media (max-width: 480px) {

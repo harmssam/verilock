@@ -75,6 +75,28 @@ export function canDeleteDocument(
   return true
 }
 
+/**
+ * Creator may purge VeriLock server records for a locked agreement only when
+ * signatures/fields are already stored on the Nimiq blockchain (data archive).
+ * On-chain fingerprint + archive txs remain; only our app metadata is removed.
+ */
+export function canPurgeServerCopy(
+  doc: Pick<SealDocument, 'status' | 'creatorAddress' | 'dataArchive' | 'attestation'>,
+  address: string | null,
+): boolean {
+  if (!address || !isDocumentCreator(doc, address)) return false
+  if (doc.status !== 'locked' && doc.attestation?.status !== 'confirmed') return false
+  return Boolean(doc.dataArchive?.onChain)
+}
+
+/** Locked fingerprint + full data archive on Nimiq. */
+export function isFullyOnChain(
+  doc: Pick<SealDocument, 'status' | 'dataArchive' | 'attestation'>,
+): boolean {
+  const locked = doc.status === 'locked' || doc.attestation?.status === 'confirmed'
+  return locked && Boolean(doc.dataArchive?.onChain)
+}
+
 export function isCollectingSignatures(doc: SealDocument): boolean {
   if (doc.status === 'locked') return false
   if (doc.signingProgress.required === 0) return false
@@ -103,9 +125,12 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
   const progress = required === 0 ? 'direct lock' : `${signed}/${required} signed`
 
   if (doc.status === 'locked' || doc.attestation?.status === 'confirmed') {
+    const fullyBackedUp = Boolean(doc.dataArchive?.onChain)
     return {
       bucket: 'locked',
-      headline: 'Locked on-chain',
+      headline: fullyBackedUp
+        ? 'Fingerprint + data on blockchain'
+        : 'Locked on-chain',
       detail: progress,
       cta: 'View',
     }
