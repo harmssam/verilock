@@ -720,6 +720,15 @@ export async function broadcastStreamFrames(
   frames: Buffer[],
   options?: BroadcastStreamOptions,
 ): Promise<BroadcastStreamResult> {
+  if (!frames.length) {
+    return {
+      hashes: [],
+      confirmed: 0,
+      partial: false,
+      error: 'No frames to broadcast (empty stream)',
+    }
+  }
+
   const { getServiceKeyPairForBroadcast, getServiceWalletAddress } = await import(
     './serviceWallet.js'
   )
@@ -737,6 +746,12 @@ export async function broadcastStreamFrames(
     frames.length * STREAM_FRAME_VALUE_LUNA + STREAM_FEE_BUFFER_LUNA
   try {
     const balance = await getWalletBalanceLuna(senderAddress)
+    console.log('[annotation-stream] service wallet balance check', {
+      sender: senderAddress.slice(0, 12),
+      balance,
+      minBalance,
+      frames: frames.length,
+    })
     if (balance < minBalance) {
       return {
         hashes: [],
@@ -749,6 +764,8 @@ export async function broadcastStreamFrames(
     if (err instanceof Error && err.message.includes('Service wallet balance')) {
       return { hashes: [], confirmed: 0, partial: false, error: err.message }
     }
+    // Fail open on balance read errors (same as credit seals) so a cold light client
+    // does not block the proven /pdf multi-tx path.
     console.warn('[annotation-stream] could not read service wallet balance', err)
   }
 

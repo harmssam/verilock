@@ -240,10 +240,31 @@ export async function getBlockNumber(): Promise<number> {
 }
 
 export async function getWalletBalanceLuna(address: string): Promise<number> {
-  const client = await getBroadcastClient()
-  const account = await client.getAccount(normalizeAddress(address))
-  if ('balance' in account && typeof account.balance === 'number') {
-    return account.balance
+  const normalized = normalizeAddress(address)
+  // Prefer public JSON-RPC — light client can report 0 before consensus is warm
+  // (false "balance too low" kills multi-tx archive / annotation stream).
+  try {
+    const account = await rpcCall<{ balance?: number }>('getAccountByAddress', [normalized])
+    if (account && typeof account.balance === 'number') {
+      return account.balance
+    }
+  } catch (err) {
+    console.warn(
+      '[nimiq] getAccountByAddress failed, trying light client',
+      err instanceof Error ? err.message : err,
+    )
+  }
+  try {
+    const client = await getBroadcastClient()
+    const account = await client.getAccount(normalized)
+    if ('balance' in account && typeof account.balance === 'number') {
+      return account.balance
+    }
+  } catch (err) {
+    console.warn(
+      '[nimiq] light-client getAccount failed',
+      err instanceof Error ? err.message : err,
+    )
   }
   return 0
 }

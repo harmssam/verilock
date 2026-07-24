@@ -102,8 +102,8 @@ function framesContentHash(framesHex: string[]): string {
   return createHash('sha256').update(framesHex.join('')).digest('hex')
 }
 
-/** Accept only well-formed 64-byte VeriLock stream frames (magic 0xA1 + known version). */
-function assertValidStreamFrameHex(hex: string, index: number, source: DocumentDataArchiveSource): void {
+/** Accept well-formed 64-byte VeriLock stream frames (magic 0xA1, version 1 or 2). */
+function assertValidStreamFrameHex(hex: string, index: number, _source: DocumentDataArchiveSource): void {
   if (typeof hex !== 'string' || !/^[a-f0-9]{128}$/i.test(hex)) {
     throw new Error(`Invalid frame hex at index ${index}`)
   }
@@ -112,15 +112,12 @@ function assertValidStreamFrameHex(hex: string, index: number, source: DocumentD
     throw new Error(`Frame ${index} is ${buf.length} bytes (need 64)`)
   }
   if (buf[0] !== STREAM_MAGIC) {
-    throw new Error(`Frame ${index} has bad stream magic`)
+    throw new Error(`Frame ${index} has bad stream magic (expected 0xA1 like /pdf lab)`)
   }
   const ver = buf[1]!
-  if (source === 'placements') {
-    if (ver !== STREAM_VERSION_PLACEMENT) {
-      throw new Error(`Frame ${index} is not a placement stream (v2) frame`)
-    }
-  } else if (ver !== STREAM_VERSION_ANNOTATION) {
-    throw new Error(`Frame ${index} is not an annotation stream (v1) frame`)
+  // v1 = free-form annotation stream (/pdf lab); v2 = placement construction stream
+  if (ver !== STREAM_VERSION_ANNOTATION && ver !== STREAM_VERSION_PLACEMENT) {
+    throw new Error(`Frame ${index} has unsupported stream version ${ver}`)
   }
 }
 
@@ -589,7 +586,7 @@ async function runBackgroundBroadcast(input: {
 
   try {
     if (remainingHex.length === 0) {
-      if (txHashes.length === collected.framesHex.length) {
+      if (txHashes.length === collected.framesHex.length && collected.framesHex.length > 0) {
         persist({
           txHashes,
           confirmedFrames: txHashes.length,
@@ -600,18 +597,53 @@ async function runBackgroundBroadcast(input: {
         fireArchiveNotifyEmail(documentId, txHashes.length, chargedCredits)
         return
       }
+      // Incomplete pin / resume state — do not call broadcast with an empty batch
+      // (that used to look like success with 0 hashes → false "broadcast failed").
+      persist({
+        txHashes,
+        confirmedFrames: txHashes.length,
+        onChain: false,
+        jobStatus: 'failed',
+        error:
+          txHashes.length > 0
+            ? `Resume needed: ${txHashes.length}/${collected.framesHex.length} frames on-chain — try Store forever again (free)`
+            : 'No packed frames to broadcast (same multi-tx path as /pdf lab). Re-open and retry.',
+      })
+      return
     }
 
-    const frames = remainingHex.map(hex => Buffer.from(hex, 'hex'))
+    // Same multi-tx path as /pdf lab (publishAnnotationStream → broadcastStreamFrames).
+    // Use Buffer.copy into fixed 64-byte frames like packAnnotationStream does.
+    const frames = remainingHex.map(hex => {
+      const raw = Buffer.from(hex, 'hex')
+      const f = Buffer.alloc(64)
+      raw.copy(f, 0, 0, Math.min(64, raw.length))
+      return f
+    })
+    console.log('[data-archive] broadcasting frames', {
+      documentId,
+      total: collected.framesHex.length,
+      remaining: frames.length,
+      resumeFrom: safeResume,
+      source: collected.source,
+    })
     const result = await broadcastStreamFrames(frames, {
+      // Skip long visibility polling so large streams finish; hashes are persisted per frame.
       skipVisibilityWait: true,
-      interFrameDelayMs: 80,
-      onFrame: ({ hashes }) => {
-        // `hashes` is only this remaining batch; prepend any prior resumed hashes.
+      // Match /pdf pacing closely (was 120ms there).
+      interFrameDelayMs: 120,
+      onFrame: ({ hashes, index }) => {
         const all = [
           ...(safeResume > 0 ? priorHashes.slice(0, safeResume) : []),
           ...hashes,
         ]
+        if (index === 0 || (index + 1) % 8 === 0 || index + 1 === frames.length) {
+          console.log('[data-archive] frame progress', {
+            documentId,
+            done: all.length,
+            total: collected.framesHex.length,
+          })
+        }
         persist({
           txHashes: all,
           confirmedFrames: all.length,
@@ -686,13 +718,21 @@ async function runBackgroundBroadcast(input: {
         console.error('[data-archive] refund failed', refundErr)
       }
     }
+    const failMsg =
+      result.error ||
+      'Could not broadcast data frames on-chain (same path as /pdf lab). Credits refunded if nothing was written.'
+    console.error('[data-archive] zero-hash failure', {
+      documentId,
+      error: failMsg,
+      remaining: frames.length,
+    })
     persist({
       txHashes: [],
       confirmedFrames: 0,
       onChain: false,
       creditsCharged: 0,
       jobStatus: 'failed',
-      error: result.error ?? 'Could not write data frames on-chain (credits refunded)',
+      error: failMsg,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
