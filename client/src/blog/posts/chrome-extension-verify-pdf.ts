@@ -11,7 +11,7 @@ export const post: BlogPost = {
   tags: ['feature', 'verify'],
   coverImage: cover,
   coverAlt:
-    'White desk with an invoice PDF, mouse cursor, and teal check shield for private document verification',
+    'White desk with an invoice PDF and teal glass check shield for private document verification',
   relatedSlugs: [
     'how-to-verify-signed-pdf-without-a-wallet',
     'tamper-proof-pdf-verification',
