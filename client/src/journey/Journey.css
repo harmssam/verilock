@@ -2826,6 +2826,139 @@ a.hash-chip.text-link:focus-visible {
   min-height: 2.4rem;
 }
 
+.data-archive-modal--progress {
+  width: min(28rem, 100%);
+  max-height: min(92dvh, 48rem);
+}
+
+.data-archive-progress-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.data-archive-close--progress {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+}
+
+.data-archive-actions--progress {
+  justify-content: center;
+}
+
+.data-archive-progress-pct {
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: inherit;
+}
+
+.data-archive-progress-bar {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.data-archive-progress-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--mint, #0d9488) 85%, #0f766e),
+    color-mix(in srgb, var(--mint, #5eead4) 70%, #14b8a6)
+  );
+  transition: width 0.45s ease;
+}
+
+.data-archive-email {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
+  background: rgba(13, 148, 136, 0.04);
+}
+
+.data-archive-email-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--lr-text, var(--text, #0f172a));
+  cursor: pointer;
+}
+
+.data-archive-email-check input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.data-archive-email-check span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.data-archive-email-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.12));
+  border-radius: 10px;
+  background: #fff;
+  color: var(--lr-text, var(--text, #0f172a));
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.data-archive-email-input:focus {
+  outline: none;
+  border-color: rgba(13, 148, 136, 0.5);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+/* Light shell: seal progress panel text is dark on white modal */
+.data-archive-modal .credit-seal-progress {
+  border-color: rgba(13, 148, 136, 0.28);
+  background:
+    linear-gradient(
+      160deg,
+      rgba(13, 148, 136, 0.08),
+      #ffffff 50%,
+      rgba(251, 191, 36, 0.05)
+    );
+  box-shadow: none;
+}
+
+.data-archive-modal .credit-seal-progress-title,
+.data-archive-modal .credit-seal-progress-status {
+  color: var(--lr-text, var(--text, #0f172a));
+}
+
+.data-archive-modal .credit-seal-progress-kicker {
+  color: var(--mint-deep, #0f766e);
+}
+
+.data-archive-modal .credit-seal-progress-core {
+  color: var(--mint-deep, #0f766e);
+  background: rgba(13, 148, 136, 0.1);
+  border-color: rgba(13, 148, 136, 0.35);
+}
+
+.data-archive-modal .credit-seal-progress-core--done {
+  color: #fff;
+  background: var(--mint-deep, #0f766e);
+}
+
 .agreements-page-item--archive {
   border-color: rgba(13, 148, 136, 0.28);
   background: rgba(13, 148, 136, 0.04);

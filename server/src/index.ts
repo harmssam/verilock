@@ -504,6 +504,7 @@ app.get(
 /**
  * Pay credits and broadcast packed annotation / placement frames on Nimiq.
  * Reuses the multi-tx frame pipeline proven in the /pdf experiment.
+ * Body: optional { notifyEmail } for completion email after success.
  */
 app.post(
   '/api/documents/:id/on-chain-data',
@@ -514,8 +515,36 @@ app.post(
     try {
       const { archiveDocumentDataOnChain } = await import('./documentDataArchive.js')
       const address = res.locals.address as string
-      const result = await archiveDocumentDataOnChain(routeParam(req.params.id), address)
-      res.json(result)
+      const docId = routeParam(req.params.id)
+      const body = (req.body ?? {}) as { notifyEmail?: string | null }
+      let notifyEmail: string | null = null
+      if (body.notifyEmail != null && String(body.notifyEmail).trim() !== '') {
+        try {
+          notifyEmail = sanitizeNotifyEmail(body.notifyEmail)
+        } catch (err) {
+          res.status(400).json({
+            error: err instanceof Error ? err.message : 'Invalid notification email',
+          })
+          return
+        }
+      }
+
+      const result = await archiveDocumentDataOnChain(docId, address)
+
+      let notifyEmailQueued = false
+      if (notifyEmail && (result.onChain || (result.txHashes?.length ?? 0) > 0)) {
+        notifyEmailQueued = true
+        void import('./email/dataArchiveComplete.js').then(({ notifyDataArchiveComplete }) =>
+          notifyDataArchiveComplete({
+            documentId: docId,
+            to: notifyEmail!,
+            frameCount: result.frameCount,
+            creditsCharged: result.creditsCharged,
+          }),
+        )
+      }
+
+      res.json({ ...result, notifyEmailQueued })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'On-chain data archive failed'
       const status =
