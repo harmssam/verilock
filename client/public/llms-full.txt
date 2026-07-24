@@ -6,7 +6,7 @@ VeriLock is a browser-based document signing application that permanently anchor
 
 ### The Core Promise
 1. **Your file never leaves your device.** Fingerprinting happens locally in the browser.
-2. **Sign together.** Invite co-signers; each signs with their Nimiq wallet.
+2. **Sign today.** Invite co-signers; each signs with their Nimiq wallet.
 3. **Prove forever.** The final fingerprint is locked on the Nimiq blockchain. Anyone can verify it later — no wallet, no account, no subscription.
 
 ## Pages

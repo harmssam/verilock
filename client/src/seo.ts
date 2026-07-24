@@ -1,5 +1,5 @@
 export const SITE_NAME = 'VeriLock'
-export const SITE_TAGLINE = 'Sign together. Prove forever.'
+export const SITE_TAGLINE = 'Sign today. Prove forever.'
 export const DEFAULT_ORIGIN = 'https://verilock.online'
 export const DEFAULT_OG_IMAGE = '/verilock-mark.png'
 
@@ -16,7 +16,7 @@ export const PAGE_META = {
   home: {
     title: `${SITE_NAME} — Sign Documents & Lock Proof on Nimiq`,
     description:
-      'Sign documents together (PDF or image) and permanently anchor fingerprints on the Nimiq blockchain. Your file never leaves your device — verify integrity anytime without a wallet.',
+      'Sign documents today (PDF or image) and permanently anchor fingerprints on the Nimiq blockchain. Your file never leaves your device — verify integrity anytime without a wallet.',
     path: '/',
   },
   pricing: {

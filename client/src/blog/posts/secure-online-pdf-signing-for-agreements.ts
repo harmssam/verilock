@@ -61,7 +61,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Sign together. Prove forever. Locks are 50 NIM through July (95% off list), then the standard fee returns August 1.',
+      text: 'Sign today. Prove forever. Locks are 50 NIM through July (95% off list), then the standard fee returns August 1.',
     },
   ],
 }

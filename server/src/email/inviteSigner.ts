@@ -146,7 +146,7 @@ export async function sendPartyInviteEmail(input: {
     'Important: VeriLock never hosts or emails the PDF. Use the exact PDF file the organizer shared with you, then open a link above to match the fingerprint and sign.',
     '',
     '—',
-    'VeriLock · Sign together. Prove forever.',
+    'VeriLock · Sign today. Prove forever.',
     appPublicUrl(),
   ].join('\n')
 
@@ -216,7 +216,7 @@ export async function sendPartyInviteEmail(input: {
             <td style="padding:20px 28px 28px;text-align:center;font-family:system-ui,sans-serif;">
               <img src="${markUrl}" width="36" height="36" alt="" style="display:inline-block;border:0;opacity:0.9;" />
               <p style="margin:10px 0 0;font-size:12px;color:#94a3b8;">
-                VeriLock · Sign together. Prove forever.<br/>
+                VeriLock · Sign today. Prove forever.<br/>
                 <a href="${appPublicUrl()}" style="color:#94a3b8;">${escapeHtml(appPublicUrl())}</a>
               </p>
             </td>
