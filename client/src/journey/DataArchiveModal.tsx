@@ -194,7 +194,7 @@ export function DataArchiveModal({
                 <li>
                   <span className="data-archive-fact-label">Cost</span>
                   <span className="data-archive-fact-value data-archive-fact-value--cost">
-                    {creditLabel}
+                    {credits <= 0 ? 'Already paid — free resume' : creditLabel}
                   </span>
                 </li>
                 {balance != null && (
@@ -281,7 +281,9 @@ export function DataArchiveModal({
                   onClick={handleConfirm}
                 >
                   <Database size={16} strokeWidth={2.25} aria-hidden />
-                  Store forever · {creditLabel}
+                  {credits <= 0
+                    ? 'Resume storage (free)'
+                    : `Store forever · ${creditLabel}`}
                 </button>
               )}
             </footer>

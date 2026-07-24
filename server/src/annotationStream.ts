@@ -696,11 +696,30 @@ export interface BroadcastStreamResult {
   error?: string
 }
 
+export interface BroadcastStreamOptions {
+  /**
+   * Called after each successful frame broadcast (for incremental DB persist).
+   * index is 0-based within this `frames` batch.
+   */
+  onFrame?: (info: { index: number; hash: string; hashes: string[] }) => void
+  /**
+   * Skip the multi-second post-broadcast visibility polling loop.
+   * Use for large multi-tx archives so the HTTP path does not sit on RPC lag
+   * (hashes are still recorded; confirmation can catch up later).
+   */
+  skipVisibilityWait?: boolean
+  /** Delay between frames in ms (default 120). */
+  interFrameDelayMs?: number
+}
+
 /**
  * Broadcast pre-packed 64-byte frames via the service wallet (one basic tx each).
  * Shared by annotation-stream experiment and paid document data-archive upsell.
  */
-export async function broadcastStreamFrames(frames: Buffer[]): Promise<BroadcastStreamResult> {
+export async function broadcastStreamFrames(
+  frames: Buffer[],
+  options?: BroadcastStreamOptions,
+): Promise<BroadcastStreamResult> {
   const { getServiceKeyPairForBroadcast, getServiceWalletAddress } = await import(
     './serviceWallet.js'
   )
@@ -769,10 +788,12 @@ export async function broadcastStreamFrames(frames: Buffer[]): Promise<Broadcast
     const hex = tx.toHex()
     const expectedHash = tx.hash().replace(/^0x/i, '').toLowerCase()
 
+    let pushedHash: string | null = null
     try {
       const result = await broadcastRawTransactionDetailed(hex)
       const h = (result.hash || expectedHash).toLowerCase()
       hashes.push(h)
+      pushedHash = h
     } catch (err) {
       try {
         const details = await client.sendTransaction(tx)
@@ -784,7 +805,9 @@ export async function broadcastStreamFrames(frames: Buffer[]): Promise<Broadcast
             error: `Frame ${i} rejected (state: ${details.state})`,
           }
         }
-        hashes.push(details.transactionHash.replace(/^0x/i, '').toLowerCase())
+        const h = details.transactionHash.replace(/^0x/i, '').toLowerCase()
+        hashes.push(h)
+        pushedHash = h
       } catch (inner) {
         const msg = err instanceof Error ? err.message : String(inner)
         return {
@@ -796,14 +819,24 @@ export async function broadcastStreamFrames(frames: Buffer[]): Promise<Broadcast
       }
     }
 
-    if (i + 1 < frames.length) {
-      await new Promise(r => setTimeout(r, 120))
+    if (pushedHash) {
+      try {
+        options?.onFrame?.({ index: i, hash: pushedHash, hashes: [...hashes] })
+      } catch (hookErr) {
+        console.warn('[annotation-stream] onFrame hook failed', hookErr)
+      }
+    }
+
+    const delay = options?.interFrameDelayMs ?? 120
+    if (i + 1 < frames.length && delay > 0) {
+      await new Promise(r => setTimeout(r, delay))
     }
   }
 
   // Fast visibility check: wait briefly on first + last, then one pass over all.
+  // Skip for large multi-tx archives so callers are not held for tens of seconds.
   let confirmed = 0
-  if (hashes.length > 0) {
+  if (hashes.length > 0 && !options?.skipVisibilityWait) {
     const sample = [hashes[0]!, hashes[hashes.length - 1]!]
     for (const h of sample) {
       try {
@@ -832,6 +865,9 @@ export async function broadcastStreamFrames(frames: Buffer[]): Promise<Broadcast
       await new Promise(r => setTimeout(r, VISIBILITY_POLL_MS))
     }
     confirmed = confirmedSet.size
+  } else if (hashes.length > 0 && options?.skipVisibilityWait) {
+    // Treat submitted hashes as "known" for progress; RPC lag is fine.
+    confirmed = hashes.length
   }
 
   const partial = hashes.length < frames.length
