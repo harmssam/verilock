@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Check,
+  Copy,
   Fingerprint,
   LoaderCircle,
   Lock,
@@ -239,6 +240,8 @@ export function DocumentJourney({
   const [coSignerNames, setCoSignerNames] = useState<string[]>([''])
   /** Client-only invite emails for co-signers — prefill Share .eml To; never uploaded with the PDF. */
   const [coSignerEmails, setCoSignerEmails] = useState<string[]>([''])
+  /** partyId → draft invite email (stable across reordering / signed filter). */
+  const [partyInviteEmails, setPartyInviteEmails] = useState<Record<string, string>>({})
   const [docNotes, setDocNotes] = useState(() => loadCreateFormCache()?.docNotes ?? '')
   /** Draft total parties for share-step Signatures UI (applied via API). */
   const [requiredSigners, setRequiredSigners] = useState(1)
@@ -759,6 +762,17 @@ export function DocumentJourney({
       // Prefill email fields for resend when we restored session badges.
       if (doc && Object.keys(next).length > 0) {
         const unsigned = doc.parties.filter(x => x.required && !x.signed)
+        setPartyInviteEmails(prev => {
+          const merged = { ...prev }
+          let changed = false
+          for (const party of unsigned) {
+            const sent = next[party.id]
+            if (!sent || merged[party.id]?.trim()) continue
+            merged[party.id] = sent.email
+            changed = true
+          }
+          return changed ? merged : prev
+        })
         setCoSignerEmails(prev => {
           const emails = [...prev]
           let changed = false
@@ -1249,6 +1263,7 @@ export function DocumentJourney({
     setDocType('contract')
     setCoSignerNames([''])
     setCoSignerEmails([''])
+    setPartyInviteEmails({})
     setDocNotes('')
     setRequiredSigners(1)
     setDoc(null)
@@ -3521,65 +3536,76 @@ export function DocumentJourney({
 
                     {role === 'creator' && !doc.sealed && (
                       <div className="signatures-config-form">
-                        {/* After construction lock, roster is immutable — no configureDocumentCosigners. */}
+                        {/**
+                         * Roster count is set on Arrange (placement lock) — do not re-ask here.
+                         * Only allow changing count before anyone has signed and before the plan
+                         * is locked (legacy / edge cases without a frozen layout).
+                         */}
                         {!(
                           FEATURES.pdfAnnotationUi && constructionPlan?.status === 'locked'
-                        ) && (
-                        <label className="field">
-                          <span className="field-label">How many parties must sign?</span>
-                          <select
-                            value={Math.max(requiredSigners, signedCount(doc))}
-                            onChange={e => {
-                              const n = Number(e.target.value)
-                              const others = Math.max(0, n - 1)
-                              const nextNames = coSignerNames.slice(0, others)
-                              while (nextNames.length < others) nextNames.push('')
-                              const nextEmails = coSignerEmails.slice(0, others)
-                              while (nextEmails.length < others) nextEmails.push('')
-                              setRequiredSigners(n)
-                              setCoSignerNames(nextNames)
-                              setCoSignerEmails(nextEmails)
-                              if (n <= 1) setCreatorNotifyEmail('')
-                              // Persist immediately so invite actions appear without a Save step.
-                              void applyCosigners({
-                                requiredSignatures: n,
-                                coSignerNames: nextNames,
-                              })
-                              if (n <= 1) {
-                                setNotifyEmailSavedValue(null)
-                                setNotifyEmailError(null)
-                                setNotifyEmailFlashSaved(false)
-                                // Clear server-side ready-to-seal notify (no longer multi-party).
-                                if (FEATURES.emailNotifyUi && token && doc) {
-                                  void api
-                                    .setDocumentNotifyEmail(token, doc.id, null)
-                                    .catch(() => {
-                                      /* non-fatal */
-                                    })
+                        ) &&
+                          signedCount(doc) === 0 && (
+                          <label className="field">
+                            <span className="field-label">How many parties must sign?</span>
+                            <select
+                              value={Math.max(requiredSigners, signedCount(doc))}
+                              onChange={e => {
+                                const n = Number(e.target.value)
+                                const others = Math.max(0, n - 1)
+                                const nextNames = coSignerNames.slice(0, others)
+                                while (nextNames.length < others) nextNames.push('')
+                                const nextEmails = coSignerEmails.slice(0, others)
+                                while (nextEmails.length < others) nextEmails.push('')
+                                setRequiredSigners(n)
+                                setCoSignerNames(nextNames)
+                                setCoSignerEmails(nextEmails)
+                                if (n <= 1) setCreatorNotifyEmail('')
+                                // Persist immediately so invite actions appear without a Save step.
+                                void applyCosigners({
+                                  requiredSignatures: n,
+                                  coSignerNames: nextNames,
+                                })
+                                if (n <= 1) {
+                                  setNotifyEmailSavedValue(null)
+                                  setNotifyEmailError(null)
+                                  setNotifyEmailFlashSaved(false)
+                                  // Clear server-side ready-to-seal notify (no longer multi-party).
+                                  if (FEATURES.emailNotifyUi && token && doc) {
+                                    void api
+                                      .setDocumentNotifyEmail(token, doc.id, null)
+                                      .catch(() => {
+                                        /* non-fatal */
+                                      })
+                                  }
                                 }
-                              }
-                            }}
-                            disabled={busy}
-                          >
-                            {Array.from({ length: 10 }, (_, i) => i + 1)
-                              .filter(n => n >= Math.max(1, signedCount(doc)))
-                              .map(n => (
-                                <option key={n} value={n}>
-                                  {n === 1
-                                    ? '1 signature (you only — no co-signers)'
-                                    : `${n} signatures (you + ${n - 1} other${n - 1 === 1 ? '' : 's'})`}
-                                </option>
-                              ))}
-                          </select>
-                        </label>
-                        )}
+                              }}
+                              disabled={busy}
+                            >
+                              {Array.from({ length: 10 }, (_, i) => i + 1)
+                                .filter(n => n >= Math.max(1, signedCount(doc)))
+                                .map(n => (
+                                  <option key={n} value={n}>
+                                    {n === 1
+                                      ? '1 signature (you only — no co-signers)'
+                                      : `${n} signatures (you + ${n - 1} other${n - 1 === 1 ? '' : 's'})`}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                          )}
 
-                        {/* After lock: one clear card per party — names frozen, emails local-only, copy personal link. */}
-                        {FEATURES.pdfAnnotationUi &&
-                          constructionPlan?.status === 'locked' &&
-                          doc.parties.filter(p => p.required && !p.signed).length > 0 && (
+                        {/*
+                          One card per person who still needs to sign: email + Send email +
+                          Copy invite link. Not gated on construction-plan lock — that old
+                          gate left a dead “Invite detail / Mail app only” form after Arrange.
+                        */}
+                        {doc.parties.filter(p => p.required && !p.signed).length > 0 && (
                           <div className="field-stack">
                             <span className="field-label">Invite each person</span>
+                            <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                              Enter their email and send, or copy their personal invite link.
+                              Hand off the same document file separately — VeriLock never hosts it.
+                            </p>
                             {doc.parties
                               .filter(p => p.required && !p.signed)
                               .map((p, index) => {
@@ -3592,9 +3618,23 @@ export function DocumentJourney({
                                   p.roleLabel ||
                                   `Person ${index + 1}`
                                 const emailed = inviteEmailSent[p.id]
-                                const emailVal = coSignerEmails[index] ?? ''
+                                const emailVal =
+                                  partyInviteEmails[p.id] ??
+                                  coSignerEmails[index] ??
+                                  emailed?.email ??
+                                  ''
                                 const sending = inviteSendBusyId === p.id
                                 const note = inviteSendNote[p.id]
+                                const setPartyEmail = (value: string) => {
+                                  setPartyInviteEmails(prev => ({ ...prev, [p.id]: value }))
+                                  // Keep legacy array in sync for count-picker edge paths.
+                                  setCoSignerEmails(prev => {
+                                    const next = [...prev]
+                                    while (next.length <= index) next.push('')
+                                    next[index] = value
+                                    return next
+                                  })
+                                }
                                 return (
                                   <div
                                     key={p.id}
@@ -3647,23 +3687,19 @@ export function DocumentJourney({
                                         autoComplete="email"
                                         value={emailVal}
                                         onChange={e => {
-                                          const value = clampField(
-                                            e.target.value,
-                                            MAX_SUPPORT_EMAIL_LENGTH,
+                                          setPartyEmail(
+                                            clampField(
+                                              e.target.value,
+                                              MAX_SUPPORT_EMAIL_LENGTH,
+                                            ),
                                           )
-                                          setCoSignerEmails(prev => {
-                                            const next = [...prev]
-                                            while (next.length <= index) next.push('')
-                                            next[index] = value
-                                            return next
-                                          })
                                         }}
                                         maxLength={MAX_SUPPORT_EMAIL_LENGTH}
                                         placeholder="name@company.com"
                                         disabled={busy || p.signed || sending}
                                       />
                                     </label>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                    <div className="share-cosigner-actions">
                                       <button
                                         type="button"
                                         className={`btn ${emailed ? 'btn-secondary' : 'btn-primary'}${sending ? ' btn--busy' : ''}`}
@@ -3726,10 +3762,19 @@ export function DocumentJourney({
                                             Sending…
                                           </>
                                         ) : emailed ? (
-                                          'Resend invite email'
+                                          'Resend email'
                                         ) : (
-                                          'Send invite email'
+                                          'Send email'
                                         )}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        disabled={busy || p.signed}
+                                        onClick={() => void copyText(personLink, p.id, label)}
+                                      >
+                                        <Copy size={16} strokeWidth={2.25} aria-hidden />
+                                        Copy invite link
                                       </button>
                                       {/* Mobile: OS share sheet (iMessage, WhatsApp, …) + PDF when allowed */}
                                       {typeof navigator !== 'undefined' &&
@@ -3750,19 +3795,11 @@ export function DocumentJourney({
                                             Share
                                           </button>
                                         )}
-                                      <button
-                                        type="button"
-                                        className="btn btn-secondary"
-                                        disabled={busy || p.signed}
-                                        onClick={() => void copyText(personLink, p.id, label)}
-                                      >
-                                        Copy personal link
-                                      </button>
                                     </div>
                                     {!emailSendEnabled && (
                                       <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>
-                                        Email send is disabled until Resend is configured (
-                                        RESEND_ENABLED). You can still copy the personal link.
+                                        Email send is disabled until Resend is configured on the
+                                        server. You can still copy the invite link.
                                       </p>
                                     )}
                                     {note && !emailed ? (
@@ -3776,73 +3813,6 @@ export function DocumentJourney({
                                   </div>
                                 )
                               })}
-                          </div>
-                        )}
-
-                        {/* Pre-lock / legacy: optional co-signer names + emails */}
-                        {inviteeSlotCount > 0 &&
-                          !(
-                            FEATURES.pdfAnnotationUi && constructionPlan?.status === 'locked'
-                          ) && (
-                          <div className="field-stack">
-                            <span className="field-label">
-                              Invite detail{inviteeSlotCount > 1 ? 's' : ''} (optional)
-                            </span>
-                            {Array.from({ length: inviteeSlotCount }, (_, index) => {
-                              const partyLabel = `Invitee ${index + 1}`
-                              return (
-                                <div key={index} className="field-stack share-cosigner-fields">
-                                  <label className="field">
-                                    <span className="field-label">{partyLabel} name</span>
-                                    <input
-                                      value={coSignerNames[index] ?? ''}
-                                      onChange={e => {
-                                        const value = clampField(
-                                          e.target.value,
-                                          MAX_DISPLAY_NAME_LENGTH,
-                                        )
-                                        setCoSignerNames(prev => {
-                                          const next = [...prev]
-                                          while (next.length <= index) next.push('')
-                                          next[index] = value
-                                          return next
-                                        })
-                                      }}
-                                      onBlur={() => void applyCosigners()}
-                                      maxLength={MAX_DISPLAY_NAME_LENGTH}
-                                      placeholder="Name (optional)"
-                                      disabled={busy}
-                                    />
-                                  </label>
-                                  <label className="field">
-                                    <span className="field-label">
-                                      {partyLabel} invite email (Mail app only)
-                                    </span>
-                                    <input
-                                      type="email"
-                                      inputMode="email"
-                                      autoComplete="email"
-                                      value={coSignerEmails[index] ?? ''}
-                                      onChange={e => {
-                                        const value = clampField(
-                                          e.target.value,
-                                          MAX_SUPPORT_EMAIL_LENGTH,
-                                        )
-                                        setCoSignerEmails(prev => {
-                                          const next = [...prev]
-                                          while (next.length <= index) next.push('')
-                                          next[index] = value
-                                          return next
-                                        })
-                                      }}
-                                      maxLength={MAX_SUPPORT_EMAIL_LENGTH}
-                                      placeholder="name@company.com"
-                                      disabled={busy}
-                                    />
-                                  </label>
-                                </div>
-                              )
-                            })}
                           </div>
                         )}
 
