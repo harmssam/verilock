@@ -3034,13 +3034,6 @@ a.hash-chip.text-link:focus-visible {
   white-space: nowrap;
 }
 
-.agreements-page-purge-row {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.15rem;
-}
-
 .agreements-page-purge {
   color: var(--text-muted, #64748b);
   font-size: 0.8rem;
@@ -3050,72 +3043,6 @@ a.hash-chip.text-link:focus-visible {
 .agreements-page-purge:hover:not(:disabled) {
   color: #b91c1c;
   background: rgba(251, 113, 133, 0.08);
-}
-
-.agreements-page-purge-help {
-  position: relative;
-  flex: 0 0 auto;
-}
-
-.agreements-page-purge-help-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.65rem;
-  height: 1.65rem;
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-muted, #64748b);
-  cursor: pointer;
-  list-style: none;
-}
-
-.agreements-page-purge-help-btn::-webkit-details-marker {
-  display: none;
-}
-
-.agreements-page-purge-help-btn:hover,
-.agreements-page-purge-help[open] > .agreements-page-purge-help-btn {
-  color: var(--mint-deep, #0f766e);
-  background: rgba(13, 148, 136, 0.1);
-}
-
-.agreements-page-purge-help-btn:focus-visible {
-  outline: 2px solid rgba(13, 148, 136, 0.45);
-  outline-offset: 1px;
-}
-
-.agreements-page-purge-help-panel {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 0.35rem);
-  z-index: 5;
-  width: min(16.5rem, 70vw);
-  padding: 0.65rem 0.75rem;
-  border-radius: 10px;
-  border: 1px solid var(--border, rgba(15, 23, 42, 0.1));
-  background: #ffffff;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
-  color: var(--text, #0f172a);
-  text-align: left;
-}
-
-.agreements-page-purge-help-panel strong {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 700;
-  margin-bottom: 0.3rem;
-}
-
-.agreements-page-purge-help-panel p {
-  margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.4;
-  color: var(--text-muted, #4b5c6b);
-  font-weight: 500;
 }
 
 .cancel-agreement-icon--purge {
@@ -3262,12 +3189,37 @@ a.hash-chip.text-link:focus-visible {
   background: rgba(13, 148, 136, 0.04);
 }
 
+.signatures-config-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
 .signatures-config-head h3 {
-  margin: 0 0 0.25rem;
+  margin: 0;
   font-family: var(--font-display);
   font-size: 1.05rem;
   font-weight: 750;
   letter-spacing: -0.02em;
+}
+
+.signatures-config-sub {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-muted, #64748b);
+}
+
+.invite-manage-back {
+  margin: 0 0 0.15rem;
+  padding-inline: 0.35rem;
+  color: var(--text-muted, #64748b);
+  font-size: 0.8rem;
+}
+
+.invite-manage-back:hover {
+  color: var(--text, #0f172a);
 }
 
 .signatures-config-form {
@@ -3299,61 +3251,56 @@ a.hash-chip.text-link:focus-visible {
   line-height: 1.45;
 }
 
-/* “All set” waiting room after invites / notify-email save */
-.invite-all-set {
+/* Quiet waiting view after Done inviting (party list lives once above on Sign). */
+.invite-waiting {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 0.85rem;
-  padding: 1.35rem 1.2rem 1.25rem;
-  border-radius: 14px;
-  border: 1px solid rgba(13, 148, 136, 0.28);
-  background:
-    linear-gradient(180deg, rgba(13, 148, 136, 0.08) 0%, rgba(255, 255, 255, 0.96) 42%),
-    #ffffff;
-  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
-  text-align: center;
+  padding: 1.1rem 1.05rem 1.05rem;
+  border-radius: 12px;
+  border: 1px solid rgba(13, 148, 136, 0.22);
+  background: rgba(13, 148, 136, 0.05);
 }
 
-.invite-all-set-hero {
+.invite-waiting-head {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: left;
 }
 
-.invite-all-set-icon {
-  display: grid;
-  place-items: center;
-  width: 3.25rem;
-  height: 3.25rem;
-  border-radius: 999px;
-  background: rgba(13, 148, 136, 0.14);
+.invite-waiting-eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: #0f766e;
-  box-shadow: 0 0 0 6px rgba(13, 148, 136, 0.06);
 }
 
-.invite-all-set-title {
+.invite-waiting-title {
   margin: 0;
   font-family: var(--font-display, inherit);
-  font-size: 1.45rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-size: 1.15rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
   color: #0f172a;
 }
 
-.invite-all-set-lead {
-  margin: 0 auto;
-  max-width: 26rem;
-  font-size: 0.98rem;
+.invite-waiting-lead {
+  margin: 0;
+  font-size: 0.9rem;
   line-height: 1.5;
   color: #334155;
 }
 
-.invite-all-set-lead strong {
+.invite-waiting-lead strong {
   font-weight: 700;
   color: #0f172a;
 }
 
-.invite-all-set-notify {
+.invite-waiting-notify {
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
@@ -3368,43 +3315,34 @@ a.hash-chip.text-link:focus-visible {
   line-height: 1.45;
 }
 
-.invite-all-set-notify svg {
+.invite-waiting-notify svg {
   flex-shrink: 0;
   margin-top: 0.12rem;
 }
 
-.invite-all-set-notify strong {
+.invite-waiting-notify strong {
   font-weight: 700;
   color: #0f172a;
   word-break: break-all;
 }
 
-.invite-all-set-notify--muted {
+.invite-waiting-notify--muted {
   border-color: rgba(15, 23, 42, 0.08);
   background: rgba(15, 23, 42, 0.03);
   color: #64748b;
 }
 
-.invite-all-set-progress {
-  text-align: left;
-}
-
-.invite-all-set .party-list {
-  text-align: left;
-}
-
-.invite-all-set-actions {
+.invite-waiting-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 0.5rem;
 }
 
-.invite-all-set-actions .btn {
-  min-width: 9rem;
+.invite-waiting-actions .btn {
+  min-width: 8.5rem;
 }
 
-.invite-all-set-foot {
+.invite-waiting-foot {
   margin: 0;
   font-size: 0.78rem;
   line-height: 1.45;
