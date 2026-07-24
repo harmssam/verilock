@@ -46,7 +46,7 @@ const PHASE_META: Record<
 const WAIT_TIPS = [
   'You do not need to stay on this page — work continues on VeriLock’s servers.',
   'The PDF never leaves your devices. Only signatures and form fields go on-chain.',
-  'Larger agreements take longer (more data frames). A minute or two is normal.',
+  'This can take a few minutes for larger agreements. Leaving is fine.',
   'Come back anytime under My agreements to see the “Data on blockchain” badge.',
 ]
 
@@ -155,11 +155,13 @@ export function DataArchiveProgress({
   }, [])
 
   const statusLine = useMemo(() => {
-    if (message?.trim()) return message.trim()
-    if (phase === 'done') return 'Stored forever on the Nimiq blockchain.'
-    if (phase === 'confirm') return 'Confirming on the Nimiq blockchain — safe to leave…'
-    if (phase === 'write') return 'Writing signatures and fields on-chain…'
-    return 'Reserving credits — you can leave this page anytime…'
+    if (phase === 'done') {
+      return message?.trim() || 'Stored forever on the Nimiq blockchain.'
+    }
+    // Prefer short, calm status over long server diagnostics while in progress.
+    if (phase === 'confirm') return 'Confirming on the Nimiq blockchain…'
+    if (phase === 'write') return 'Writing to the Nimiq blockchain…'
+    return 'Getting ready…'
   }, [message, phase])
 
   const creditLabel =
@@ -210,7 +212,7 @@ export function DataArchiveProgress({
         <p className="credit-seal-progress-elapsed muted">
           {phase === 'done'
             ? 'Done'
-            : `${percent}% · ${elapsedSec}s · often 30–90 seconds for larger agreements`}
+            : `${percent}% complete · This can take a few minutes`}
         </p>
       </div>
 
