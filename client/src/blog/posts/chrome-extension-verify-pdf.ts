@@ -25,7 +25,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'The open-source extension is on GitHub as clevertech-os/verilock-chrome-extension. Load it unpacked in Chrome developer mode while the listing is prepared. Same privacy model as the site: the file is hashed on your machine, and only the SHA-256 fingerprint is sent to look up locks.',
+      text: 'The open-source extension is on GitHub as clevertech-os/verilock-chrome-extension. It is currently being submitted to the Chrome Web Store for public listing — once approved, it will be a one-click install. Until then, load it unpacked in Chrome developer mode. Same privacy model as the site: the file is hashed on your machine, and only the SHA-256 fingerprint is sent to look up locks.',
     },
     {
       type: 'h2',
