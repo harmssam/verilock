@@ -245,6 +245,8 @@ export function DocumentJourney({
   const [busy, setBusy] = useState(false)
   const [doc, setDoc] = useState<JourneyDoc | null>(null)
   const [sharedAck, setSharedAck] = useState(false)
+  /** True after the creator has opened the waiting view at least once this session. */
+  const [inviteWaitingVisited, setInviteWaitingVisited] = useState(false)
   const [signFile, setSignFile] = useState<File | null>(null)
   const [signHash, setSignHash] = useState<string | null>(null)
   const [signerName, setSignerName] = useState('')
@@ -438,8 +440,8 @@ export function DocumentJourney({
           const { required } = document.signingProgress
           // Solo agreements re-open on share so co-signers can still be added.
           // Do NOT auto-ack multi-party mid-invite — that hides the invite form
-          // behind “All set!” before any invites were sent. Waiting room only after
-          // explicit “All set — wait for co-signers”.
+          // behind the waiting view before any invites were sent. Waiting view
+          // only after explicit “Done inviting”.
           // preferSeal / agreements “seal now” skips share intentionally.
           setSharedAck(preferSeal || required === 0)
         } else {
@@ -870,6 +872,17 @@ export function DocumentJourney({
       !creatorStillNeedsToSign,
   )
 
+  /**
+   * Creator is past their own signature (or organizer-only) and the dock is in
+   * the invite / waiting UI on Sign or Arrange — used to de-clutter chrome.
+   */
+  const creatorInviteDock =
+    Boolean(doc && showInvitePhase && role === 'creator' && (step === 'share' || step === 'sign'))
+  /** Quiet “come back when everyone signed” view (after Done inviting). */
+  const inviteWaitingView = creatorInviteDock && sharedAck
+  /** Active invite-management form (email/link cards). */
+  const inviteManageView = creatorInviteDock && !sharedAck
+
   /** Per-person invite: /d/:slug?party=<partyId> */
   const preferredPartyFromUrl = useMemo(() => {
     if (typeof window === 'undefined') return null
@@ -1240,6 +1253,7 @@ export function DocumentJourney({
     setRequiredSigners(1)
     setDoc(null)
     setSharedAck(false)
+    setInviteWaitingVisited(false)
     setSignFile(null)
     setSignHash(null)
     setSignerName('')
@@ -1681,7 +1695,7 @@ export function DocumentJourney({
           setSharedAck(true)
           setLockMessage(null)
         } else {
-          // Creator: multi incomplete → keep invite form open (do not hide behind “All set!”).
+          // Creator: multi incomplete → keep invite form open (not waiting view yet).
           // Ready-to-lock / solo: ack so we skip waiting-room chrome on seal.
           if (signedDoc.signingProgress.readyToLock) {
             setSharedAck(true)
@@ -2064,15 +2078,16 @@ export function DocumentJourney({
   }, [token, doc, constructionPlan, pdfHash, signHash])
 
   /**
-   * Creator finished inviting (or saved a notify email) — show the “all set / wait”
-   * screen instead of the long invite form.
+   * Creator finished inviting — switch to the quiet waiting view (not a second
+   * party list). Explicit so we never hide the invite form before invites go out.
    */
   const acknowledgeShare = useCallback(() => {
     setSharedAck(true)
+    setInviteWaitingVisited(true)
     scrollToJourneyAction('smooth')
   }, [scrollToJourneyAction])
 
-  /** Return from the waiting screen to manage invites / notification email. */
+  /** Leave waiting view to manage invites / notification email (same step). */
   const reopenInviteSetup = useCallback(() => {
     setSharedAck(false)
     scrollToJourneyAction('smooth')
@@ -2139,7 +2154,7 @@ export function DocumentJourney({
         notifyEmailFlashTimerRef.current = null
         setNotifyEmailFlashSaved(false)
       }, 4000)
-      // Stay on the invite form — waiting room is explicit via “All set — wait for co-signers”.
+      // Stay on the invite form — waiting view is explicit via “Done inviting”.
     } catch (err) {
       setNotifyEmailError(
         err instanceof Error ? err.message : 'Could not save notification email',
@@ -2500,9 +2515,13 @@ export function DocumentJourney({
                     ? 'Complete'
                     : step === 'verify' && verifyMatched
                       ? 'Verify'
-                      : activeStage && stepIndex >= 0
-                        ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label}`
-                        : 'Action'}
+                      : inviteWaitingView && activeStage && stepIndex >= 0
+                        ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label} · waiting`
+                        : inviteManageView && activeStage && stepIndex >= 0
+                          ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label} · invites`
+                          : activeStage && stepIndex >= 0
+                            ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label}`
+                            : 'Action'}
                 </p>
                 <h3>
                   {step === 'done' && role === 'signer'
@@ -2516,7 +2535,11 @@ export function DocumentJourney({
                           verifyOutcome.matches.some(m => m.status === 'locked')
                           ? 'Match confirmed — locked on Nimiq'
                           : 'Fingerprint matches'
-                        : activeStage?.verb ?? 'Continue'}
+                        : inviteWaitingView
+                          ? 'Waiting for co-signers'
+                          : inviteManageView
+                            ? 'Invite co-signers'
+                            : activeStage?.verb ?? 'Continue'}
                 </h3>
                 <p className="muted action-blurb">
                   {step === 'done' && role === 'signer'
@@ -2530,10 +2553,16 @@ export function DocumentJourney({
                         ? verifyPartyView
                           ? 'Your local file matches. Open the signed document and recorded ink below.'
                           : 'Your local file matches a VeriLock record. Details below.'
-                        : activeStage?.blurb}
+                        : inviteWaitingView
+                          ? 'Progress updates here as people sign. When everyone is done, continue to lock the agreement on the blockchain.'
+                          : inviteManageView
+                            ? 'Send each person a personal link (and the same document file separately — VeriLock never hosts it). When you are finished inviting, return to the waiting view.'
+                            : activeStage?.blurb}
                 </p>
               </div>
               {activeStage &&
+                !inviteWaitingView &&
+                !inviteManageView &&
                 !(step === 'done' && role === 'creator') &&
                 !(step === 'verify' && verifyMatched) && (
                 <p className="action-privacy">
@@ -2548,7 +2577,11 @@ export function DocumentJourney({
                 {displayError}
               </div>
             )}
-            {lockMessage && !displayError && !(step === 'seal' && busy && creditBalance >= 1) && (
+            {/* Invite dock already explains post-sign state — hide lock flash clutter. */}
+            {lockMessage &&
+              !displayError &&
+              !(step === 'seal' && busy && creditBalance >= 1) &&
+              !creatorInviteDock && (
               <div className="result-banner result-banner--ok" role="status">
                 {lockMessage}
               </div>
@@ -2939,7 +2972,13 @@ export function DocumentJourney({
                         </div>
                       </div>
 
-                      <PartyList doc={doc} revealNames={revealParticipantPrivate} />
+                      <PartyList
+                        doc={doc}
+                        revealNames={revealParticipantPrivate}
+                        inviteEmailByPartyId={
+                          role === 'creator' ? inviteEmailSent : undefined
+                        }
+                      />
 
                       {/* Creator invites on the share step (after they sign). Never on invited path. */}
                       {canCancelCurrent && role === 'creator' && (
@@ -3044,10 +3083,16 @@ export function DocumentJourney({
                               </section>
                             )}
 
+                          {/* Creator invite/wait dock already shows party status — skip duplicate banner. */}
                           {account &&
                             signingResolution &&
                             !signingResolution.ok &&
-                            signingResolution.hint !== 'pick_person' && (
+                            signingResolution.hint !== 'pick_person' &&
+                            !(
+                              creatorInviteDock &&
+                              (signingResolution.hint === 'already_signed' ||
+                                signingResolution.hint === 'complete')
+                            ) && (
                             <div className="result-banner result-banner--ok">
                               {signingResolution.message}
                             </div>
@@ -3352,69 +3397,61 @@ export function DocumentJourney({
               {/* Invite co-signers: Arrange (organizer-only) or Sign (after creator signed). */}
               {doc && showInvitePhase && role === 'creator' && (step === 'share' || step === 'sign') && (
                 <div className="action-stack">
-                  {/* Waiting room after invites / notify-email save — clear “come back later”. */}
+                  {/* Waiting room — party progress lives once above (Sign) or here (Arrange-only). */}
                   {sharedAck &&
                   (requiredCount(doc) > 1 || inviteeSlotCount > 0) &&
                   !allSigned(doc) ? (
                     <section
-                      className="invite-all-set"
-                      aria-labelledby="invite-all-set-title"
+                      className="invite-waiting"
+                      aria-label="Waiting for co-signers"
                     >
-                      <div className="invite-all-set-hero" aria-hidden>
-                        <span className="invite-all-set-icon">
-                          <Check size={28} strokeWidth={2.5} />
-                        </span>
-                      </div>
-                      <h3 id="invite-all-set-title" className="invite-all-set-title">
-                        All set!
-                      </h3>
-                      <p className="invite-all-set-lead">
-                        Come back here when everyone has signed to continue and{' '}
-                        <strong>lock the agreement</strong> on the blockchain.
-                      </p>
                       {notifyEmailSavedValue && notifyEmailSavedValue.trim() !== '' ? (
-                        <p className="invite-all-set-notify" role="status">
+                        <p className="invite-waiting-notify" role="status">
                           <MailCheck size={16} strokeWidth={2.25} aria-hidden />
                           <span>
-                            We&apos;ll also email{' '}
-                            <strong>{notifyEmailSavedValue}</strong> when the last signature
-                            lands — you can still return anytime to check progress.
+                            We&apos;ll email <strong>{notifyEmailSavedValue}</strong> when the
+                            last signature lands. You can still return anytime to check progress.
                           </span>
                         </p>
                       ) : (
-                        <p className="invite-all-set-notify invite-all-set-notify--muted">
-                          This page updates as people sign. You don&apos;t need to leave it open.
+                        <p className="invite-waiting-notify invite-waiting-notify--muted">
+                          Live updates as people sign — leave the tab open or come back later.
+                          When everyone has signed, continue to lock on the blockchain.
                         </p>
                       )}
 
-                      <div className="progress-bar-wrap invite-all-set-progress">
-                        <div className="progress-bar-meta">
-                          <span>
-                            Signatures {signedCount(doc)}/{requiredCount(doc)}
-                          </span>
-                          <span className="muted">{doc.title}</span>
-                        </div>
-                        <div className="progress-bar-track">
-                          <div
-                            className="progress-bar-fill"
-                            style={{
-                              width: `${
-                                requiredCount(doc)
-                                  ? (signedCount(doc) / requiredCount(doc)) * 100
-                                  : 0
-                              }%`,
-                            }}
+                      {/* Arrange step has no Sign party block above — show roster here only. */}
+                      {step === 'share' ? (
+                        <>
+                          <div className="progress-bar-wrap">
+                            <div className="progress-bar-meta">
+                              <span>
+                                Signatures {signedCount(doc)}/{requiredCount(doc)}
+                              </span>
+                              <span className="muted">{doc.title}</span>
+                            </div>
+                            <div className="progress-bar-track">
+                              <div
+                                className="progress-bar-fill"
+                                style={{
+                                  width: `${
+                                    requiredCount(doc)
+                                      ? (signedCount(doc) / requiredCount(doc)) * 100
+                                      : 0
+                                  }%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <PartyList
+                            doc={doc}
+                            revealNames={revealParticipantPrivate}
+                            inviteEmailByPartyId={inviteEmailSent}
                           />
-                        </div>
-                      </div>
+                        </>
+                      ) : null}
 
-                      <PartyList
-                        doc={doc}
-                        revealNames={revealParticipantPrivate}
-                        inviteEmailByPartyId={inviteEmailSent}
-                      />
-
-                      <div className="invite-all-set-actions">
+                      <div className="invite-waiting-actions">
                         <button
                           type="button"
                           className="btn btn-secondary"
@@ -3428,39 +3465,59 @@ export function DocumentJourney({
                           </button>
                         ) : null}
                       </div>
-                      <p className="muted invite-all-set-foot">
-                        Reminder: co-signers need the signing link <em>and</em> the same agreement
-                        file (VeriLock never hosts the PDF).
+                      <p className="muted invite-waiting-foot">
+                        Need to resend a link? Use <strong>Manage invites</strong> (same step —
+                        only this panel changes). Co-signers need the link <em>and</em> the same
+                        document file.
                       </p>
                     </section>
                   ) : (
                   <section className="signatures-config" aria-labelledby="signatures-config-title">
                     <header className="signatures-config-head">
-                      <h3 id="signatures-config-title">Invite co-signers</h3>
+                      {inviteWaitingVisited ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost invite-manage-back"
+                          onClick={acknowledgeShare}
+                        >
+                          <ArrowLeft size={14} strokeWidth={2.25} aria-hidden />
+                          Back to waiting view
+                        </button>
+                      ) : null}
+                      <h3 id="signatures-config-title">Send invites</h3>
+                      <p className="signatures-config-sub">
+                        {step === 'sign'
+                          ? 'Your signature is already recorded. Use the cards below for each person who still needs to sign.'
+                          : 'Use the cards below for each person who needs to sign.'}
+                      </p>
                     </header>
 
-                    <div className="progress-bar-wrap">
-                      <div className="progress-bar-meta">
-                        <span>
-                          Signatures {signedCount(doc)}/{requiredCount(doc)}
-                        </span>
-                        <span className="muted">{doc.title}</span>
-                      </div>
-                      <div className="progress-bar-track">
-                        <div
-                          className="progress-bar-fill"
-                          style={{
-                            width: `${requiredCount(doc) ? (signedCount(doc) / requiredCount(doc)) * 100 : 0}%`,
-                          }}
+                    {/* Arrange-only: roster not already shown in the Sign stack. */}
+                    {step === 'share' ? (
+                      <>
+                        <div className="progress-bar-wrap">
+                          <div className="progress-bar-meta">
+                            <span>
+                              Signatures {signedCount(doc)}/{requiredCount(doc)}
+                            </span>
+                            <span className="muted">{doc.title}</span>
+                          </div>
+                          <div className="progress-bar-track">
+                            <div
+                              className="progress-bar-fill"
+                              style={{
+                                width: `${requiredCount(doc) ? (signedCount(doc) / requiredCount(doc)) * 100 : 0}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <PartyList
+                          doc={doc}
+                          revealNames={revealParticipantPrivate}
+                          inviteEmailByPartyId={inviteEmailSent}
                         />
-                      </div>
-                    </div>
-
-                    <PartyList
-                      doc={doc}
-                      revealNames={revealParticipantPrivate}
-                      inviteEmailByPartyId={inviteEmailSent}
-                    />
+                      </>
+                    ) : null}
 
                     {role === 'creator' && !doc.sealed && (
                       <div className="signatures-config-form">
@@ -3916,12 +3973,14 @@ export function DocumentJourney({
                           className="btn btn-primary btn-lg"
                           onClick={acknowledgeShare}
                         >
-                          All set — wait for co-signers
+                          {inviteWaitingVisited
+                            ? 'Return to waiting view'
+                            : 'Done inviting — show waiting view'}
                         </button>
                         <p className="muted invite-setup-finish-note">
-                          Use each card above to email or share a personal link. Hand off the
-                          document file separately (VeriLock never hosts it). When you&apos;re done
-                          inviting, continue to the waiting screen.
+                          This does not send invites for you — use the cards above first. The
+                          waiting view is a quieter screen you can leave open (or leave and
+                          return later) while co-signers finish.
                         </p>
                       </div>
                     )}

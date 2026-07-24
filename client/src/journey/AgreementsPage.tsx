@@ -1,5 +1,4 @@
 import {
-  CircleHelp,
   Database,
   FilePlus,
   LoaderCircle,
@@ -824,47 +823,30 @@ export function AgreementsPage({
                           </button>
                         )}
                         {canPurge && (
-                          <div className="agreements-page-purge-row">
-                            <button
-                              type="button"
-                              className={`btn btn-ghost agreements-page-purge${cancelling ? ' btn--busy' : ''}`}
-                              disabled={Boolean(cancellingId)}
-                              onClick={() => requestPurgeServer(doc)}
-                            >
-                              {cancelling ? (
-                                <>
-                                  <LoaderCircle
-                                    className="btn-spinner"
-                                    size={15}
-                                    strokeWidth={2.5}
-                                    aria-hidden
-                                  />
-                                  Removing…
-                                </>
-                              ) : (
-                                <>
-                                  <Trash2 size={15} strokeWidth={2.25} aria-hidden />
-                                  Remove from VeriLock
-                                </>
-                              )}
-                            </button>
-                            <details className="agreements-page-purge-help">
-                              <summary
-                                className="agreements-page-purge-help-btn"
-                                aria-label="What does Remove from VeriLock do?"
-                              >
-                                <CircleHelp size={15} strokeWidth={2.25} aria-hidden />
-                              </summary>
-                              <div className="agreements-page-purge-help-panel" role="note">
-                                <strong>What “Remove from VeriLock” does</strong>
-                                <p>
-                                  Drops the agreement from our server list / metadata. The Nimiq
-                                  fingerprint lock and multi-tx data stay on the blockchain
-                                  permanently. Your local PDF is not deleted.
-                                </p>
-                              </div>
-                            </details>
-                          </div>
+                          <button
+                            type="button"
+                            className={`btn btn-ghost agreements-page-purge${cancelling ? ' btn--busy' : ''}`}
+                            disabled={Boolean(cancellingId)}
+                            onClick={() => requestPurgeServer(doc)}
+                            title="Removes the agreement from VeriLock’s server list. On-chain fingerprint and multi-tx data stay on Nimiq."
+                          >
+                            {cancelling ? (
+                              <>
+                                <LoaderCircle
+                                  className="btn-spinner"
+                                  size={15}
+                                  strokeWidth={2.5}
+                                  aria-hidden
+                                />
+                                Removing…
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 size={15} strokeWidth={2.25} aria-hidden />
+                                Remove from VeriLock
+                              </>
+                            )}
+                          </button>
                         )}
                         {canCancel && (
                           <button
