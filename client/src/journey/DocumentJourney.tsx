@@ -252,7 +252,7 @@ export function DocumentJourney({
   const [sharedAck, setSharedAck] = useState(false)
   /**
    * Creator free-complete (all signed): print/done is primary until they choose lock.
-   * preferSeal / “Lock now” sets this so seal payment stays front-and-center.
+   * preferSeal / lock CTAs (“Lock now”, “Retry lock”) set this so seal payment stays front-and-center.
    */
   const [creatorChoseLock, setCreatorChoseLock] = useState(false)
   /** True after the creator has opened the waiting view at least once this session. */

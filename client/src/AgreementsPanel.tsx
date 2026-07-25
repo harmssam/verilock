@@ -8,6 +8,7 @@ import {
   getAgreementView,
   groupAgreements,
   isDocumentCreator,
+  isLockCta,
   type AgreementBucket,
 } from './agreements'
 import { documentTypeLabel, type SealDocument } from './types'
@@ -71,7 +72,7 @@ export function AgreementsPanel({
     const creator = isDocumentCreator(doc, address)
     const isActive = doc.id === activeDocId
 
-    const showSealButton = view.cta === 'Lock now' && onSeal && creator
+    const showSealButton = isLockCta(view.cta) && onSeal && creator
 
     return (
       <div
@@ -103,7 +104,7 @@ export function AgreementsPanel({
             className="btn btn-primary agreement-seal-btn"
             onClick={() => onSeal(doc.slug)}
           >
-            Lock now
+            {view.cta}
           </button>
         )}
       </div>
