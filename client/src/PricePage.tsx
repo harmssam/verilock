@@ -27,7 +27,6 @@ import { LoginSheet } from './journey/LoginSheet'
 import './PricePage.css'
 
 const NIMIQ_URL = 'https://www.nimiq.com'
-const FASTSPOT_URL = 'https://www.fastspot.io/'
 
 interface CreditsPublicInfo {
   enabled: boolean
@@ -288,7 +287,7 @@ export function PricePage({
                     strokeWidth={2.5}
                     aria-hidden
                   />
-                  Loading live USD price
+                  Loading…
                 </span>
               ) : showPackAsPrimary ? (
                 <span className="price-page-model-card-price">
@@ -307,7 +306,7 @@ export function PricePage({
                 </span>
               ) : (
                 <span className="price-page-model-card-price price-page-model-card-price--pending">
-                  USD price unavailable
+                  Unavailable
                   <button
                     type="button"
                     className="btn btn-ghost price-page-quote-retry"
@@ -325,24 +324,6 @@ export function PricePage({
                 </span>
               )}
             </div>
-            <p className="muted price-page-model-hint">
-              {halfPrice ? `${stripeMarkup}x live NIM market rate` : 'Live NIM market rate'}
-              {' '}
-              (CoinGecko; Fastspot when available —{' '}
-              <a href={FASTSPOT_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
-                go.fastspot.io
-              </a>
-              ).
-              {showPackAsPrimary && (
-                <>
-                  {' '}
-                  {unitUsd != null
-                    ? `About ${formatFiatAmount(unitUsd, 'USD')} per credit before the card minimum. `
-                    : null}
-                  Checkout is pack-based (Stripe min {formatFiatAmount(stripeMinUsd, 'USD')}).
-                </>
-              )}
-            </p>
           </div>
 
           <div className="price-page-model-or" role="separator" aria-label="or">
