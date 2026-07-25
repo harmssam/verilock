@@ -136,12 +136,10 @@ export function DataArchiveModal({
               <Database size={22} strokeWidth={2} />
             </div>
             <div className="data-archive-head-text">
-              <h2 id={titleId}>Store data forever on the Nimiq blockchain</h2>
+              <h2 id={titleId}>Store forever on Nimiq</h2>
               <p className="muted data-archive-subtitle">
-                Your fingerprint is already locked. Push signatures, field layout,
-                names, wallets, and form text to Nimiq permanently. Anyone who has
-                the PDF (or its fingerprint) can reconstruct this overlay data from
-                the public chain—not only VeriLock.
+                Write signatures, fields, names, and wallets to the public Nimiq
+                ledger—permanently.
               </p>
             </div>
             <button
@@ -175,7 +173,7 @@ export function DataArchiveModal({
               notifyEmail={wantEmail && email.trim() ? email.trim().toLowerCase() : null}
               message={
                 done
-                  ? 'Stored forever on the Nimiq blockchain.'
+                  ? 'Stored forever on Nimiq.'
                   : error
                     ? error
                     : null
@@ -235,13 +233,15 @@ export function DataArchiveModal({
                 )}
               </ul>
 
+              <p className="data-archive-public-notice" role="note">
+                <strong>Public by design.</strong> Nimiq is a public ledger. Anyone
+                with the PDF or its fingerprint can reconstruct this overlay—not only
+                VeriLock. This is permanent disclosure, not private storage.
+              </p>
+
               <p className="muted data-archive-note">
-                The PDF never leaves your devices. Overlay data (ink, names, wallets)
-                is written as multi-tx frames on Nimiq, tagged with the first 8 bytes
-                of the fingerprint. That data is public to anyone who knows the
-                fingerprint—treat this as a permanent disclosure, not private storage.
-                A recovery file is optional convenience if you purge VeriLock&apos;s
-                index later.
+                The PDF never leaves your devices. A recovery file is optional if you
+                later purge VeriLock&apos;s index.
               </p>
 
               {showEmailUi && (

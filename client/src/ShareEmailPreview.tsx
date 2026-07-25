@@ -84,7 +84,7 @@ export function ShareEmailPreview({ content, compact }: ShareEmailPreviewProps) 
         </ul>
       </section>
 
-      <p className="share-email-preview-footer">VeriLock · Sign today. Prove forever.</p>
+      <p className="share-email-preview-footer">VeriLock · Sign free. Lock when it matters.</p>
     </div>
   )
 }

@@ -39,6 +39,29 @@ export function withAuth(token: string) {
   return { Authorization: `Bearer ${token}` }
 }
 
+/** Shared shape for on-chain data archive quote / SSE progress events. */
+export interface OnChainDataQuote {
+  documentId: string
+  eligible: boolean
+  reason?: string
+  locked: boolean
+  onChain: boolean
+  frameCount: number
+  credits: number
+  framesPerCredit: number
+  source: 'placements' | 'annotations' | null
+  creditsCharged: number
+  txHashes: string[]
+  confirmedFrames: number
+  balance: number | null
+  broadcastReady: boolean
+  creditsEnabled: boolean
+  error?: string | null
+  jobStatus: 'idle' | 'processing' | 'complete' | 'failed'
+  alreadyPaid: boolean
+  progressPercent: number
+}
+
 export interface CreateDocumentBody {
   title: string
   originalFileName?: string
@@ -564,33 +587,123 @@ export const api = {
 
   /** Quote multi-tx on-chain data archive (signatures / initials / text). Creator only. */
   getOnChainDataQuote: (token: string, docId: string) =>
-    request<{
-      documentId: string
-      eligible: boolean
-      reason?: string
-      locked: boolean
-      onChain: boolean
-      frameCount: number
-      credits: number
-      framesPerCredit: number
-      source: 'placements' | 'annotations' | null
-      creditsCharged: number
-      txHashes: string[]
-      confirmedFrames: number
-      balance: number | null
-      broadcastReady: boolean
-      creditsEnabled: boolean
-      error?: string | null
-      jobStatus: 'idle' | 'processing' | 'complete' | 'failed'
-      alreadyPaid: boolean
-      progressPercent: number
-    }>(`/api/documents/${docId}/on-chain-data`, {
+    request<OnChainDataQuote>(`/api/documents/${docId}/on-chain-data`, {
       headers: withAuth(token),
     }),
 
   /**
+   * SSE stream of archive progress (one long-lived connection).
+   * Prefer over polling: server pushes after each broadcast frame.
+   * Uses fetch + Authorization (native EventSource cannot set headers).
+   * Resolves when the job ends, the stream closes, or signal aborts.
+   */
+  streamOnChainDataProgress: async (
+    token: string,
+    docId: string,
+    onProgress: (quote: OnChainDataQuote) => void,
+    options?: { signal?: AbortSignal },
+  ): Promise<'complete' | 'failed' | 'closed' | 'aborted'> => {
+    const signal = options?.signal
+    if (signal?.aborted) return 'aborted'
+
+    const res = await fetch(`${API_BASE}/api/documents/${docId}/on-chain-data/stream`, {
+      headers: {
+        ...withAuth(token),
+        Accept: 'text/event-stream',
+      },
+      signal,
+    })
+    if (!res.ok) {
+      let message = `Request failed (${res.status})`
+      try {
+        const data = (await res.json()) as { error?: string }
+        if (data?.error) message = data.error
+      } catch {
+        /* ignore */
+      }
+      const err = new Error(message) as Error & { status?: number }
+      err.status = res.status
+      throw err
+    }
+    if (!res.body) {
+      throw new Error('Archive progress stream unavailable')
+    }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let terminal: 'complete' | 'failed' | null = null
+
+    const handleBlock = (block: string) => {
+      let eventName = 'message'
+      const dataLines: string[] = []
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) {
+          eventName = line.slice(6).trim()
+        } else if (line.startsWith('data:')) {
+          dataLines.push(line.slice(5).trimStart())
+        }
+      }
+      if (dataLines.length === 0) return
+      const raw = dataLines.join('\n')
+      if (eventName === 'progress') {
+        try {
+          onProgress(JSON.parse(raw) as OnChainDataQuote)
+        } catch {
+          /* ignore malformed */
+        }
+        return
+      }
+      if (eventName === 'end') {
+        try {
+          const end = JSON.parse(raw) as { jobStatus?: string; onChain?: boolean }
+          if (end.onChain || end.jobStatus === 'complete') terminal = 'complete'
+          else if (end.jobStatus === 'failed') terminal = 'failed'
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          // Flush any trailing event that lacked a final blank line.
+          buffer += decoder.decode()
+          if (buffer.trim()) handleBlock(buffer)
+          break
+        }
+        buffer += decoder.decode(value, { stream: true })
+        // SSE events are separated by blank lines
+        let sep: number
+        while ((sep = buffer.indexOf('\n\n')) >= 0) {
+          const block = buffer.slice(0, sep)
+          buffer = buffer.slice(sep + 2)
+          if (block.trim()) handleBlock(block)
+        }
+        if (terminal) {
+          try {
+            await reader.cancel()
+          } catch {
+            /* ignore */
+          }
+          return terminal
+        }
+      }
+    } catch (err) {
+      if (signal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
+        return 'aborted'
+      }
+      throw err
+    }
+
+    return terminal ?? 'closed'
+  },
+
+  /**
    * Start paid multi-tx archive (returns quickly; work continues in background).
-   * Poll getOnChainDataQuote until jobStatus is complete | failed.
+   * Subscribe via streamOnChainDataProgress (SSE); fall back to getOnChainDataQuote poll.
    * alreadyPaid resumes are free. Optional notifyEmail on success.
    */
   archiveOnChainData: (

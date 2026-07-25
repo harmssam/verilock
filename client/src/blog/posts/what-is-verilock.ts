@@ -26,7 +26,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'The product promise is simple: sign together, prove forever. The PDF is not uploaded for signing. The chain holds a compact record of the document hash, not the contract wording.',
+      text: 'The product promise is simple: sign free, lock when it matters. The PDF is not uploaded for signing. The chain holds a compact record of the document hash, not the contract wording.',
     },
     {
       type: 'h2',
@@ -117,7 +117,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Sign today. Prove forever. Through the end of July, a permanent Nimiq on-chain lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
+      text: 'Sign free. Lock when it matters. Through the end of July, a permanent Nimiq on-chain lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
     },
   ],
 }

@@ -164,7 +164,13 @@ const publicReadLimit = rateLimit(60, 60_000)
 const annotationStreamLimit = rateLimit(6, 60_000)
 /** Multi-tx data archive is expensive (service wallet + credits); keep tight. */
 const dataArchiveLimit = rateLimit(6, 60_000)
-const dataArchiveQuoteLimit = rateLimit(30, 60_000)
+/**
+ * Quote / recovery GETs. Progress prefers SSE (one long-lived connection);
+ * this limit covers open-modal quote + poll fallback only.
+ */
+const dataArchiveQuoteLimit = rateLimit(60, 60_000)
+/** Open SSE streams for archive progress (one connection per job watch). */
+const dataArchiveStreamLimit = rateLimit(20, 60_000)
 // Hash verify is read-only and easy to double-fire from UI retries; allow a higher burst.
 const verifyHashLimit = rateLimit(60, 60_000)
 /** Public contact form - tight limit against spam floods. */
@@ -502,6 +508,128 @@ app.get(
             ? 403
             : 400
       res.status(status).json({ error: message })
+    }
+  },
+)
+
+/**
+ * Server-Sent Events stream of on-chain data archive progress.
+ * Creator only. Prefer this over polling while a job is writing frames.
+ * Auth via Authorization header (fetch + stream; not native EventSource).
+ */
+app.get(
+  '/api/documents/:id/on-chain-data/stream',
+  dataArchiveStreamLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  async (req, res) => {
+    try {
+      const {
+        quoteDocumentDataArchive,
+        subscribeArchiveProgress,
+      } = await import('./documentDataArchive.js')
+      const { assertDocumentCreator } = await import('./documents.js')
+      const address = res.locals.address as string
+      const docId = routeParam(req.params.id)
+      assertDocumentCreator(docId, address)
+
+      // Long-lived stream: disable socket idle timeout (default ~2 min on some hosts).
+      req.socket.setTimeout(0)
+      res.status(200)
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+      res.setHeader('Cache-Control', 'no-cache, no-transform')
+      res.setHeader('Connection', 'keep-alive')
+      // Disable proxy buffering (nginx / some CDNs) so each frame event flushes.
+      res.setHeader('X-Accel-Buffering', 'no')
+      res.flushHeaders?.()
+
+      let cleaned = false
+      let unsubscribe: (() => void) | null = null
+      let heartbeat: ReturnType<typeof setInterval> | null = null
+
+      const cleanup = () => {
+        if (cleaned) return
+        cleaned = true
+        if (heartbeat != null) clearInterval(heartbeat)
+        heartbeat = null
+        unsubscribe?.()
+        unsubscribe = null
+      }
+
+      const isTerminal = (q: {
+        onChain?: boolean
+        jobStatus?: string
+      }) =>
+        Boolean(q.onChain) ||
+        q.jobStatus === 'complete' ||
+        q.jobStatus === 'failed'
+
+      const writeEvent = (event: string, data: unknown): boolean => {
+        if (res.writableEnded || res.destroyed || cleaned) return false
+        try {
+          res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+          return true
+        } catch {
+          cleanup()
+          return false
+        }
+      }
+
+      const endTerminal = (quote: { jobStatus?: string; onChain?: boolean }) => {
+        writeEvent('end', {
+          jobStatus: quote.jobStatus ?? 'failed',
+          onChain: Boolean(quote.onChain),
+        })
+        cleanup()
+        if (!res.writableEnded) res.end()
+      }
+
+      heartbeat = setInterval(() => {
+        if (res.writableEnded || res.destroyed || cleaned) return
+        try {
+          res.write(`: ping ${Date.now()}\n\n`)
+        } catch {
+          cleanup()
+        }
+      }, 15_000)
+
+      req.on('close', cleanup)
+      res.on('close', cleanup)
+      res.on('error', cleanup)
+
+      // Immediate snapshot so reconnects catch current TX count.
+      const snap = quoteDocumentDataArchive(docId, address)
+      if (!writeEvent('progress', snap)) return
+      if (isTerminal(snap)) {
+        endTerminal(snap)
+        return
+      }
+
+      unsubscribe = subscribeArchiveProgress(docId, quote => {
+        if (!writeEvent('progress', quote)) return
+        if (isTerminal(quote)) endTerminal(quote)
+      })
+
+      // Re-quote after subscribe so we cannot miss a terminal publish that
+      // landed in the gap between the initial snapshot and listener registration.
+      const after = quoteDocumentDataArchive(docId, address)
+      if (!writeEvent('progress', after)) return
+      if (isTerminal(after)) {
+        endTerminal(after)
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Stream failed'
+      if (!res.headersSent) {
+        const status =
+          message.includes('not found')
+            ? 404
+            : message.includes('Only the creator')
+              ? 403
+              : 400
+        res.status(status).json({ error: message })
+        return
+      }
+      res.end()
     }
   },
 )
