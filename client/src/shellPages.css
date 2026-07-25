@@ -349,6 +349,22 @@
     line-height: 1.58;
   }
 
+  .price-page-why-footnotes {
+    border-top-color: var(--lr-line, #e2e8f0);
+  }
+
+  .price-page-why-footnote {
+    color: var(--lr-muted, #4b5c6b);
+  }
+
+  .price-page-why-footnote strong {
+    color: var(--lr-text, #0f172a);
+  }
+
+  .price-page-why-fn-ref {
+    color: var(--lr-accent, #0d9488);
+  }
+
   .price-page-why-item {
     border-color: var(--lr-line);
     background: #fafdfc;

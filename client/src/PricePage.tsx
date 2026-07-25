@@ -419,7 +419,12 @@ export function PricePage({
               Why Nimiq?
             </h3>
             <p className="price-page-why-lead muted">
-              Browser-first Layer&nbsp;1. The record lives on the chain, not our servers.{' '}
+              Browser-first Layer&nbsp;1
+              <a href="#price-why-footnote-l1" className="price-page-why-fn-ref" aria-describedby="price-why-footnote-l1">
+                <sup>1</sup>
+                <span className="visually-hidden"> (explained below)</span>
+              </a>
+              . The record lives on the chain, not our servers.{' '}
               <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
                 nimiq.com
                 <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
@@ -453,6 +458,19 @@ export function PricePage({
             </span>
           </li>
         </ul>
+        <footer className="price-page-why-footnotes">
+          <p id="price-why-footnote-l1" className="price-page-why-footnote muted">
+            <span className="price-page-why-fn-mark" aria-hidden>
+              1
+            </span>
+            <span>
+              <strong>Layer&nbsp;1</strong> means Nimiq is its own public blockchain (not a side
+              system running on top of another chain). <strong>Browser-first</strong> means you can
+              use it from a normal web browser and wallet without installing heavy blockchain
+              software. For VeriLock, that is how your lock is recorded and checked online.
+            </span>
+          </p>
+        </footer>
       </section>
     </div>
   )

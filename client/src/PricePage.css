@@ -371,6 +371,67 @@
   max-width: 40rem;
 }
 
+.price-page-why-fn-ref {
+  margin-left: 0.1em;
+  color: var(--mint-deep, #0f766e);
+  font-weight: 700;
+  text-decoration: none;
+  vertical-align: super;
+  font-size: 0.72em;
+  line-height: 0;
+}
+
+.price-page-why-fn-ref:hover,
+.price-page-why-fn-ref:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.price-page-why-fn-ref sup {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.price-page-why-footnotes {
+  margin: 1rem 0 0;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.price-page-why-footnote {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  max-width: 42rem;
+}
+
+.price-page-why-footnote strong {
+  font-weight: 700;
+  color: var(--text, #0f172a);
+}
+
+.price-page-why-fn-mark {
+  flex-shrink: 0;
+  font-weight: 750;
+  color: var(--mint-deep, #0f766e);
+  min-width: 0.9rem;
+}
+
+/* Screen-reader only helper for the footnote link */
+.price-page-why .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .price-page-why-list {
   list-style: none;
   margin: 0;
