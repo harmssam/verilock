@@ -326,11 +326,13 @@ export function PricePage({
               )}
             </div>
             <p className="muted price-page-model-hint">
-              {halfPrice ? `${stripeMarkup}x live NIM rate` : 'Live NIM rate'} via{' '}
+              {halfPrice ? `${stripeMarkup}x live NIM market rate` : 'Live NIM market rate'}
+              {' '}
+              (CoinGecko; Fastspot when available —{' '}
               <a href={FASTSPOT_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
-                Fastspot
+                go.fastspot.io
               </a>
-              .
+              ).
               {showPackAsPrimary && (
                 <>
                   {' '}

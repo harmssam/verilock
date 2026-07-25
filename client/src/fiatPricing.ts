@@ -8,7 +8,7 @@ export interface NimPrices {
   eur: number
   cad: number
   lastUpdatedAt: number | null
-  source: 'fastspot'
+  source: 'fastspot' | 'coingecko'
 }
 
 export function isFiatCurrency(value: string): value is FiatCurrency {
