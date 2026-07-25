@@ -1722,16 +1722,17 @@ export function DocumentJourney({
           // Ready-to-lock / solo: ack so we skip waiting-room chrome on seal.
           if (signedDoc.signingProgress.readyToLock) {
             setSharedAck(true)
-            const solo = signedDoc.signingProgress.required <= 1
-            setLockMessage(
-              solo
-                ? 'Signature complete. Continue to lock.'
-                : 'All signatures collected. Continue to lock.',
-            )
+            // Multi-party free complete: clear banner so free-complete dock is not undercut.
+            // Solo / direct-ready still nudge toward optional lock.
+            if (signedDoc.signingProgress.required <= 1) {
+              setLockMessage('Signature complete. Print free, or lock for 1 credit when ready.')
+            } else {
+              setLockMessage(null)
+            }
           } else {
             setSharedAck(false)
             setLockMessage(
-              'Your signature is recorded. Invite co-signers below, then lock when everyone has signed.',
+              'Your signature is recorded. Invite co-signers below. When everyone has signed, print free or lock for 1 credit.',
             )
           }
         }
@@ -2625,6 +2626,15 @@ export function DocumentJourney({
             {lockMessage &&
               !displayError &&
               !(step === 'seal' && busy && creditBalance >= 1) &&
+              // Free-complete dock already states print/lock options — hide lock-first flash.
+              !(
+                step === 'seal' &&
+                doc &&
+                !doc.directSeal &&
+                allSigned(doc) &&
+                !doc.sealed &&
+                !creatorChoseLock
+              ) &&
               !creatorInviteDock && (
               <div className="result-banner result-banner--ok" role="status">
                 {lockMessage}
@@ -3042,9 +3052,9 @@ export function DocumentJourney({
                           <Check size={18} strokeWidth={2.5} />
                           {role === 'creator'
                             ? requiredCount(doc) <= 1
-                              ? 'Signature complete. Continue to lock'
-                              : 'All parties signed. Continue to lock'
-                            : 'Thanks, your part is complete. The creator locks the agreement on the blockchain.'}
+                              ? 'Signature complete. Print free, or lock for 1 credit'
+                              : 'Everyone signed — free complete. Print or lock when ready'
+                            : 'Thanks, your part is complete. The creator can print free or lock on the blockchain.'}
                         </div>
                       ) : (
                         <>
@@ -3922,8 +3932,8 @@ export function DocumentJourney({
                               </button>
                             </div>
                             <span id="notify-email-hint" className="muted notify-email-hint">
-                              We only use this to tell you the agreement is ready to lock. Never
-                              required. Press <strong>Save email</strong> so we store it.
+                              We only use this to tell you everyone has signed (print free or lock).
+                              Never required. Press <strong>Save email</strong> so we store it.
                             </span>
                             {notifyEmailError ? (
                               <p className="notify-email-error" role="alert">
@@ -4077,18 +4087,18 @@ export function DocumentJourney({
                       </section>
                       <button
                         type="button"
-                        className="btn btn-secondary btn-lg"
+                        className="btn btn-secondary"
                         onClick={() => setCreatorChoseLock(true)}
                       >
-                        <Lock size={18} strokeWidth={2.25} />
-                        Lock permanently — 1 credit
+                        <Lock size={16} strokeWidth={2.25} />
+                        Optional: lock permanently (1 credit)
                       </button>
                       <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
                         Without a lock, VeriLock keeps the agreement record. The chain does not yet
                         prove this fingerprint. Use <strong>Print</strong> above when your local
                         file is matched.
                       </p>
-                      <button type="button" className="btn btn-secondary" onClick={resetAll}>
+                      <button type="button" className="btn btn-ghost" onClick={resetAll}>
                         <Check size={15} strokeWidth={2.25} />
                         Done — keep free
                       </button>
@@ -4245,8 +4255,8 @@ export function DocumentJourney({
                               </>
                             ) : allSigned(doc) || doc.readyToLock ? (
                               <>
-                                Your fields and wallet signature are recorded. The creator will seal
-                                the fingerprint on Nimiq when ready.
+                                Your fields and wallet signature are recorded. The creator can print
+                                free or lock the fingerprint on Nimiq when ready.
                               </>
                             ) : (
                               <>

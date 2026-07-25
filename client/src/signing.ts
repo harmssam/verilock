@@ -86,8 +86,8 @@ export function resolveSigningParty(
       message: waiting
         ? `You already signed as ${signedParty?.displayName ?? 'a party'}. Waiting for other signatures.`
         : isCreator
-          ? 'You already signed. You can lock the agreement on the blockchain when you are ready.'
-          : 'Thanks, your part is recorded. The creator will lock the agreement on the blockchain.',
+          ? 'You already signed. Print free, or lock on the blockchain when you want a permanent proof.'
+          : 'Thanks, your part is recorded. The creator can print free or lock on the blockchain.',
     }
   }
 
@@ -101,8 +101,8 @@ export function resolveSigningParty(
       message:
         doc.signingProgress.readyToLock || doc.status === 'ready_to_lock'
           ? isCreator
-            ? 'All signatures are in. Continue to lock on the blockchain when you are ready.'
-            : 'All signatures are in. Thanks. The creator will lock this agreement on the blockchain.'
+            ? 'All signatures are in. Print free, or lock on the blockchain when you want a permanent proof.'
+            : 'All signatures are in. Thanks. The creator can print free or lock on the blockchain.'
           : 'No signatures are pending on this document.',
     }
   }
