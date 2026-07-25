@@ -238,7 +238,7 @@ export function PricePage({
               <Database size={18} strokeWidth={2.25} aria-hidden />
               <div>
                 <h4 className="price-page-tier-name">On-chain data backup</h4>
-                <p className="price-page-tier-price">Credits by size</p>
+                <p className="price-page-tier-price">Typically 5–10 credits</p>
               </div>
             </header>
             <ul className="price-page-tier-list">
@@ -256,8 +256,9 @@ export function PricePage({
               </li>
             </ul>
             <p className="muted price-page-tier-note">
-              Quoted in credits from frame count (about 1 credit per 10 chain transactions). Offline
-              chain-only recall is a planned VeriLock Offline update.
+              Cost depends on how many signatures and field entries are on the document. Most
+              agreements fall between about 5 and 10 credits; you see the exact amount before you
+              confirm.
             </p>
           </article>
         </div>
