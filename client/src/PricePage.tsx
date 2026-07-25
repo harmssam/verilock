@@ -188,8 +188,9 @@ export function PricePage({
         <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
           Nimiq
         </a>
-        . Optional on-chain backup stores signatures and field data publicly on Nimiq
-        (recoverable by anyone who has the PDF fingerprint—not only VeriLock).
+        . Optional on-chain backup stores signatures and field data publicly on Nimiq so
+        anyone with the document hash can reconstruct the full signed agreement—not only
+        through VeriLock.
       </p>
 
       <section className="price-page-tiers" aria-labelledby="price-tiers-heading">
@@ -270,163 +271,161 @@ export function PricePage({
               </li>
               <li>
                 <Check size={14} strokeWidth={2.5} aria-hidden />
-                Signatures &amp; field data on-chain
+                Signatures, initials &amp; field text on-chain
               </li>
               <li>
                 <Check size={14} strokeWidth={2.5} aria-hidden />
-                Reconstruct with PDF hash + Nimiq (public to hash holders)
+                Full signed contract reconstructible from the document hash alone
+              </li>
+              <li>
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                Anyone with the hash can recover it on Nimiq—no VeriLock required
               </li>
             </ul>
             <p className="muted price-page-tier-note">
-              Cost depends on how many signatures and field entries are on the document. Most
-              agreements fall between about 5 and 10 credits; you see the exact amount before you
-              confirm.
+              With only the document&apos;s fingerprint (hash), you can rebuild the agreement&apos;s
+              signatures and field details from Nimiq. Cost depends on how many signatures and
+              field entries are stored. Most agreements fall between about 5 and 10 credits; you
+              see the exact amount before you confirm.
             </p>
           </article>
         </div>
       </section>
 
       {creditsEnabled ? (
-        <div className="price-page-model" aria-labelledby="price-model-heading">
-          <div className="price-page-model-intro">
-            <span className="price-page-model-label" id="price-model-heading">
-              How to pay
-            </span>
-            <p className="muted price-page-model-explain">
-              Credit card or{' '}
-              <a href="#price-why-nimiq" className="price-page-nimiq-link price-page-nim-jump">
-                NIM
-              </a>
-              .
-            </p>
-          </div>
-
-          {/* Mobile: stacked + horizontal OR. Desktop: card | vertical OR | NIM. */}
-          <div className="price-page-model-options">
-            <div className="price-page-model-row price-page-model-row--card">
-              <span className="price-page-model-label">
-                <CreditCard size={12} strokeWidth={2.5} aria-hidden />
-                Credit card
-              </span>
-              <div className="price-page-model-value price-page-model-value--card">
-                {!quoteReady ? (
-                  <span
-                    className="price-page-model-card-price price-page-model-card-price--pending"
-                    role="status"
-                  >
-                    <LoaderCircle
-                      className="btn-spinner"
-                      size={16}
-                      strokeWidth={2.5}
-                      aria-hidden
-                    />
-                    Loading…
-                  </span>
-                ) : showPackAsPrimary ? (
-                  <span className="price-page-model-card-price">
-                    {formatFiatAmount(minPackUsd!, 'USD')}
-                    <span className="price-page-model-per">for {minPack} credits</span>
-                  </span>
-                ) : unitUsd != null ? (
-                  <span className="price-page-model-card-price">
-                    {formatFiatAmount(unitUsd, 'USD')}
-                    <span className="price-page-model-per">per credit</span>
-                  </span>
-                ) : minPackUsd != null ? (
-                  <span className="price-page-model-card-price">
-                    {formatFiatAmount(minPackUsd, 'USD')}
-                    <span className="price-page-model-per">for {minPack} credits</span>
-                  </span>
-                ) : (
-                  <span className="price-page-model-card-price price-page-model-card-price--pending">
-                    Unavailable
-                    <button
-                      type="button"
-                      className="btn btn-ghost price-page-quote-retry"
-                      onClick={() => {
-                        setCreditsInfo(prev =>
-                          prev
-                            ? { ...prev, quoteReady: false, quoteError: false }
-                            : prev,
-                        )
-                        setQuoteRefreshKey(k => k + 1)
-                      }}
-                    >
-                      Retry
-                    </button>
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="price-page-model-or" role="separator" aria-label="or">
-              <span className="price-page-model-or-text">or</span>
-            </div>
-
-            <div className="price-page-model-row price-page-model-row--nim">
-              <span className="price-page-model-label">
-                <NimiqHexagonIcon size={12} />
-                NIM
-              </span>
-              <div className="price-page-model-value price-page-model-value--card">
-                <span className="price-page-model-card-price">
-                  {pricing.feeNim} NIM
-                  <span className="price-page-model-per">per lock</span>
-                </span>
-              </div>
-              {pricing.promoActive ? (
-                <p className="muted price-page-model-hint">
-                  Limited promo through July
-                  {pricing.baseFeeNim > pricing.feeNim
-                    ? ` (regularly ${pricing.baseFeeNim} NIM)`
-                    : ''}
-                  .
-                </p>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <SealPricingDisplay showNote={false} />
-      )}
-
-      {creditsEnabled && (
-        <section className="price-page-credits" id="buy-credits" aria-labelledby="price-credits-heading">
-          <div className="price-page-credits-intro">
-            <h3 id="price-credits-heading" className="price-page-credits-title">
+        <section
+          className="price-page-pay"
+          id="buy-credits"
+          aria-labelledby="price-pay-heading"
+        >
+          <header className="price-page-pay-intro">
+            <h3 id="price-pay-heading" className="price-page-pay-title">
               <Coins size={18} strokeWidth={2.25} aria-hidden />
               Buy credits
             </h3>
-            <p className="muted price-page-credits-lead">
-              Packs of{' '}
+            <p className="muted price-page-pay-lead">
+              1 credit = 1 fingerprint lock. Pay with card or{' '}
+              <a href="#price-why-nimiq" className="price-page-nimiq-link price-page-nim-jump">
+                NIM
+              </a>
+              . Packs of{' '}
               {creditsInfo?.packs && creditsInfo.packs.length >= 2
                 ? `${creditsInfo.packs[0]}-${creditsInfo.packs[creditsInfo.packs.length - 1]}`
                 : '10-100'}
               . Wallet only when you purchase.
             </p>
+          </header>
+
+          {/* Rates strip: card floor vs NIM per lock, then pack picker below */}
+          <div className="price-page-pay-rates" aria-label="How to pay">
+            <div className="price-page-model-options">
+              <div className="price-page-model-row price-page-model-row--card">
+                <span className="price-page-model-label">
+                  <CreditCard size={12} strokeWidth={2.5} aria-hidden />
+                  Credit card
+                </span>
+                <div className="price-page-model-value price-page-model-value--card">
+                  {!quoteReady ? (
+                    <span
+                      className="price-page-model-card-price price-page-model-card-price--pending"
+                      role="status"
+                    >
+                      <LoaderCircle
+                        className="btn-spinner"
+                        size={16}
+                        strokeWidth={2.5}
+                        aria-hidden
+                      />
+                      Loading…
+                    </span>
+                  ) : showPackAsPrimary ? (
+                    <span className="price-page-model-card-price">
+                      {formatFiatAmount(minPackUsd!, 'USD')}
+                      <span className="price-page-model-per">for {minPack} credits</span>
+                    </span>
+                  ) : unitUsd != null ? (
+                    <span className="price-page-model-card-price">
+                      {formatFiatAmount(unitUsd, 'USD')}
+                      <span className="price-page-model-per">per credit</span>
+                    </span>
+                  ) : minPackUsd != null ? (
+                    <span className="price-page-model-card-price">
+                      {formatFiatAmount(minPackUsd, 'USD')}
+                      <span className="price-page-model-per">for {minPack} credits</span>
+                    </span>
+                  ) : (
+                    <span className="price-page-model-card-price price-page-model-card-price--pending">
+                      Unavailable
+                      <button
+                        type="button"
+                        className="btn btn-ghost price-page-quote-retry"
+                        onClick={() => {
+                          setCreditsInfo(prev =>
+                            prev
+                              ? { ...prev, quoteReady: false, quoteError: false }
+                              : prev,
+                          )
+                          setQuoteRefreshKey(k => k + 1)
+                        }}
+                      >
+                        Retry
+                      </button>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="price-page-model-or" role="separator" aria-label="or">
+                <span className="price-page-model-or-text">or</span>
+              </div>
+
+              <div className="price-page-model-row price-page-model-row--nim">
+                <span className="price-page-model-label">
+                  <NimiqHexagonIcon size={12} />
+                  NIM
+                </span>
+                <div className="price-page-model-value price-page-model-value--card">
+                  <span className="price-page-model-card-price">
+                    {pricing.feeNim} NIM
+                    <span className="price-page-model-per">per lock</span>
+                  </span>
+                </div>
+                {pricing.promoActive ? (
+                  <p className="muted price-page-model-hint">
+                    Limited promo through July
+                    {pricing.baseFeeNim > pricing.feeNim
+                      ? ` (regularly ${pricing.baseFeeNim} NIM)`
+                      : ''}
+                    .
+                  </p>
+                ) : null}
+              </div>
+            </div>
           </div>
 
-          <CreditsPanel
-            token={token}
-            address={address}
-            nimiq={nimiq}
-            setNimiq={setNimiq}
-            preferCardPrice
-            onRequestLogin={
-              onConnect
-                ? () => {
-                    if (!journeyLoginNeedsSheet(connectMode)) {
-                      onConnect()
-                      return
+          <div className="price-page-pay-buy">
+            <CreditsPanel
+              token={token}
+              address={address}
+              nimiq={nimiq}
+              setNimiq={setNimiq}
+              preferCardPrice
+              onRequestLogin={
+                onConnect
+                  ? () => {
+                      if (!journeyLoginNeedsSheet(connectMode)) {
+                        onConnect()
+                        return
+                      }
+                      setBuyLoginOpen(true)
                     }
-                    setBuyLoginOpen(true)
-                  }
-                : undefined
-            }
-            onBalanceChange={() => {
-              onCreditsPurchased?.()
-            }}
-          />
+                  : undefined
+              }
+              onBalanceChange={() => {
+                onCreditsPurchased?.()
+              }}
+            />
+          </div>
 
           {!signedIn && onConnect && buyLoginOpen && journeyLoginNeedsSheet(connectMode) && (
             <div className="price-page-credits-connect">
@@ -441,6 +440,8 @@ export function PricePage({
             </div>
           )}
         </section>
+      ) : (
+        <SealPricingDisplay showNote={false} />
       )}
 
       <section className="price-page-why" aria-labelledby="price-why-nimiq">
