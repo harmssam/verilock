@@ -398,8 +398,9 @@ export function ArchiveLab({ wallet }: ArchiveLabProps) {
             <RefreshCw size={18} aria-hidden /> 4. Reconstruct by hash
           </h2>
           <p className="muted">
-            Uses only the fingerprint. <code>scan</code> walks the service wallet / sink for
-            frames with association id <span className="mono">{assoc}</span>.
+            Uses only the fingerprint. <code>scan</code> walks the <strong>service wallet</strong>{' '}
+            (sender of our frames) for association id{' '}
+            <span className="mono">{assoc}</span>. Lab rows never displace production archives.
           </p>
           <div className="archive-lab-actions">
             <button

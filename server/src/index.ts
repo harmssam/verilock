@@ -1356,8 +1356,11 @@ app.post(
 
 /**
  * /pdf2 lab: accept pre-packed multi-stream frames (annotation + manifest),
- * index under documentId `lab:<sha256>`, optional multi-tx broadcast.
- * No seal credits. Gated by PDF_ANNOTATION_UI.
+ * index under documentId `lab:<sha256>` (never mixed into production public index),
+ * optional multi-tx broadcast. No seal credits. Gated by PDF_ANNOTATION_UI.
+ *
+ * Frames must unpack and bind to originalSha256 (8-byte assoc + HEAD full hash).
+ * onChain requires every frame hash + full confirmed count (no partial success).
  */
 app.post(
   '/api/lab/stream-broadcast',
@@ -1391,25 +1394,30 @@ app.post(
         return
       }
 
+      const { assertFramesBelongToPdfHash } = await import('./archiveStream.js')
+      try {
+        assertFramesBelongToPdfHash(sha, framesHex)
+      } catch (err) {
+        res.status(400).json({
+          error: err instanceof Error ? err.message : 'Frame validation failed',
+        })
+        return
+      }
+
       const {
-        STREAM_MAGIC,
         isAnnotationStreamBroadcastEnabled,
         broadcastStreamFrames,
       } = await import('./annotationStream.js')
       const { getServiceWalletAddress, isServiceWalletConfigured } = await import(
         './serviceWallet.js'
       )
-      const { upsertDocumentDataArchive } = await import('./db.js')
-
-      for (let i = 0; i < framesHex.length; i++) {
-        const buf = Buffer.from(framesHex[i]!, 'hex')
-        if (buf.length !== 64 || buf[0] !== STREAM_MAGIC) {
-          res.status(400).json({ error: `Invalid stream frame at index ${i}` })
-          return
-        }
-      }
+      const {
+        getLabDocumentDataArchive,
+        upsertDocumentDataArchive,
+      } = await import('./db.js')
 
       const documentId = `lab:${sha}`
+      const prior = getLabDocumentDataArchive(sha)
       const now = Date.now()
       let txHashes: string[] = []
       let onChain = false
@@ -1433,16 +1441,23 @@ app.post(
         })
         txHashes = result.hashes
         confirmedFrames = result.confirmed
+        // Strict: all hashes + every frame confirmed. No partial onChain.
         onChain =
           result.hashes.length === frames.length &&
           !result.partial &&
-          result.confirmed > 0
+          result.confirmed === frames.length
         if (result.error) broadcastError = result.error
         if (result.hashes.length === frames.length && result.confirmed < frames.length) {
-          onChain = result.confirmed >= Math.min(2, frames.length)
+          onChain = false
           broadcastError =
             result.error ??
-            `Broadcast all frames; ${result.confirmed} visible so far (RPC lag ok)`
+            `Broadcast ${result.hashes.length} frames; only ${result.confirmed} confirmed — not marked on-chain`
+        }
+        if (result.hashes.length < frames.length) {
+          onChain = false
+          broadcastError =
+            result.error ??
+            `Partial broadcast: ${result.hashes.length}/${frames.length} frames`
         }
       } else if (wantBroadcast) {
         broadcastError = !broadcastEnabled
@@ -1462,7 +1477,7 @@ app.post(
         confirmedFrames,
         error: broadcastError ?? null,
         jobStatus: onChain ? 'complete' : broadcastError ? 'failed' : 'idle',
-        createdAt: now,
+        createdAt: prior?.createdAt ?? now,
         updatedAt: now,
       })
 

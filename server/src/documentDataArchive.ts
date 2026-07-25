@@ -752,14 +752,26 @@ async function runBackgroundBroadcast(input: {
           })
           return
         }
+        if (!verify.ok) {
+          // Do not claim on-chain success without HEAD/END sample match.
+          // Credits already charged; free resume re-verifies without re-broadcast.
+          persist({
+            txHashes,
+            confirmedFrames: verify.matched,
+            onChain: false,
+            jobStatus: 'failed',
+            error:
+              verify.error ??
+              `Broadcast complete but chain samples not visible yet (${verify.matched}/${verify.checked}) — resume free to re-check`,
+          })
+          return
+        }
         persist({
           txHashes,
-          confirmedFrames: verify.ok ? txHashes.length : verify.matched,
+          confirmedFrames: txHashes.length,
           onChain: true,
           jobStatus: 'complete',
-          error: verify.ok
-            ? null
-            : `Broadcast complete; ${verify.matched}/${verify.checked} chain samples visible`,
+          error: null,
         })
         fireArchiveNotifyEmail(documentId, txHashes.length, chargedCredits)
         return
@@ -834,43 +846,38 @@ async function runBackgroundBroadcast(input: {
         Boolean(verify.error) &&
         (verify.error!.includes('payload mismatch') ||
           verify.error!.includes('failed execution'))
-      if (permanentFail) {
-        console.error('[data-archive] chain sample permanent failure', {
+      if (!verify.ok) {
+        console.warn('[data-archive] chain sample incomplete — not marking onChain', {
           documentId,
+          checked: verify.checked,
+          matched: verify.matched,
           error: verify.error,
+          permanentFail,
         })
         persist({
           txHashes: allHashes,
           confirmedFrames: verify.matched,
           onChain: false,
           jobStatus: 'failed',
-          error: verify.error ?? 'On-chain frame sample verification failed',
+          error:
+            verify.error ??
+            `Broadcast ${allHashes.length} frames but chain samples not confirmed (${verify.matched}/${verify.checked}) — resume free to re-check`,
         })
         return
       }
-      if (!verify.ok) {
-        console.warn('[data-archive] chain sample lagging; marking complete on broadcast', {
-          documentId,
-          checked: verify.checked,
-          matched: verify.matched,
-          error: verify.error,
-        })
-      }
       persist({
         txHashes: allHashes,
-        confirmedFrames: verify.ok ? allHashes.length : verify.matched,
+        confirmedFrames: allHashes.length,
         onChain: true,
         jobStatus: 'complete',
-        error: verify.ok
-          ? result.error ?? null
-          : `Broadcast complete; ${verify.matched}/${verify.checked} chain samples visible (${verify.error ?? 'RPC lag'})`,
+        error: result.error ?? null,
       })
       console.log('[data-archive] complete', {
         documentId,
         frames: allHashes.length,
         credits: chargedCredits,
         chainSamples: verify.matched,
-        samplesOk: verify.ok,
+        samplesOk: true,
       })
       fireArchiveNotifyEmail(documentId, allHashes.length, chargedCredits)
       return
@@ -1111,6 +1118,7 @@ export function publicChainDataIndex(originalSha256: string): {
   confirmedFrames: number
   txHashes: string[]
   source: DocumentDataArchiveSource | null
+  /** Omitted from product index intentionally (lab/private ids not exposed). */
   documentId: string | null
   serviceWalletAddress: string | null
   updatedAt: number | null
@@ -1139,7 +1147,8 @@ export function publicChainDataIndex(originalSha256: string): {
     confirmedFrames: row.confirmedFrames,
     txHashes: row.txHashes,
     source: row.source,
-    documentId: row.documentId,
+    // Do not leak internal document UUID on public index
+    documentId: null,
     serviceWalletAddress: getServiceWalletAddress(),
     updatedAt: row.updatedAt,
   }
@@ -1182,6 +1191,7 @@ export async function reconstructArchiveBySha256(
     onChain: boolean,
     extra?: {
       chainError?: string
+      integrityOk?: boolean
       scanMeta?: {
         scannedTxs: number
         truncated: boolean
@@ -1194,13 +1204,17 @@ export async function reconstructArchiveBySha256(
     if (unpacked.originalSha256 !== hash) {
       throw new Error('Unpacked stream fingerprint does not match request')
     }
+    const integrityOk =
+      extra?.integrityOk !== undefined
+        ? extra.integrityOk
+        : !extra?.chainError && !(extra?.scanMeta?.truncated)
     return {
       originalSha256: hash,
       source,
       onChain,
       frameCount: framesHex.length,
       txHashes,
-      integrityOk: !extra?.chainError,
+      integrityOk,
       unpacked,
       ...(extra?.chainError ? { chainError: extra.chainError } : {}),
       ...(extra?.scanMeta ? { scanMeta: extra.scanMeta } : {}),
@@ -1212,10 +1226,16 @@ export async function reconstructArchiveBySha256(
     if (!scan.found || scan.framesHex.length === 0) {
       throw new Error(
         scan.error ||
-          'No archive frames found on Nimiq for this fingerprint (scanned service wallet / sink)',
+          'No archive frames found on Nimiq for this fingerprint (scanned service wallet)',
       )
     }
-    return tryUnpack(scan.framesHex, 'scan', scan.txHashes, true, {
+    // Truncated history is not full integrity even if streams unpack.
+    const integrityOk = !scan.truncated
+    return tryUnpack(scan.framesHex, 'scan', scan.txHashes, integrityOk, {
+      integrityOk,
+      chainError: scan.truncated
+        ? 'Chain history scan was truncated — older frames may be missing; integrity not guaranteed'
+        : undefined,
       scanMeta: {
         scannedTxs: scan.scannedTxs,
         truncated: scan.truncated,

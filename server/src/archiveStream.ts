@@ -34,7 +34,6 @@ import {
 import {
   decodeRecipientDataBytes,
   fetchTransactionsByAddress,
-  getExpectedAttestationRecipient,
   type NimiqTransaction,
 } from './nimiq-rpc.js'
 
@@ -482,14 +481,78 @@ function frameFullPdfHash(head: Buffer): string | null {
   return head.subarray(header, header + 32).toString('hex')
 }
 
-/** True when frame carries the 8-byte (or legacy 4-byte) association for this PDF hash. */
-export function frameMatchesPdfAssociation(frame: Buffer, pdfSha256: string): boolean {
+/**
+ * True when frame carries the association id for this PDF hash.
+ * Prefer 8-byte (modern) match; legacy 4-byte only when allowLegacy is true
+ * (and ideally only after HEAD self-detect proves old layout).
+ */
+export function frameMatchesPdfAssociation(
+  frame: Buffer,
+  pdfSha256: string,
+  options?: { allowLegacy?: boolean },
+): boolean {
   const want = associationIdFromPdfHash(pdfSha256)
   // New 8-byte assoc
   if (frame.subarray(5, 5 + ASSOC_LEN).equals(want)) return true
-  // Legacy 4-byte prefix
-  if (frame.subarray(5, 9).equals(want.subarray(0, 4))) return true
+  // Legacy 4-byte prefix (weaker filter — optional for mixed-era history)
+  if (options?.allowLegacy !== false) {
+    if (frame.subarray(5, 9).equals(want.subarray(0, 4))) return true
+  }
   return false
+}
+
+/**
+ * Validate pre-packed multi-stream frames belong to `pdfSha256` before index/broadcast.
+ * Rejects mismatched association ids, HEAD full-hash drift, and unpack failures.
+ */
+export function assertFramesBelongToPdfHash(pdfSha256: string, framesHex: string[]): void {
+  const hash = pdfSha256.toLowerCase()
+  if (!/^[a-f0-9]{64}$/.test(hash)) {
+    throw new Error('pdf hash must be 64 hex chars')
+  }
+  if (framesHex.length === 0) throw new Error('No frames to validate')
+  const buffers = framesHexToBuffers(framesHex)
+  let streams: Buffer[][]
+  try {
+    streams = splitFrameStreams(buffers)
+  } catch (err) {
+    throw new Error(
+      `Invalid multi-stream framing: ${err instanceof Error ? err.message : String(err)}`,
+    )
+  }
+  const wantAssoc = associationIdFromPdfHash(hash)
+  for (let s = 0; s < streams.length; s++) {
+    const stream = streams[s]!
+    for (let i = 0; i < stream.length; i++) {
+      const f = stream[i]!
+      if (f[0] !== STREAM_MAGIC) {
+        throw new Error(`Stream ${s} frame ${i}: bad magic`)
+      }
+      // Require modern 8-byte association id on newly accepted archives
+      if (!f.subarray(5, 5 + ASSOC_LEN).equals(wantAssoc)) {
+        throw new Error(
+          `Stream ${s} frame ${i}: association id does not match originalSha256`,
+        )
+      }
+    }
+    const head = stream[0]!
+    if (head[2] !== FRAME_HEAD) {
+      throw new Error(`Stream ${s}: first frame must be HEAD`)
+    }
+    const full = frameFullPdfHash(head)
+    if (full !== hash) {
+      throw new Error(
+        `Stream ${s}: HEAD full PDF hash does not match originalSha256`,
+      )
+    }
+    try {
+      unpackJsonStreamPayload(stream)
+    } catch (err) {
+      throw new Error(
+        `Stream ${s}: unpack failed (${err instanceof Error ? err.message : String(err)})`,
+      )
+    }
+  }
 }
 
 /**
@@ -500,17 +563,45 @@ export function frameMatchesPdfAssociation(frame: Buffer, pdfSha256: string): bo
 export function assembleArchiveStreamsFromPool(
   pdfSha256: string,
   pool: ScannedFrame[],
+  options?: {
+    /** Prefer service-wallet sender only (reject sink-only injects). */
+    requireSender?: string | null
+    /** Prefer modern 8-byte assoc; legacy 4-byte only when HEAD proves old layout. */
+    preferModernAssoc?: boolean
+  },
 ): { frames: ScannedFrame[]; streamCount: number } {
   const hash = pdfSha256.toLowerCase()
-  // Pre-filter: only frames tagged with this document's association id
-  const related = pool.filter(f => frameMatchesPdfAssociation(f.buf, hash))
-  const heads = related.filter(f => {
-    const full = frameFullPdfHash(f.buf)
-    return full === hash
-  })
+  const requireSender = options?.requireSender
+    ? options.requireSender.replace(/\s+/g, '').toUpperCase()
+    : null
+  const preferModern = options?.preferModernAssoc !== false
+
+  let poolScoped = pool
+  if (requireSender) {
+    poolScoped = pool.filter(
+      f => f.from.replace(/\s+/g, '').toUpperCase() === requireSender,
+    )
+  }
+
+  // Prefer 8-byte association; fall back to legacy only for HEAD-proven old streams
+  const modernRelated = poolScoped.filter(f =>
+    frameMatchesPdfAssociation(f.buf, hash, { allowLegacy: false }),
+  )
+  const headsModern = modernRelated.filter(f => frameFullPdfHash(f.buf) === hash)
+
+  // Legacy HEADs (4-byte prefix era): only if HEAD self-detects legacy layout
+  const legacyHeads = preferModern
+    ? poolScoped.filter(f => {
+        if (f.buf[2] !== FRAME_HEAD) return false
+        if (frameFullPdfHash(f.buf) !== hash) return false
+        const { assocLen } = detectFrameLayout(f.buf, hash)
+        return assocLen === 4
+      })
+    : []
+
+  const heads = [...headsModern, ...legacyHeads]
   if (heads.length === 0) return { frames: [], streamCount: 0 }
 
-  // Stable chronological order of streams
   heads.sort((a, b) => a.order - b.order || a.txHash.localeCompare(b.txHash))
 
   const usedTx = new Set<string>()
@@ -522,6 +613,13 @@ export function assembleArchiveStreamsFromPool(
     const total = head.buf[4]!
     const version = head.buf[1]!
     if (total < 2 || total > 128) continue
+    const { assocLen } = detectFrameLayout(head.buf, hash)
+    const allowLegacyForStream = assocLen === 4
+
+    // Candidate pool for this stream: same layout era
+    const related = poolScoped.filter(f =>
+      frameMatchesPdfAssociation(f.buf, hash, { allowLegacy: allowLegacyForStream }),
+    )
 
     const chosen: ScannedFrame[] = new Array(total)
     chosen[0] = head
@@ -531,25 +629,26 @@ export function assembleArchiveStreamsFromPool(
         if (usedTx.has(f.txHash) || f.txHash === head.txHash) return false
         if (f.buf[0] !== STREAM_MAGIC) return false
         if (f.buf[1] !== version) return false
-        if (f.buf[2] === FRAME_HEAD) return false // only one HEAD
+        if (f.buf[2] === FRAME_HEAD) return false
         if (f.buf[3] !== seq) return false
         if (f.buf[4] !== total) return false
+        // Same chronological neighborhood: must be after HEAD (serialized broadcast)
+        if (f.order < head.order) return false
         return true
       })
       if (cands.length === 0) {
         ok = false
         break
       }
-      // Prefer frames after HEAD in chronological order (serialized broadcast).
-      const after = cands.filter(c => c.order >= head.order)
-      const pickPool = after.length > 0 ? after : cands
-      pickPool.sort((a, b) => a.order - b.order || a.txHash.localeCompare(b.txHash))
-      chosen[seq] = pickPool[0]!
+      cands.sort((a, b) => a.order - b.order || a.txHash.localeCompare(b.txHash))
+      // Prefer nearest after HEAD to reduce cross-stream mix under same total
+      chosen[seq] = cands[0]!
     }
     if (!ok) continue
 
     try {
-      unpackJsonStreamPayload(chosen.map(c => c.buf))
+      const unpacked = unpackJsonStreamPayload(chosen.map(c => c.buf))
+      if (unpacked.pdfSha256 !== hash) continue
     } catch {
       continue
     }
@@ -635,7 +734,10 @@ export async function scanArchiveByPdfHash(
   options?: {
     maxTxs?: number
     pageSize?: number
-    /** Override addresses (defaults: service wallet + attestation sink). */
+    /**
+     * Addresses to scan. Default: **service wallet only** (sender of archives).
+     * Do not include the public sink by default — anyone can send dust to the sink.
+     */
     addresses?: string[]
   },
 ): Promise<ScanArchiveResult> {
@@ -656,11 +758,11 @@ export async function scanArchiveByPdfHash(
 
   const { getServiceWalletAddress } = await import('./serviceWallet.js')
   const service = getServiceWalletAddress()
-  const sink = getExpectedAttestationRecipient()
+  // Integrity: only scan service wallet (frames we broadcast). Sink is public.
   const addresses = (
     options?.addresses?.length
       ? options.addresses
-      : [service, sink].filter((a): a is string => Boolean(a))
+      : [service].filter((a): a is string => Boolean(a))
   ).map(a => a.replace(/\s+/g, '').toUpperCase())
 
   if (addresses.length === 0) {
@@ -673,7 +775,8 @@ export async function scanArchiveByPdfHash(
       scannedTxs: 0,
       truncated: false,
       scanAddresses: [],
-      error: 'No service wallet or attestation sink configured for chain scan',
+      error:
+        'Service wallet not configured for hash-only chain scan (set SERVICE_WALLET_PRIVATE_KEY)',
     }
   }
 
@@ -697,7 +800,6 @@ export async function scanArchiveByPdfHash(
     }
   }
 
-  // Re-index order by block when available, else keep merge order
   const pool = [...byTx.values()].sort((a, b) => {
     const ba = a.blockNumber ?? 0
     const bb = b.blockNumber ?? 0
@@ -708,7 +810,14 @@ export async function scanArchiveByPdfHash(
     f.order = i
   })
 
-  const { frames, streamCount } = assembleArchiveStreamsFromPool(hash, pool)
+  // Prefer frames sent by the service wallet when present
+  const requireSender = service
+    ? service.replace(/\s+/g, '').toUpperCase()
+    : null
+  const { frames, streamCount } = assembleArchiveStreamsFromPool(hash, pool, {
+    requireSender,
+    preferModernAssoc: true,
+  })
   return {
     originalSha256: hash,
     found: frames.length > 0,

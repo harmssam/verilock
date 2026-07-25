@@ -128,7 +128,9 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
         </p>
         <p>
           Locking spends <strong>1 credit</strong> to anchor only the document fingerprint on Nimiq. Optional
-          data backup writes signatures and field data on-chain so those details can outlive our servers.
+          data backup writes signatures, names, wallets, and field data on-chain so those details
+          can outlive our servers—and so anyone with the PDF fingerprint can reconstruct them from
+          Nimiq. The PDF file itself never leaves devices.
         </p>
       </section>
 

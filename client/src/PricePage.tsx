@@ -188,8 +188,8 @@ export function PricePage({
         <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
           Nimiq
         </a>
-        . Optional on-chain backup stores signatures and field data so VeriLock servers are not
-        required to recall them later.
+        . Optional on-chain backup stores signatures and field data publicly on Nimiq
+        (recoverable by anyone who has the PDF fingerprint—not only VeriLock).
       </p>
 
       <section className="price-page-tiers" aria-labelledby="price-tiers-heading">
@@ -274,7 +274,7 @@ export function PricePage({
               </li>
               <li>
                 <Check size={14} strokeWidth={2.5} aria-hidden />
-                Recall without relying on our servers
+                Reconstruct with PDF hash + Nimiq (public to hash holders)
               </li>
             </ul>
             <p className="muted price-page-tier-note">
