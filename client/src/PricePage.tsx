@@ -22,6 +22,11 @@ import {
   type JourneyConnectRequest,
 } from './journey/journeyConnectUi'
 import { LoginSheet } from './journey/LoginSheet'
+import {
+  consumePricingBuyResume,
+  shouldRestoreBuyCreditsScroll,
+  scrollToBuyCredits,
+} from './pricingBuyResume'
 import './PricePage.css'
 
 const NIMIQ_URL = 'https://www.nimiq.com'
@@ -153,6 +158,26 @@ export function PricePage({
   useEffect(() => {
     if (signedIn) setBuyLoginOpen(false)
   }, [signedIn])
+
+  // After wallet login (or refresh with ?pack= / #buy-credits), land on buy section.
+  useEffect(() => {
+    if (!shouldRestoreBuyCreditsScroll()) return
+    let cancelled = false
+    const run = () => {
+      if (cancelled) return
+      scrollToBuyCredits(signedIn ? 'smooth' : 'auto')
+      // Clear session resume once signed in so later visits don't re-jump.
+      if (signedIn) consumePricingBuyResume()
+    }
+    // Wait for pack chips / quotes to paint so scroll target has height.
+    const t0 = window.setTimeout(run, 80)
+    const t1 = window.setTimeout(run, 400)
+    return () => {
+      cancelled = true
+      window.clearTimeout(t0)
+      window.clearTimeout(t1)
+    }
+  }, [signedIn, quoteReady])
 
   return (
     <div className="card price-page">
