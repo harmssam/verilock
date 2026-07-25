@@ -36,6 +36,8 @@ function isStepDone(
   }
 
   if (role === 'verifier') {
+    // Fingerprint step is complete once a match advances the journey to `done`.
+    if (stageId === 'verify' && step === 'done') return true
     return false
   }
 
@@ -83,7 +85,9 @@ export function StageRail({
     if (role === 'signer' && (step === 'done' || doc?.sealed)) {
       return Math.max(0, stages.findIndex(s => s.id === 'done'))
     }
-    if (role === 'creator' && step === 'done') return stages.length - 1
+    if ((role === 'creator' || role === 'verifier') && step === 'done') {
+      return stages.length - 1
+    }
     const i = stages.findIndex(s => s.id === step)
     return i >= 0 ? i : 0
   })()

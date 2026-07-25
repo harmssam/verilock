@@ -55,6 +55,57 @@ const CHIP_OPTIONS: Array<{ key: BucketFilter; label: string }> = [
   { key: 'locked', label: 'Locked' },
 ]
 
+/** Title with file extension (drops the separate filename line). */
+function agreementListTitle(doc: SealDocument): string {
+  const title = doc.title?.trim() || 'Untitled'
+  const filename = doc.originalFilename?.trim()
+  if (!filename) return title
+  const extMatch = filename.match(/(\.[A-Za-z0-9]{1,10})$/)
+  if (!extMatch) return title
+  const ext = extMatch[1]
+  if (title.toLowerCase().endsWith(ext.toLowerCase())) return title
+  return `${title}${ext}`
+}
+
+/** When the agreement finished (lock, or last signature if all signed). */
+function agreementCompletedAt(doc: SealDocument): number | null {
+  if (doc.lockedAt) return doc.lockedAt
+  const locked =
+    doc.status === 'locked' ||
+    doc.attestation?.status === 'confirmed' ||
+    doc.signingProgress.readyToLock ||
+    doc.status === 'ready_to_lock' ||
+    (doc.signingProgress.required > 0 &&
+      doc.signingProgress.signed >= doc.signingProgress.required)
+  if (!locked) return null
+  const times: number[] = []
+  for (const s of doc.signatures) {
+    if (typeof s.signedAt === 'number') times.push(s.signedAt)
+  }
+  for (const p of doc.parties) {
+    if (typeof p.signedAt === 'number') times.push(p.signedAt)
+  }
+  if (times.length === 0) return null
+  return Math.max(...times)
+}
+
+/** Compact list date — e.g. "Jul 24, 3:42 PM" (locale-aware). */
+function formatAgreementWhen(ts: number): string {
+  return new Date(ts).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function formatAgreementWhenFull(ts: number): string {
+  return new Date(ts).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+}
+
 interface AgreementsPageProps {
   token: string | null
   address: string | null
@@ -734,6 +785,13 @@ export function AgreementsPage({
                     archive &&
                     !archive.onChain &&
                     archive.eligible
+                  const completedAt = agreementCompletedAt(doc)
+                  const whenAt = completedAt ?? doc.createdAt
+                  const whenLabel = completedAt
+                    ? fingerprintLocked
+                      ? 'Locked'
+                      : 'Completed'
+                    : 'Created'
                   return (
                     <li
                       key={doc.id}
@@ -757,19 +815,26 @@ export function AgreementsPage({
                               className="agreements-page-backed-icon"
                               title="Fingerprint and data stored on the Nimiq blockchain"
                             >
-                              <ShieldCheck size={16} strokeWidth={2.25} aria-hidden />
+                              <ShieldCheck size={15} strokeWidth={2.25} aria-hidden />
                             </span>
                           )}
-                          <strong className="agreements-page-title">{doc.title}</strong>
+                          <strong className="agreements-page-title">
+                            {agreementListTitle(doc)}
+                          </strong>
                           <span className="agreements-page-type">{documentTypeLabel(doc.type)}</span>
                         </span>
-                        {doc.originalFilename && (
-                          <span className="muted agreements-page-filename">{doc.originalFilename}</span>
-                        )}
                         <span className="muted agreements-page-meta">
                           {creator ? 'You created' : "You're a signer"}
                           {' · '}
                           {view.detail}
+                          {' · '}
+                          <time
+                            className="agreements-page-when"
+                            dateTime={new Date(whenAt).toISOString()}
+                            title={`${whenLabel} ${formatAgreementWhenFull(whenAt)}`}
+                          >
+                            {formatAgreementWhen(whenAt)}
+                          </time>
                           {' · '}
                           <code className="mono">{shortHash(doc.originalSha256)}</code>
                         </span>
@@ -777,12 +842,12 @@ export function AgreementsPage({
                         {fingerprintLocked && (
                           <span className="agreements-page-tags">
                             <span className="agreements-page-archive-badge agreements-page-archive-badge--lock">
-                              <Lock size={12} strokeWidth={2.5} aria-hidden />
+                              <Lock size={11} strokeWidth={2.5} aria-hidden />
                               Fingerprint locked
                             </span>
                             {fullyOnChain && (
                               <span className="agreements-page-archive-badge agreements-page-archive-badge--data">
-                                <Database size={12} strokeWidth={2.5} aria-hidden />
+                                <Database size={11} strokeWidth={2.5} aria-hidden />
                                 Data on blockchain
                               </span>
                             )}
@@ -797,14 +862,14 @@ export function AgreementsPage({
                         >
                           {preferSeal ? (
                             <>
-                              <Lock size={15} strokeWidth={2.25} aria-hidden />
+                              <Lock size={14} strokeWidth={2.25} aria-hidden />
                               Lock now
                             </>
                           ) : freeComplete ? (
                             view.cta
                           ) : view.cta === 'Sign now' ? (
                             <>
-                              <PenLine size={15} strokeWidth={2.25} aria-hidden />
+                              <PenLine size={14} strokeWidth={2.25} aria-hidden />
                               Sign now
                             </>
                           ) : (
@@ -818,14 +883,14 @@ export function AgreementsPage({
                             onClick={() => onOpen(doc, true)}
                             title="Lock fingerprint on the Nimiq blockchain (1 credit)"
                           >
-                            <Lock size={15} strokeWidth={2.25} aria-hidden />
+                            <Lock size={14} strokeWidth={2.25} aria-hidden />
                             Lock (1 credit)
                           </button>
                         )}
                         {showArchiveUpsell && (
                           <button
                             type="button"
-                            className="btn btn-primary agreements-page-archive-btn"
+                            className="btn btn-primary agreements-page-archive-btn agreements-page-cta"
                             onClick={() => void requestArchive(doc)}
                             title={
                               archive.credits > 0
@@ -833,7 +898,7 @@ export function AgreementsPage({
                                 : 'Store signatures & fields on the Nimiq blockchain'
                             }
                           >
-                            <Database size={15} strokeWidth={2.25} aria-hidden />
+                            <Database size={14} strokeWidth={2.25} aria-hidden />
                             {archive.credits > 0
                               ? `Store forever · ${formatDataArchiveCredits(archive.credits)}`
                               : 'Store forever'}
@@ -851,7 +916,7 @@ export function AgreementsPage({
                               <>
                                 <LoaderCircle
                                   className="btn-spinner"
-                                  size={15}
+                                  size={14}
                                   strokeWidth={2.5}
                                   aria-hidden
                                 />
@@ -859,8 +924,8 @@ export function AgreementsPage({
                               </>
                             ) : (
                               <>
-                                <Trash2 size={15} strokeWidth={2.25} aria-hidden />
-                                Remove from VeriLock
+                                <Trash2 size={14} strokeWidth={2.25} aria-hidden />
+                                Remove
                               </>
                             )}
                           </button>
@@ -876,7 +941,7 @@ export function AgreementsPage({
                               <>
                                 <LoaderCircle
                                   className="btn-spinner"
-                                  size={15}
+                                  size={14}
                                   strokeWidth={2.5}
                                   aria-hidden
                                 />
@@ -884,7 +949,7 @@ export function AgreementsPage({
                               </>
                             ) : (
                               <>
-                                <Trash2 size={15} strokeWidth={2.25} aria-hidden />
+                                <Trash2 size={14} strokeWidth={2.25} aria-hidden />
                                 Cancel
                               </>
                             )}

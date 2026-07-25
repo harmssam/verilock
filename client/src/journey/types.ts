@@ -91,14 +91,28 @@ export const SIGNER_STAGES: JourneyStage[] = [
   },
 ]
 
-/** Verifier path: local fingerprint lookup only. */
+/**
+ * Verifier path: local fingerprint → record/chain lookup.
+ * Step ids: `verify` (drop + hash) then `done` (match against VeriLock + Nimiq).
+ */
 export const VERIFIER_STAGES: JourneyStage[] = [
   {
     id: 'verify',
-    label: 'Verify',
-    verb: 'Check a document',
-    blurb: 'Drop a locked document. We fingerprint it locally and match the on-chain record.',
-    privacyNote: 'The file stays on this device - only the fingerprint is checked.',
+    label: 'Fingerprint',
+    verb: 'Drop a document to fingerprint',
+    blurb:
+      'Drop any copy of a locked document. We compute its SHA-256 fingerprint entirely in your browser - the file never leaves this device, and we never upload it.',
+    privacyNote:
+      'Only the short fingerprint is used for lookup. No wallet is required for this step.',
+  },
+  {
+    id: 'done',
+    label: 'Match',
+    verb: 'Check VeriLock records and the blockchain',
+    blurb:
+      'We look up that fingerprint in VeriLock’s local records and against the Nimiq blockchain to see whether a locked proof exists. If it matches, you get the public lock details (status, explorer link, and hash).',
+    privacyNote:
+      'Unless you connect with a wallet that was one of the original parties, names, signatures, and other private entries stay anonymous. Outsiders only see that the fingerprint matches a lock.',
   },
 ]
 
