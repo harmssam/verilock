@@ -1,5 +1,14 @@
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
-import { Coins, CreditCard, ExternalLink, LoaderCircle } from 'lucide-react'
+import {
+  Check,
+  Coins,
+  CreditCard,
+  Database,
+  ExternalLink,
+  LoaderCircle,
+  Lock,
+  PenLine,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from './api'
 import { formatFiatAmount } from './fiatPricing'
@@ -113,13 +122,107 @@ export function PricePage({
     <div className="card price-page">
       <h2>Pricing</h2>
       <p className="muted price-page-lead">
-        Signing and file checks are free.{' '}
-        <strong>1 credit = 1 document verified and locked</strong> on{' '}
+        Multi-party PDF signing is <strong>100% free</strong>. Upgrade when you want a permanent
+        proof: <strong>1 credit = 1 fingerprint lock</strong> on{' '}
         <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
           Nimiq
         </a>
-        . Permanent fingerprint; re-checkable without VeriLock.
+        . Optional on-chain backup stores signatures and field data so VeriLock servers are not
+        required to recall them later.
       </p>
+
+      <section className="price-page-tiers" aria-labelledby="price-tiers-heading">
+        <h3 id="price-tiers-heading" className="price-page-tiers-title">
+          What you get
+        </h3>
+        <div className="price-page-tier-grid">
+          <article className="price-page-tier price-page-tier--free">
+            <header className="price-page-tier-head">
+              <PenLine size={18} strokeWidth={2.25} aria-hidden />
+              <div>
+                <h4 className="price-page-tier-name">Sign free</h4>
+                <p className="price-page-tier-price">$0</p>
+              </div>
+            </header>
+            <ul className="price-page-tier-list">
+              <li>
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                Create, invite, and co-sign with wallets
+              </li>
+              <li>
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                Print when everyone has signed
+              </li>
+              <li>
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                Saved in My agreements (metadata only)
+              </li>
+              <li>
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                Document never uploaded
+              </li>
+            </ul>
+            <p className="muted price-page-tier-note">
+              Free signing stores the agreement record on VeriLock. It is not a permanent public
+              proof until you lock.
+            </p>
+          </article>
+          <article className="price-page-tier price-page-tier--lock">
+            <header className="price-page-tier-head">
+              <Lock size={18} strokeWidth={2.25} aria-hidden />
+              <div>
+                <h4 className="price-page-tier-name">Lock on blockchain</h4>
+                <p className="price-page-tier-price">1 credit</p>
+              </div>
+            </header>
+            <ul className="price-page-tier-list">
+              <li>
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                Everything in Sign free
+              </li>
+              <li>
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                Fingerprint anchored on Nimiq forever
+              </li>
+              <li>
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                Anyone can re-check the file later
+              </li>
+              <li>
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                Proof outlives this app
+              </li>
+            </ul>
+          </article>
+          <article className="price-page-tier price-page-tier--data">
+            <header className="price-page-tier-head">
+              <Database size={18} strokeWidth={2.25} aria-hidden />
+              <div>
+                <h4 className="price-page-tier-name">On-chain data backup</h4>
+                <p className="price-page-tier-price">Credits by size</p>
+              </div>
+            </header>
+            <ul className="price-page-tier-list">
+              <li>
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                After fingerprint lock
+              </li>
+              <li>
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                Signatures &amp; field data on-chain
+              </li>
+              <li>
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                Recall without relying on our servers
+              </li>
+            </ul>
+            <p className="muted price-page-tier-note">
+              Quoted in credits from frame count (about 1 credit per 10 chain transactions). Offline
+              chain-only recall is a planned VeriLock Offline update.
+            </p>
+          </article>
+        </div>
+      </section>
 
       {creditsEnabled ? (
         <div className="price-page-model" aria-labelledby="price-model-heading">

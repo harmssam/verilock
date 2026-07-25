@@ -11,7 +11,6 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { formatBlogDate, getAllPosts } from '../blog'
-import { formatSealFeeNim, getSealPricing } from '../sealPricing'
 import type { PathRole } from '../journey/types'
 import { AppLink } from '../AppLink'
 import { LandingHowItWorks } from './LandingHowItWorks'
@@ -37,27 +36,22 @@ interface HeroClaim {
 }
 
 function buildHeroClaims(): HeroClaim[] {
-  const pricing = getSealPricing()
-  const feeNim = formatSealFeeNim(pricing.feeNim)
-
   return [
     {
       icon: ShieldCheck,
-      status: 'Your document stays on this device. Always.',
+      status: 'Sign PDFs free — multi-party, wallet-backed.',
     },
     {
       icon: Users,
-      status: 'Co-sign with wallets. No file upload.',
+      status: 'Your document stays on this device. Always.',
     },
     {
       icon: Lock,
-      status: pricing.promoActive
-        ? `Permanent on-chain lock for ${feeNim} (July promo)`
-        : `Permanent on-chain lock for a flat ${feeNim} fee`,
+      status: 'Lock a permanent proof for 1 credit.',
     },
     {
       icon: Fingerprint,
-      status: 'Anyone can re-check the locked proof later',
+      status: 'Anyone can re-check a locked proof later',
     },
   ]
 }
@@ -78,8 +72,8 @@ const PATHS: {
 }[] = [
   {
     role: 'creator',
-    title: 'Create & lock',
-    detail: 'Start an agreement, invite co-signers, lock a permanent proof',
+    title: 'Create & sign',
+    detail: 'Start free: invite co-signers, print when done — lock on-chain when you want',
     icon: Fingerprint,
     imageAlt: '',
   },
@@ -141,11 +135,11 @@ export function LandingHome({
         <div className="lr-hero-copy">
           <h1 id="lr-hero-headline" className="lr-hero-headline">
             Sign a document together.{' '}
-            <span className="lr-hero-headline-em">Prove it never changed.</span>
+            <span className="lr-hero-headline-em">Free.</span>
           </h1>
           <p className="lr-hero-sub">
-            Co-sign agreements with your Nimiq account. Your document stays on your device. Lock a permanent
-            proof anyone can check later. No account needed to verify locked documents.
+            Co-sign PDFs with your Nimiq wallet — free. Your document stays on your device. Print when
+            everyone has signed. Upgrade anytime: lock a permanent proof on the blockchain for 1 credit.
           </p>
           {/*
             One primary CTA only. Paths below cover Create / Invited / Verify.
@@ -157,13 +151,20 @@ export function LandingHome({
               className="lr-cta lr-cta--primary"
               onClick={() => onPickRole('creator')}
             >
-              Create &amp; lock
+              Create &amp; sign free
               <ArrowRight size={16} strokeWidth={2.25} aria-hidden />
             </AppLink>
             <a className="lr-cta lr-cta--ghost" href="#lr-paths">
               Sign or verify
             </a>
           </div>
+          <p className="lr-promo" role="note">
+            <span className="lr-promo-free">100% free to sign</span>
+            <span className="lr-promo-sep" aria-hidden>
+              ·
+            </span>
+            <span>Lock on blockchain for 1 credit</span>
+          </p>
           <p
             className={`lr-status${claimVisible ? ' lr-status--in' : ''}`}
             aria-live="polite"
@@ -226,7 +227,7 @@ export function LandingHome({
             What are you here to do?
           </h2>
           <p className="lr-paths-lead">
-            Pick a path. Create, sign an invite, or verify a locked document.
+            Pick a path. Create and sign free, open an invite, or verify a locked proof.
           </p>
         </div>
 

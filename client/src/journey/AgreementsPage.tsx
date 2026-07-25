@@ -715,6 +715,10 @@ export function AgreementsPage({
                   const view = getAgreementView(doc, address)
                   const creator = isDocumentCreator(doc, address)
                   const preferSeal = view.cta === 'Lock now' && creator
+                  const freeComplete =
+                    creator &&
+                    view.bucket === 'ready_to_seal' &&
+                    view.cta === 'View & print'
                   const canCancel = canDeleteDocument(doc, address)
                   const canPurge = canPurgeServerCopy(doc, address)
                   const cancelling = cancellingId === doc.id
@@ -788,7 +792,7 @@ export function AgreementsPage({
                       <div className="agreements-page-actions">
                         <button
                           type="button"
-                          className={`btn ${preferSeal ? 'btn-primary' : 'btn-secondary'} agreements-page-cta`}
+                          className={`btn ${preferSeal ? 'btn-primary' : freeComplete ? 'btn-primary' : 'btn-secondary'} agreements-page-cta`}
                           onClick={() => onOpen(doc, preferSeal)}
                         >
                           {preferSeal ? (
@@ -796,6 +800,8 @@ export function AgreementsPage({
                               <Lock size={15} strokeWidth={2.25} aria-hidden />
                               Lock now
                             </>
+                          ) : freeComplete ? (
+                            view.cta
                           ) : view.cta === 'Sign now' ? (
                             <>
                               <PenLine size={15} strokeWidth={2.25} aria-hidden />
@@ -805,6 +811,17 @@ export function AgreementsPage({
                             view.cta
                           )}
                         </button>
+                        {freeComplete && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary agreements-page-cta"
+                            onClick={() => onOpen(doc, true)}
+                            title="Lock fingerprint on the Nimiq blockchain (1 credit)"
+                          >
+                            <Lock size={15} strokeWidth={2.25} aria-hidden />
+                            Lock (1 credit)
+                          </button>
+                        )}
                         {showArchiveUpsell && (
                           <button
                             type="button"

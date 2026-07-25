@@ -248,6 +248,11 @@ export function DocumentJourney({
   const [busy, setBusy] = useState(false)
   const [doc, setDoc] = useState<JourneyDoc | null>(null)
   const [sharedAck, setSharedAck] = useState(false)
+  /**
+   * Creator free-complete (all signed): print/done is primary until they choose lock.
+   * preferSeal / “Lock now” sets this so seal payment stays front-and-center.
+   */
+  const [creatorChoseLock, setCreatorChoseLock] = useState(false)
   /** True after the creator has opened the waiting view at least once this session. */
   const [inviteWaitingVisited, setInviteWaitingVisited] = useState(false)
   const [signFile, setSignFile] = useState<File | null>(null)
@@ -447,6 +452,8 @@ export function DocumentJourney({
           // only after explicit “Done inviting”.
           // preferSeal / agreements “seal now” skips share intentionally.
           setSharedAck(preferSeal || required === 0)
+          // Lock-now from My agreements opens the paid seal panel; free complete otherwise.
+          setCreatorChoseLock(preferSeal || required === 0)
         } else {
           // /d/:slug is the invite path — land on signer flow (connect → sign), not verify.
           // Unclaimed co-signers may not match canRevealParticipantDetails until they sign.
@@ -1268,6 +1275,7 @@ export function DocumentJourney({
     setRequiredSigners(1)
     setDoc(null)
     setSharedAck(false)
+    setCreatorChoseLock(false)
     setInviteWaitingVisited(false)
     setSignFile(null)
     setSignHash(null)
@@ -2526,53 +2534,74 @@ export function DocumentJourney({
               </div>
               <div>
                 <p className="action-kicker">
-                  {step === 'done' && role !== 'signer'
-                    ? 'Complete'
-                    : step === 'verify' && verifyMatched
-                      ? 'Verify'
-                      : inviteWaitingView && activeStage && stepIndex >= 0
-                        ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label} · waiting`
-                        : inviteManageView && activeStage && stepIndex >= 0
-                          ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label} · invites`
-                          : activeStage && stepIndex >= 0
-                            ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label}`
-                            : 'Action'}
+                  {step === 'seal' &&
+                  doc &&
+                  !doc.directSeal &&
+                  allSigned(doc) &&
+                  !doc.sealed &&
+                  !creatorChoseLock
+                    ? 'Complete · free'
+                    : step === 'done' && role !== 'signer'
+                      ? 'Complete'
+                      : step === 'verify' && verifyMatched
+                        ? 'Verify'
+                        : inviteWaitingView && activeStage && stepIndex >= 0
+                          ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label} · waiting`
+                          : inviteManageView && activeStage && stepIndex >= 0
+                            ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label} · invites`
+                            : activeStage && stepIndex >= 0
+                              ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label}`
+                              : 'Action'}
                 </p>
                 <h3>
-                  {step === 'done' && role === 'signer'
-                    ? doc?.sealed
-                      ? 'Agreement sealed — your part is done'
-                      : (activeStage?.verb ?? 'Your signature is recorded')
-                    : step === 'done'
-                      ? 'Agreement sealed'
-                      : step === 'verify' && verifyMatched
-                        ? verifyOutcome.kind === 'match' &&
-                          verifyOutcome.matches.some(m => m.status === 'locked')
-                          ? 'Match confirmed — locked on Nimiq'
-                          : 'Fingerprint matches'
-                        : inviteWaitingView
-                          ? 'Waiting for co-signers'
-                          : inviteManageView
-                            ? 'Invite co-signers'
-                            : activeStage?.verb ?? 'Continue'}
+                  {step === 'seal' &&
+                  doc &&
+                  !doc.directSeal &&
+                  allSigned(doc) &&
+                  !doc.sealed &&
+                  !creatorChoseLock
+                    ? 'Everyone signed — print free or lock'
+                    : step === 'done' && role === 'signer'
+                      ? doc?.sealed
+                        ? 'Agreement sealed — your part is done'
+                        : (activeStage?.verb ?? 'Your signature is recorded')
+                      : step === 'done'
+                        ? 'Agreement sealed'
+                        : step === 'verify' && verifyMatched
+                          ? verifyOutcome.kind === 'match' &&
+                            verifyOutcome.matches.some(m => m.status === 'locked')
+                            ? 'Match confirmed — locked on Nimiq'
+                            : 'Fingerprint matches'
+                          : inviteWaitingView
+                            ? 'Waiting for co-signers'
+                            : inviteManageView
+                              ? 'Invite co-signers'
+                              : activeStage?.verb ?? 'Continue'}
                 </h3>
                 <p className="muted action-blurb">
-                  {step === 'done' && role === 'signer'
-                    ? doc?.sealed
-                      ? 'Your signature is on this agreement. Review parties and recorded ink below. Drop the same file you signed to see the organizer’s field layout (the PDF never left anyone’s device).'
-                      : (activeStage?.blurb ??
-                        'Your fields and wallet signature are recorded. Review them below; the creator locks when everyone has finished.')
-                    : step === 'done'
-                      ? 'Keep your file. Drop a copy below anytime to verify the fingerprint.'
-                      : step === 'verify' && verifyMatched
-                        ? verifyPartyView
-                          ? 'Your local file matches. Open the signed document and recorded ink below.'
-                          : 'Your local file matches a VeriLock record. Details below.'
-                        : inviteWaitingView
-                          ? 'Progress updates here as people sign. When everyone is done, continue to lock the agreement on the blockchain.'
-                          : inviteManageView
-                            ? 'Send each person a personal link (and the same document file separately — VeriLock never hosts it). When you are finished inviting, return to the waiting view.'
-                            : activeStage?.blurb}
+                  {step === 'seal' &&
+                  doc &&
+                  !doc.directSeal &&
+                  allSigned(doc) &&
+                  !doc.sealed &&
+                  !creatorChoseLock
+                    ? 'Signing is free. Print a signed copy, keep it in My agreements, or upgrade to lock a permanent proof on Nimiq for 1 credit.'
+                    : step === 'done' && role === 'signer'
+                      ? doc?.sealed
+                        ? 'Your signature is on this agreement. Review parties and recorded ink below. Drop the same file you signed to see the organizer’s field layout (the PDF never left anyone’s device).'
+                        : (activeStage?.blurb ??
+                          'Your fields and wallet signature are recorded. Review them below; the creator locks when everyone has finished.')
+                      : step === 'done'
+                        ? 'Keep your file. Drop a copy below anytime to verify the fingerprint.'
+                        : step === 'verify' && verifyMatched
+                          ? verifyPartyView
+                            ? 'Your local file matches. Open the signed document and recorded ink below.'
+                            : 'Your local file matches a VeriLock record. Details below.'
+                          : inviteWaitingView
+                            ? 'Progress updates here as people sign. When everyone is done, you can print free or lock on the blockchain.'
+                            : inviteManageView
+                              ? 'Send each person a personal link (and the same document file separately — VeriLock never hosts it). When you are finished inviting, return to the waiting view.'
+                              : activeStage?.blurb}
                 </p>
               </div>
               {activeStage &&
@@ -3967,8 +3996,116 @@ export function DocumentJourney({
                       title={doc.title}
                       fingerprintPreview={doc.fingerprintPreview}
                     />
+                  ) : !doc.directSeal && allSigned(doc) && !doc.sealed && !creatorChoseLock ? (
+                    /* Free complete: print / done primary; lock is optional upgrade */
+                    <>
+                      <div className="done-banner">
+                        <Check size={18} strokeWidth={2.5} />
+                        <div>
+                          <strong>Everyone has signed — free complete.</strong>
+                          <p className="muted">
+                            Print a signed copy or keep this agreement in My agreements at no cost.
+                            Locking is optional: a permanent on-chain fingerprint proof costs 1 credit.
+                          </p>
+                        </div>
+                      </div>
+                      <PartyList doc={doc} revealNames={revealParticipantPrivate} />
+                      {doc.source.signatures.length > 0 && (
+                        <SignaturesPanel
+                          signatures={doc.source.signatures}
+                          parties={doc.source.parties}
+                          compact
+                          revealPrivate={revealParticipantPrivate}
+                          authToken={token}
+                          fingerprint={doc.fingerprint}
+                          documentId={doc.id}
+                        />
+                      )}
+                      <section
+                        className="journey-pdf-editor"
+                        aria-labelledby="free-complete-print-title"
+                      >
+                        <header className="signatures-config-head">
+                          <h3 id="free-complete-print-title">Print signed document</h3>
+                          <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
+                            Drop the same file you fingerprinted so signatures paint on the page,
+                            then print. The file never leaves this device.
+                          </p>
+                        </header>
+                        <DocumentStage
+                          step={step}
+                          doc={doc}
+                          file={signFile ?? (hasVerifiedLocalPdf ? pdfFile : null)}
+                          onFileChange={file => {
+                            setSignFile(file)
+                            setSignHash(null)
+                            if (!file) setLocalError(null)
+                          }}
+                          accepting={!hasVerifiedLocalPdf}
+                          localCopyRequired
+                          localCopyMatches={
+                            hasVerifiedLocalPdf
+                              ? true
+                              : !(signFile || pdfFile)
+                                ? null
+                                : signFileMatches ||
+                                  Boolean(pdfFile && pdfHash === doc.fingerprint)
+                          }
+                        />
+                        {signFile &&
+                          !hasVerifiedLocalPdf &&
+                          signHash &&
+                          signHash !== doc.fingerprint && (
+                            <div className="result-banner result-banner--bad">
+                              That file does not match this agreement fingerprint. Use{' '}
+                              <strong>{doc.fileName}</strong>.
+                            </div>
+                          )}
+                        {hasVerifiedLocalPdf && (signFile || pdfFile) && (
+                          <SignedDocumentView
+                            className="signed-document-view signed-document-view--primary"
+                            file={(signFile ?? pdfFile)!}
+                            fingerprint={doc.fingerprint}
+                            documentId={doc.id}
+                            authToken={token}
+                            revealPrivate={revealParticipantPrivate}
+                            documentAnnotations={doc.source.annotations}
+                            signatures={doc.source.signatures}
+                            parties={doc.source.parties}
+                          />
+                        )}
+                      </section>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-lg"
+                        onClick={() => setCreatorChoseLock(true)}
+                      >
+                        <Lock size={18} strokeWidth={2.25} />
+                        Lock permanently — 1 credit
+                      </button>
+                      <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
+                        Without a lock, VeriLock keeps the agreement record. The chain does not yet
+                        prove this fingerprint. Use <strong>Print</strong> above when your local
+                        file is matched.
+                      </p>
+                      <button type="button" className="btn btn-secondary" onClick={resetAll}>
+                        <Check size={15} strokeWidth={2.25} />
+                        Done — keep free
+                      </button>
+                    </>
                   ) : (
                     <>
+                      {!doc.directSeal && allSigned(doc) && !doc.sealed && creatorChoseLock && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => setCreatorChoseLock(false)}
+                          style={{ alignSelf: 'flex-start' }}
+                        >
+                          <ArrowLeft size={14} strokeWidth={2.25} />
+                          Back to free complete
+                        </button>
+                      )}
                       <DocumentStage
                         step={step}
                         doc={doc}

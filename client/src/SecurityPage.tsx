@@ -81,7 +81,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
         <h2>What wallets prove</h2>
         <p>
           Connecting a Nimiq wallet proves <strong>control of an address</strong> used as identity for
-          create, sign, and lock on the blockchain steps. The wallet does not receive your document bytes through VeriLock. Signing
+          create, sign, and optional lock-on-blockchain steps. The wallet does not receive your document bytes through VeriLock. Signing
           records intent from that address against the agreement fingerprint, not custody of the file on our
           servers.
         </p>
@@ -116,6 +116,19 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
           </a>{' '}
           — hash on your device and check a Nimiq lock transaction or certificate without uploading the
           file. Source and desktop builds (macOS, Windows, Linux) are on GitHub.
+        </p>
+      </section>
+
+      <section id="free-vs-lock" className="security-section">
+        <h2>Free signing vs on-chain lock</h2>
+        <p>
+          Multi-party signing is free: agreements, wallet signatures, and field layouts live as{' '}
+          <strong>metadata on VeriLock servers</strong> so you can invite, complete, print, and reopen from My
+          agreements. That free record is not a permanent public proof.
+        </p>
+        <p>
+          Locking spends <strong>1 credit</strong> to anchor only the document fingerprint on Nimiq. Optional
+          data backup writes signatures and field data on-chain so those details can outlive our servers.
         </p>
       </section>
 
@@ -166,11 +179,11 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
         <div className="security-footer-actions">
           {onCreate ? (
             <button type="button" className="security-btn security-btn--primary" onClick={onCreate}>
-              Create &amp; lock
+              Create &amp; sign free
             </button>
           ) : (
             <a className="security-btn security-btn--primary" href="/?intent=creator">
-              Create &amp; lock
+              Create &amp; sign free
             </a>
           )}
           {onVerify ? (
