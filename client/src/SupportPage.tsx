@@ -1,5 +1,5 @@
 /**
- * Support / contact — public form with layered bot protection
+ * Support / contact - public form with layered bot protection
  * (honeypot, min fill time, rate limit, optional Cloudflare Turnstile).
  */
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
@@ -75,7 +75,7 @@ export function SupportPage() {
   const [email, setEmail] = useState('')
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
-  /** Honeypot — must stay empty. */
+  /** Honeypot - must stay empty. */
   const [website, setWebsite] = useState('')
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null)
@@ -218,7 +218,7 @@ export function SupportPage() {
         <div className="support-success" role="status">
           <p className="support-success-title">Message sent</p>
           <p className="muted">
-            Thanks — we received your note. If a reply is needed, we&apos;ll use the email address you
+            Thanks - we received your note. If a reply is needed, we&apos;ll use the email address you
             provided.
           </p>
           <button
@@ -242,7 +242,7 @@ export function SupportPage() {
       <h2>Support</h2>
       <p className="muted support-lead">
         Questions about signing, sealing, verification, or billing? Send a message and we&apos;ll get back
-        to you. Your document never needs to leave your device for support — describe the issue in words; don&apos;t
+        to you. Your document never needs to leave your device for support - describe the issue in words; don&apos;t
         attach files here.
       </p>
 

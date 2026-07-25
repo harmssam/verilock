@@ -1,4 +1,4 @@
-# VeriLock — product context (Impeccable / redesign)
+# VeriLock - product context (Impeccable / redesign)
 
 ## Register
 
@@ -25,7 +25,7 @@ Fingerprint a document **on-device** (PDF or image), collect multi-party wallet 
 
 ## Positioning
 
-**Free multi-party sign (wallet identity + local fingerprint) + optional paid on-chain lock** — agreements without uploading files to VeriLock.
+**Free multi-party sign (wallet identity + local fingerprint) + optional paid on-chain lock** - agreements without uploading files to VeriLock.
 
 ### Freemium tiers (product language)
 
@@ -150,7 +150,7 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 | Feature | Notes |
 |---------|--------|
 | Hero status claims | Rotating trust / fee lines under CTAs |
-| Path: Create & sign | Role `creator` — free multi-party; optional lock |
+| Path: Create & sign | Role `creator` - free multi-party; optional lock |
 | Path: I was invited | Role `signer` |
 | Path: Verify a file | Role `verifier` |
 | How VeriLock works | Collapsible multi-beat story, role-aware |
@@ -159,22 +159,22 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 
 ### Creator path stages
 
-Wallet login (LoginSheet / Hub / Pay) is a **gate** when creating, signing, or sealing — not a numbered stage.
+Wallet login (LoginSheet / Hub / Pay) is a **gate** when creating, signing, or sealing - not a numbered stage.
 
-1. **Fingerprint** — Document drop/browse (PDF or image), local SHA-256, agreement type (rental/contract/nda/other), rental landlord/tenant, full name, optional email notify (flag), optional title, **direct seal** checkbox, required signer count 1–4, optional co-signer names, optional notes (type-dependent), create CTA (prompts login if needed)
-2. **Sign** — Creator signs first: signature progress, party list, cancel (creator), match document, signature pad / image, optional **Sign on mobile** (QR handoff), sign CTA
-3. **Share** — After creator signed: party list, ShareInviteCard (copy link / email package), wait for co-signers, cancel until first signature (if still allowed)
-4. **Seal / free complete** — After multi-party all signed: free complete (print primary, lock secondary upsell). Choosing lock (or direct seal) shows pricing, credits / NIM pay, credit seal progress.
-5. **Verify** — Re-drop document to confirm match after seal / done
+1. **Fingerprint** - Document drop/browse (PDF or image), local SHA-256, agreement type (rental/contract/nda/other), rental landlord/tenant, full name, optional email notify (flag), optional title, **direct seal** checkbox, required signer count 1–4, optional co-signer names, optional notes (type-dependent), create CTA (prompts login if needed)
+2. **Sign** - Creator signs first: signature progress, party list, cancel (creator), match document, signature pad / image, optional **Sign on mobile** (QR handoff), sign CTA
+3. **Share** - After creator signed: party list, ShareInviteCard (copy link / email package), wait for co-signers, cancel until first signature (if still allowed)
+4. **Seal / free complete** - After multi-party all signed: free complete (print primary, lock secondary upsell). Choosing lock (or direct seal) shows pricing, credits / NIM pay, credit seal progress.
+5. **Verify** - Re-drop document to confirm match after seal / done
 
 ### Signer path stages
 
-1. **Sign** — Drop document to lookup agreement **or** open `/d/:slug`; match fingerprint; login when ready to sign; name if needed; signature pad (or Sign on mobile); sign
-2. **Done** — Confirmation; seal is creator’s job
+1. **Sign** - Drop document to lookup agreement **or** open `/d/:slug`; match fingerprint; login when ready to sign; name if needed; signature pad (or Sign on mobile); sign
+2. **Done** - Confirmation; seal is creator’s job
 
 ### Verifier path stages
 
-1. **Verify** — Drop document, local hash, lookup matches, mismatch handling; **wallet optional** (skip login)
+1. **Verify** - Drop document, local hash, lookup matches, mismatch handling; **wallet optional** (skip login)
 
 ### Cross-cutting journey UI
 
@@ -188,7 +188,7 @@ Wallet login (LoginSheet / Hub / Pay) is a **gate** when creating, signing, or s
 | Role pill | Creating / signing / verifying as… |
 | Per-step privacy note | Dock header |
 | Signatures panel patterns | Party list, signed counts |
-| Sign on mobile | `SignOnMobileModal` + `/m/sign/:sessionId` (`FEATURES.signOnMobile`) — **vector strokes** E2E (+ optional PNG preview); wallet bind on desktop |
+| Sign on mobile | `SignOnMobileModal` + `/m/sign/:sessionId` (`FEATURES.signOnMobile`) - **vector strokes** E2E (+ optional PNG preview); wallet bind on desktop |
 | Delete/cancel agreement | When `canDeleteDocument` allows |
 | Credit seal progress | Non-blocking seal UX |
 | Hub return path + intent restore | `hubReturnPath`, `journeyIntent` |
@@ -205,7 +205,7 @@ Wallet login (LoginSheet / Hub / Pay) is a **gate** when creating, signing, or s
 ### Explicitly out of redesign scope (do not reintroduce as primary)
 
 - Archive UI under `client/src/archive/` (local-only gitignored snapshots)
-- Product blog (`client/src/blog/`, `/blog` routes, BlogPage) — local-only, not production
+- Product blog (`client/src/blog/`, `/blog` routes, BlogPage) - local-only, not production
 - New email product redesign beyond existing `FEATURES.emailNotifyUi` gate
 
 ---
@@ -224,11 +224,11 @@ Agreements open via header / AccountMenu → `/agreements` (no quiet home strip)
 
 ## Design principles (parity-safe)
 
-1. **Task first** — Path → rail → dock → stage; never bury the three intents.
-2. **Local file honesty** — UI must keep making “file never leaves device” obvious.
+1. **Task first** - Path → rail → dock → stage; never bury the three intents.
+2. **Local file honesty** - UI must keep making “file never leaves device” obvious.
 3. **One primary action** in the dock; secondary actions stay secondary.
-4. **Restrained product color** — accent for primary actions and state, not decoration soup.
-5. **Familiar controls** — selects, checkboxes, drop zones, and buttons stay recognizable.
+4. **Restrained product color** - accent for primary actions and state, not decoration soup.
+5. **Familiar controls** - selects, checkboxes, drop zones, and buttons stay recognizable.
 
 Expanded bans, token table, critique workflow, and pre-ship checklist: **`docs/journey-anti-slop.md`**.
 ## Conversion / proof (secondary; marketing slices only)

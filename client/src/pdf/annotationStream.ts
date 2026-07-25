@@ -16,7 +16,7 @@ export const FRAME_HEAD = 1
 export const FRAME_DATA = 2
 export const FRAME_END = 3
 
-/** Slim wire form — no PNG; path for signatures; geometry for marks/text. */
+/** Slim wire form - no PNG; path for signatures; geometry for marks/text. */
 export type StreamAnnotation =
   | {
       t: 's'

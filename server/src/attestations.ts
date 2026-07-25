@@ -28,13 +28,13 @@ import { getServiceWalletAddress } from './serviceWallet.js'
 const SKIP_CHAIN_VERIFY = process.env.SKIP_CHAIN_VERIFY === 'true'
 const POLL_INTERVAL_MS = 5_000
 const POLL_TIMEOUT_MS = 180_000
-/** Give Hub/client broadcasts more time — Albatross can lag public RPC briefly. */
+/** Give Hub/client broadcasts more time - Albatross can lag public RPC briefly. */
 const NOT_FOUND_FAIL_AFTER_MS = 90_000
 
 const TX_NOT_ON_CHAIN_MESSAGE_HUB =
   'Seal transaction was not found on the Nimiq blockchain. Tap Retry seal to sign again in Hub.'
 const TX_NOT_ON_CHAIN_MESSAGE_CREDIT =
-  'Credit seal proof was not found on the Nimiq blockchain yet. Tap Retry seal — your credit is returned if the proof never lands.'
+  'Credit seal proof was not found on the Nimiq blockchain yet. Tap Retry seal - your credit is returned if the proof never lands.'
 
 export type AttestationResult =
   | { status: 'confirmed'; txHash: string; blockNumber?: number; payload: string }

@@ -91,7 +91,7 @@ const names = new Set(finalDoc.parties.filter(p => p.status === 'signed').map(p 
 assert(names.has('Tenant A'), `expected Tenant A display name, got ${[...names].join(', ')}`)
 assert(names.has('Tenant B'), `expected Tenant B display name, got ${[...names].join(', ')}`)
 
-// No open slots left — third wallet must fail cleanly
+// No open slots left - third wallet must fail cleanly
 let thirdFailed = false
 try {
   addSignature({

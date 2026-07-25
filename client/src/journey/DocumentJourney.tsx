@@ -119,7 +119,7 @@ import type { UseJourneyWalletResult } from './useJourneyWallet'
 
 interface DocumentJourneyProps {
   wallet: UseJourneyWalletResult
-  /** Shell pushState navigation epoch — re-read /d/:slug deep links. */
+  /** Shell pushState navigation epoch - re-read /d/:slug deep links. */
   navEpoch?: number
   /** Per-route document meta for SEO (title, canonical, noindex). */
   onPageMeta?: (meta: PageMeta) => void
@@ -218,12 +218,12 @@ export function DocumentJourney({
   const [pageCount, setPageCount] = useState(1)
   // Form fields rehydrate from sessionStorage so Hub login remount keeps type/title/etc.
   const [title, setTitle] = useState(() => loadCreateFormCache()?.title ?? '')
-  /** Last title we auto-filled from a file name — used so a new file replaces it. */
+  /** Last title we auto-filled from a file name - used so a new file replaces it. */
   const autoTitleFromFileRef = useRef<string | null>(null)
   const [creatorName, setCreatorName] = useState(
     () => loadCreateFormCache()?.creatorName ?? '',
   )
-  /** Optional ready-to-seal email — collected only when FEATURES.emailNotifyUi is on. */
+  /** Optional ready-to-seal email - collected only when FEATURES.emailNotifyUi is on. */
   const [creatorNotifyEmail, setCreatorNotifyEmail] = useState(
     () => loadCreateFormCache()?.creatorNotifyEmail ?? '',
   )
@@ -238,7 +238,7 @@ export function DocumentJourney({
   )
   /** Optional display names for other parties (index 0 = first co-signer). */
   const [coSignerNames, setCoSignerNames] = useState<string[]>([''])
-  /** Client-only invite emails for co-signers — prefill Share .eml To; never uploaded with the PDF. */
+  /** Client-only invite emails for co-signers - prefill Share .eml To; never uploaded with the PDF. */
   const [coSignerEmails, setCoSignerEmails] = useState<string[]>([''])
   /** partyId → draft invite email (stable across reordering / signed filter). */
   const [partyInviteEmails, setPartyInviteEmails] = useState<Record<string, string>>({})
@@ -262,7 +262,7 @@ export function DocumentJourney({
   const [sigPadKey, setSigPadKey] = useState(0)
   const [signOnMobileOpen, setSignOnMobileOpen] = useState(false)
   const [mobileSigPreview, setMobileSigPreview] = useState<string | null>(null)
-  /** Construction placements (Arrange step) — empty slots until lock; then immutable. */
+  /** Construction placements (Arrange step) - empty slots until lock; then immutable. */
   const [constructionPlan, setConstructionPlan] = useState<ConstructionPlan | null>(null)
   /** idle → loading → ready (has plan) | none (404 / no plan). Avoids draft-seed race. */
   const [planLoadState, setPlanLoadState] = useState<'idle' | 'loading' | 'ready' | 'none'>('idle')
@@ -277,7 +277,7 @@ export function DocumentJourney({
   const [pickedPartyId, setPickedPartyId] = useState<string | null>(null)
   /** partyId → last invite send status for UI feedback */
   const [inviteSendBusyId, setInviteSendBusyId] = useState<string | null>(null)
-  /** Transient notes (link copied, share sheet, …) — not the durable email-sent badge. */
+  /** Transient notes (link copied, share sheet, …) - not the durable email-sent badge. */
   const [inviteSendNote, setInviteSendNote] = useState<Record<string, string>>({})
   /**
    * partyId → last successful invite email (session-persisted so the signers
@@ -288,7 +288,7 @@ export function DocumentJourney({
   >({})
   /**
    * Post-invite handoff help: email or copy-link.
-   * Stays open until the user dismisses (no auto-timeout — easy to miss).
+   * Stays open until the user dismisses (no auto-timeout - easy to miss).
    */
   const [inviteHandoff, setInviteHandoff] = useState<{
     key: number
@@ -348,7 +348,7 @@ export function DocumentJourney({
 
 
   // After Hub returns: restore role from ?intent= (or session on deep links).
-  // Never rewrite the URL here — sticky session + syncIntentToUrl caused ?intent=signer loops.
+  // Never rewrite the URL here - sticky session + syncIntentToUrl caused ?intent=signer loops.
   useEffect(() => {
     if (!bootReady) return
     const intent = resolveJourneyIntent()
@@ -447,7 +447,7 @@ export function DocumentJourney({
           saveJourneyIntent('creator')
           const { required } = document.signingProgress
           // Solo agreements re-open on share so co-signers can still be added.
-          // Do NOT auto-ack multi-party mid-invite — that hides the invite form
+          // Do NOT auto-ack multi-party mid-invite - that hides the invite form
           // behind the waiting view before any invites were sent. Waiting view
           // only after explicit “Done inviting”.
           // preferSeal / agreements “seal now” skips share intentionally.
@@ -455,7 +455,7 @@ export function DocumentJourney({
           // Lock-now from My agreements opens the paid seal panel; free complete otherwise.
           setCreatorChoseLock(preferSeal || required === 0)
         } else {
-          // /d/:slug is the invite path — land on signer flow (connect → sign), not verify.
+          // /d/:slug is the invite path - land on signer flow (connect → sign), not verify.
           // Unclaimed co-signers may not match canRevealParticipantDetails until they sign.
           if (sealed && address && !canRevealParticipantDetails(document, address)) {
             setRole(prev => (prev === 'creator' ? prev : 'verifier'))
@@ -529,11 +529,11 @@ export function DocumentJourney({
   const naturalStep = useMemo<JourneyStepId>(() => {
     if (!role) return 'welcome'
     if (role === 'verifier') return 'verify'
-    // Wallet login is a gate on actions — not a numbered rail step.
+    // Wallet login is a gate on actions - not a numbered rail step.
     if (role === 'signer') {
       if (!doc) return 'sign'
       // After this wallet has signed (or everyone has), show the short "done" step.
-      // Never route invitees to seal — only the document creator seals.
+      // Never route invitees to seal - only the document creator seals.
       if (doc.sealed || walletHasSignedJourneyDoc(doc, address)) return 'done'
       return 'sign'
     }
@@ -624,7 +624,7 @@ export function DocumentJourney({
       const hi = order.indexOf(hold)
       const ni = order.indexOf(natural)
       if (hi < 0 || ni < 0 || hi > ni) return false
-      // Fingerprint is finished once the agreement exists — use cancel to start over.
+      // Fingerprint is finished once the agreement exists - use cancel to start over.
       if (hold === 'fingerprint') return false
       // After the first signature, earlier steps are view-only via natural flow only.
       if (signedCount(doc) > 0 && hold !== natural) return false
@@ -639,7 +639,7 @@ export function DocumentJourney({
   }, [stepHold, naturalStep, canHoldStep])
 
   /**
-   * Anchor for “where do I act next?” — stage rail + action dock.
+   * Anchor for “where do I act next?” - stage rail + action dock.
    * Sticky shell header uses scroll-margin-top so the title isn’t hidden under the nav.
    */
   const stepFocusRef = useRef<HTMLDivElement>(null)
@@ -676,7 +676,7 @@ export function DocumentJourney({
       scrollRafRef.current = requestAnimationFrame(() => {
         scrollRafRef.current = null
         run()
-        // Late layout (PDF stage / placement editor unmount) — nudge once more.
+        // Late layout (PDF stage / placement editor unmount) - nudge once more.
         scrollTimerRef.current = setTimeout(() => {
           scrollTimerRef.current = null
           run()
@@ -715,7 +715,7 @@ export function DocumentJourney({
       } else if (canHoldStep(id, naturalStep)) {
         setStepHold(id)
       }
-      // Rail click: step may already match hold/natural — force scroll anyway.
+      // Rail click: step may already match hold/natural - force scroll anyway.
       scrollToJourneyAction('smooth')
     },
     [naturalStep, canHoldStep, scrollToJourneyAction],
@@ -859,14 +859,14 @@ export function DocumentJourney({
 
   const stepIndex = activeStage ? pathStages.findIndex(s => s.id === activeStage.id) : -1
 
-  /** Creator opted out of signing — only blocks *this* wallet, never invitees. */
+  /** Creator opted out of signing - only blocks *this* wallet, never invitees. */
   const creatorIsOrganizerOnly =
     FEATURES.pdfAnnotationUi &&
     constructionPlan?.status === 'locked' &&
     (constructionPlan.creatorSigningAs == null || constructionPlan.creatorSigningAs === 0) &&
     Boolean(doc && address && isDocumentCreator(doc.source, address))
 
-  /** Creator chose a party and still needs to sign — Arrange should not force invite UI. */
+  /** Creator chose a party and still needs to sign - Arrange should not force invite UI. */
   const creatorStillNeedsToSign = Boolean(
     doc &&
       address &&
@@ -895,7 +895,7 @@ export function DocumentJourney({
 
   /**
    * Creator is past their own signature (or organizer-only) and the dock is in
-   * the invite / waiting UI on Sign or Arrange — used to de-clutter chrome.
+   * the invite / waiting UI on Sign or Arrange - used to de-clutter chrome.
    */
   const creatorInviteDock =
     Boolean(doc && showInvitePhase && role === 'creator' && (step === 'share' || step === 'sign'))
@@ -1095,7 +1095,7 @@ export function DocumentJourney({
       }
       return
     }
-    // Already verified for this file + agreement — skip re-hash churn.
+    // Already verified for this file + agreement - skip re-hash churn.
     if (signHash === doc.fingerprint && pdfHash === doc.fingerprint && signFile === pdfFile) {
       return
     }
@@ -1381,7 +1381,7 @@ export function DocumentJourney({
     setBusy(true)
     setLocalError(null)
     try {
-      // Fingerprint only — parties / who signs are set when placements lock.
+      // Fingerprint only - parties / who signs are set when placements lock.
       const metadata =
         documentTypeUsesNotes(docType) && docNotes.trim()
           ? { notes: clampField(docNotes.trim(), MAX_DOCUMENT_NOTES_LENGTH) }
@@ -1392,7 +1392,7 @@ export function DocumentJourney({
         originalFileName: pdfFile.name,
         type: docType,
         creatorRole: 'creator',
-        // Optional organizer label only — not assumed to be Person 1 / a signer.
+        // Optional organizer label only - not assumed to be Person 1 / a signer.
         creatorDisplayName: clampField(
           creatorName.trim() || 'Organizer',
           MAX_DISPLAY_NAME_LENGTH,
@@ -1412,7 +1412,7 @@ export function DocumentJourney({
       setPageFieldsConfirmed(false)
       window.history.pushState({}, '', `/d/${document.slug}`)
       void clearCreatePdfDraftState()
-      // Step advances to Arrange — bring the next actions into view.
+      // Step advances to Arrange - bring the next actions into view.
       scrollToJourneyAction('auto')
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Create failed')
@@ -1441,12 +1441,12 @@ export function DocumentJourney({
       await navigator.clipboard.writeText(text)
       if (notePartyId) {
         setInviteSendNote(prev => ({ ...prev, [notePartyId]: 'Link copied' }))
-        // Same file-handoff reminder as after invite email — user must act on it.
+        // Same file-handoff reminder as after invite email - user must act on it.
         showInviteHandoffHelp(contactLabel?.trim() || 'your co-signer', 'link')
       }
       return true
     } catch {
-      setLocalError('Could not copy — select the link and copy it manually.')
+      setLocalError('Could not copy - select the link and copy it manually.')
       return false
     }
   }
@@ -1588,7 +1588,7 @@ export function DocumentJourney({
 
   /**
    * Seed a draft plan only after we know the server has none (create / arrange path).
-   * Never overwrite while loading — that forced invitees into “unlocked arrange” flash.
+   * Never overwrite while loading - that forced invitees into “unlocked arrange” flash.
    */
   useEffect(() => {
     if (!FEATURES.pdfAnnotationUi || !doc) return
@@ -1851,7 +1851,7 @@ export function DocumentJourney({
 
         const planRoot = constructionPlan.planRoot
         let lastErr: Error | null = null
-        // Concurrent signers may race on prevRoot — refresh tip and retry.
+        // Concurrent signers may race on prevRoot - refresh tip and retry.
         for (let attempt = 0; attempt < 4; attempt++) {
           try {
             let known = knownBlobIds
@@ -1942,7 +1942,7 @@ export function DocumentJourney({
     if (!token || !doc || !constructionPlan) return
     const hash = (pdfHash || signHash || doc.fingerprint || constructionPlan.pdfSha256).toLowerCase()
     if (!/^[a-f0-9]{64}$/.test(hash)) {
-      setLocalError('Document fingerprint missing — re-open the file.')
+      setLocalError('Document fingerprint missing - re-open the file.')
       return
     }
     if (constructionPlan.slots.length === 0) {
@@ -2025,7 +2025,7 @@ export function DocumentJourney({
         `Layout saved · ${saved.slotCount} boxes · ${asLabel} · root ${shortHash(saved.planRoot ?? planRoot)}`,
       )
       setStepHold(null)
-      // Step advances to Sign / Invite — scroll to the dock (user was mid-PDF).
+      // Step advances to Sign / Invite - scroll to the dock (user was mid-PDF).
       scrollToJourneyAction('auto')
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Could not save placements')
@@ -2052,7 +2052,7 @@ export function DocumentJourney({
     }
     const hash = (pdfHash || signHash || doc.fingerprint || constructionPlan.pdfSha256).toLowerCase()
     if (!/^[a-f0-9]{64}$/.test(hash)) {
-      setLocalError('Document fingerprint missing — re-open the file.')
+      setLocalError('Document fingerprint missing - re-open the file.')
       return
     }
     setPlacementLockBusy(true)
@@ -2093,7 +2093,7 @@ export function DocumentJourney({
       setPageFieldsConfirmed(false)
       setSharedAck(false)
       setStepHold(null)
-      setPlacementStatus('Placements re-opened — adjust fields, then continue.')
+      setPlacementStatus('Placements re-opened - adjust fields, then continue.')
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Could not re-open placements')
     } finally {
@@ -2102,7 +2102,7 @@ export function DocumentJourney({
   }, [token, doc, constructionPlan, pdfHash, signHash])
 
   /**
-   * Creator finished inviting — switch to the quiet waiting view (not a second
+   * Creator finished inviting - switch to the quiet waiting view (not a second
    * party list). Explicit so we never hide the invite form before invites go out.
    */
   const acknowledgeShare = useCallback(() => {
@@ -2119,7 +2119,7 @@ export function DocumentJourney({
 
   /**
    * Persist cosigner count + optional names from the share-step Signatures UI.
-   * Called automatically when party count changes or names blur — no Save button.
+   * Called automatically when party count changes or names blur - no Save button.
    * Ready-to-lock notify email is saved separately (see saveNotifyEmail) so it can
    * show explicit “Saved” feedback without the full cosigner busy state.
    */
@@ -2178,7 +2178,7 @@ export function DocumentJourney({
         notifyEmailFlashTimerRef.current = null
         setNotifyEmailFlashSaved(false)
       }, 4000)
-      // Stay on the invite form — waiting view is explicit via “Done inviting”.
+      // Stay on the invite form - waiting view is explicit via “Done inviting”.
     } catch (err) {
       setNotifyEmailError(
         err instanceof Error ? err.message : 'Could not save notification email',
@@ -2243,7 +2243,7 @@ export function DocumentJourney({
     if (!token || !address || !doc) return
     if (!doc.directSeal && !allSigned(doc)) {
       setLocalError(
-        `${signedCount(doc)} of ${requiredCount(doc)} signatures collected — remaining signers must sign before locking on the blockchain.`,
+        `${signedCount(doc)} of ${requiredCount(doc)} signatures collected - remaining signers must sign before locking on the blockchain.`,
       )
       return
     }
@@ -2279,13 +2279,13 @@ export function DocumentJourney({
     if (!token || !doc) return
     if (!doc.directSeal && !allSigned(doc)) {
       setLocalError(
-        `${signedCount(doc)} of ${requiredCount(doc)} signatures collected — remaining signers must sign before locking on the blockchain.`,
+        `${signedCount(doc)} of ${requiredCount(doc)} signatures collected - remaining signers must sign before locking on the blockchain.`,
       )
       return
     }
     setBusy(true)
     setLocalError(null)
-    setLockMessage('Reserving 1 credit — you can leave this page anytime…')
+    setLockMessage('Reserving 1 credit - you can leave this page anytime…')
     const result = await sealJourneyDocumentWithCredit({
       token,
       doc: doc.source,
@@ -2321,7 +2321,7 @@ export function DocumentJourney({
       syncIntentToUrl(role)
     }
     saveHubReturnPath()
-    // Hub redirect remounts the SPA — commit PDF draft before navigate.
+    // Hub redirect remounts the SPA - commit PDF draft before navigate.
     void (async () => {
       if (pdfFile && !doc) await flushCreatePdfDraft()
       await connect(options !== undefined ? options : journeyConnectOptions(connectMode))
@@ -2561,17 +2561,17 @@ export function DocumentJourney({
                   allSigned(doc) &&
                   !doc.sealed &&
                   !creatorChoseLock
-                    ? 'Everyone signed — print free or lock'
+                    ? 'Everyone signed - print free or lock'
                     : step === 'done' && role === 'signer'
                       ? doc?.sealed
-                        ? 'Agreement sealed — your part is done'
+                        ? 'Agreement sealed - your part is done'
                         : (activeStage?.verb ?? 'Your signature is recorded')
                       : step === 'done'
                         ? 'Agreement sealed'
                         : step === 'verify' && verifyMatched
                           ? verifyOutcome.kind === 'match' &&
                             verifyOutcome.matches.some(m => m.status === 'locked')
-                            ? 'Match confirmed — locked on Nimiq'
+                            ? 'Match confirmed - locked on Nimiq'
                             : 'Fingerprint matches'
                           : inviteWaitingView
                             ? 'Waiting for co-signers'
@@ -2601,7 +2601,7 @@ export function DocumentJourney({
                           : inviteWaitingView
                             ? 'Progress updates here as people sign. When everyone is done, you can print free or lock on the blockchain.'
                             : inviteManageView
-                              ? 'Send each person a personal link (and the same document file separately — VeriLock never hosts it). When you are finished inviting, return to the waiting view.'
+                              ? 'Send each person a personal link (and the same document file separately - VeriLock never hosts it). When you are finished inviting, return to the waiting view.'
                               : activeStage?.blurb}
                 </p>
               </div>
@@ -2622,11 +2622,11 @@ export function DocumentJourney({
                 {displayError}
               </div>
             )}
-            {/* Invite dock already explains post-sign state — hide lock flash clutter. */}
+            {/* Invite dock already explains post-sign state - hide lock flash clutter. */}
             {lockMessage &&
               !displayError &&
               !(step === 'seal' && busy && creditBalance >= 1) &&
-              // Free-complete dock already states print/lock options — hide lock-first flash.
+              // Free-complete dock already states print/lock options - hide lock-first flash.
               !(
                 step === 'seal' &&
                 doc &&
@@ -2675,7 +2675,7 @@ export function DocumentJourney({
                     ) : (
                       <>
                         <strong>Drop a document</strong> or <strong>Browse files</strong>. The file
-                        is opened in your browser only — never sent to VeriLock servers.
+                        is opened in your browser only - never sent to VeriLock servers.
                       </>
                     )}
                   </p>
@@ -2703,9 +2703,9 @@ export function DocumentJourney({
                       maxLength={MAX_TITLE_LENGTH}
                       placeholder={
                         docType === 'rental'
-                          ? '123 Main St — 12-month lease'
+                          ? '123 Main St - 12-month lease'
                           : docType === 'nda'
-                            ? 'Project Falcon — mutual NDA'
+                            ? 'Project Falcon - mutual NDA'
                             : docType === 'contract'
                               ? 'Vendor services agreement'
                               : 'Agreement title'
@@ -2820,7 +2820,7 @@ export function DocumentJourney({
                         </h3>
                         {constructionPlan.status !== 'locked' ? (
                           <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-                            Layout design only — place empty signature, initial, and name boxes for each
+                            Layout design only - place empty signature, initial, and name boxes for each
                             person. You are not signing yet; that happens in the next step.
                           </p>
                         ) : (
@@ -2870,7 +2870,7 @@ export function DocumentJourney({
                             )}
                           </button>
                           <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                            Saves the field layout and moves on — still no signatures collected
+                            Saves the field layout and moves on - still no signatures collected
                             here. You can come back to edit until someone signs.
                           </p>
                         </div>
@@ -3053,7 +3053,7 @@ export function DocumentJourney({
                           {role === 'creator'
                             ? requiredCount(doc) <= 1
                               ? 'Signature complete. Print free, or lock for 1 credit'
-                              : 'Everyone signed — free complete. Print or lock when ready'
+                              : 'Everyone signed - free complete. Print or lock when ready'
                             : 'Thanks, your part is complete. The creator can print free or lock on the blockchain.'}
                         </div>
                       ) : (
@@ -3137,7 +3137,7 @@ export function DocumentJourney({
                               </section>
                             )}
 
-                          {/* Creator invite/wait dock already shows party status — skip duplicate banner. */}
+                          {/* Creator invite/wait dock already shows party status - skip duplicate banner. */}
                           {account &&
                             signingResolution &&
                             !signingResolution.ok &&
@@ -3356,7 +3356,7 @@ export function DocumentJourney({
                                   )}
                                   {sigBlob && pageFieldsDone && pageFieldsRequired && !mobileSigPreview && (
                                     <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                                      Using the signature you drew on the document — no need to draw
+                                      Using the signature you drew on the document - no need to draw
                                       again.
                                     </p>
                                   )}
@@ -3431,7 +3431,7 @@ export function DocumentJourney({
                                     {isMultiParty
                                       ? role === 'creator'
                                         ? 'Records your signature, then invite co-signers to complete their fields on the same document.'
-                                        : 'Records you as this party on the agreement. You are already signed in — this does not open a new wallet login.'
+                                        : 'Records you as this party on the agreement. You are already signed in - this does not open a new wallet login.'
                                       : 'Records you as the signer. Next you can seal on Nimiq.'}
                                   </p>
                                 </>
@@ -3451,7 +3451,7 @@ export function DocumentJourney({
               {/* Invite co-signers: Arrange (organizer-only) or Sign (after creator signed). */}
               {doc && showInvitePhase && role === 'creator' && (step === 'share' || step === 'sign') && (
                 <div className="action-stack">
-                  {/* Waiting room — party progress lives once above (Sign) or here (Arrange-only). */}
+                  {/* Waiting room - party progress lives once above (Sign) or here (Arrange-only). */}
                   {sharedAck &&
                   (requiredCount(doc) > 1 || inviteeSlotCount > 0) &&
                   !allSigned(doc) ? (
@@ -3469,12 +3469,12 @@ export function DocumentJourney({
                         </p>
                       ) : (
                         <p className="invite-waiting-notify invite-waiting-notify--muted">
-                          Live updates as people sign — leave the tab open or come back later.
+                          Live updates as people sign - leave the tab open or come back later.
                           When everyone has signed, continue to lock on the blockchain.
                         </p>
                       )}
 
-                      {/* Arrange step has no Sign party block above — show roster here only. */}
+                      {/* Arrange step has no Sign party block above - show roster here only. */}
                       {step === 'share' ? (
                         <>
                           <div className="progress-bar-wrap">
@@ -3520,7 +3520,7 @@ export function DocumentJourney({
                         ) : null}
                       </div>
                       <p className="muted invite-waiting-foot">
-                        Need to resend a link? Use <strong>Manage invites</strong> (same step —
+                        Need to resend a link? Use <strong>Manage invites</strong> (same step -
                         only this panel changes). Co-signers need the link <em>and</em> the same
                         document file.
                       </p>
@@ -3576,7 +3576,7 @@ export function DocumentJourney({
                     {role === 'creator' && !doc.sealed && (
                       <div className="signatures-config-form">
                         {/**
-                         * Roster count is set on Arrange (placement lock) — do not re-ask here.
+                         * Roster count is set on Arrange (placement lock) - do not re-ask here.
                          * Only allow changing count before anyone has signed and before the plan
                          * is locked (legacy / edge cases without a frozen layout).
                          */}
@@ -3625,7 +3625,7 @@ export function DocumentJourney({
                                 .map(n => (
                                   <option key={n} value={n}>
                                     {n === 1
-                                      ? '1 signature (you only — no co-signers)'
+                                      ? '1 signature (you only - no co-signers)'
                                       : `${n} signatures (you + ${n - 1} other${n - 1 === 1 ? '' : 's'})`}
                                   </option>
                                 ))}
@@ -3635,7 +3635,7 @@ export function DocumentJourney({
 
                         {/*
                           One card per person who still needs to sign: email + Send email +
-                          Copy invite link. Not gated on construction-plan lock — that old
+                          Copy invite link. Not gated on construction-plan lock - that old
                           gate left a dead “Invite detail / Mail app only” form after Arrange.
                         */}
                         {doc.parties.filter(p => p.required && !p.signed).length > 0 && (
@@ -3643,7 +3643,7 @@ export function DocumentJourney({
                             <span className="field-label">Invite each person</span>
                             <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
                               Enter their email and send, or copy their personal invite link.
-                              Hand off the same document file separately — VeriLock never hosts it.
+                              Hand off the same document file separately - VeriLock never hosts it.
                             </p>
                             {doc.parties
                               .filter(p => p.required && !p.signed)
@@ -3945,7 +3945,7 @@ export function DocumentJourney({
                             notifyEmailSavedValue.trim() !== '' ? (
                               <p className="notify-email-saved" role="status">
                                 <Check size={14} strokeWidth={2.5} aria-hidden />
-                                Saved — we&apos;ll email{' '}
+                                Saved - we&apos;ll email{' '}
                                 <strong>{notifyEmailSavedValue}</strong> when everyone has signed.
                               </p>
                             ) : null}
@@ -3984,10 +3984,10 @@ export function DocumentJourney({
                         >
                           {inviteWaitingVisited
                             ? 'Return to waiting view'
-                            : 'Done inviting — show waiting view'}
+                            : 'Done inviting - show waiting view'}
                         </button>
                         <p className="muted invite-setup-finish-note">
-                          This does not send invites for you — use the cards above first. The
+                          This does not send invites for you - use the cards above first. The
                           waiting view is a quieter screen you can leave open (or leave and
                           return later) while co-signers finish.
                         </p>
@@ -4012,7 +4012,7 @@ export function DocumentJourney({
                       <div className="done-banner">
                         <Check size={18} strokeWidth={2.5} />
                         <div>
-                          <strong>Everyone has signed — free complete.</strong>
+                          <strong>Everyone has signed - free complete.</strong>
                           <p className="muted">
                             Print a signed copy or keep this agreement in My agreements at no cost.
                             Locking is optional: a permanent on-chain fingerprint proof costs 1 credit.
@@ -4100,7 +4100,7 @@ export function DocumentJourney({
                       </p>
                       <button type="button" className="btn btn-ghost" onClick={resetAll}>
                         <Check size={15} strokeWidth={2.25} />
-                        Done — keep free
+                        Done - keep free
                       </button>
                     </>
                   ) : (
@@ -4151,7 +4151,7 @@ export function DocumentJourney({
                               ? requiredCount(doc) <= 1
                                 ? 'Signature complete.'
                                 : `All ${requiredCount(doc)} signatures collected.`
-                              : `${signedCount(doc)} of ${requiredCount(doc)} signatures collected — waiting on remaining signers.`}
+                              : `${signedCount(doc)} of ${requiredCount(doc)} signatures collected - waiting on remaining signers.`}
                         </p>
                       </div>
                       {creditBalance < 1 && (
@@ -4203,7 +4203,7 @@ export function DocumentJourney({
                           {!inNimiqPay && !nimiq && (
                             <p className="muted journey-seal-hint" style={{ margin: 0 }}>
                               {isMobileDevice()
-                                ? 'Locking works best inside Nimiq Pay. In the browser, this lock uses Nimiq Hub — keep VeriLock open until you return and the on-chain proof is confirmed.'
+                                ? 'Locking works best inside Nimiq Pay. In the browser, this lock uses Nimiq Hub - keep VeriLock open until you return and the on-chain proof is confirmed.'
                                 : 'Locking redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the on-chain proof is confirmed. Or buy credits with card (or NIM at half the card rate) above to lock without another wallet payment.'}
                             </p>
                           )}
@@ -4216,7 +4216,7 @@ export function DocumentJourney({
 
               {(step === 'verify' || step === 'done') && (
                 <div className="action-stack">
-                  {/* Co-signer revisit: show parties, ink, and optional local PDF layout — not a dead-end "verify" screen. */}
+                  {/* Co-signer revisit: show parties, ink, and optional local PDF layout - not a dead-end "verify" screen. */}
                   {step === 'done' && doc && role === 'signer' && (
                     <>
                       <div className="done-banner">
@@ -4228,7 +4228,7 @@ export function DocumentJourney({
                         <div>
                           <strong>
                             {doc.sealed
-                              ? 'Locked on-chain — you already signed.'
+                              ? 'Locked on-chain - you already signed.'
                               : 'Thanks, you are done signing.'}
                           </strong>
                           <p className="muted">
@@ -4297,7 +4297,7 @@ export function DocumentJourney({
                             <h3 id="signer-review-layout-title">Signed document</h3>
                             <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
                               Drop the same file you signed to see signatures, initials, and text
-                              fields on the page. Read only — the file never leaves this device.
+                              fields on the page. Read only - the file never leaves this device.
                             </p>
                           </header>
                           <DocumentStage
@@ -4534,7 +4534,7 @@ export function DocumentJourney({
                           verifyOutcome.explorerUrl ||
                           lockedMatch?.attestation?.explorerUrl ||
                           null
-                        // Header already says match confirmed — keep this banner tight.
+                        // Header already says match confirmed - keep this banner tight.
                         return (
                           <div
                             className={`result-banner result-banner--ok${
@@ -4593,7 +4593,7 @@ export function DocumentJourney({
                         token &&
                         (() => {
                           const planHash = verifyPartyMatch.originalSha256
-                          // Same agreement only by id/slug — never fingerprint (PDF reuse).
+                          // Same agreement only by id/slug - never fingerprint (PDF reuse).
                           const sameDoc =
                             doc &&
                             (doc.id === verifyPartyMatch.id ||
@@ -4629,7 +4629,7 @@ export function DocumentJourney({
                           verifyOutcome.matches[0] ??
                           null
                         if (!primary || primary.signatures.length === 0) return null
-                        // Same agreement only by id/slug — never fingerprint (PDF reuse).
+                        // Same agreement only by id/slug - never fingerprint (PDF reuse).
                         const sameDoc =
                           doc &&
                           (doc.id === primary.id || doc.slug === primary.slug)
@@ -4770,7 +4770,7 @@ export function DocumentJourney({
 
       {/*
         Portal to body: .lr-view-blend uses transform, which traps position:fixed.
-        No auto-dismiss — stays until Got it (easy to miss when it vanished after ~10s).
+        No auto-dismiss - stays until Got it (easy to miss when it vanished after ~10s).
       */}
       {inviteHandoff &&
         typeof document !== 'undefined' &&
@@ -4807,8 +4807,8 @@ export function DocumentJourney({
               </header>
               <h3 id="invite-handoff-title" className="invite-handoff-modal-title">
                 {inviteHandoff.mode === 'email'
-                  ? 'Email sent — file not attached'
-                  : 'Link copied — send the file too'}
+                  ? 'Email sent - file not attached'
+                  : 'Link copied - send the file too'}
               </h3>
               <p className="invite-handoff-modal-body">
                 {inviteHandoff.mode === 'email' ? (
@@ -4827,7 +4827,7 @@ export function DocumentJourney({
               </p>
               <p className="invite-handoff-modal-body invite-handoff-modal-body--emphasis">
                 You still need to send the agreement file to the remaining parties so they can
-                open it and sign. Co-signers must use that exact file — the fingerprint has to
+                open it and sign. Co-signers must use that exact file - the fingerprint has to
                 match.
               </p>
               <div className="invite-handoff-modal-actions">

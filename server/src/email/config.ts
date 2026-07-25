@@ -10,7 +10,7 @@ export function isResendConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY?.trim())
 }
 
-/** Master switch — leave false until the Resend sending domain is verified. */
+/** Master switch - leave false until the Resend sending domain is verified. */
 export function isResendSendEnabled(): boolean {
   return isResendConfigured() && truthy(process.env.RESEND_ENABLED)
 }

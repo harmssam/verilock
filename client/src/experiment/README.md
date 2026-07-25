@@ -27,7 +27,7 @@ Mounted in the production shell (noindex):
 | URL | UI |
 |-----|-----|
 | `/pdf` | Annotate PDF + create/verify |
-| `/pdf/lab` | **Signature encoding lab** — draw, RDP simplify, compare PNG vs path sizes / ~Nimiq frames |
+| `/pdf/lab` | **Signature encoding lab** - draw, RDP simplify, compare PNG vs path sizes / ~Nimiq frames |
 
 ```text
 http://localhost:5176/pdf
@@ -36,7 +36,7 @@ http://localhost:5176/pdf/lab
 
 ## Server
 
-- `documents.annotations` TEXT column (nullable JSON) — legacy docs stay `NULL`.
+- `documents.annotations` TEXT column (nullable JSON) - legacy docs stay `NULL`.
 - `publicDocument()` returns `annotations`.
 - Create route rejects accidental PDF byte fields.
 - Annotation streams (`POST /api/annotation-streams`): owner-scoped, max 32 frames, optional on-chain broadcast (`ANNOTATION_STREAM_BROADCAST` + service wallet).

@@ -1,24 +1,24 @@
 # VeriLock
 
-PDF signer mini app for [Nimiq Pay](https://nimiq.com/nimiq-pay/) — sign agreements and anchor document SHA-256 hashes on the Nimiq blockchain.
+PDF signer mini app for [Nimiq Pay](https://nimiq.com/nimiq-pay/) - sign agreements and anchor document SHA-256 hashes on the Nimiq blockchain.
 
 Built for the [Mini Apps Competition](https://miniappscompetition.com/).
 
 **Live demo:** [https://verilock.online/](https://verilock.online/) (Railway)
 
-**Offline verifier (open source):** [clevertech-os/verilock-offline](https://github.com/clevertech-os/verilock-offline) — hash and re-check seals on your device (web + macOS / Windows / Linux desktop) without using this site. Companion repo; product create/sign/seal stays here.
+**Offline verifier (open source):** [clevertech-os/verilock-offline](https://github.com/clevertech-os/verilock-offline) - hash and re-check seals on your device (web + macOS / Windows / Linux desktop) without using this site. Companion repo; product create/sign/seal stays here.
 
-> **UI source of truth:** production SPA — `client/src/App.tsx` (shell) + `client/src/landing/` + `client/src/journey/`  
+> **UI source of truth:** production SPA - `client/src/App.tsx` (shell) + `client/src/landing/` + `client/src/journey/`  
 > (default `npm run dev` / `npm run build`). Historical UIs live only under `client/src/archive/`. See **`AGENTS.md`**.
 
 ## What it does
 
-1. **Fingerprint** a PDF locally (rental agreement, contract, etc.) — the file never leaves your device
+1. **Fingerprint** a PDF locally (rental agreement, contract, etc.) - the file never leaves your device
 2. **(Optional)** Share the agreement link and send the same PDF to other signers out-of-band
-3. **Sign** (optional) — each party verifies their PDF matches, then signs via Nimiq wallet
-4. **Direct seal option** — for already-signed PDFs or docs that need no signatures: just fingerprint and seal the hash yourself in one step
-5. **Lock** — Nimiq transaction anchors `seal:v1:lock:{docId}:{sha256}` on-chain (creator attests)
-6. **Verify** — anyone can upload a PDF or enter a doc ID to check integrity
+3. **Sign** (optional) - each party verifies their PDF matches, then signs via Nimiq wallet
+4. **Direct seal option** - for already-signed PDFs or docs that need no signatures: just fingerprint and seal the hash yourself in one step
+5. **Lock** - Nimiq transaction anchors `seal:v1:lock:{docId}:{sha256}` on-chain (creator attests)
+6. **Verify** - anyone can upload a PDF or enter a doc ID to check integrity
 
 ## Quick start (local)
 
@@ -44,7 +44,7 @@ SKIP_CHAIN_VERIFY=true npm run dev
 
 ## Deploy to Railway
 
-VeriLock deploys as a **single service**: Express API + static client from one URL (ideal for mini apps — no CORS headaches).
+VeriLock deploys as a **single service**: Express API + static client from one URL (ideal for mini apps - no CORS headaches).
 
 ### 1. Create project
 
@@ -61,7 +61,7 @@ In the Railway dashboard:
 2. Mount path: `/data`
 3. Set environment variable: `DATA_DIR=/data`
 
-This keeps SQLite (`verilock.db`) across deploys. PDF files are not stored — only document fingerprints and signing metadata.
+This keeps SQLite (`verilock.db`) across deploys. PDF files are not stored - only document fingerprints and signing metadata.
 
 ### 3. Environment variables
 
@@ -138,7 +138,7 @@ nimiqpay://miniapp?url=https://your-app.up.railway.app
 seal:v1:lock:{docId8}:{finalSha256}
 ```
 
-Self-send transaction (`recipient = sender`, `value = 0`) — the locking wallet is the on-chain attestor.
+Self-send transaction (`recipient = sender`, `value = 0`) - the locking wallet is the on-chain attestor.
 
 ## API endpoints
 
@@ -162,5 +162,5 @@ Self-send transaction (`recipient = sender`, `value = 0`) — the locking wallet
 - [x] NIM wallet interaction (`sign`, `sendBasicTransactionWithData`)
 - [x] Railway deploy config (volume, health check, monolith)
 - [x] Public GitHub repo with OSS license (MIT)
-- [x] Live HTTPS demo on Railway — [https://verilock.online/](https://verilock.online/)
-- [x] Nimiq wallet for prize payout — `NQ81 5N9J RGBJ MLJQ NBKE MQ1R D27T XS8P CVKA`
+- [x] Live HTTPS demo on Railway - [https://verilock.online/](https://verilock.online/)
+- [x] Nimiq wallet for prize payout - `NQ81 5N9J RGBJ MLJQ NBKE MQ1R D27T XS8P CVKA`

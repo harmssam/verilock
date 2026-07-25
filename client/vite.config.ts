@@ -5,7 +5,7 @@ import type { Connect, Plugin } from 'vite'
 import { defineConfig } from 'vite'
 
 /**
- * Production SPA — light shell + journey product flow as the sole root.
+ * Production SPA - light shell + journey product flow as the sole root.
  *
  * Build (default):
  *   npm run build --prefix client

@@ -21,7 +21,7 @@ export function useRevealDocumentOnAuth(
 
   useEffect(() => {
     if (!doc || !token) return
-    // Already unlocked for this viewer — nothing to do.
+    // Already unlocked for this viewer - nothing to do.
     if (doc.source.participantDetailsRevealed === true) return
 
     let cancelled = false

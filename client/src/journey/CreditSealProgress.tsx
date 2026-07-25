@@ -40,7 +40,7 @@ const PHASE_META: Record<
 }
 
 const WAIT_TIPS = [
-  'Your file never leaves this device — only the fingerprint is locked on the blockchain.',
+  'Your file never leaves this device - only the fingerprint is locked on the blockchain.',
   'Closing this tab is fine. The server keeps working until the lock confirms.',
   'Come back anytime: open this agreement to see when it is locked.',
   'One credit = one permanent on-chain lock. No NIM wallet prompt needed.',
@@ -139,9 +139,9 @@ export function CreditSealProgress({
   const statusLine = useMemo(() => {
     if (message?.trim()) return message.trim()
     if (phase === 'done') return 'Locked on Nimiq.'
-    if (phase === 'confirm') return 'Confirming on Nimiq — safe to close this tab…'
+    if (phase === 'confirm') return 'Confirming on Nimiq - safe to close this tab…'
     if (phase === 'broadcast') return 'Posting on-chain proof from VeriLock servers…'
-    return 'Reserving 1 credit — you can leave this page anytime…'
+    return 'Reserving 1 credit - you can leave this page anytime…'
   }, [message, phase])
 
   return (
@@ -220,7 +220,7 @@ export function CreditSealProgress({
           <div>
             <strong>You can leave this page</strong>
             <p className="muted">
-              Locking runs on VeriLock’s servers — closing the tab or switching apps does not cancel
+              Locking runs on VeriLock’s servers - closing the tab or switching apps does not cancel
               it. Reopen this agreement anytime to see the locked status.
             </p>
           </div>

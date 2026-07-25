@@ -191,7 +191,7 @@ async function annotationsFromSignatureImages(input: {
       }
       continue
     }
-    // signature / initial — prefer party ink image
+    // signature / initial - prefer party ink image
     if (slot.kind === 'signature' || slot.kind === 'initial') {
       const partyId = personToParty.get(slot.personSlotIndex)
       const imageDataUrl = partyId ? imageByParty.get(partyId) : undefined
@@ -216,9 +216,9 @@ export interface SignedDocumentViewProps {
   file: File
   /** PDF fingerprint (sha256 hex) used to load placement fills. */
   fingerprint: string | null | undefined
-  /** Agreement id — required when the same PDF is used on multiple agreements. */
+  /** Agreement id - required when the same PDF is used on multiple agreements. */
   documentId?: string | null
-  /** Session token — required to unlock fill wire frames / private images. */
+  /** Session token - required to unlock fill wire frames / private images. */
   authToken?: string | null
   /**
    * When false, only plain document pages are shown (no private overlays).
@@ -270,7 +270,7 @@ export function SignedDocumentView({
   useEffect(() => {
     let cancelled = false
 
-    // Public / non-party: never paint private ink — bare document only.
+    // Public / non-party: never paint private ink - bare document only.
     if (!revealPrivate) {
       setAnnotations([])
       setLoadState('plain')
@@ -337,7 +337,7 @@ export function SignedDocumentView({
             setLoadState('ready')
             setNote(
               filledCount > 0
-                ? 'Signatures and fields reconstructed on your local copy — read only.'
+                ? 'Signatures and fields reconstructed on your local copy - read only.'
                 : null,
             )
             return
@@ -410,7 +410,7 @@ export function SignedDocumentView({
           setAnnotations([])
           setLoadState('plain')
           setNote(
-            'Could not load field layout. Showing your local file only — signature images appear under Recorded signatures when present.',
+            'Could not load field layout. Showing your local file only - signature images appear under Recorded signatures when present.',
           )
         }
       }
@@ -428,7 +428,7 @@ export function SignedDocumentView({
     try {
       await printRenderedPages(
         reconRef.current?.getPagesRoot() ?? null,
-        file.name ? `Signed — ${file.name}` : 'Signed document',
+        file.name ? `Signed - ${file.name}` : 'Signed document',
       )
     } catch (err) {
       setPrintError(err instanceof Error ? err.message : 'Could not print')
@@ -447,7 +447,7 @@ export function SignedDocumentView({
           <div className="signed-document-view-head-text">
             <h3 className="signed-document-view-title">Signed document</h3>
             <p className="muted signed-document-view-lead">
-              Your local file with recorded signatures on the page. Read only — nothing leaves this
+              Your local file with recorded signatures on the page. Read only - nothing leaves this
               device.
             </p>
           </div>

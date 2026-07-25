@@ -13,7 +13,7 @@ Journey SPA blog under `/blog`. Content lives in `client/src/blog/posts/`. UI in
 
 ## Hard rules
 
-1. **No em dashes** (`—` / U+2014). Use commas, periods, or hyphens.
+1. **No em dashes** (U+2014 long dash). Use commas, periods, or hyphens.
 2. **You are already on verilock.online.** Do not write "try it on verilock.online", "open verilock.online", or similar site-name CTAs. Readers are already on the product site.
 3. **End-of-post CTA:** advertise the **current lock promo / fee**, not a generic "try the product" line. Soft internal paths only (Pricing, Verify, Agreements, home create flow) if you need a next step.
 4. **Do not invent fees.** Read live numbers from `client/src/sealPricing.ts` (and Pricing UI). As of July 2026: list **1000 NIM**, July promo **95% off → 50 NIM**, **promo ends August 1** (`isJulyPromoActive`: calendar month === July).
@@ -70,15 +70,15 @@ Do not generate 3 decorative concept shots per post. If the body figure is only 
 
 ### Choose the medium (in this order)
 
-1. **Product UI screenshot / crop** — best for product-true posts (verify match, path picker, lock step). Real pixels beat AI chrome.
-2. **Code-built diagram** (SVG or HTML → export) — best for labeled flows, compare tables, "what lives where." Exact text stays readable. Prefer this over generative diagrams.
-3. **Generative editorial still** — only for covers and rare scenario moments where photography-like restraint works. One subject, quiet light, no magic.
+1. **Product UI screenshot / crop** - best for product-true posts (verify match, path picker, lock step). Real pixels beat AI chrome.
+2. **Code-built diagram** (SVG or HTML → export) - best for labeled flows, compare tables, "what lives where." Exact text stays readable. Prefer this over generative diagrams.
+3. **Generative editorial still** - only for covers and rare scenario moments where photography-like restraint works. One subject, quiet light, no magic.
 
 Never use generative art for: fee numbers, step labels, product logos as text, or multi-panel labeled explainer charts.
 
 ### Style lock (generative only)
 
-**Target look:** Quiet light-SaaS product still life or restrained corporate photography. Soft daylight or soft studio light. Near-white page field `#fafdfc` with soft mint wash `#f0fdfa`. Soft teal accents `#0d9488` / `#14b8a6` only. Soft charcoal / warm gray props. Matches production light shell and X ad art — not the archived navy shell.
+**Target look:** Quiet light-SaaS product still life or restrained corporate photography. Soft daylight or soft studio light. Near-white page field `#fafdfc` with soft mint wash `#f0fdfa`. Soft teal accents `#0d9488` / `#14b8a6` only. Soft charcoal / warm gray props. Matches production light shell and X ad art - not the archived navy shell.
 
 **Composition:** One clear subject. Large negative space. Centered or rule-of-thirds. 16:9 covers, 4:3 or 1:1 body if needed. Feels like Stripe / Linear / Notion marketing, not Midjourney "crypto dashboard."
 
@@ -138,7 +138,7 @@ Looks like a premium SaaS marketing photo, not a 3D crypto illustration.
 
 ### Example prompts (copy and adapt)
 
-**Cover — private agreement**
+**Cover - private agreement**
 
 ```text
 A closed silver laptop on a light desk with a single unsigned paper contract beside it, slightly out of focus plant in the far corner.
@@ -149,7 +149,7 @@ Light: soft and even, low contrast, no god rays, no neon, no particles.
 Mood: calm B2B document privacy, professional, not crypto, not sci-fi.
 ```
 
-**Cover — multi-party review**
+**Cover - multi-party review**
 
 ```text
 Two pairs of professional hands at a meeting table reviewing one shared printed agreement, pens nearby, no faces.
@@ -160,7 +160,7 @@ Light: soft and even, no dramatic beams, no neon.
 Mood: business collaboration and trust, not technology fantasy.
 ```
 
-**Body — silent edit (integrity)**
+**Body - silent edit (integrity)**
 
 ```text
 Two nearly identical printed contract pages side by side on a gray desk; the right page has one small circled number change in red pen.
@@ -171,7 +171,7 @@ Light: even softbox light, no glow effects.
 Mood: careful business review, not cybersecurity poster art.
 ```
 
-**Body — verify without wallet**
+**Body - verify without wallet**
 
 ```text
 An open laptop on a clean desk showing a blurred document in a generic browser window with a simple green check on a white dialog, no readable words.
@@ -191,7 +191,7 @@ Mood: ordinary professional verification, accessible and calm.
 
 ### Diagrams and UI (preferred body art)
 
-- **SVG / HTML diagram:** four-step flow, local vs public, integrity vs identity. Exact labels. Match light shell colors (near-white `#fafdfc`, text slate `#0f172a`, teal accent `#0d9488` / `#14b8a6` only — not archived navy).
+- **SVG / HTML diagram:** four-step flow, local vs public, integrity vs identity. Exact labels. Match light shell colors (near-white `#fafdfc`, text slate `#0f172a`, teal accent `#0d9488` / `#14b8a6` only - not archived navy).
 - **UI crop:** export from Journey at 2x, crop tight, no desktop clutter. Alt text describes the state ("Verify result: fingerprint match").
 
 ### Captions and alt
@@ -243,8 +243,8 @@ Do not stack every figure as full width. Prefer one full process image, then a s
 
 Link related guides into these when relevant:
 
-- `what-is-verilock` — product definition and limits
-- `how-verilock-works` — fingerprint → sign → lock → verify
+- `what-is-verilock` - product definition and limits
+- `how-verilock-works` - fingerprint → sign → lock → verify
 
 ## Layout
 
@@ -275,10 +275,10 @@ Local UI at `/blog-studio` with two tabs:
 ### Image flow
 
 1. `npm run dev` (server on :3002)
-2. Ensure Grok CLI is installed and signed in: `grok login` (xAI OAuth — not the X developer API)
+2. Ensure Grok CLI is installed and signed in: `grok login` (xAI OAuth - not the X developer API)
 3. Open `/blog-studio`, pick post + asset
 4. Type your own text in **Image prompt**, or **Write image prompt** (from article copy) / **Compare models** → **Use this prompt** (editable after)
-5. **Generate with Grok Imagine** — uses the current prompt box text; server starts a **background** headless `grok` job (UI polls status; disconnect no longer kills the job). Imagine writes/overwrites the target under `client/public/blog/`, preview refreshes
+5. **Generate with Grok Imagine** - uses the current prompt box text; server starts a **background** headless `grok` job (UI polls status; disconnect no longer kills the job). Imagine writes/overwrites the target under `client/public/blog/`, preview refreshes
 6. Fallback: **Copy handoff** → paste into Grok Build chat if CLI is unavailable
 7. Commit + push when you want production updated
 

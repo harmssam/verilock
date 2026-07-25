@@ -171,7 +171,7 @@ export function DocumentStage({
 
   let caption: string
   // Sealed status + explorer live in the verify/match banner (“Anchored on Nimiq · View…”)
-  // — keep this caption about the local file, not a second chain line.
+  // - keep this caption about the local file, not a second chain line.
   if (sealed) caption = 'Local fingerprint matches the locked record'
   else if (needsLocalCopy) {
     caption = 'Drop or browse to select the matching file'
@@ -182,7 +182,7 @@ export function DocumentStage({
   } else if (localCopyRequired && hasLocalFile) {
     caption = 'Checking fingerprint…'
   } else if (step === 'fingerprint' && canInteract)
-    caption = 'Step 2 — drop a document here, or browse'
+    caption = 'Step 2 - drop a document here, or browse'
   else if (fingerprinted && !canInteract) caption = 'Fingerprint lives here - file stays on device'
   else if (canInteract) caption = 'Drop a document here, or browse'
   else caption = 'Your document will appear here'
@@ -277,7 +277,7 @@ export function DocumentStage({
                 <span className="doc-card-empty-sub">No file chosen yet</span>
               ) : canInteract ? (
                 <span className="doc-card-empty-sub doc-card-empty-sub--hint">
-                  {DOCUMENT_FORMATS_LABEL}. Opened in your browser only — never sent to VeriLock
+                  {DOCUMENT_FORMATS_LABEL}. Opened in your browser only - never sent to VeriLock
                   servers.
                 </span>
               ) : null}

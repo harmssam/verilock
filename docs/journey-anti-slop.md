@@ -22,14 +22,14 @@ Do **not** jump to “make it pretty.” Use a critique loop:
 intent → constraints → tokens/reference → one surface → visual review → reject/revise → systemize
 ```
 
-1. **Intent** — Which path/stage/shell screen? (Create / Invited / Verify, or pricing/privacy/security/agreements.)
-2. **Constraints** — Feature parity: same routes, stages, dock controls, privacy model. See `PRODUCT.md`.
-3. **Positive reference** — Reuse existing tokens and components (section 2). Do not invent a second palette.
-4. **Negative reference** — Run the ban list (section 3) before coding decorative chrome.
-5. **One surface** — Path cards, dock, or stage; not a whole redesign pass in one shot.
-6. **Review** — Section 5 self-check. Prefer scoped passes (“spacing only”, “contrast only”).
-7. **Ugly states** — Section 6 before calling it done.
-8. **Systemize** — If a new pattern is good, encode it in tokens/CSS classes, not a one-off.
+1. **Intent** - Which path/stage/shell screen? (Create / Invited / Verify, or pricing/privacy/security/agreements.)
+2. **Constraints** - Feature parity: same routes, stages, dock controls, privacy model. See `PRODUCT.md`.
+3. **Positive reference** - Reuse existing tokens and components (section 2). Do not invent a second palette.
+4. **Negative reference** - Run the ban list (section 3) before coding decorative chrome.
+5. **One surface** - Path cards, dock, or stage; not a whole redesign pass in one shot.
+6. **Review** - Section 5 self-check. Prefer scoped passes (“spacing only”, “contrast only”).
+7. **Ugly states** - Section 6 before calling it done.
+8. **Systemize** - If a new pattern is good, encode it in tokens/CSS classes, not a one-off.
 
 **Context rule:** short prompt → long visual output is almost always slop. Prefer: paste the relevant component CSS, token block, and the ban list into the task rather than “restyle the hero.”
 
@@ -50,7 +50,7 @@ Design **serves the workflow** (path → rail → dock → document stage).
 | Surfaces | Deep navy: `--bg-deep` `#0d112e`, `--bg-mid` `#121a38`, translucent `--surface*` |
 | Text | `--text` / `--text-muted` / `--text-dim` (blue-tinted neutrals, not pure gray) |
 | Accents | **Mint** primary (`--mint`, `--mint-deep`); **sky** secondary; **coral** errors; **lime** success accents; **amber** warnings |
-| Brand gradient | `--gradient-brand` (mint → sky → blue) — reserved for brand moments (e.g. wordmark), not every card |
+| Brand gradient | `--gradient-brand` (mint → sky → blue) - reserved for brand moments (e.g. wordmark), not every card |
 | Radius | `--radius-sm/md/lg/pill` |
 | Shadows | Soft depth + optional mint/blue glow; use sparingly |
 
@@ -65,8 +65,8 @@ Design **serves the workflow** (path → rail → dock → document stage).
 ### Patterns that already work
 
 - **One primary action** in the action dock; secondary stays secondary
-- **Document stage** metaphor (fingerprint / signatures / seal) — product, not decoration
-- **Local-file honesty** — file never leaves device; UI must keep saying so
+- **Document stage** metaphor (fingerprint / signatures / seal) - product, not decoration
+- **Local-file honesty** - file never leaves device; UI must keep saying so
 - Restrained accent: mint for primary CTAs and state, not rainbow soup
 - Familiar controls: selects, checkboxes, drop zones, buttons
 
@@ -108,14 +108,14 @@ If a change would make someone say “AI made this SaaS site,” reject it.
 
 ### Allowed only when already intentional (do not expand)
 
-- Ambient body radial blurs / soft blobs (`index.css`) — environment, not new UI chrome
-- Light `backdrop-filter` on specific header/nav chrome — keep rare; prefer solid fills on mobile
-- Document-stage paper gradient (light card on dark app) — metaphor only
+- Ambient body radial blurs / soft blobs (`index.css`) - environment, not new UI chrome
+- Light `backdrop-filter` on specific header/nav chrome - keep rare; prefer solid fills on mobile
+- Document-stage paper gradient (light card on dark app) - metaphor only
 - `--gradient-brand` on brand wordmark / rare brand moments
 
 ### Copy bans (product + blog)
 
-- Em dashes (`—`) in user-facing copy (blog hard rule; prefer product too)
+- Em dashes (U+2014 long dash) in user-facing copy (blog hard rule; prefer product too)
 - Legal overclaims (“court-admissible”, “legally binding”) unless counsel-approved
 - Moon language / absolute security claims
 - Site-name CTAs (“try verilock.online”) on the product site itself
@@ -197,7 +197,7 @@ AI is good at the ideal screenshot. Product design is the rest:
 |------|------|
 | Any visual restyle | `PRODUCT.md` feature parity → this file → edit `App` / `landing/` / `journey/` only |
 | Impeccable craft/shape/polish | Impeccable setup + **product** register + this file |
-| Blog / archive | Local-only gitignored trees — never production; do not re-add `/blog` |
+| Blog / archive | Local-only gitignored trees - never production; do not re-add `/blog` |
 
 **Feature parity wins over aesthetics.** If a visual idea conflicts with inventory, drop the visual idea.
 

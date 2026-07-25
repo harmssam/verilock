@@ -44,7 +44,7 @@ export function getSealPricing(now = new Date()): SealPricing {
 
 /**
  * Extra luna historically reserved for a Nimiq network fee buffer.
- * Network fees are not required for our balance gate — keep 0.
+ * Network fees are not required for our balance gate - keep 0.
  */
 export const SEAL_TX_FEE_BUFFER_LUNA = 0
 

@@ -1,5 +1,5 @@
 /**
- * Shared pdf.js helpers — render pages client-side only.
+ * Shared pdf.js helpers - render pages client-side only.
  * No pdf-lib; PDF bytes never leave the browser for rendering.
  */
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'

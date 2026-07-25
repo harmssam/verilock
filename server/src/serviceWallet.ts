@@ -74,7 +74,7 @@ function normalizeTxHashFromCore(hash: string): string {
  * Broadcast a minimal attestation proof from the service wallet.
  * Value is capped; only called after a credit reservation exists.
  *
- * Important: Nimiq rejects self-sends ("Sender same as recipient") — same rule as
+ * Important: Nimiq rejects self-sends ("Sender same as recipient") - same rule as
  * Hub checkout. Credit proofs must go to the attestation sink (like direct NIM seals),
  * with a minimal value (1 luna) and the seal payload in recipient data.
  *
@@ -100,7 +100,7 @@ export async function broadcastCreditSealProof(input: {
   }
   if (sink === senderAddress) {
     throw new Error(
-      'Service wallet must not equal the attestation sink — Nimiq rejects self-send transactions',
+      'Service wallet must not equal the attestation sink - Nimiq rejects self-send transactions',
     )
   }
 
@@ -185,7 +185,7 @@ export async function broadcastCreditSealProof(input: {
     clientState: broadcast.clientState,
   })
 
-  // Require real network visibility — RPC may return a hash without inclusion.
+  // Require real network visibility - RPC may return a hash without inclusion.
   const visible = await waitForTransactionVisible(txHash, 90_000, 2_000, {
     rebroadcastHex: hex,
   })

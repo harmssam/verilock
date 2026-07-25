@@ -9,7 +9,7 @@ export function PrivacyNotice() {
         <p className="muted">
           VeriLock locks document proof the right way: fingerprint your file locally, collect wallet-backed
           signatures from every party, and anchor the hash permanently on the Nimiq blockchain. Your file
-          stays on your device — yet anyone with a copy can verify it matches the locked record.
+          stays on your device - yet anyone with a copy can verify it matches the locked record.
         </p>
       </div>
     </div>

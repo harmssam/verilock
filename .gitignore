@@ -26,14 +26,14 @@ tmp-*.jpg
 14.jpg
 client/tmp-home.png
 
-# Historical UI snapshots — keep locally, not in GitHub
+# Historical UI snapshots - keep locally, not in GitHub
 client/src/archive/
 
 # Local design / promo assets (production logos live in client/public/verilock-mark*)
 branding/
 logo-ideas/
 
-# Local content studios (Blog Studio + X Post Studio — never ship)
+# Local content studios (Blog Studio + X Post Studio - never ship)
 server/src/blogStudio.ts
 server/src/blogStudioCopy.ts
 server/src/blogStudioGrok.ts

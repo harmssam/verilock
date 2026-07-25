@@ -55,7 +55,7 @@ export function PdfDropZone({
   onChange,
   disabled,
   label = 'Drop document here',
-  hint = `or click to browse (${DOCUMENT_FORMATS_LABEL}) — never leaves this device`,
+  hint = `or click to browse (${DOCUMENT_FORMATS_LABEL}) - never leaves this device`,
   accept = DOCUMENT_ACCEPT,
   multiple = false,
   onFiles,

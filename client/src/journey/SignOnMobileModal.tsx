@@ -35,7 +35,7 @@ interface SignOnMobileModalProps {
    * (avoids stretch when applying strokes).
    */
   padAspect?: number
-  /** `signature` | `initial` — labels on the phone capture page. */
+  /** `signature` | `initial` - labels on the phone capture page. */
   fieldKind?: 'signature' | 'initial'
 }
 
@@ -269,7 +269,7 @@ export function SignOnMobileModal({
 
   const handleUse = async () => {
     if (!received?.path?.strokes?.length) {
-      setError('No signature strokes received — try again from your phone.')
+      setError('No signature strokes received - try again from your phone.')
       setPhase('error')
       return
     }
@@ -316,11 +316,11 @@ export function SignOnMobileModal({
       : phase === 'waiting'
         ? 'Waiting for phone… scan the QR code'
         : phase === 'connecting'
-          ? 'Phone connected — establishing private channel…'
+          ? 'Phone connected - establishing private channel…'
           : phase === 'connected'
-            ? 'Connected — draw and confirm on your phone'
+            ? 'Connected - draw and confirm on your phone'
             : phase === 'received'
-              ? 'Signature received (vector ink) — review below'
+              ? 'Signature received (vector ink) - review below'
               : phase === 'error'
                 ? error ?? 'Something went wrong'
                 : ''
@@ -392,7 +392,7 @@ export function SignOnMobileModal({
 
         {depositHint && phase !== 'received' && phase !== 'error' && phase !== 'creating' && (
           <p className="muted sig-mobile-expires">
-            Still waiting — keep this window open. Your phone can still deliver via the secure backup
+            Still waiting - keep this window open. Your phone can still deliver via the secure backup
             path.
           </p>
         )}

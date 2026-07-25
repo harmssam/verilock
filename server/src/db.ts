@@ -103,11 +103,11 @@ if (!documentColumns.some(col => col.name === 'creator_notify_email')) {
 if (!documentColumns.some(col => col.name === 'ready_to_seal_email_sent_at')) {
   db.exec('ALTER TABLE documents ADD COLUMN ready_to_seal_email_sent_at INTEGER')
 }
-/** JSON array of client PDF annotations (nullable — legacy docs have none). */
+/** JSON array of client PDF annotations (nullable - legacy docs have none). */
 if (!documentColumns.some(col => col.name === 'annotations')) {
   db.exec('ALTER TABLE documents ADD COLUMN annotations TEXT')
 }
-/** Organizer label from step 1 — used in invite emails; not the same as a signer slot. */
+/** Organizer label from step 1 - used in invite emails; not the same as a signer slot. */
 if (!documentColumns.some(col => col.name === 'creator_display_name')) {
   db.exec('ALTER TABLE documents ADD COLUMN creator_display_name TEXT')
 }
@@ -187,7 +187,7 @@ export interface DocumentRecord {
   metadata: Record<string, unknown> | null
   /**
    * Client-placed PDF annotations (signature/text overlays). Nullable JSON.
-   * PDF bytes are never stored — only geometry + small image/text payloads.
+   * PDF bytes are never stored - only geometry + small image/text payloads.
    */
   annotations: unknown[] | null
   requiredSignatures: number
@@ -575,7 +575,7 @@ export function claimPartyWalletIfOpen(partyId: string, walletAddress: string): 
       .run(wallet, partyId)
     return result.changes === 1
   } catch (err) {
-    // Unique index on (document_id, wallet) — this wallet already owns another party.
+    // Unique index on (document_id, wallet) - this wallet already owns another party.
     const message = err instanceof Error ? err.message.toLowerCase() : ''
     if (message.includes('unique')) return false
     throw err
@@ -1420,7 +1420,7 @@ export function getPlacementPlan(originalSha256: string): PlacementPlanRecord | 
     .all(sha) as Record<string, unknown>[]
   if (rows.length === 0) return null
   if (rows.length === 1) return rowToPlacementPlan(rows[0]!)
-  // Ambiguous: multiple agreements share this PDF — require documentId.
+  // Ambiguous: multiple agreements share this PDF - require documentId.
   return null
 }
 
@@ -2084,7 +2084,7 @@ export function clearSigHandoffDeposit(roomId: string): void {
   ).run(roomId)
 }
 
-/** @deprecated Prefer peek + clear on complete — kept for any leftover callers. */
+/** @deprecated Prefer peek + clear on complete - kept for any leftover callers. */
 export function consumeSigHandoffDeposit(
   roomId: string,
 ): { iv: Buffer; ciphertext: Buffer } | null {

@@ -63,7 +63,7 @@ export function sanitizeFilename(name: string | undefined): string | null {
 const EMAIL_MAX_LENGTH = 254
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-/** Optional creator notify email — returns null if empty; throws if invalid. */
+/** Optional creator notify email - returns null if empty; throws if invalid. */
 export function sanitizeNotifyEmail(value: string | undefined | null): string | null {
   if (value == null) return null
   const cleaned = stripControlChars(value).trim().toLowerCase().slice(0, EMAIL_MAX_LENGTH)
@@ -148,7 +148,7 @@ function sanitizeAnnotationId(raw: unknown, fallback: string): string {
 /**
  * Sanitize client PDF annotations for storage.
  * Returns null when empty/omitted; throws on invalid payloads.
- * Never accepts PDF file bytes — only overlay geometry + small images/text.
+ * Never accepts PDF file bytes - only overlay geometry + small images/text.
  */
 export function sanitizeAnnotations(input: unknown): unknown[] | null {
   if (input == null) return null

@@ -39,7 +39,7 @@ function buildHeroClaims(): HeroClaim[] {
   return [
     {
       icon: ShieldCheck,
-      status: 'Sign PDFs free — multi-party, wallet-backed.',
+      status: 'Sign PDFs free - multi-party, wallet-backed.',
     },
     {
       icon: Users,
@@ -73,7 +73,7 @@ const PATHS: {
   {
     role: 'creator',
     title: 'Create & sign',
-    detail: 'Start free: invite co-signers, print when done — lock on-chain when you want',
+    detail: 'Start free: invite co-signers, print when done - lock on-chain when you want',
     icon: Fingerprint,
     imageAlt: '',
   },
@@ -138,7 +138,7 @@ export function LandingHome({
             <span className="lr-hero-headline-em">Free.</span>
           </h1>
           <p className="lr-hero-sub">
-            Co-sign PDFs with your Nimiq wallet — free. Your document stays on your device. Print when
+            Co-sign PDFs with your Nimiq wallet - free. Your document stays on your device. Print when
             everyone has signed. Upgrade anytime: lock a permanent proof on the blockchain for 1 credit.
           </p>
           {/*

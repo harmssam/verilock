@@ -1,5 +1,5 @@
 /**
- * Public support contact form — validation, bot checks, email delivery.
+ * Public support contact form - validation, bot checks, email delivery.
  */
 import {
   appPublicUrl,
@@ -13,7 +13,7 @@ export const MAX_SUPPORT_SUBJECT_LENGTH = 120
 export const MAX_SUPPORT_MESSAGE_LENGTH = 4000
 export const MAX_SUPPORT_EMAIL_LENGTH = 254
 
-/** Minimum time (ms) a human needs before submit — bots often fire instantly. */
+/** Minimum time (ms) a human needs before submit - bots often fire instantly. */
 export const SUPPORT_MIN_FILL_MS = 2_500
 /** Reject absurdly old formStartedAt (stale tabs / replay). */
 export const SUPPORT_MAX_FILL_MS = 24 * 60 * 60 * 1000
@@ -64,7 +64,7 @@ export interface SupportContactBody {
   email?: unknown
   subject?: unknown
   message?: unknown
-  /** Honeypot — must be empty. */
+  /** Honeypot - must be empty. */
   website?: unknown
   /** Client clock when form mounted (ms since epoch). */
   formStartedAt?: unknown
@@ -83,7 +83,7 @@ export type SupportSanitizeResult =
       turnstileToken: string | null
     }
   | { ok: false; error: string; status: number }
-  /** Silent bot rejection — respond 200 so scrapers don't probe. */
+  /** Silent bot rejection - respond 200 so scrapers don't probe. */
   | { ok: false; silent: true }
 
 export function sanitizeSupportContact(body: SupportContactBody): SupportSanitizeResult {
@@ -108,7 +108,7 @@ export function sanitizeSupportContact(body: SupportContactBody): SupportSanitiz
 
   const elapsed = Date.now() - formStartedAt
   if (elapsed < SUPPORT_MIN_FILL_MS) {
-    // Too fast — treat as bot, silent success.
+    // Too fast - treat as bot, silent success.
     return { ok: false, silent: true }
   }
   if (elapsed > SUPPORT_MAX_FILL_MS || formStartedAt > Date.now() + 60_000) {
@@ -253,7 +253,7 @@ export async function deliverSupportContact(input: {
     '',
     input.message,
     '',
-    '—',
+    '-',
     `Reply-To should be set to the sender. From: ${resendFromAddress()}`,
   ].join('\n')
 

@@ -11,7 +11,7 @@
  * - Creator-only; document must already be fingerprint-locked
  * - Credits spent once per attempt; full failure refunds; partial keeps charge
  * - Concurrent archives for the same document coalesce (no double broadcast)
- * - After charge, frames are pinned — later fill growth cannot free-ride
+ * - After charge, frames are pinned - later fill growth cannot free-ride
  * - Partial broadcast resumes from the first missing frame index
  */
 import { createHash } from 'node:crypto'
@@ -237,7 +237,7 @@ export interface DataArchiveQuote {
   broadcastReady: boolean
   creditsEnabled: boolean
   error?: string | null
-  /** idle | processing | complete | failed — processing means server is writing in background. */
+  /** idle | processing | complete | failed - processing means server is writing in background. */
   jobStatus: 'idle' | 'processing' | 'complete' | 'failed'
   /** True when credits already spent and user can resume free of charge. */
   alreadyPaid: boolean
@@ -351,8 +351,8 @@ export function quoteDocumentDataArchive(
     if (spend.alreadyPaid && !onChain) {
       reason =
         hashes > 0
-          ? `Resume free — ${hashes}/${frameCount} frames already written (no extra charge)`
-          : 'Credits already reserved — resume storage free of charge'
+          ? `Resume free - ${hashes}/${frameCount} frames already written (no extra charge)`
+          : 'Credits already reserved - resume storage free of charge'
     }
   }
 
@@ -387,7 +387,7 @@ type ArchiveResult = DataArchiveQuote & {
   accepted?: boolean
 }
 
-/** In-process background jobs — one per document. */
+/** In-process background jobs - one per document. */
 const inflightArchives = new Map<string, Promise<void>>()
 
 /** Optional completion emails requested at job start (key = documentId). */
@@ -449,7 +449,7 @@ export async function archiveDocumentDataOnChain(
     }
   }
 
-  // Already running in this process — return current progress without double-start.
+  // Already running in this process - return current progress without double-start.
   if (inflightArchives.has(documentId)) {
     return {
       ...quoteDocumentDataArchive(documentId, address),
@@ -516,7 +516,7 @@ export async function archiveDocumentDataOnChain(
   }
   upsertDocumentDataArchive(existing)
 
-  // Background work — do not await (avoids 524 gateway timeouts on multi-tx).
+  // Background work - do not await (avoids 524 gateway timeouts on multi-tx).
   const job = runBackgroundBroadcast({
     documentId,
     walletAddress: address,
@@ -597,7 +597,7 @@ async function runBackgroundBroadcast(input: {
         fireArchiveNotifyEmail(documentId, txHashes.length, chargedCredits)
         return
       }
-      // Incomplete pin / resume state — do not call broadcast with an empty batch
+      // Incomplete pin / resume state - do not call broadcast with an empty batch
       // (that used to look like success with 0 hashes → false "broadcast failed").
       persist({
         txHashes,
@@ -606,7 +606,7 @@ async function runBackgroundBroadcast(input: {
         jobStatus: 'failed',
         error:
           txHashes.length > 0
-            ? `Resume needed: ${txHashes.length}/${collected.framesHex.length} frames on-chain — try Store forever again (free)`
+            ? `Resume needed: ${txHashes.length}/${collected.framesHex.length} frames on-chain - try Store forever again (free)`
             : 'No packed frames to broadcast (same multi-tx path as /pdf lab). Re-open and retry.',
       })
       return
@@ -678,7 +678,7 @@ async function runBackgroundBroadcast(input: {
     }
 
     if (allHashes.length > 0) {
-      // Partial — keep charge, leave idle so client can resume free.
+      // Partial - keep charge, leave idle so client can resume free.
       persist({
         txHashes: allHashes,
         confirmedFrames: allHashes.length,
@@ -686,12 +686,12 @@ async function runBackgroundBroadcast(input: {
         jobStatus: 'failed',
         error:
           result.error ??
-          `Partial write: ${allHashes.length}/${collected.framesHex.length} frames — resume free of charge`,
+          `Partial write: ${allHashes.length}/${collected.framesHex.length} frames - resume free of charge`,
       })
       return
     }
 
-    // Zero hashes — refund so user is not stranded after 524 / wallet empty.
+    // Zero hashes - refund so user is not stranded after 524 / wallet empty.
     const refundCredits = chargedCredits
     if (!getLedgerByIdempotencyKey(refundKey(documentId, attempt))) {
       try {
@@ -774,7 +774,7 @@ async function runBackgroundBroadcast(input: {
         confirmedFrames: hashes.length,
         onChain: false,
         jobStatus: 'failed',
-        error: `${msg} — partial progress kept; resume free of charge`,
+        error: `${msg} - partial progress kept; resume free of charge`,
       })
     }
   }
@@ -782,7 +782,7 @@ async function runBackgroundBroadcast(input: {
 
 /**
  * Lightweight summary for agreement list cards (creator view).
- * Avoids packing frames / scanning full placement JSON on every /api/me load —
+ * Avoids packing frames / scanning full placement JSON on every /api/me load -
  * expensive quote packing stays on GET/POST .../on-chain-data (modal open).
  */
 export function dataArchiveSummaryForDocument(documentId: string): {
@@ -831,7 +831,7 @@ export function dataArchiveSummaryForDocument(documentId: string): {
           ? { reason: 'Writing to the Nimiq blockchain…' }
           : eligible
             ? existing.creditsCharged > 0
-              ? { reason: 'Resume free — credits already reserved' }
+              ? { reason: 'Resume free - credits already reserved' }
               : {}
             : {
                 reason: !locked
@@ -865,7 +865,7 @@ export function dataArchiveSummaryForDocument(documentId: string): {
     }
     if (frameHint === 0 && Array.isArray(doc.annotations) && doc.annotations.length > 0) {
       // Unknown exact pack size until modal quote; show as eligible with placeholder 0
-      // credits so UI still surfaces upsell — requestArchive loads the real quote.
+      // credits so UI still surfaces upsell - requestArchive loads the real quote.
       frameHint = -1
     }
     if (frameHint === 0) return null

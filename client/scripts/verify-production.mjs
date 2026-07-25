@@ -180,7 +180,7 @@ check('Share step supports Web Share + .eml handoff without server file upload',
 if (process.env.VERIFY_DIST === '1') {
   check('client/dist after production build is indexable journey shell', () => {
     const index = join(clientDir, 'dist', 'index.html')
-    assert.ok(existsSync(index), 'client/dist/index.html missing — run npm run build first')
+    assert.ok(existsSync(index), 'client/dist/index.html missing - run npm run build first')
     const html = readFileSync(index, 'utf8')
     assert.ok(
       html.includes('data-verilock-surface="journey"') ||

@@ -1,4 +1,4 @@
-# Nimiq Network Integration — VeriLock
+# Nimiq Network Integration - VeriLock
 
 Living reference for how **VeriLock** connects wallets, signs login challenges, broadcasts lock (attestation) transactions, and verifies proofs on the Nimiq blockchain. Official behavior is defined on [nimiq.dev](https://www.nimiq.dev); this document maps VeriLock’s implementation to those APIs and records project-specific choices (checkout vs `signTransaction`, redirect recovery, broadcast fallbacks).
 
@@ -25,7 +25,7 @@ Living reference for how **VeriLock** connects wallets, signs login challenges, 
 | Hub endpoint (runtime) | https://hub.nimiq.com | Public Hub used by VeriLock (configurable via `VITE_NIMIQ_HUB_URL`) |
 | `@nimiq/hub-api` types | npm package `PublicRequestTypes.ts` | Authoritative request/result types (linked from API reference) |
 
-Individual RPC method pages (e.g. `getTransactionByHash`) are listed on the methods index; deep links may change—use the index when refreshing.
+Individual RPC method pages (e.g. `getTransactionByHash`) are listed on the methods index; deep links may change-use the index when refreshing.
 
 ---
 
@@ -79,12 +79,12 @@ VeriLock picks a mode at runtime (`getWalletMode()` in `client/src/nimiq.ts`):
 | **Hub** (`hub`) | Default when not in Pay host | [@nimiq/hub-api](https://www.nimiq.dev/hub) → `https://hub.nimiq.com` | Desktop browser, popup or full-page redirect |
 
 ```ts
-// client/src/nimiq.ts — getWalletMode()
+// client/src/nimiq.ts - getWalletMode()
 if (isNimiqPayHost() || window.nimiq) return 'nimiq-pay'
 return 'hub'
 ```
 
-**Opening in Nimiq Pay:** `nimiqpay://miniapp?url=<https-url>` ([Mini Apps — Sharing](https://www.nimiq.dev/mini-apps)).
+**Opening in Nimiq Pay:** `nimiqpay://miniapp?url=<https-url>` ([Mini Apps - Sharing](https://www.nimiq.dev/mini-apps)).
 
 VeriLock uses the **full invite URL** (path + query, e.g. `/d/:slug?party=`) so Pay does not drop the user on home. Before launch we also stash the path in **localStorage** (`verilock-pay-return-path`) and restore it on boot if Pay only loaded the origin. Scheme is only assigned on mobile (`launchNimiqPayMiniApp`). Invite emails include both a browser link and a Pay deeplink.
 
@@ -92,16 +92,16 @@ VeriLock uses the **full invite URL** (path + query, e.g. `/d/:slug?party=`) so 
 
 ## Authentication / sign-in
 
-VeriLock uses a **challenge–response** pattern recommended for third-party Hub apps ([accounts guide — `signMessage` for authentication](https://www.nimiq.dev/hub/guide/accounts#alternative-signmessage-for-authentication)).
+VeriLock uses a **challenge–response** pattern recommended for third-party Hub apps ([accounts guide - `signMessage` for authentication](https://www.nimiq.dev/hub/guide/accounts#alternative-signmessage-for-authentication)).
 
 ### Server: challenge and verify
 
 | Step | Endpoint | Implementation |
 |------|----------|----------------|
-| 1. Challenge | `POST /api/auth/challenge` | `server/src/index.ts` — nonce `VeriLock sign-in:{uuid}:{timestamp}`, session token |
+| 1. Challenge | `POST /api/auth/challenge` | `server/src/index.ts` - nonce `VeriLock sign-in:{uuid}:{timestamp}`, session token |
 | 2. Verify | `POST /api/auth/verify` | Hub: `verifyHubSignedMessage` (`server/src/hub-signature.ts`); Pay: RPC `verifySignature` (`server/src/nimiq-rpc.ts`) |
 
-Hub messages use the Keyguard prefix documented in the [transactions guide — Message Prefixing](https://www.nimiq.dev/hub/guide/transactions#message-prefixing):
+Hub messages use the Keyguard prefix documented in the [transactions guide - Message Prefixing](https://www.nimiq.dev/hub/guide/transactions#message-prefixing):
 
 ```
 sign(sha256(`\x16Nimiq Signed Message:\n${message.length}${message}`))
@@ -111,14 +111,14 @@ Pay path passes the raw nonce to RPC `verifySignature` with `isHex: true` (Nimiq
 
 ### Hub: `chooseAddress` + `signMessage`
 
-**Popup flow** — `connectViaHub()` (`client/src/nimiq.ts`):
+**Popup flow** - `connectViaHub()` (`client/src/nimiq.ts`):
 
 1. `hub.chooseAddress({ appName })` → address ([`chooseAddress`](https://www.nimiq.dev/hub/api-reference#chooseaddress))
 2. `POST /api/auth/challenge` with address
 3. `hub.signMessage({ appName, message: nonce, signer: address })` ([`signMessage`](https://www.nimiq.dev/hub/api-reference#signmessage))
 4. Client `POST /api/auth/verify` with `authScheme: 'hub'`
 
-**Redirect flow** (mobile-friendly, [concepts — Redirect](https://www.nimiq.dev/hub/guide/concepts#redirect)):
+**Redirect flow** (mobile-friendly, [concepts - Redirect](https://www.nimiq.dev/hub/guide/concepts#redirect)):
 
 1. `chooseAddress` with `RedirectRequestBehavior.withLocalState({ flow: 'login' })`
 2. Page navigates to Hub; on return, `setupHubRedirectHandlers()` completes the chain
@@ -128,11 +128,11 @@ Registered handlers: `RequestType.CHOOSE_ADDRESS` → challenge + `signMessage`;
 
 ### Nimiq Pay: `init` + `connect` + `sign`
 
-**Flow** — `connectNimiq()` / `signChallenge()` (`client/src/nimiq.ts`), orchestrated from `App.tsx` `connectWallet()`:
+**Flow** - `connectNimiq()` / `signChallenge()` (`client/src/nimiq.ts`), orchestrated from `App.tsx` `connectWallet()`:
 
-1. `init({ timeout })` — wait for injected provider ([Mini Apps — How it works](https://www.nimiq.dev/mini-apps#how-it-works))
-2. `nimiq.connect()` — account dialog when needed (typed in SDK, not on nimiq.dev provider page)
-3. `nimiq.listAccounts()` — first account
+1. `init({ timeout })` - wait for injected provider ([Mini Apps - How it works](https://www.nimiq.dev/mini-apps#how-it-works))
+2. `nimiq.connect()` - account dialog when needed (typed in SDK, not on nimiq.dev provider page)
+3. `nimiq.listAccounts()` - first account
 4. Server challenge + `nimiq.sign(nonce)` ([`sign`](https://www.nimiq.dev/mini-apps/api-reference/nimiq-provider#sign))
 5. `POST /api/auth/verify` with `authScheme: 'pay'`
 
@@ -145,7 +145,7 @@ Session persisted in `sessionStorage` (`client/src/session.ts`: `token`, `addres
 | Hub API | Default `PopupRequestBehavior` | `RedirectRequestBehavior.withLocalState(...)` |
 | Popup blockers | Risk; VeriLock shows `popupBlockedHelp()` | No popup ([getting started](https://www.nimiq.dev/hub/getting-started)) |
 | Return handling | In-popup promise resolves | URL hash `#id&status&result` + `checkRedirectResponse()` |
-| VeriLock extras | — | Lenient parser when `document.referrer` is empty (`hubSealRedirect.ts`) |
+| VeriLock extras | - | Lenient parser when `document.referrer` is empty (`hubSealRedirect.ts`) |
 
 **Boot order:** `App.tsx` calls `setupHubRedirectHandlers()` **before** any `history.replaceState` that would strip the hash.
 
@@ -153,7 +153,7 @@ Session persisted in `sessionStorage` (`client/src/session.ts`: `token`, `addres
 
 ## Lock transaction flow
 
-Locking anchors the document’s **final SHA-256** (PDF + signatures metadata) on-chain in a basic transaction’s unstructured data field (max **64 bytes** per Nimiq basic tx — noted in `nimiq.ts` / `nimiq-rpc.ts`).
+Locking anchors the document’s **final SHA-256** (PDF + signatures metadata) on-chain in a basic transaction’s unstructured data field (max **64 bytes** per Nimiq basic tx - noted in `nimiq.ts` / `nimiq-rpc.ts`).
 
 ### End-to-end steps
 
@@ -184,7 +184,7 @@ Separate from seals. Multi-tx overlay frames for PDF annotations (path/text/chec
 
 | Byte | Meaning |
 |------|---------|
-| 0 | Magic **`0xA1`** (never `0x01` — seal verifier will reject stream txs as seals) |
+| 0 | Magic **`0xA1`** (never `0x01` - seal verifier will reject stream txs as seals) |
 | 1 | Stream version (`1` free-form annotations, **`2` placement construction batches**) |
 | 2 | Frame type: HEAD / DATA / END |
 | 3–4 | seq / total frames |
@@ -199,12 +199,12 @@ Separate from seals. Multi-tx overlay frames for PDF annotations (path/text/chec
 
 **Version 2 (placement construction):** each multi-tx sequence is one **append batch** (plan lock or fill). Payload JSON carries `people`/`places` (geometry only), content-addressed `blobs` (ink/text), and `fills` (slot → blob_id). Identical ink is emitted once (`blob_id = sha256(payload)[0:16]`); batches chain via `prevRoot`. See `docs/placement-construction.md`, `client/src/pdf/placements.ts`, `client/src/pdf/placementStream.ts`.
 
-Seal verification still requires exact 37-byte `0x01` payload — stream txs cannot satisfy `verifyAttestationPayload`.
+Seal verification still requires exact 37-byte `0x01` payload - stream txs cannot satisfy `verifyAttestationPayload`.
 
 ```ts
-// client/src/nimiq.ts — buildAttestationPayloadBytes()
+// client/src/nimiq.ts - buildAttestationPayloadBytes()
 payload[0] = ATTESTATION_PAYLOAD_VERSION // 1
-// bytes 1–4: docShortId(docId) — 4 bytes from first 8 hex chars of UUID
+// bytes 1–4: docShortId(docId) - 4 bytes from first 8 hex chars of UUID
 // bytes 5–36: finalSha256 as 32 bytes
 ```
 
@@ -213,18 +213,18 @@ Legacy UTF-8 format `seal:v1:lock:{shortId}:{sha256}` is still accepted when ver
 **Hub:** payload passed as `Uint8Array` in `extraData`.  
 **Pay:** hex string via `buildAttestationPayload()` in `data` field of `sendBasicTransactionWithData`.
 
-### Hub: `checkout` to attestation sink (1 luna) — not self-send, not value 0
+### Hub: `checkout` to attestation sink (1 luna) - not self-send, not value 0
 
-VeriLock uses **`hub.checkout()`** for lock ([API reference — checkout](https://www.nimiq.dev/hub/api-reference#checkout), [transactions guide](https://www.nimiq.dev/hub/guide/transactions#checkout)). Hub signs **and broadcasts** the transaction.
+VeriLock uses **`hub.checkout()`** for lock ([API reference - checkout](https://www.nimiq.dev/hub/api-reference#checkout), [transactions guide](https://www.nimiq.dev/hub/guide/transactions#checkout)). Hub signs **and broadcasts** the transaction.
 
 ```ts
-// client/src/nimiq.ts — buildHubLockCheckoutRequest()
+// client/src/nimiq.ts - buildHubLockCheckoutRequest()
 {
   appName: APP_NAME,
   sender: address,
   forceSender: true,
   recipient: getHubAttestationRecipient(), // ≠ sender (Hub rejects identical addresses)
-  value: 1,                                // 1 luna — Hub rejects value 0
+  value: 1,                                // 1 luna - Hub rejects value 0
   flags: 0,
   extraData: buildAttestationPayloadBytes(docId, finalSha256),
   validityDuration: 120,
@@ -252,7 +252,7 @@ Hub’s request parser rejects **value 0**. The 1-luna payment (~0.00001 NIM) go
 ### Nimiq Pay: zero-value self-send
 
 ```ts
-// client/src/nimiq.ts — sendLockAttestation()
+// client/src/nimiq.ts - sendLockAttestation()
 await nimiq.sendBasicTransactionWithData({
   recipient: address,
   value: 0,
@@ -282,7 +282,7 @@ finalizeHubLockTransaction()
 
 | Layer | Method | File |
 |-------|--------|------|
-| Hub | Implicit broadcast on `checkout` | [Hub transactions — checkout broadcasts](https://www.nimiq.dev/hub/guide/transactions#checkout) |
+| Hub | Implicit broadcast on `checkout` | [Hub transactions - checkout broadcasts](https://www.nimiq.dev/hub/guide/transactions#checkout) |
 | Client RPC | `sendRawTransaction` (lookup + relay fallback) | `nimiq.ts` → `nimiqRpcCall` |
 | Server | `@nimiq/core` `Client.sendTransaction()` after consensus | `server/src/nimiq-rpc.ts` → `broadcastRawTransaction` |
 | Server API | `POST /api/transactions/broadcast` | `server/src/index.ts` (auth required) |
@@ -301,7 +301,7 @@ createServerBroadcastFallback(token) → api.broadcastTransaction(token, seriali
 
 ### Redirect recovery (`sealInFlight`, lenient parsing)
 
-Hub redirect return can lose `sessionStorage.rpcRequests` or `document.referrer` ([concepts — Handling Redirect Responses](https://www.nimiq.dev/hub/guide/concepts#handling-redirect-responses)). VeriLock mitigates:
+Hub redirect return can lose `sessionStorage.rpcRequests` or `document.referrer` ([concepts - Handling Redirect Responses](https://www.nimiq.dev/hub/guide/concepts#handling-redirect-responses)). VeriLock mitigates:
 
 | Mechanism | Storage | Purpose |
 |-----------|---------|---------|
@@ -312,7 +312,7 @@ Hub redirect return can lose `sessionStorage.rpcRequests` or `document.referrer`
 
 `processLenientHubRedirect()`:
 
-1. `readRedirectResponse()` — hash or stored `response-{rpcId}`
+1. `readRedirectResponse()` - hash or stored `response-{rpcId}`
 2. Match `loadStoredRpcRequest(id)` **or** fall back to `loadSealInFlight()`
 3. For lock: `completeLockRedirect()` → `finalizeHubLockTransaction()` → `onLockComplete`
 4. For login: resume `chooseAddress` → `signMessage` chain
@@ -321,7 +321,7 @@ On lock redirect start, `markSealRedirectStarted()` saves `sealInFlight`; cleare
 
 **Boot hub-return UX** (`App.tsx`):
 
-1. `setupHubRedirectHandlers()` returns `{ redirectHandled, lockCompletion }` — boot **awaits** `lockCompletion` before continuing.
+1. `setupHubRedirectHandlers()` returns `{ redirectHandled, lockCompletion }` - boot **awaits** `lockCompletion` before continuing.
 2. `hydrateHubReturnDocument()` immediately sets screen, session, `busy`, and loads the document so the seal card is visible (not a blank page).
 3. Orphaned `sealInFlight` (no URL hash / `rpcId` left to process) is cleared on boot to avoid stale notices after refresh.
 4. `shouldShowStaleSealNotice()` skips when attestation already `failed` or doc is `locking` (SealCard handles those cases).
@@ -334,12 +334,12 @@ Server-side proof checking lives in `verifyAttestation()` (`server/src/nimiq-rpc
 
 ### Checks (in order)
 
-1. **Transaction exists** — `getTransactionByHash`, else `getTransactionFromMempool`
-2. **Confirmations** — `tx.confirmations >= NIM_MIN_CONFIRMATIONS` (default `1`)
-3. **`executionResult`** — must be `true` (failed txs rejected with hint to fund Hub wallet with ~0.01 NIM)
-4. **Sender** — `tx.from` matches session `senderAddress`
-5. **Value** — self-send: `0` or `1` luna; non-self-send: optional `ATTESTATION_RECIPIENT` sink (production default: Nimiq Foundation vesting contract)
-6. **Payload** — `recipientData` bytes match `buildAttestationPayloadBytes(docId, finalSha256)`
+1. **Transaction exists** - `getTransactionByHash`, else `getTransactionFromMempool`
+2. **Confirmations** - `tx.confirmations >= NIM_MIN_CONFIRMATIONS` (default `1`)
+3. **`executionResult`** - must be `true` (failed txs rejected with hint to fund Hub wallet with ~0.01 NIM)
+4. **Sender** - `tx.from` matches session `senderAddress`
+5. **Value** - self-send: `0` or `1` luna; non-self-send: optional `ATTESTATION_RECIPIENT` sink (production default: Nimiq Foundation vesting contract)
+6. **Payload** - `recipientData` bytes match `buildAttestationPayloadBytes(docId, finalSha256)`
 
 ### Attestation lifecycle
 
@@ -357,15 +357,15 @@ Background poller: every 5s, pending attestations younger than 120s (`startAttes
 
 ## Environment variables
 
-### Client (Vite — prefix `VITE_`)
+### Client (Vite - prefix `VITE_`)
 
 | Variable | Default | Used in |
 |----------|---------|---------|
-| `VITE_NIMIQ_HUB_URL` | `https://hub.nimiq.com` | `client/src/nimiq.ts` — `HubApi` endpoint |
+| `VITE_NIMIQ_HUB_URL` | `https://hub.nimiq.com` | `client/src/nimiq.ts` - `HubApi` endpoint |
 | `VITE_NIMIQ_RPC_URL` | `https://rpc.nimiqwatch.com` | Client-side `sendRawTransaction` / tx lookup |
 | Hub `appName` | `VeriLock` (hardcoded in `client/src/nimiq.ts`) | Label shown in Hub / Pay approval dialogs |
 | `VITE_ATTESTATION_RECIPIENT` | Nimiq Foundation (see `getHubAttestationRecipient`) | Hub checkout recipient (must ≠ sender) |
-| `VITE_API_URL` | `''` (same origin) | `client/src/api.ts` — dev proxy vs production monolith |
+| `VITE_API_URL` | `''` (same origin) | `client/src/api.ts` - dev proxy vs production monolith |
 
 ### Server
 
@@ -375,8 +375,8 @@ Background poller: every 5s, pending attestations younger than 120s (`startAttes
 | `NIM_MIN_CONFIRMATIONS` | `1` | `verifyAttestation` |
 | `ATTESTATION_RECIPIENT` | (prod: Nimiq Foundation vesting) | Non-self-send attestations only |
 | `SKIP_CHAIN_VERIFY` | unset | Skips on-chain verify when `true` |
-| `NODE_ENV` | — | Enables default attestation recipient in production |
-| `DATA_DIR` / `PORT` / `CORS_ORIGIN` | — | Deployment; not Nimiq-specific |
+| `NODE_ENV` | - | Enables default attestation recipient in production |
+| `DATA_DIR` / `PORT` / `CORS_ORIGIN` | - | Deployment; not Nimiq-specific |
 
 See `.env.example` at repo root for a full template.
 
@@ -386,9 +386,9 @@ See `.env.example` at repo root for a full template.
 
 | Symptom | Likely cause | VeriLock behavior / fix |
 |---------|--------------|---------------------|
-| “Pop-up blocked” | Hub popup not opened synchronously from click | Use redirect (`preferRedirect`) or Nimiq Pay; see [getting started — popup rules](https://www.nimiq.dev/hub/getting-started) |
+| “Pop-up blocked” | Hub popup not opened synchronously from click | Use redirect (`preferRedirect`) or Nimiq Pay; see [getting started - popup rules](https://www.nimiq.dev/hub/getting-started) |
 | “Redirecting to Nimiq Hub…” then stall | User still in Hub or hash not processed | Ensure boot calls `setupHubRedirectHandlers` first; check URL for `#id&status&result` |
-| Stale seal notice | `sealInFlight` set but redirect incomplete | `staleSealMessage()` — signatures saved; tap **Retry seal** |
+| Stale seal notice | `sealInFlight` set but redirect incomplete | `staleSealMessage()` - signatures saved; tap **Retry seal** |
 | “Sealing…” for 1–2+ minutes | Normal: Hub sign + broadcast wait + block confirmation | Watch `hub:progress` logs; should complete in ~1–2 min when funded |
 | Blank page after Hub return (fixed) | `activeDoc` not loaded until async lock finished | Boot now hydrates document + shows “Completing seal after Hub…” |
 | “Transaction was signed in Hub but did not reach the Nimiq network” | Legacy `signTransaction` relay could not see tx | Current path uses `checkout` + Hub broadcast; retry after hard refresh |
@@ -404,7 +404,7 @@ See `.env.example` at repo root for a full template.
 
 **Debug logging:** `sealLog` / `sealWarn` / `sealError` in `client/src/sealDebug.ts` (grep console for `[verilock]` and hub labels).
 
-**COOP/COEP:** Do not set cross-origin isolation headers — they break Hub popups ([getting started](https://www.nimiq.dev/hub/getting-started)).
+**COOP/COEP:** Do not set cross-origin isolation headers - they break Hub popups ([getting started](https://www.nimiq.dev/hub/getting-started)).
 
 ---
 
@@ -412,20 +412,20 @@ See `.env.example` at repo root for a full template.
 
 When changing wallet, lock, or verify flows, re-check these nimiq.dev pages:
 
-- [ ] https://www.nimiq.dev/hub/api-reference — method signatures, `extraData`, `SignedTransaction`
-- [ ] https://www.nimiq.dev/hub/guide/transactions — checkout vs `signTransaction`, Luna, message signing
-- [ ] https://www.nimiq.dev/hub/guide/concepts — redirect behavior, `checkRedirectResponse`, state preservation
-- [ ] https://www.nimiq.dev/hub/getting-started — popup-blocker guidance, COOP/COEP
-- [ ] https://www.nimiq.dev/hub/guide/accounts — third-party authentication pattern
-- [ ] https://www.nimiq.dev/mini-apps — deeplink format, security model
-- [ ] https://www.nimiq.dev/mini-apps/api-reference/nimiq-provider — Pay sign/send methods
-- [ ] https://www.nimiq.dev/rpc/methods — `sendRawTransaction`, `getTransactionByHash`, `verifySignature`, `getTransactionFromMempool`
+- [ ] https://www.nimiq.dev/hub/api-reference - method signatures, `extraData`, `SignedTransaction`
+- [ ] https://www.nimiq.dev/hub/guide/transactions - checkout vs `signTransaction`, Luna, message signing
+- [ ] https://www.nimiq.dev/hub/guide/concepts - redirect behavior, `checkRedirectResponse`, state preservation
+- [ ] https://www.nimiq.dev/hub/getting-started - popup-blocker guidance, COOP/COEP
+- [ ] https://www.nimiq.dev/hub/guide/accounts - third-party authentication pattern
+- [ ] https://www.nimiq.dev/mini-apps - deeplink format, security model
+- [ ] https://www.nimiq.dev/mini-apps/api-reference/nimiq-provider - Pay sign/send methods
+- [ ] https://www.nimiq.dev/rpc/methods - `sendRawTransaction`, `getTransactionByHash`, `verifySignature`, `getTransactionFromMempool`
 
 **Also verify in repo:**
 
-- [ ] `client/src/nimiq.ts` — Hub/Pay entry points, payload, broadcast
+- [ ] `client/src/nimiq.ts` - Hub/Pay entry points, payload, broadcast
 - [ ] `client/src/hubSealRedirect.ts` / `hubRedirectParse.ts` / `sealRecovery.ts`
-- [ ] `client/src/App.tsx` — boot, `connectWallet`, `lockDocument`, `finishLock`
+- [ ] `client/src/App.tsx` - boot, `connectWallet`, `lockDocument`, `finishLock`
 - [ ] `server/src/nimiq-rpc.ts` / `attestations.ts` / `hub-signature.ts`
 - [ ] `.env.example` and `README.md` deploy vars
 - [ ] `@nimiq/hub-api` and `@nimiq/mini-app-sdk` version bumps in `client/package.json`

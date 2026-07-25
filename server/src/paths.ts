@@ -5,7 +5,7 @@ const serverSrcDir = dirname(fileURLToPath(import.meta.url))
 const serverDir = join(serverSrcDir, '..')
 const projectRoot = join(serverDir, '..')
 
-/** Persistent data root — mount a Railway volume at /data and set DATA_DIR=/data */
+/** Persistent data root - mount a Railway volume at /data and set DATA_DIR=/data */
 export function getDataDir(): string {
   if (process.env.DATA_DIR) return process.env.DATA_DIR
   if (process.env.RAILWAY_VOLUME_MOUNT_PATH) return process.env.RAILWAY_VOLUME_MOUNT_PATH

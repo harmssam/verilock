@@ -51,7 +51,7 @@ function kindFromHash(): 'signature' | 'initial' {
 }
 
 /**
- * Full-screen mobile signature capture — no wallet, no PDF, no preview step.
+ * Full-screen mobile signature capture - no wallet, no PDF, no preview step.
  * Draw → Done sends vectors (E2E encrypted) to the desktop host.
  */
 export function SignMobilePage() {
@@ -77,7 +77,7 @@ export function SignMobilePage() {
 
     void (async () => {
       if (!sessionId) {
-        setError('Invalid link — ask your computer to show a new QR code.')
+        setError('Invalid link - ask your computer to show a new QR code.')
         setPhase('error')
         return
       }

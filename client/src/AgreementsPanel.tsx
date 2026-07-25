@@ -136,7 +136,7 @@ export function AgreementsPanel({
           </>
         ) : (
           <p className="muted">
-            No agreements yet — create one by fingerprinting a file on your computer and collecting signatures.
+            No agreements yet - create one by fingerprinting a file on your computer and collecting signatures.
           </p>
         )}
       </div>
@@ -173,7 +173,7 @@ export function AgreementsPanel({
       </div>
 
       {compact && actionable === 0 && sealedCount === 0 && groups.waiting.length === 0 && (
-        <p className="muted">No agreements in progress — start a new one or open Agreements for your full list.</p>
+        <p className="muted">No agreements in progress - start a new one or open Agreements for your full list.</p>
       )}
 
       {visibleBuckets.map(bucket => {

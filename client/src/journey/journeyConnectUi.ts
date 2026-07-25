@@ -70,7 +70,7 @@ export function journeyMobileChoiceLabels(): {
     payHint: 'Requires the Nimiq Pay app',
     hubIdle: 'Continue in browser',
     hubBusy: 'Opening Hub…',
-    hubHint: 'Nimiq Hub — one step, no app install',
+    hubHint: 'Nimiq Hub - one step, no app install',
     storesLabel: 'Get Nimiq Pay',
   }
 }
@@ -107,7 +107,7 @@ export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
         title: 'Login with Nimiq',
         about,
         steps: [
-          'Continue opens Nimiq Hub once in this browser — no app install, no pop-up chain.',
+          'Continue opens Nimiq Hub once in this browser - no app install, no pop-up chain.',
           'Pick or create a wallet, approve the sign-in, and return logged in.',
         ],
       }
@@ -129,7 +129,7 @@ export function journeyConnectLead(
     role === 'signer'
       ? ' After connect you can drop the shared document to open the agreement.'
       : role === 'verifier'
-        ? ' Wallet is optional for verify — connect only if you need it.'
+        ? ' Wallet is optional for verify - connect only if you need it.'
         : ' After connect, step 2 opens the document stage.'
 
   switch (mode) {
@@ -140,6 +140,6 @@ export function journeyConnectLead(
     case 'hub-fallback':
       return `Nimiq Pay did not open. Install the app, or continue with Nimiq Hub in this browser.${tail}`
     case 'hub':
-      return `Connect your Nimiq wallet in the browser via Nimiq Hub — no app install needed.${tail}`
+      return `Connect your Nimiq wallet in the browser via Nimiq Hub - no app install needed.${tail}`
   }
 }

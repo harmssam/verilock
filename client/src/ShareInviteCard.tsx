@@ -44,12 +44,12 @@ interface ShareInviteCardProps {
   onCopyLink: () => void | boolean | Promise<void | boolean>
   /**
    * Local document still in memory (create/share session).
-   * When set, user can share or package the file — never uploaded.
+   * When set, user can share or package the file - never uploaded.
    */
   pdfFile?: File | null
   /**
    * Co-signer invite emails from the Signatures UI (client-only).
-   * Used as Mail / .eml To — no separate field here.
+   * Used as Mail / .eml To - no separate field here.
    */
   inviteRecipients?: string[]
   embedded?: boolean
@@ -115,7 +115,7 @@ function instructionItems(
             </>
           ) : (
             <>
-              Enter the co-signer invite email above, then <strong>Open in Mail</strong> — To and
+              Enter the co-signer invite email above, then <strong>Open in Mail</strong> - To and
               the invite body fill automatically
             </>
           )}
@@ -188,7 +188,7 @@ export function ShareInviteCard({
     [webShareOk],
   )
 
-  /** From Signatures UI only — no duplicate To field. */
+  /** From Signatures UI only - no duplicate To field. */
   const recipients = useMemo(
     () =>
       inviteRecipients
@@ -278,14 +278,14 @@ export function ShareInviteCard({
         setShareReady(true)
         window.setTimeout(() => setShareReady(false), 2200)
       } else if (result === 'cancelled') {
-        // User dismissed the sheet — no error.
+        // User dismissed the sheet - no error.
       } else {
         const fallback =
           plan.platform === 'windows'
             ? 'Download .eml package'
             : 'Open in Mail'
         setShareError(
-          `Sharing isn’t available here. Use “${fallback}” instead — the file never leaves this device for VeriLock.`,
+          `Sharing isn’t available here. Use “${fallback}” instead - the file never leaves this device for VeriLock.`,
         )
         setWebShareOk(false)
       }
@@ -306,7 +306,7 @@ export function ShareInviteCard({
     if (to === null) return
     if (to.length === 0) {
       setRecipientError(
-        'Add the co-signer invite email above first — Mail will open with that address filled in.',
+        'Add the co-signer invite email above first - Mail will open with that address filled in.',
       )
       return
     }
@@ -393,7 +393,7 @@ export function ShareInviteCard({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeCopyModal()
     }
-    // Prop is named `document` (SealDocument) — use globalThis for DOM.
+    // Prop is named `document` (SealDocument) - use globalThis for DOM.
     const dom = globalThis.document
     dom.addEventListener('keydown', onKey)
     const prev = dom.body.style.overflow
@@ -437,7 +437,7 @@ export function ShareInviteCard({
           {mailBusy
             ? 'Opening Mail…'
             : mailReady
-              ? 'Mail opened — attach file'
+              ? 'Mail opened - attach file'
               : 'Open in Mail'}
         </button>
       )
@@ -520,7 +520,7 @@ export function ShareInviteCard({
                     (<span className="share-pdf-name">{pdfName}</span>)
                   </>
                 ) : null}
-                . VeriLock never hosts the file — co-signers use that exact file to verify the
+                . VeriLock never hosts the file - co-signers use that exact file to verify the
                 fingerprint matches.
               </p>
               <ul className="share-copy-modal-steps">
@@ -559,8 +559,8 @@ export function ShareInviteCard({
       {!embedded && <h2>Invite signers</h2>}
       <p className="muted share-card-intro">
         {document.signingProgress.required === 0
-          ? 'Direct seal mode — no signers to invite.'
-          : `${document.signingProgress.signed}/${document.signingProgress.required} signed — share with the other party.`}{' '}
+          ? 'Direct seal mode - no signers to invite.'
+          : `${document.signingProgress.signed}/${document.signingProgress.required} signed - share with the other party.`}{' '}
         {canPackEml ? (
           withPdfName(shareIntroForPlan(plan, pdfName), pdfName)
         ) : (
@@ -672,7 +672,7 @@ export function ShareInviteCard({
           ) : plan.platform === 'ios' ? (
             <>
               {' '}
-              If To is blank in Mail, prefer <strong>Open in Mail</strong> instead — Mail often
+              If To is blank in Mail, prefer <strong>Open in Mail</strong> instead - Mail often
               ignores To on imported drafts.
             </>
           ) : (

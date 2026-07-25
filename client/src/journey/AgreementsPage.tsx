@@ -46,7 +46,7 @@ const SERVER_LIST_CAP = 100
 
 type BucketFilter = 'all' | AgreementBucket
 
-/** Compact chip copy — section headings still use BUCKET_LABELS. */
+/** Compact chip copy - section headings still use BUCKET_LABELS. */
 const CHIP_OPTIONS: Array<{ key: BucketFilter; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'needs_you', label: 'Needs you' },
@@ -166,7 +166,7 @@ export function AgreementsPage({
   const [archiveDone, setArchiveDone] = useState(false)
   const [archiveError, setArchiveError] = useState<string | null>(null)
   const [archiveEmailAvailable, setArchiveEmailAvailable] = useState(false)
-  /** Sync guard — React state alone can miss double-clicks before re-render. */
+  /** Sync guard - React state alone can miss double-clicks before re-render. */
   const archiveInFlightRef = useRef(false)
   /** Doc id being archived so background completion still updates the list. */
   const archiveDocIdRef = useRef<string | null>(null)
@@ -294,7 +294,7 @@ export function AgreementsPage({
       setArchiveCredits(quote.alreadyPaid ? 0 : quote.credits)
       setArchiveBalance(quote.balance)
       if (quote.jobStatus === 'processing') {
-        // Job still running (e.g. after a prior 524) — show progress and poll.
+        // Job still running (e.g. after a prior 524) - show progress and poll.
         setPendingArchive(doc)
         setArchiveBusy(true)
         setArchiveDone(false)
@@ -425,7 +425,7 @@ export function AgreementsPage({
           return
         }
         if (quote.jobStatus === 'failed' && !quote.alreadyPaid) {
-          // Failed and refunded — show error.
+          // Failed and refunded - show error.
           applyArchiveQuoteToDocs(docId, quote)
           setArchiveBusy(false)
           setArchiveError(
@@ -437,7 +437,7 @@ export function AgreementsPage({
           return
         }
         if (quote.jobStatus === 'failed' && quote.alreadyPaid) {
-          // Partial — can resume free; stop busy and show resume message.
+          // Partial - can resume free; stop busy and show resume message.
           applyArchiveQuoteToDocs(docId, { ...quote, eligible: true })
           setArchiveBusy(false)
           setArchiveError(
@@ -448,19 +448,19 @@ export function AgreementsPage({
           if (archiveModalOpenRef.current) setPendingArchive(docSnapshot)
           return
         }
-        // Still processing — keep UI busy
+        // Still processing - keep UI busy
       }
 
       // Timed out polling (job may still be running server-side).
       applyArchiveQuoteToDocs(docId, last ?? started)
       setArchiveBusy(false)
       setArchiveError(
-        'Still writing in the background. Close this window and reopen Store forever later — if credits were charged, resume is free.',
+        'Still writing in the background. Close this window and reopen Store forever later - if credits were charged, resume is free.',
       )
       if (archiveModalOpenRef.current) setPendingArchive(docSnapshot)
     } catch (err) {
       setArchiveBusy(false)
-      // 524 / network: job may still be running or already paid — refresh quote.
+      // 524 / network: job may still be running or already paid - refresh quote.
       try {
         const quote = await api.getOnChainDataQuote(token, docId)
         if (typeof quote.balance === 'number') {
@@ -478,7 +478,7 @@ export function AgreementsPage({
         if (quote.alreadyPaid || quote.jobStatus === 'processing') {
           setArchiveError(
             quote.jobStatus === 'processing'
-              ? 'Connection dropped while writing — work may still be running. Wait a minute, then open Store forever again (resume is free if already paid).'
+              ? 'Connection dropped while writing - work may still be running. Wait a minute, then open Store forever again (resume is free if already paid).'
               : 'Request interrupted after credits were reserved. Click Store forever again to resume free of charge.',
           )
           if (archiveModalOpenRef.current) setPendingArchive(docSnapshot)
@@ -490,7 +490,7 @@ export function AgreementsPage({
       setArchiveError(
         err instanceof Error
           ? err.message
-          : 'Could not start blockchain storage — check My agreements and try again',
+          : 'Could not start blockchain storage - check My agreements and try again',
       )
       if (archiveModalOpenRef.current) {
         setPendingArchive(docSnapshot)
@@ -583,7 +583,7 @@ export function AgreementsPage({
             <h2>Your agreements</h2>
             <p className="muted agreements-page-subtitle">
               No agreements yet for <span className="agreements-page-wallet">{shortAddress(address)}</span>.
-              When you create or sign, they show up here — even years later.
+              When you create or sign, they show up here - even years later.
             </p>
           </div>
         </header>

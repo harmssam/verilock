@@ -1,4 +1,4 @@
-# Production packaging — single SPA
+# Production packaging - single SPA
 
 **One production frontend.** Default `npm run build`, `Dockerfile`, and `railway.toml` package the light shell + journey product flow into `client/dist`.
 
@@ -8,7 +8,7 @@ Legacy dual-service names (`service-b`, `package:service-b`, `Dockerfile.service
 
 | Service | URL | Notes |
 |---------|-----|--------|
-| **VeriLock-Journey** | https://verilock.online | Production — SPA + volume `verilock-journey-volume` |
+| **VeriLock-Journey** | https://verilock.online | Production - SPA + volume `verilock-journey-volume` |
 | **VeriLock** (legacy host) | https://verilock-production.up.railway.app | Optional rollback; volume `nimiq-seal-volume` |
 
 Redeploy production:

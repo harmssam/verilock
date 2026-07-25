@@ -44,7 +44,7 @@ interface PdfAnnotatorProps {
 
 /**
  * Local-only document annotator: render PDF or image, place signature/text overlays.
- * Emits normalized annotations — no file bytes ever leave this component.
+ * Emits normalized annotations - no file bytes ever leave this component.
  */
 export function PdfAnnotator({
   file,
@@ -641,7 +641,7 @@ export function PdfAnnotator({
             className="pdf-annotator-text-input"
             value={textDraft}
             onChange={e => setTextDraft(e.target.value)}
-            placeholder="e.g. Agreed — Jane Doe"
+            placeholder="e.g. Agreed - Jane Doe"
             disabled={disabled || !canAddText(annotations)}
             rows={2}
           />
@@ -678,7 +678,7 @@ export function PdfAnnotator({
             {MAX_TEXT_ANNOTATIONS} text, {MAX_MARK_ANNOTATIONS} check/X marks.
           </p>
           {annotations.length === 0 ? (
-            <p className="pdf-annotator-hint">None yet — place a signature or text on a page.</p>
+            <p className="pdf-annotator-hint">None yet - place a signature or text on a page.</p>
           ) : (
             <ul className="pdf-annotator-list">
               {annotations.map(a => (
@@ -729,7 +729,7 @@ export function PdfAnnotator({
             </button>
           )}
           <p className="pdf-annotator-hint">
-            Document stays on this device. Hash + annotation paths/text go to the server — never the
+            Document stays on this device. Hash + annotation paths/text go to the server - never the
             file bytes.
           </p>
         </aside>

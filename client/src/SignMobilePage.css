@@ -101,7 +101,7 @@
 }
 
 /*
- * Landscape: stage height is short — size the pad by available height so aspect
+ * Landscape: stage height is short - size the pad by available height so aspect
  * does not collapse to 0 (height:100% + aspect-ratio was a circular flex layout).
  */
 @media (orientation: landscape) {

@@ -40,6 +40,9 @@ interface CreditsPublicInfo {
   /** Live pack totals for the smallest pack (Stripe floor may apply). */
   minPack: number | null
   minPackStripeUsd: number | null
+  /** Quote fetch settled (success or fail) - avoids infinite "Live USD quote…". */
+  quoteReady: boolean
+  quoteError: boolean
 }
 
 export interface PricePageProps {
@@ -65,6 +68,7 @@ export function PricePage({
 }: PricePageProps = {}) {
   const pricing = getSealPricing()
   const [creditsInfo, setCreditsInfo] = useState<CreditsPublicInfo | null>(null)
+  const [quoteRefreshKey, setQuoteRefreshKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -76,18 +80,40 @@ export function PricePage({
           api.creditsPackQuotes().catch(() => null),
         ])
         if (cancelled) return
-        const packs = cfg.packs?.length ? cfg.packs : packCatalog?.packs.map(p => p.pack) ?? [10, 25, 50, 100]
+        const packs = cfg.packs?.length
+          ? cfg.packs
+          : (packCatalog?.packs.map(p => p.pack) ?? [10, 25, 50, 100])
         const minPack = packs[0] ?? 10
         const minPackQuote = packCatalog?.packs.find(p => p.pack === minPack) ?? null
+        // Prefer unit quote; if it failed, back-solve from min pack (pre-floor when possible).
+        let creditStripeUsd =
+          unitQuote != null && Number.isFinite(unitQuote.creditStripeUsd)
+            ? unitQuote.creditStripeUsd
+            : null
+        if (
+          creditStripeUsd == null &&
+          minPackQuote != null &&
+          minPack > 0 &&
+          Number.isFinite(minPackQuote.creditStripeUsdTotal)
+        ) {
+          // Pack total may include Stripe floor - still better than blank.
+          creditStripeUsd = minPackQuote.creditStripeUsdTotal / minPack
+        }
+        const minPackStripeUsd =
+          minPackQuote != null && Number.isFinite(minPackQuote.creditStripeUsdTotal)
+            ? minPackQuote.creditStripeUsdTotal
+            : null
         setCreditsInfo({
           enabled: cfg.enabled,
           stripeEnabled: cfg.stripeEnabled,
           stripeMarkup: cfg.stripeMarkup,
           stripeMinChargeCents: cfg.stripeMinChargeCents,
           packs,
-          creditStripeUsd: unitQuote?.creditStripeUsd ?? null,
+          creditStripeUsd,
           minPack,
-          minPackStripeUsd: minPackQuote?.creditStripeUsdTotal ?? null,
+          minPackStripeUsd,
+          quoteReady: true,
+          quoteError: creditStripeUsd == null && minPackStripeUsd == null,
         })
       } catch {
         if (!cancelled) {
@@ -100,6 +126,8 @@ export function PricePage({
             creditStripeUsd: null,
             minPack: 10,
             minPackStripeUsd: null,
+            quoteReady: true,
+            quoteError: true,
           })
         }
       }
@@ -107,7 +135,7 @@ export function PricePage({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [quoteRefreshKey])
 
   const signedIn = Boolean(token && address)
   const creditsEnabled = creditsInfo?.enabled !== false
@@ -115,8 +143,16 @@ export function PricePage({
   const halfPrice = stripeMarkup === 2
   const stripeMinUsd = (creditsInfo?.stripeMinChargeCents ?? 50) / 100
   const minPack = creditsInfo?.minPack ?? 10
-  const unitBelowStripeMin =
-    creditsInfo?.creditStripeUsd != null && creditsInfo.creditStripeUsd < stripeMinUsd
+  const unitUsd = creditsInfo?.creditStripeUsd ?? null
+  const minPackUsd = creditsInfo?.minPackStripeUsd ?? null
+  const quoteReady = creditsInfo?.quoteReady === true
+  const unitBelowStripeMin = unitUsd != null && unitUsd < stripeMinUsd
+  /** Card checkout is pack-based when unit rate is under Stripe's floor. */
+  const showPackAsPrimary =
+    quoteReady &&
+    unitBelowStripeMin &&
+    minPackUsd != null &&
+    Number.isFinite(minPackUsd)
 
   return (
     <div className="card price-page">
@@ -241,31 +277,67 @@ export function PricePage({
               Credit card
             </span>
             <div className="price-page-model-value price-page-model-value--card">
-              {creditsInfo?.creditStripeUsd != null ? (
+              {!quoteReady ? (
+                <span
+                  className="price-page-model-card-price price-page-model-card-price--pending"
+                  role="status"
+                >
+                  <LoaderCircle
+                    className="btn-spinner"
+                    size={16}
+                    strokeWidth={2.5}
+                    aria-hidden
+                  />
+                  Loading live USD price
+                </span>
+              ) : showPackAsPrimary ? (
                 <span className="price-page-model-card-price">
-                  {formatFiatAmount(creditsInfo.creditStripeUsd, 'USD')}
+                  {formatFiatAmount(minPackUsd!, 'USD')}
+                  <span className="price-page-model-per">for {minPack} credits</span>
+                </span>
+              ) : unitUsd != null ? (
+                <span className="price-page-model-card-price">
+                  {formatFiatAmount(unitUsd, 'USD')}
                   <span className="price-page-model-per">per credit</span>
+                </span>
+              ) : minPackUsd != null ? (
+                <span className="price-page-model-card-price">
+                  {formatFiatAmount(minPackUsd, 'USD')}
+                  <span className="price-page-model-per">for {minPack} credits</span>
                 </span>
               ) : (
                 <span className="price-page-model-card-price price-page-model-card-price--pending">
-                  Live USD quote…
+                  USD price unavailable
+                  <button
+                    type="button"
+                    className="btn btn-ghost price-page-quote-retry"
+                    onClick={() => {
+                      setCreditsInfo(prev =>
+                        prev
+                          ? { ...prev, quoteReady: false, quoteError: false }
+                          : prev,
+                      )
+                      setQuoteRefreshKey(k => k + 1)
+                    }}
+                  >
+                    Retry
+                  </button>
                 </span>
               )}
             </div>
             <p className="muted price-page-model-hint">
-              {halfPrice ? `${stripeMarkup}× live NIM rate` : 'Live NIM rate'} via{' '}
+              {halfPrice ? `${stripeMarkup}x live NIM rate` : 'Live NIM rate'} via{' '}
               <a href={FASTSPOT_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
                 Fastspot
               </a>
               .
-              {unitBelowStripeMin && (
+              {showPackAsPrimary && (
                 <>
                   {' '}
-                  Min charge {formatFiatAmount(stripeMinUsd, 'USD')}
-                  {creditsInfo?.minPackStripeUsd != null
-                    ? `: ${minPack}-credit pack (${formatFiatAmount(creditsInfo.minPackStripeUsd, 'USD')})`
-                    : ` from a ${minPack}-credit pack`}
-                  .
+                  {unitUsd != null
+                    ? `About ${formatFiatAmount(unitUsd, 'USD')} per credit before the card minimum. `
+                    : null}
+                  Checkout is pack-based (Stripe min {formatFiatAmount(stripeMinUsd, 'USD')}).
                 </>
               )}
             </p>

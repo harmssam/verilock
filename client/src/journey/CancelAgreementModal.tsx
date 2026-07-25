@@ -1,6 +1,6 @@
 /**
  * Confirm cancel (draft) or purge server copy (fully on-chain backed-up).
- * Portaled dialog — replaces native window.confirm.
+ * Portaled dialog - replaces native window.confirm.
  */
 import { AlertTriangle, Database, LoaderCircle, Trash2, X } from 'lucide-react'
 import { useEffect, useId, useRef } from 'react'
@@ -141,12 +141,12 @@ export function CancelAgreementModal({
               <li>On-chain fingerprint lock remains public on Nimiq.</li>
               <li>On-chain signatures and field data (if stored) remain on Nimiq.</li>
               <li>VeriLock list entry, invites, and server metadata are removed.</li>
-              <li>Your local PDF is not deleted — only our app record.</li>
+              <li>Your local PDF is not deleted - only our app record.</li>
             </>
           ) : (
             <>
               <li>Co-signer invite links for this draft will stop working.</li>
-              <li>Your local document file is not deleted — only the VeriLock record.</li>
+              <li>Your local document file is not deleted - only the VeriLock record.</li>
               <li>This cannot be undone.</li>
             </>
           )}

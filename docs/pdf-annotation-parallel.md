@@ -1,4 +1,4 @@
-# PDF annotation lab — parallel to seal
+# PDF annotation lab - parallel to seal
 
 The PDF overlay + Nimiq stream work is a **parallel product path**. It must not change seal behavior (wallet sign, credits, attestations, prepare-lock).
 
@@ -6,8 +6,8 @@ The PDF overlay + Nimiq stream work is a **parallel product path**. It must not 
 
 | Surface | Role |
 |---------|------|
-| `/` … `/d/:slug`, seal, credits | **Active product** — DocumentJourney |
-| `/pdf`, `/pdf/lab` | **Lab** — annotate, pack, on-chain stream, reconstruct |
+| `/` … `/d/:slug`, seal, credits | **Active product** - DocumentJourney |
+| `/pdf`, `/pdf/lab` | **Lab** - annotate, pack, on-chain stream, reconstruct |
 
 No landing path card points at `/pdf` unless you add one later.
 
@@ -29,12 +29,12 @@ No landing path card points at `/pdf` unless you add one later.
 
 ## Live testing without risking production deploys
 
-**Option A — same site, lab URL only (current)**  
+**Option A - same site, lab URL only (current)**  
 - Product: `https://verilock.online/`  
 - Lab: `https://verilock.online/pdf` (noindex)  
 - Seal path unchanged; only `/pdf` uses lab code.
 
-**Option B — Railway staging environment (recommended for risky deploys)**  
+**Option B - Railway staging environment (recommended for risky deploys)**  
 
 ```bash
 railway environment new staging --duplicate production
@@ -49,7 +49,7 @@ Copy seal-critical vars to staging; use a **separate** funded service wallet if 
 On the creator rail, **Arrange** embeds `PlacementEditor` in production `DocumentJourney` when `PDF_ANNOTATION_UI` / `FEATURES.pdfAnnotationUi` is on:
 
 1. Fingerprint → create  
-2. **Arrange** — name people, place empty signature/name boxes, lock placements (`POST /api/placement-plans`)  
+2. **Arrange** - name people, place empty signature/name boxes, lock placements (`POST /api/placement-plans`)  
 3. Sign (wallet + fill slots later in Phase 3)  
 4. Invite / wait for co-signers  
 5. Seal  

@@ -23,7 +23,7 @@ export async function notifyDataArchiveComplete(input: {
     const doc = getDocumentById(input.documentId)
     const title = doc?.title?.trim() || 'your agreement'
     const link = agreementsDeepLink()
-    const subject = `Data stored on the Nimiq blockchain — "${title}"`
+    const subject = `Data stored on the Nimiq blockchain - "${title}"`
     const text = [
       'Hi,',
       '',
@@ -32,9 +32,9 @@ export async function notifyDataArchiveComplete(input: {
       'Open My agreements anytime to review the status:',
       link,
       '',
-      'VeriLock never hosts your PDF — keep your local copy.',
+      'VeriLock never hosts your PDF - keep your local copy.',
       '',
-      '—',
+      '-',
       'VeriLock · Sign today. Prove forever.',
     ].join('\n')
 
@@ -46,7 +46,7 @@ export async function notifyDataArchiveComplete(input: {
         <p>Open <strong>My agreements</strong> anytime to review:</p>
         <p><a href="${link}" style="display:inline-block;padding:12px 18px;background:#0d9488;color:#fff;text-decoration:none;border-radius:999px;font-weight:600">Open My agreements</a></p>
         <p style="font-size:14px;color:#475569">Or paste this link:<br/><a href="${link}">${link}</a></p>
-        <p style="font-size:13px;color:#64748b">VeriLock never hosts your PDF — keep your local copy.</p>
+        <p style="font-size:13px;color:#64748b">VeriLock never hosts your PDF - keep your local copy.</p>
         <p style="font-size:12px;color:#94a3b8">VeriLock · Sign today. Prove forever.</p>
       </div>
     `.trim()

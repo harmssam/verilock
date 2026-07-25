@@ -24,7 +24,7 @@ export interface JourneyStage {
 
 /**
  * Creator path stages (rail + how-it-works).
- * Wallet login is a gate on create/sign/seal — not a numbered stage.
+ * Wallet login is a gate on create/sign/seal - not a numbered stage.
  */
 export const CREATOR_STAGES: JourneyStage[] = [
   {
@@ -34,14 +34,14 @@ export const CREATOR_STAGES: JourneyStage[] = [
     blurb:
       'Drop a PDF, PNG, JPEG, or WebP. We only register its fingerprint (no signing yet). Next you arrange who signs where.',
     privacyNote:
-      'Opened in your browser only — never sent to VeriLock servers. Only the fingerprint is registered.',
+      'Opened in your browser only - never sent to VeriLock servers. Only the fingerprint is registered.',
   },
   {
     id: 'share',
     label: 'Arrange',
     verb: 'Design where people will sign',
     blurb:
-      'This step is design only — not signing. Name each person, place empty signature / initial / name boxes on the document, and choose whether you are one of them (or only organizing). Continue when the layout looks right; signing and invites come next.',
+      'This step is design only - not signing. Name each person, place empty signature / initial / name boxes on the document, and choose whether you are one of them (or only organizing). Continue when the layout looks right; signing and invites come next.',
     privacyNote: 'Only placement geometry is stored, not the document bytes.',
   },
   {
@@ -98,7 +98,7 @@ export const VERIFIER_STAGES: JourneyStage[] = [
     label: 'Verify',
     verb: 'Check a document',
     blurb: 'Drop a locked document. We fingerprint it locally and match the on-chain record.',
-    privacyNote: 'The file stays on this device — only the fingerprint is checked.',
+    privacyNote: 'The file stays on this device - only the fingerprint is checked.',
   },
 ]
 
@@ -169,7 +169,7 @@ export function toJourneyDoc(doc: SealDocument, fileSize = 0): JourneyDoc {
 
   const parties: JourneyParty[] = doc.parties.map(p => {
     const sig = doc.signatures.find(s => s.partyId === p.id)
-    // Only a real signature record counts as signed — never party status alone.
+    // Only a real signature record counts as signed - never party status alone.
     const signed = Boolean(sig)
     return {
       id: p.id,
@@ -235,7 +235,7 @@ export function signedCount(doc: JourneyDoc): number {
 
 /**
  * Whether this wallet already submitted a signature on the agreement.
- * Prefer signature rows (signerAddress) — party.walletAddress may still be null
+ * Prefer signature rows (signerAddress) - party.walletAddress may still be null
  * after an open-slot claim until a refresh binds it.
  */
 export function walletHasSignedJourneyDoc(

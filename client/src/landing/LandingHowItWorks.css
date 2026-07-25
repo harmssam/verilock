@@ -1,4 +1,4 @@
-/* How VeriLock works — redesign motion + registry palette
+/* How VeriLock works - redesign motion + registry palette
    Easing: ease-out-expo. No bounce. Content stays readable while revealing. */
 
 .lr-how {
@@ -608,7 +608,7 @@
   }
 }
 
-/* Fingerprint — file icon → arrow → fingerprint (no boxes) */
+/* Fingerprint - file icon → arrow → fingerprint (no boxes) */
 .lr-how-visual--fingerprint {
   display: flex;
   align-items: center;
@@ -737,7 +737,7 @@
   min-height: 4.4rem;
 }
 
-/* Share — FileText icon alone (no surrounding box) */
+/* Share - FileText icon alone (no surrounding box) */
 .lr-share-doc {
   position: absolute;
   left: 0.15rem;
@@ -835,7 +835,7 @@
   }
 }
 
-/* SVG <circle> people — fill/stroke, not HTML border-box */
+/* SVG <circle> people - fill/stroke, not HTML border-box */
 .lr-share-person {
   fill: rgba(15, 23, 42, 0.08);
   stroke: rgba(255, 255, 255, 0.22);
@@ -1153,7 +1153,7 @@
   animation-delay: 0.34s;
 }
 
-/* Verify: document + magnifier — one slow pass, then rest */
+/* Verify: document + magnifier - one slow pass, then rest */
 .lr-how-inspect {
   position: relative;
   width: 100%;

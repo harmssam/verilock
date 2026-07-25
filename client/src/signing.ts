@@ -114,7 +114,7 @@ export function resolveSigningParty(
     return { ok: true, party: assigned, reason: 'assigned' }
   }
 
-  // Pre-bound addresses that are not this wallet — do not offer them as open picks.
+  // Pre-bound addresses that are not this wallet - do not offer them as open picks.
   const open = pending.filter(p => !p.walletAddress)
 
   if (!allowOpenClaim) {
@@ -151,7 +151,7 @@ export function resolveSigningParty(
           message: `This invite is for ${preferred.displayName ?? 'a specific person'} and wallet ${shortAddress(preferred.walletAddress)}. Connect that wallet to continue.`,
         }
       }
-      // Name-only (or unbound) slot — claim this preferred party
+      // Name-only (or unbound) slot - claim this preferred party
       return { ok: true, party: preferred, reason: 'preferred' }
     }
   }
@@ -170,12 +170,12 @@ export function resolveSigningParty(
     }
   }
 
-  // Single open name-only slot — claim it directly
+  // Single open name-only slot - claim it directly
   if (open.length === 1) {
     return { ok: true, party: open[0]!, reason: 'open' }
   }
 
-  // Multiple open name-only parties — invitee must pick who they are
+  // Multiple open name-only parties - invitee must pick who they are
   return {
     ok: false,
     hint: 'pick_person',

@@ -1,5 +1,5 @@
 /**
- * How VeriLock works — shell home accordion (light production SPA).
+ * How VeriLock works - shell home accordion (light production SPA).
  * Stages/copy match the product flow; quieter motion for the landing surface.
  * Beat animations start when each step scrolls into view and play once (no loop).
  */

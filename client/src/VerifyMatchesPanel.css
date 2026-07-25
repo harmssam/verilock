@@ -1,4 +1,4 @@
-/* Verify match panel — light production shell (mint on white). */
+/* Verify match panel - light production shell (mint on white). */
 
 .verify-matches {
   margin-top: 1rem;
@@ -82,7 +82,7 @@
   flex-shrink: 0;
 }
 
-/* File row: light surface, readable mono — never dark glass */
+/* File row: light surface, readable mono - never dark glass */
 .verify-matches .document-filename,
 .verify-match-filename {
   display: flex;

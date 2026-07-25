@@ -16,7 +16,7 @@
   font-size: 0.8125rem;
 }
 
-/* Icon-only tools (checkmark / X) — square hit target, no label gap */
+/* Icon-only tools (checkmark / X) - square hit target, no label gap */
 .pdf-annotator-toolbar .btn.btn-icon-only {
   display: inline-flex;
   align-items: center;
@@ -95,7 +95,7 @@
   background: #fff;
   user-select: none;
   /* Finger pan scrolls the stage (critical on phone/iPad). Keep pan enabled even
-     while a place tool is active — placement uses tap (pointerup without drag),
+     while a place tool is active - placement uses tap (pointerup without drag),
      not pointerdown, so scrolling and placing can coexist. */
   touch-action: pan-x pan-y;
 }

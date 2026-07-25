@@ -11,7 +11,7 @@ export function utf8Buffer(s: string): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
 }
 
-/** SHA-256 hex — uses Web Crypto (browser + Node 19+); no pdf.js dependency. */
+/** SHA-256 hex - uses Web Crypto (browser + Node 19+); no pdf.js dependency. */
 export async function sha256HexBytes(data: ArrayBuffer | Uint8Array): Promise<string> {
   const buf =
     data instanceof Uint8Array
@@ -49,7 +49,7 @@ export function isInkPlacementKind(kind: PlacementKind | string): boolean {
   return kind === 'signature' || kind === 'initial'
 }
 
-/** Empty template on the page — no ink/text payload until a fill. */
+/** Empty template on the page - no ink/text payload until a fill. */
 export interface PlacementSlot {
   id: string
   /** Which person fills this (matches ConstructionPerson.slotIndex). */
@@ -162,7 +162,7 @@ export const MIN_CONSTRUCTION_PEOPLE = 1
 
 /** Stable palette for person chips / slots (cycles if ever needed beyond length). */
 /**
- * Person chip / slot colors — spaced around the hue wheel so neighbors stay distinct
+ * Person chip / slot colors - spaced around the hue wheel so neighbors stay distinct
  * on light UI (no two teals, no amber+orange pair, no rose+pink+fuchsia pile-up).
  */
 export const PERSON_COLORS = [
@@ -353,7 +353,7 @@ export async function computeBlobSha256(payload: BlobPayload): Promise<string> {
   return sha256HexBytes(utf8Buffer(blobPayloadToCanonicalJson(payload)))
 }
 
-/** First 16 bytes (32 hex) of payload hash — content-addressed blob id. */
+/** First 16 bytes (32 hex) of payload hash - content-addressed blob id. */
 export async function computeBlobId(payload: BlobPayload): Promise<string> {
   const full = await computeBlobSha256(payload)
   return full.slice(0, 32)

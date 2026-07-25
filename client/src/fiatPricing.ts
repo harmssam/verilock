@@ -31,11 +31,23 @@ export function nimToFiat(nim: number, currency: FiatCurrency, prices: NimPrices
 }
 
 export function formatFiatAmount(amount: number, currency: FiatCurrency): string {
-  const fractionDigits = amount < 0.01 ? 4 : amount < 1 ? 3 : 2
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: Math.min(fractionDigits, 2),
-    maximumFractionDigits: fractionDigits,
-  }).format(amount)
+  if (!Number.isFinite(amount)) return 'n/a'
+  const abs = Math.abs(amount)
+  // Sub-dollar live rates need extra precision; whole dollars stay at 2.
+  const maximumFractionDigits = abs > 0 && abs < 0.01 ? 4 : abs > 0 && abs < 1 ? 3 : 2
+  const minimumFractionDigits = Math.min(2, maximumFractionDigits)
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits,
+      maximumFractionDigits,
+    }).format(amount)
+  } catch {
+    // Rare engine quirks with currency + fraction options.
+    const fixed = amount.toFixed(maximumFractionDigits)
+    if (currency === 'USD') return `$${fixed}`
+    if (currency === 'EUR') return `€${fixed}`
+    return `CA$${fixed}`
+  }
 }

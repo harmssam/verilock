@@ -70,22 +70,22 @@ export function PrivacyPolicyPage() {
         <h3>Third-party services</h3>
         <ul className="privacy-policy-list muted">
           <li>
-            <strong>Nimiq</strong> — wallet connection, signing, and on-chain attestation via Nimiq Hub and
+            <strong>Nimiq</strong> - wallet connection, signing, and on-chain attestation via Nimiq Hub and
             Nimiq Pay
           </li>
           <li>
-            <strong>Fastspot</strong> — estimated fiat exchange rates shown on the pricing page (fee amounts
+            <strong>Fastspot</strong> - estimated fiat exchange rates shown on the pricing page (fee amounts
             only; no personal data is sent)
           </li>
           <li>
-            <strong>Google Fonts</strong> — web fonts loaded from Google&apos;s CDN when you open the app
+            <strong>Google Fonts</strong> - web fonts loaded from Google&apos;s CDN when you open the app
           </li>
           <li>
-            <strong>Resend</strong> — transactional email delivery (optional ready-to-seal notifications and
+            <strong>Resend</strong> - transactional email delivery (optional ready-to-seal notifications and
             support form messages)
           </li>
           <li>
-            <strong>Cloudflare Turnstile</strong> — bot protection on the support form when enabled
+            <strong>Cloudflare Turnstile</strong> - bot protection on the support form when enabled
           </li>
         </ul>
         <p className="muted">We do not use advertising or analytics trackers.</p>

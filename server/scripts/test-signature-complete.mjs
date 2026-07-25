@@ -82,7 +82,7 @@ try {
 }
 assert(prepareThrew, 'prepareLock must reject incomplete collection')
 
-// Tenant signs — now ready
+// Tenant signs - now ready
 pub = addSignature({
   documentId: docId,
   partyId: tenant.id,

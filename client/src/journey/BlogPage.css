@@ -335,7 +335,7 @@
   }
 }
 
-/* Post article — same shell width as blog index (no narrower column) */
+/* Post article - same shell width as blog index (no narrower column) */
 .blog-page--post {
   width: 100%;
   max-width: none;
@@ -387,7 +387,7 @@
   margin-top: 0.35rem;
 }
 
-/* Default block rhythm — airier than dense card UIs */
+/* Default block rhythm - airier than dense card UIs */
 .blog-body > * + * {
   margin-top: 1.15rem;
 }
@@ -450,7 +450,7 @@
   clear: both;
 }
 
-/* Pull quote — editorial break without full-width media */
+/* Pull quote - editorial break without full-width media */
 .blog-body-quote {
   margin: 0;
   padding: 0.35rem 0 0.35rem 1.15rem;
@@ -533,7 +533,7 @@
   width: 100%;
 }
 
-/* Centered inset — shorter aspect, less banner-like */
+/* Centered inset - shorter aspect, less banner-like */
 .blog-figure--narrow {
   clear: both;
   width: min(100%, 22rem);

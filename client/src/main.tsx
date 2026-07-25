@@ -1,5 +1,5 @@
 /**
- * Production UI entry — light shell + journey product flow.
+ * Production UI entry - light shell + journey product flow.
  * Built via vite.config.ts → client/dist. See AGENTS.md.
  */
 import { StrictMode } from 'react'
@@ -7,7 +7,7 @@ import { createRoot } from 'react-dom/client'
 import { restorePayReturnPathIfNeeded, savePayReturnPath } from './hubReturnPath'
 import { isMobileDevice, isNimiqPayHost, launchNimiqPayMiniApp } from './nimiq'
 import './index.css'
-/* Journey product styles — light production theme (dark base archived) */
+/* Journey product styles - light production theme (dark base archived) */
 import './journey/Journey.css'
 import { App } from './App'
 /* Shell layout (header/home/footer) then page chrome (pricing/404) */
@@ -18,7 +18,7 @@ import './landing/LandingHowItWorks.css'
 /**
  * Email “Open in Nimiq Pay” uses HTTPS `?openPay=1` (email clients often block
  * nimiqpay://). Strip the flag, stash the invite path, then hand off to Pay.
- * Desktop: only strip the flag — do not leave a sticky localStorage return path.
+ * Desktop: only strip the flag - do not leave a sticky localStorage return path.
  */
 function handleOpenPayQueryParam(): void {
   if (typeof window === 'undefined') return
@@ -28,7 +28,7 @@ function handleOpenPayQueryParam(): void {
   const cleanPath = `${url.pathname}${url.search}${url.hash}`
   const cleanHref = url.toString()
   window.history.replaceState(window.history.state, '', cleanPath)
-  // Already inside Pay WebView — just keep the clean invite URL.
+  // Already inside Pay WebView - just keep the clean invite URL.
   if (isNimiqPayHost()) return
   if (isMobileDevice()) {
     savePayReturnPath(cleanPath)

@@ -40,7 +40,7 @@ export function savePayReturnPath(path?: string): void {
   if (typeof window === 'undefined') return
   const next =
     path ?? `${window.location.pathname}${window.location.search}${window.location.hash}`
-  // Never stash bare home — nothing useful to restore.
+  // Never stash bare home - nothing useful to restore.
   if (!next || next === '/' || next === '') return
   try {
     localStorage.setItem(PAY_RETURN_PATH_KEY, next)
@@ -114,7 +114,7 @@ export function restorePayReturnPathIfNeeded(): string | null {
   }
 
   const current = window.location.pathname
-  // Already on a document/verify deep link — drop stale pending.
+  // Already on a document/verify deep link - drop stale pending.
   if (documentSlugFromPath(current) || verifySlugFromPath(current)) {
     clearPayReturnPath()
     return null

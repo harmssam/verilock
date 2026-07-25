@@ -335,7 +335,7 @@ export function SignatureStrokePad({
           <p className="sig-pad-hint muted">Draw with your finger or mouse. Clear to start over.</p>
         ) : (
           <p className="sig-pad-hint muted">
-            Vector ink with RDP ε={epsilon}px (lab default). PNG is preview only — path is what we
+            Vector ink with RDP ε={epsilon}px (lab default). PNG is preview only - path is what we
             keep.
           </p>
         ))}

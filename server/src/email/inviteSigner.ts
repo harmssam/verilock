@@ -1,5 +1,5 @@
 /**
- * Per-person signing invite (Resend). No PDF attachment — link + copy only.
+ * Per-person signing invite (Resend). No PDF attachment - link + copy only.
  */
 import { assertDocumentCreator } from '../documents.js'
 import { getPartiesForDocument, getPartyById } from '../db.js'
@@ -108,7 +108,7 @@ export async function sendPartyInviteEmail(input: {
 
   const base = documentDeepLink(doc.slug)
   const link = `${base}${base.includes('?') ? '&' : '?'}party=${encodeURIComponent(party.id)}`
-  // HTTPS bridge with openPay=1 — email clients often block nimiqpay:// schemes.
+  // HTTPS bridge with openPay=1 - email clients often block nimiqpay:// schemes.
   // Client strips the flag, stashes the path, then launches Nimiq Pay with the full URL.
   const payHttpsBridge = `${link}${link.includes('?') ? '&' : '?'}openPay=1`
   // Native scheme (plain-text + clients that allow it), full invite path in url=.
@@ -135,7 +135,7 @@ export async function sendPartyInviteEmail(input: {
     'Open in your browser (Nimiq Hub login works here):',
     link,
     '',
-    'Or open in the Nimiq Pay app (best on phone — installs Pay if needed via the site first):',
+    'Or open in the Nimiq Pay app (best on phone - installs Pay if needed via the site first):',
     payHttpsBridge,
     '',
     'Nimiq Pay direct link (if your mail app allows custom schemes):',
@@ -145,7 +145,7 @@ export async function sendPartyInviteEmail(input: {
     '',
     'Important: VeriLock never hosts or emails the PDF. Use the exact PDF file the organizer shared with you, then open a link above to match the fingerprint and sign.',
     '',
-    '—',
+    '-',
     'VeriLock · Sign today. Prove forever.',
     appPublicUrl(),
   ].join('\n')

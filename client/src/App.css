@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   Production light shell — layout, header, home, footer.
+   Production light shell - layout, header, home, footer.
    Journey components: journey/Journey.css (light-only theme).
    Pricing / 404 chrome: shellPages.css.
    ═══════════════════════════════════════════════════════════ */
@@ -17,7 +17,7 @@
 
 /*
  * .exp-app adds top padding for the old in-flow header. Light shell uses a
- * full-bleed sticky nav — kill top padding so the bar sits at the page edge.
+ * full-bleed sticky nav - kill top padding so the bar sits at the page edge.
  * Notch/status safe-area moves onto .lr-header instead.
  */
 .lr-app.exp-app {
@@ -33,7 +33,7 @@
 }
 
 /* Track view inherits .lr-app--landing; keep journey content full shell width
-   (production .exp-app is 760px — override so create/invite/verify match home). */
+   (production .exp-app is 760px - override so create/invite/verify match home). */
 .lr-app.lr-app--landing .lr-track,
 .lr-app.lr-app--landing .lr-track .journey {
   max-width: none;
@@ -114,8 +114,7 @@
 
 /*
  * Path card lives in .lr-track (page surface), not sticky header.
- * Full-bleed still with a light left veil — enough for title contrast without
- * boxing the photo into a hard right strip.
+ * Full-bleed still + shared white wash (all paths) + copy plate for contrast.
  */
 .lr-header-track {
   position: relative;
@@ -141,55 +140,21 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: saturate(1.05) brightness(1.01) contrast(1.06);
+  filter: saturate(0.95) brightness(1.02) contrast(1.02);
   /* Zoom via placementImageStyle --lr-path-zoom / transform */
   --lr-path-zoom: 1;
-  opacity: 0.9;
+  opacity: 0.88;
   pointer-events: none;
 }
 
-/* Soft left veil for copy; photo stays visible through the mid/right. */
+/*
+ * Same full-bleed white veil for every path (create / invited / verify).
+ * Mutes the still evenly so copy never sits on raw photo detail.
+ */
 .lr-header-track-wash {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    100deg,
-    rgba(255, 255, 255, 0.9) 0%,
-    rgba(255, 255, 255, 0.72) 26%,
-    rgba(255, 255, 255, 0.28) 52%,
-    rgba(255, 255, 255, 0.06) 78%,
-    transparent 100%
-  );
-}
-
-.lr-header-track--creator .lr-header-track-wash {
-  background: linear-gradient(
-    100deg,
-    rgba(255, 255, 255, 0.92) 0%,
-    rgba(240, 253, 250, 0.7) 24%,
-    rgba(255, 255, 255, 0.24) 50%,
-    transparent 78%
-  );
-}
-
-.lr-header-track--signer .lr-header-track-wash {
-  background: linear-gradient(
-    100deg,
-    rgba(255, 255, 255, 0.92) 0%,
-    rgba(236, 254, 255, 0.7) 24%,
-    rgba(255, 255, 255, 0.24) 50%,
-    transparent 78%
-  );
-}
-
-.lr-header-track--verifier .lr-header-track-wash {
-  background: linear-gradient(
-    100deg,
-    rgba(255, 255, 255, 0.92) 0%,
-    rgba(247, 254, 231, 0.68) 24%,
-    rgba(255, 255, 255, 0.24) 50%,
-    transparent 78%
-  );
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .lr-header-track-inner {
@@ -203,12 +168,17 @@
   padding: 1.2rem 1.25rem;
 }
 
+/* Solid-ish white plate behind title + detail for reliable contrast. */
 .lr-header-track-copy {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   min-width: 0;
-  max-width: min(36rem, 68%);
+  max-width: min(36rem, 72%);
+  padding: 0.55rem 0.75rem 0.6rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .lr-header-track .lr-track-title-row {
@@ -258,25 +228,17 @@
   }
 
   .lr-header-track-bg {
-    opacity: 0.82;
+    opacity: 0.85;
+  }
+
+  /* Same veil + copy plate on small screens (slightly stronger for busy stills). */
+  .lr-header-track-wash {
+    background: rgba(255, 255, 255, 0.6);
   }
 
   .lr-header-track-copy {
-    max-width: min(36rem, 78%);
-  }
-
-  /* Slightly stronger left veil on small screens — still not a solid slab */
-  .lr-header-track-wash,
-  .lr-header-track--creator .lr-header-track-wash,
-  .lr-header-track--signer .lr-header-track-wash,
-  .lr-header-track--verifier .lr-header-track-wash {
-    background: linear-gradient(
-      100deg,
-      rgba(255, 255, 255, 0.94) 0%,
-      rgba(255, 255, 255, 0.82) 34%,
-      rgba(255, 255, 255, 0.38) 62%,
-      rgba(255, 255, 255, 0.1) 100%
-    );
+    max-width: min(36rem, 92%);
+    background: rgba(255, 255, 255, 0.95);
   }
 }
 
@@ -578,7 +540,7 @@
   margin-top: 0.15rem;
 }
 
-/* Freemium pitch under CTAs — quiet, not a gradient banner */
+/* Freemium pitch under CTAs - quiet, not a gradient banner */
 .lr-promo {
   display: flex;
   flex-wrap: wrap;
@@ -706,7 +668,7 @@ html {
   max-width: 36rem;
 }
 
-/* Trust: shell transparent until hover / focus / expand — text only */
+/* Trust: shell transparent until hover / focus / expand - text only */
 .lr-trust {
   border-radius: 12px;
   border: 1px solid transparent;
@@ -856,7 +818,7 @@ html {
   color: var(--lr-muted);
 }
 
-/* Path cards — still fills card; translucent white label strip overlays the image */
+/* Path cards - still fills card; translucent white label strip overlays the image */
 
 .lr-paths {
   display: grid;
@@ -894,7 +856,7 @@ html {
   /* Slightly tighter radius so still + border fill corners (no page bg peek) */
   border-radius: 10px;
   /*
-   * Photo cards: white rim only — no slate drop-shadow / inset ring
+   * Photo cards: white rim only - no slate drop-shadow / inset ring
    * (those read as gray arcs at the bottom corners).
    * Hover: colored border + soft outer ring only, no gray lift shadow.
    */
@@ -929,7 +891,7 @@ html {
   box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.35);
 }
 
-/* Full-bleed still — covers entire card including under the frosted label strip */
+/* Full-bleed still - covers entire card including under the frosted label strip */
 .lr-path-thumb {
   position: absolute;
   /* Slight overscan so cover image seals rounded corners under the border */
@@ -1003,7 +965,7 @@ html {
   justify-content: center;
   flex-shrink: 0;
   margin-top: 0.06rem;
-  /* Bare Lucide mark — no chip / card chrome */
+  /* Bare Lucide mark - no chip / card chrome */
   width: auto;
   height: auto;
   padding: 0;
@@ -1125,7 +1087,7 @@ html {
 }
 
 /* Header Login: quiet cool surface so Nimiq hex gold leads.
-   Do not recolor .nimiq-hexagon-icon — keep official Nimiq gold fill. */
+   Do not recolor .nimiq-hexagon-icon - keep official Nimiq gold fill. */
 .lr-header .exp-connect-btn.btn-primary {
   background: var(--lr-accent) !important;
   color: #fff !important;
@@ -1215,7 +1177,7 @@ html {
   gap: 0.45rem;
 }
 
-/* Agreements page: Create & seal / New agreement — match light CTA style */
+/* Agreements page: Create & seal / New agreement - match light CTA style */
 .lr-app .agreements-page .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -1251,7 +1213,7 @@ html {
   box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
 }
 
-/* Agreements list on light shell — beat dark-glass item fills from ExperimentApp */
+/* Agreements list on light shell - beat dark-glass item fills from ExperimentApp */
 .lr-app .agreements-page-header h2 {
   color: var(--lr-text);
 }

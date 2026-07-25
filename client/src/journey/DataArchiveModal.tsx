@@ -74,7 +74,7 @@ export function DataArchiveModal({
   useEffect(() => {
     if (!doc) return
     const onKey = (e: KeyboardEvent) => {
-      // Allow Escape anytime — work continues on the server if already busy.
+      // Allow Escape anytime - work continues on the server if already busy.
       if (e.key === 'Escape') {
         e.preventDefault()
         onClose()
@@ -194,7 +194,7 @@ export function DataArchiveModal({
                 <li>
                   <span className="data-archive-fact-label">Cost</span>
                   <span className="data-archive-fact-value data-archive-fact-value--cost">
-                    {credits <= 0 ? 'Already paid — free resume' : creditLabel}
+                    {credits <= 0 ? 'Already paid - free resume' : creditLabel}
                   </span>
                 </li>
                 {balance != null && (

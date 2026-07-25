@@ -113,7 +113,7 @@ export async function buyCreditsWithNim(args: {
           } catch {
             /* ignore */
           }
-          onProgress('Pop-up blocked — redirecting to Nimiq Hub…')
+          onProgress('Pop-up blocked - redirecting to Nimiq Hub…')
           try {
             await sendCreditTopupViaHub(address, valueLuna, {
               preferRedirect: true,

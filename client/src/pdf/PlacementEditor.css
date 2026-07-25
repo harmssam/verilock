@@ -46,7 +46,7 @@
   border: 1px solid var(--border, #cbd5e1);
   border-radius: 6px;
   background: #fff;
-  /* Black icons on white — signature-style marks read clearly */
+  /* Black icons on white - signature-style marks read clearly */
   color: #0f172a;
   cursor: pointer;
   font: inherit;
@@ -540,7 +540,7 @@
   color: var(--text, #0f172a);
 }
 
-/* Quiet utility line — no callout box, no left accent bar */
+/* Quiet utility line - no callout box, no left accent bar */
 .placement-editor-hint--design,
 .placement-editor-hint--pick {
   padding: 0;
@@ -574,7 +574,7 @@
   overflow: visible;
 }
 
-/* Solid red remove control — top-right of each box */
+/* Solid red remove control - top-right of each box */
 .placement-slot-remove {
   position: absolute;
   top: -0.4rem;

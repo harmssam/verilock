@@ -156,7 +156,7 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
       }
 
       if (bodyContainsPdfBytes(body)) {
-        throw new Error('Refusing to send PDF bytes — annotations-only payload required')
+        throw new Error('Refusing to send PDF bytes - annotations-only payload required')
       }
       setLastPostBody({
         ...body,
@@ -259,13 +259,13 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
           integrityOk: recon.integrityOk,
         })
         setVerifyAnnotations(recon.annotations as PdfAnnotation[])
-        // Soft note only — wire/index reconstruct still succeeds on RPC rate limits
+        // Soft note only - wire/index reconstruct still succeeds on RPC rate limits
         if (recon.chainError && recon.source === 'index' && recon.integrityOk === false) {
           setError(
             `Could not fully re-read chain (${recon.chainError}). Showing stored stream copy.`,
           )
         } else if (recon.chainError && recon.source === 'wire') {
-          // Rate limit on optional HEAD/END sample — not fatal
+          // Rate limit on optional HEAD/END sample - not fatal
           setError(null)
         }
         return
@@ -303,7 +303,7 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
 
   /**
    * Lab: lock a synthetic two-person plan and pack a fill where two signature
-   * slots share one ink blob (dedup). Client-only — no server publish yet.
+   * slots share one ink blob (dedup). Client-only - no server publish yet.
    */
   const runPlacementDemo = useCallback(async () => {
     if (!pdfHash) {
@@ -551,7 +551,7 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
             <strong>Placement construction v2 (local packer)</strong>
             <p className="muted" style={{ margin: '0.35rem 0' }}>
               Locks a Tom/Alex plan (sig+name slots), then packs a fill where both signature lines share one
-              ink blob. No server call — validates BLOB/PLACE/FILL + dedup before journey UI.
+              ink blob. No server call - validates BLOB/PLACE/FILL + dedup before journey UI.
             </p>
             <button
               type="button"
@@ -603,7 +603,7 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
                   ? 'yes (all frames confirmed)'
                   : streamResult.txHashes.length > 0
                     ? 'partial / incomplete'
-                    : 'no (index only — safe to publish next)'}
+                    : 'no (index only - safe to publish next)'}
                 {streamResult.confirmedFrames != null && streamResult.txHashes.length > 0
                   ? ` · confirmed ${streamResult.confirmedFrames}/${streamResult.frameCount}`
                   : ''}
@@ -747,10 +747,10 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
               : ''}
             {streamResult.partialBroadcast ? ' · partial broadcast' : ''}
             {streamResult.serviceWalletConfigured === false
-              ? ' — service wallet not configured'
+              ? ' - service wallet not configured'
               : ''}
             {streamResult.broadcastEnabled === false
-              ? ' — broadcast disabled (ANNOTATION_STREAM_BROADCAST)'
+              ? ' - broadcast disabled (ANNOTATION_STREAM_BROADCAST)'
               : ''}
           </p>
           {streamResult.broadcastError && (
@@ -808,7 +808,7 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
           <h2 style={{ fontSize: '1.05rem' }}>Reconstruct by PDF hash</h2>
           <p className="muted" style={{ fontSize: '0.875rem' }}>
             Drop the <strong>original</strong> PDF. We hash it locally, then fetch the annotation
-            stream (from Nimiq when tx hashes exist, else server index) and overlay — never upload
+            stream (from Nimiq when tx hashes exist, else server index) and overlay - never upload
             the file.
           </p>
           <label className="btn btn-ghost" style={{ display: 'inline-flex', gap: 8, cursor: 'pointer' }}>
