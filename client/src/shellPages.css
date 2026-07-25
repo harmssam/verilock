@@ -330,12 +330,10 @@
     box-shadow: 0 6px 22px rgba(15, 23, 42, 0.045);
   }
 
-  .price-page-why-badge {
-    border-color: rgba(233, 178, 19, 0.32);
-    background:
-      radial-gradient(circle at 30% 25%, rgba(255, 220, 120, 0.35), transparent 55%),
-      #fffaf0;
-    box-shadow: 0 4px 12px rgba(233, 178, 19, 0.14);
+  .price-page-nimiq-mark {
+    width: 3.25rem;
+    height: 3.25rem;
+    filter: drop-shadow(0 3px 10px rgba(233, 178, 19, 0.2));
   }
 
   .price-page-why-title {
