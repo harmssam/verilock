@@ -592,6 +592,83 @@ export const api = {
       body: JSON.stringify(body ?? {}),
     }),
 
+  /**
+   * Recovery package for offline reconstruct (tx hashes + wire frames).
+   * Creator only; download after Store forever pins frames.
+   */
+  getOnChainDataRecovery: (token: string, docId: string) =>
+    request<{
+      version: 1
+      kind: 'verilock_data_archive_recovery'
+      originalSha256: string
+      documentId: string
+      onChain: boolean
+      frameCount: number
+      txHashes: string[]
+      framesHex: string[]
+      source: 'placements' | 'annotations'
+      serviceWalletAddress: string | null
+      exportedAt: number
+    }>(`/api/documents/${docId}/on-chain-data/recovery`, {
+      headers: withAuth(token),
+    }),
+
+  /** Public: archive tx index for a PDF fingerprint (offline discovery). */
+  getChainDataIndex: (sha256: string) =>
+    request<{
+      originalSha256: string
+      found: boolean
+      onChain: boolean
+      frameCount: number
+      confirmedFrames: number
+      txHashes: string[]
+      source: 'placements' | 'annotations' | null
+      documentId: string | null
+      serviceWalletAddress: string | null
+      updatedAt: number | null
+    }>(`/api/chain-data/${sha256.toLowerCase()}`),
+
+  /**
+   * Public reconstruct of on-chain data archive by PDF fingerprint.
+   * source=wire uses stored frames; source=chain re-reads Nimiq txs.
+   */
+  reconstructChainData: (sha256: string, options?: { source?: 'wire' | 'chain' }) => {
+    const source = options?.source === 'chain' ? 'chain' : 'wire'
+    return request<{
+      originalSha256: string
+      source: 'wire' | 'chain'
+      onChain: boolean
+      frameCount: number
+      txHashes: string[]
+      integrityOk: boolean
+      chainError?: string
+      unpacked: {
+        originalSha256: string
+        source: string
+        streams: Array<{ version: number; frameCount: number; pdfSha256: string }>
+        placementBatches: unknown[]
+        annotations: unknown[] | null
+        manifest: {
+          v: 3
+          kind: 'archive_manifest'
+          pdf: string
+          pl?: string
+          doc?: string
+          title?: string
+          people: Array<{ i: number; n: string; r?: string; w?: string }>
+          sigs: Array<{
+            i: number
+            w: string
+            n?: string
+            at: number
+            t?: string
+            sha?: string
+          }>
+        } | null
+      }
+    }>(`/api/chain-data/${sha256.toLowerCase()}/reconstruct?source=${source}`)
+  },
+
   creditsBalance: (token: string, options?: { syncStripe?: boolean }) =>
     request<{
       walletAddress: string

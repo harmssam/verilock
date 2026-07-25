@@ -1042,6 +1042,32 @@ export function getDocumentDataArchive(documentId: string): DocumentDataArchiveR
   return row ? rowToDataArchive(row) : null
 }
 
+/**
+ * Public reconstruct index: latest on-chain archive for a PDF fingerprint.
+ * Prefer completed rows; fall back to any row with frames for that hash.
+ */
+export function getDocumentDataArchiveBySha256(
+  originalSha256: string,
+): DocumentDataArchiveRecord | null {
+  const hash = originalSha256.toLowerCase()
+  const onChain = db
+    .prepare(
+      `SELECT * FROM document_data_archives
+       WHERE original_sha256 = ? AND on_chain = 1
+       ORDER BY updated_at DESC LIMIT 1`,
+    )
+    .get(hash) as Record<string, unknown> | undefined
+  if (onChain) return rowToDataArchive(onChain)
+  const any = db
+    .prepare(
+      `SELECT * FROM document_data_archives
+       WHERE original_sha256 = ?
+       ORDER BY updated_at DESC LIMIT 1`,
+    )
+    .get(hash) as Record<string, unknown> | undefined
+  return any ? rowToDataArchive(any) : null
+}
+
 export function upsertDocumentDataArchive(rec: DocumentDataArchiveRecord): void {
   const jobStatus: DocumentDataArchiveJobStatus = rec.onChain
     ? 'complete'

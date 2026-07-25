@@ -814,6 +814,7 @@ export function App() {
               onPageMeta={handleJourneyPageMeta}
               onHome={goJourney}
               onStartCreate={startCreate}
+              onAgreements={goAgreements}
               onSwitchPath={role => pickRole(role, { remount: false })}
               /* Shell LandingHome owns the path picker - never double it under keep-alive. */
             />

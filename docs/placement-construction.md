@@ -43,12 +43,37 @@ Payload is one **batch** JSON (`BatchWire`):
   "bi": 0,
   "pr": "<prev batch root or 64 zeros>",
   "pl": "<plan root>",
-  "people": [{ "i": 1, "n": "Tom" }],
+  "people": [{ "i": 1, "n": "Tom", "w": "NQ…" }],
   "places": [{ "id": "...", "p": 1, "k": "s", "page": 0, "x": 0.1, "y": 0.2, "w": 0.3, "h": 0.05 }],
   "blobs": [{ "id": "<32 hex>", "t": "ink", "d": { "epsilon": 1.5, "lineWidthRatio": 0.02, "strokes": [] } }],
   "fills": [{ "s": "<slot id>", "b": "<blob id>", "p": 1 }]
 }
 ```
+
+`w` is the optional pre-bound Nimiq wallet (no spaces, uppercase). Required for offline identity reconstruct when present.
+
+### Version 3 — archive manifest
+
+Paid **Store forever** appends a final multi-tx stream (`0xA1` version **3**) after placement/annotation frames:
+
+```json
+{
+  "v": 3,
+  "kind": "archive_manifest",
+  "pdf": "<original sha256>",
+  "pl": "<plan root optional>",
+  "doc": "<document id>",
+  "title": "…",
+  "people": [{ "i": 1, "n": "Tom", "w": "NQ…" }],
+  "sigs": [{ "i": 1, "w": "NQ…", "n": "Tom", "at": 1700000000000, "t": "drawn", "sha": "<client sha>" }]
+}
+```
+
+Public discovery (no auth):
+
+- `GET /api/chain-data/:sha256` → tx hash list + onChain flag  
+- `GET /api/chain-data/:sha256/reconstruct?source=wire|chain` → unpacked batches + manifest  
+- Creator: `GET /api/documents/:id/on-chain-data/recovery` → full recovery JSON for offline
 
 ### Dedup
 
