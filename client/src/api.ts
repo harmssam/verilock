@@ -71,9 +71,10 @@ export const api = {
   health: () => request<{ ok: boolean; app: string; chainVerify: boolean; storageMode?: string }>('/api/health'),
 
   /**
-   * Hub single-trip login: omit `address` so the server issues a pending session;
-   * Hub signMessage (no signer) lets the user pick a wallet and sign in one trip.
-   * Pay / legacy: pass the connected address.
+   * Challenge for wallet login.
+   * - Omit `address` (Hub + Pay): pending session; bind wallet from public key on verify.
+   *   Pay uses this so account-access + sign sheets stay consecutive (no fetch between).
+   * - With `address` (legacy): session bound to that wallet up front.
    */
   challenge: (address?: string | null) =>
     request<{ token: string; nonce: string; address: string | null }>('/api/auth/challenge', {
