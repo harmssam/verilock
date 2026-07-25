@@ -413,9 +413,7 @@ export function PricePage({
 
       <section className="price-page-why" aria-labelledby="price-why-nimiq">
         <header className="price-page-why-head">
-          <span className="price-page-why-badge" aria-hidden>
-            <NimiqHexagonIcon size={18} className="price-page-nimiq-mark" />
-          </span>
+          <NimiqHexagonIcon size={48} className="price-page-nimiq-mark" aria-hidden />
           <div className="price-page-why-head-copy">
             <h3 id="price-why-nimiq" className="price-page-why-title">
               Why Nimiq?
