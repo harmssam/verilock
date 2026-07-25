@@ -19,12 +19,16 @@ data/
 
 # Local scratch / review captures (never ship)
 tmp/
+tmp-compare/
 tmp-*.png
 tmp-*.jpg
 **/tmp-*.png
 **/tmp-*.jpg
 14.jpg
 client/tmp-home.png
+
+# Grok agent local artifacts (reviews, session notes)
+.grok/reviews/
 
 # Historical UI snapshots - keep locally, not in GitHub
 client/src/archive/
