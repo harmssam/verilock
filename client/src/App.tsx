@@ -807,7 +807,6 @@ export function App() {
                     draggable={false}
                     style={placementImageStyle(PATH_PLACEMENTS.track[trackRole])}
                   />
-                  <span className="lr-header-track-wash" />
                 </span>
                 <div className="lr-header-track-inner">
                   <div className="lr-header-track-copy">

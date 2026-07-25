@@ -135,6 +135,18 @@
   overflow: hidden;
 }
 
+/*
+ * Soft full-bleed white veil on the media layer (create / invited / verify).
+ * ~30% of the previous wash strength so the still stays visible under copy.
+ */
+.lr-header-track-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.165);
+  pointer-events: none;
+}
+
 .lr-header-track-bg {
   display: block;
   width: 100%;
@@ -145,16 +157,6 @@
   --lr-path-zoom: 1;
   opacity: 0.88;
   pointer-events: none;
-}
-
-/*
- * Same full-bleed white veil for every path (create / invited / verify).
- * Mutes the still evenly so copy never sits on raw photo detail.
- */
-.lr-header-track-wash {
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.55);
 }
 
 .lr-header-track-inner {
@@ -231,9 +233,9 @@
     opacity: 0.85;
   }
 
-  /* Same veil + copy plate on small screens (slightly stronger for busy stills). */
-  .lr-header-track-wash {
-    background: rgba(255, 255, 255, 0.6);
+  /* Same media veil on small screens (~30% of previous 0.6 wash). */
+  .lr-header-track-media::after {
+    background: rgba(255, 255, 255, 0.18);
   }
 
   .lr-header-track-copy {
