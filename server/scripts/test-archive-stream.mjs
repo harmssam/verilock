@@ -25,8 +25,9 @@ function assert(cond, msg) {
 const STREAM_MAGIC = 0xa1
 const STREAM_VERSION_MANIFEST = 3
 const FRAME_SIZE = 64
-const FRAME_HEADER = 9
-const FRAME_BODY = 55
+const ASSOC_LEN = 8
+const FRAME_HEADER = 5 + ASSOC_LEN // 13
+const FRAME_BODY = FRAME_SIZE - FRAME_HEADER // 51
 const FRAME_HEAD = 1
 const FRAME_DATA = 2
 const FRAME_END = 3
@@ -59,7 +60,7 @@ function packJsonStreamFrames(pdfSha256, version, payload) {
     f[2] = FRAME_HEAD
     f[3] = seq++
     f[4] = total
-    hash.copy(f, 5, 0, 4)
+    hash.copy(f, 5, 0, ASSOC_LEN)
     hash.copy(f, FRAME_HEADER)
     f.writeUInt32BE(json.length, FRAME_HEADER + 32)
     f.writeUInt16BE(0, FRAME_HEADER + 36)
@@ -73,7 +74,7 @@ function packJsonStreamFrames(pdfSha256, version, payload) {
     f[2] = FRAME_DATA
     f[3] = seq++
     f[4] = total
-    hash.copy(f, 5, 0, 4)
+    hash.copy(f, 5, 0, ASSOC_LEN)
     chunk.copy(f, FRAME_HEADER)
     frames.push(f)
   }
@@ -84,7 +85,7 @@ function packJsonStreamFrames(pdfSha256, version, payload) {
     f[2] = FRAME_END
     f[3] = seq++
     f[4] = total
-    hash.copy(f, 5, 0, 4)
+    hash.copy(f, 5, 0, ASSOC_LEN)
     f.writeUInt32BE(json.length, FRAME_HEADER)
     f.writeUInt32BE(checksum, FRAME_HEADER + 4)
     frames.push(f)
@@ -162,6 +163,15 @@ assert(un.payload.kind === 'archive_manifest', 'kind')
 assert(un.payload.people.length === 2, 'people count')
 assert(un.payload.people[0].w.startsWith('NQ01'), 'wallet on wire')
 assert(un.payload.sigs.length === 1, 'sigs count')
+// 8-byte association id on every frame = first 8 of PDF hash
+assert(
+  frames[0].subarray(5, 13).equals(Buffer.from(PDF.slice(0, 16), 'hex')),
+  '8-byte assoc id on HEAD',
+)
+assert(
+  frames[1].subarray(5, 13).equals(frames[0].subarray(5, 13)),
+  'DATA shares same association id',
+)
 
 // Two streams concatenated (manifest twice) split correctly
 const double = [...frames, ...frames]

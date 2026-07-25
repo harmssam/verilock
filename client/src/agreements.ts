@@ -4,6 +4,9 @@ import { documentTypeLabel, type SealDocument } from './types'
 
 export type AgreementBucket = 'needs_you' | 'ready_to_seal' | 'waiting' | 'locked'
 
+/** Primary agreements list modes (Inbox / Completed / Archived). */
+export type AgreementListMode = 'inbox' | 'completed' | 'archived'
+
 export interface AgreementView {
   bucket: AgreementBucket
   headline: string
@@ -28,6 +31,29 @@ export const BUCKET_LABELS: Record<AgreementBucket, string> = {
   ready_to_seal: 'All signed',
   waiting: 'Waiting on others',
   locked: 'Locked',
+}
+
+export const LIST_MODE_ORDER: AgreementListMode[] = ['inbox', 'completed', 'archived']
+
+export const LIST_MODE_LABELS: Record<AgreementListMode, string> = {
+  inbox: 'Inbox',
+  completed: 'Completed',
+  archived: 'Archived',
+}
+
+/** Compact status pill copy for a single flat list (not section headings). */
+export const BUCKET_PILL_LABELS: Record<AgreementBucket, string> = {
+  needs_you: 'Needs you',
+  ready_to_seal: 'All signed',
+  waiting: 'Waiting',
+  locked: 'Locked',
+}
+
+/** Viewer-scoped soft archive (list hide), not on-chain data archive. */
+export function isListArchived(
+  doc: Pick<SealDocument, 'listArchivedAt'>,
+): boolean {
+  return typeof doc.listArchivedAt === 'number' && doc.listArchivedAt > 0
 }
 
 export function isDocumentCreator(
@@ -273,6 +299,70 @@ export function groupAgreements(
   return groups
 }
 
+/** Which primary list mode a document belongs in for this wallet. */
+export function getAgreementListMode(
+  doc: SealDocument,
+  address: string | null,
+): AgreementListMode {
+  if (isListArchived(doc)) return 'archived'
+  const bucket = getAgreementView(doc, address).bucket
+  if (bucket === 'locked') return 'completed'
+  return 'inbox'
+}
+
+export function partitionByListMode(
+  docs: SealDocument[],
+  address: string | null,
+): Record<AgreementListMode, SealDocument[]> {
+  const out: Record<AgreementListMode, SealDocument[]> = {
+    inbox: [],
+    completed: [],
+    archived: [],
+  }
+  for (const doc of docs) {
+    out[getAgreementListMode(doc, address)].push(doc)
+  }
+  return out
+}
+
+/**
+ * Sort within a list mode: inbox prioritizes action, then recency;
+ * completed/archived by finish time.
+ */
+export function sortAgreementsForMode(
+  docs: SealDocument[],
+  mode: AgreementListMode,
+  address: string | null,
+): SealDocument[] {
+  const copy = [...docs]
+  if (mode === 'inbox') {
+    const rank: Record<AgreementBucket, number> = {
+      needs_you: 0,
+      ready_to_seal: 1,
+      waiting: 2,
+      locked: 3,
+    }
+    copy.sort((a, b) => {
+      const ra = rank[getAgreementView(a, address).bucket]
+      const rb = rank[getAgreementView(b, address).bucket]
+      if (ra !== rb) return ra - rb
+      return b.createdAt - a.createdAt
+    })
+    return copy
+  }
+  if (mode === 'archived') {
+    copy.sort(
+      (a, b) =>
+        (b.listArchivedAt ?? b.lockedAt ?? b.createdAt) -
+        (a.listArchivedAt ?? a.lockedAt ?? a.createdAt),
+    )
+    return copy
+  }
+  // completed
+  copy.sort((a, b) => (b.lockedAt ?? b.createdAt) - (a.lockedAt ?? a.createdAt))
+  return copy
+}
+
 /** Case-insensitive match on title, filename, type label, and hash prefixes. */
 export function filterAgreements(docs: SealDocument[], query: string): SealDocument[] {
   const q = query.trim().toLowerCase()
@@ -297,6 +387,7 @@ export function filterAgreements(docs: SealDocument[], query: string): SealDocum
 
 export function countActionable(docs: SealDocument[], address: string | null): number {
   return docs.filter(doc => {
+    if (isListArchived(doc)) return false
     const bucket = getAgreementView(doc, address).bucket
     return bucket === 'needs_you' || bucket === 'ready_to_seal'
   }).length

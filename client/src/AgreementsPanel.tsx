@@ -8,6 +8,7 @@ import {
   getAgreementView,
   groupAgreements,
   isDocumentCreator,
+  isListArchived,
   isLockCta,
   type AgreementBucket,
 } from './agreements'
@@ -62,8 +63,10 @@ export function AgreementsPanel({
   onCreateNew,
   onSignOut,
 }: AgreementsPanelProps) {
-  const groups = groupAgreements(documents, address)
-  const actionable = countActionable(documents, address)
+  // Soft-archived docs live on /agreements → Archived, not the home strip.
+  const activeDocs = documents.filter(d => !isListArchived(d))
+  const groups = groupAgreements(activeDocs, address)
+  const actionable = countActionable(activeDocs, address)
   const visibleBuckets = visibleAgreementBuckets(groups, actionable, compact)
   const sealedCount = groups.locked.length
 
@@ -159,7 +162,7 @@ export function AgreementsPanel({
           </h2>
           {!compact && (
             <p className="muted agreements-panel-subtitle">
-              {documents.length} total
+              {activeDocs.length} active
               {actionable > 0 ? ` · ${actionable} need${actionable === 1 ? 's' : ''} your action` : ''}
               {sealedCount > 0 ? ` · ${sealedCount} sealed` : ''}
             </p>

@@ -10,6 +10,9 @@
  */
 import { createHash } from 'node:crypto'
 import {
+  ASSOC_LEN,
+  associationIdFromPdfHash,
+  detectFrameLayout,
   FRAME_BODY,
   FRAME_DATA,
   FRAME_END,
@@ -18,6 +21,7 @@ import {
   FRAME_SIZE,
   MAX_STREAM_FRAMES,
   STREAM_MAGIC,
+  writeStreamFrameHeader,
 } from './annotationStream.js'
 import { normalizeAddress } from './addresses.js'
 import {
@@ -27,6 +31,12 @@ import {
   resolvePlacementPlan,
   type DocumentDataArchiveSource,
 } from './db.js'
+import {
+  decodeRecipientDataBytes,
+  fetchTransactionsByAddress,
+  getExpectedAttestationRecipient,
+  type NimiqTransaction,
+} from './nimiq-rpc.js'
 
 /** Manifest stream version - distinct from annotation (1) and placement (2). */
 export const STREAM_VERSION_MANIFEST = 3
@@ -56,14 +66,9 @@ function writeHeader(
   type: number,
   seq: number,
   total: number,
-  hashPrefix: Buffer,
+  pdfHash: Buffer,
 ): void {
-  frame[0] = STREAM_MAGIC
-  frame[1] = version & 0xff
-  frame[2] = type
-  frame[3] = seq & 0xff
-  frame[4] = total & 0xff
-  hashPrefix.copy(frame, 5, 0, 4)
+  writeStreamFrameHeader(frame, version, type, seq, total, pdfHash)
 }
 
 /**
@@ -310,23 +315,25 @@ export function unpackJsonStreamPayload(framesIn: Buffer[]): {
     if (frames[i]![1] !== version) throw new Error(`Version mismatch at frame ${i}`)
   }
 
-  const hash = head.subarray(FRAME_HEADER, FRAME_HEADER + 32)
-  const hashPrefix = hash.subarray(0, 4)
-  const payloadLen = head.readUInt32BE(FRAME_HEADER + 32)
-  const checksum = head.readUInt32BE(FRAME_HEADER + 38)
+  const { header: hdr, assocLen } = detectFrameLayout(head)
+  const hash = head.subarray(hdr, hdr + 32)
+  const assoc = hash.subarray(0, assocLen)
+  const payloadLen = head.readUInt32BE(hdr + 32)
+  const checksum = head.readUInt32BE(hdr + 38)
   const pdfSha256 = hash.toString('hex')
 
   const parts: Buffer[] = []
   for (let i = 1; i < frames.length; i++) {
     const f = frames[i]!
     if (f[0] !== STREAM_MAGIC) throw new Error(`Bad magic on frame ${i}`)
-    if (!f.subarray(5, 9).equals(hashPrefix)) {
-      throw new Error(`Hash prefix mismatch on frame ${i}`)
+    if (!f.subarray(5, 5 + assocLen).equals(assoc)) {
+      throw new Error(`Association id mismatch on frame ${i}`)
     }
-    if (f[2] === FRAME_DATA) parts.push(f.subarray(FRAME_HEADER))
+    const { header: fh } = detectFrameLayout(f, pdfSha256)
+    if (f[2] === FRAME_DATA) parts.push(f.subarray(fh))
     else if (f[2] === FRAME_END) {
-      const endLen = f.readUInt32BE(FRAME_HEADER)
-      const endCrc = f.readUInt32BE(FRAME_HEADER + 4)
+      const endLen = f.readUInt32BE(fh)
+      const endCrc = f.readUInt32BE(fh + 4)
       if (endLen !== payloadLen || endCrc !== checksum) {
         throw new Error('END frame length/checksum mismatch')
       }
@@ -441,4 +448,275 @@ export function unpackArchiveFrames(framesHex: string[]): UnpackedArchive {
 
 export function contentHashFrames(framesHex: string[]): string {
   return createHash('sha256').update(framesHex.join('')).digest('hex')
+}
+
+// ── Hash-only chain discovery (no recovery file / no server index) ─────────
+
+export interface ScannedFrame {
+  txHash: string
+  hex: string
+  buf: Buffer
+  /** Chronological index (0 = oldest among scanned). */
+  order: number
+  from: string
+  blockNumber?: number
+}
+
+export interface ScanArchiveResult {
+  originalSha256: string
+  found: boolean
+  framesHex: string[]
+  txHashes: string[]
+  streamCount: number
+  scannedTxs: number
+  truncated: boolean
+  scanAddresses: string[]
+  error?: string
+}
+
+function frameFullPdfHash(head: Buffer): string | null {
+  if (head.length !== FRAME_SIZE || head[0] !== STREAM_MAGIC || head[2] !== FRAME_HEAD) {
+    return null
+  }
+  const { header } = detectFrameLayout(head)
+  return head.subarray(header, header + 32).toString('hex')
+}
+
+/** True when frame carries the 8-byte (or legacy 4-byte) association for this PDF hash. */
+export function frameMatchesPdfAssociation(frame: Buffer, pdfSha256: string): boolean {
+  const want = associationIdFromPdfHash(pdfSha256)
+  // New 8-byte assoc
+  if (frame.subarray(5, 5 + ASSOC_LEN).equals(want)) return true
+  // Legacy 4-byte prefix
+  if (frame.subarray(5, 9).equals(want.subarray(0, 4))) return true
+  return false
+}
+
+/**
+ * From a pool of 0xA1 frames (chronological), assemble every complete stream
+ * whose HEAD embeds `pdfSha256`. Association uses the 8-byte id (first 8 bytes
+ * of the PDF hash) so hash-only recovery does not need a recovery file.
+ */
+export function assembleArchiveStreamsFromPool(
+  pdfSha256: string,
+  pool: ScannedFrame[],
+): { frames: ScannedFrame[]; streamCount: number } {
+  const hash = pdfSha256.toLowerCase()
+  // Pre-filter: only frames tagged with this document's association id
+  const related = pool.filter(f => frameMatchesPdfAssociation(f.buf, hash))
+  const heads = related.filter(f => {
+    const full = frameFullPdfHash(f.buf)
+    return full === hash
+  })
+  if (heads.length === 0) return { frames: [], streamCount: 0 }
+
+  // Stable chronological order of streams
+  heads.sort((a, b) => a.order - b.order || a.txHash.localeCompare(b.txHash))
+
+  const usedTx = new Set<string>()
+  const assembled: ScannedFrame[] = []
+  let streamCount = 0
+
+  for (const head of heads) {
+    if (usedTx.has(head.txHash)) continue
+    const total = head.buf[4]!
+    const version = head.buf[1]!
+    if (total < 2 || total > 128) continue
+
+    const chosen: ScannedFrame[] = new Array(total)
+    chosen[0] = head
+    let ok = true
+    for (let seq = 1; seq < total; seq++) {
+      const cands = related.filter(f => {
+        if (usedTx.has(f.txHash) || f.txHash === head.txHash) return false
+        if (f.buf[0] !== STREAM_MAGIC) return false
+        if (f.buf[1] !== version) return false
+        if (f.buf[2] === FRAME_HEAD) return false // only one HEAD
+        if (f.buf[3] !== seq) return false
+        if (f.buf[4] !== total) return false
+        return true
+      })
+      if (cands.length === 0) {
+        ok = false
+        break
+      }
+      // Prefer frames after HEAD in chronological order (serialized broadcast).
+      const after = cands.filter(c => c.order >= head.order)
+      const pickPool = after.length > 0 ? after : cands
+      pickPool.sort((a, b) => a.order - b.order || a.txHash.localeCompare(b.txHash))
+      chosen[seq] = pickPool[0]!
+    }
+    if (!ok) continue
+
+    try {
+      unpackJsonStreamPayload(chosen.map(c => c.buf))
+    } catch {
+      continue
+    }
+
+    for (const c of chosen) usedTx.add(c.txHash)
+    assembled.push(...chosen)
+    streamCount += 1
+  }
+
+  return { frames: assembled, streamCount }
+}
+
+function txToFrame(tx: NimiqTransaction, order: number): ScannedFrame | null {
+  if (tx.executionResult === false) return null
+  try {
+    const bytes = decodeRecipientDataBytes(tx.recipientData)
+    if (bytes.length !== FRAME_SIZE) return null
+    if (bytes[0] !== STREAM_MAGIC) return null
+    const buf = Buffer.from(bytes)
+    return {
+      txHash: String(tx.hash || '').replace(/^0x/i, '').toLowerCase(),
+      hex: buf.toString('hex'),
+      buf,
+      order,
+      from: String(tx.from || ''),
+      blockNumber: tx.blockNumber,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Scan Nimiq address history for VeriLock stream frames belonging to `pdfSha256`.
+ * Callers typically pass the service wallet (sender) and/or attestation sink.
+ */
+export async function scanAddressForArchiveFrames(
+  address: string,
+  pdfSha256: string,
+  options?: { maxTxs?: number; pageSize?: number },
+): Promise<{ pool: ScannedFrame[]; scannedTxs: number; truncated: boolean }> {
+  const maxTxs = options?.maxTxs ?? 1500
+  const pageSize = options?.pageSize ?? 100
+  const hitsNewestFirst: ScannedFrame[] = []
+  let scannedTxs = 0
+  let startAt: string | null = null
+  let truncated = false
+
+  while (scannedTxs < maxTxs) {
+    const batch = Math.min(pageSize, maxTxs - scannedTxs)
+    const txs = await fetchTransactionsByAddress(address, batch, startAt)
+    if (txs.length === 0) break
+    for (const tx of txs) {
+      scannedTxs += 1
+      // order filled after reverse
+      const frame = txToFrame(tx, 0)
+      if (frame && frame.txHash) hitsNewestFirst.push(frame)
+    }
+    if (txs.length < batch) break
+    if (scannedTxs >= maxTxs) {
+      truncated = true
+      break
+    }
+    const last = txs[txs.length - 1]
+    if (!last?.hash) break
+    startAt = last.hash.replace(/^0x/i, '').toLowerCase()
+  }
+
+  // Chronological: oldest first
+  const chronological = hitsNewestFirst.reverse()
+  chronological.forEach((f, i) => {
+    f.order = i
+  })
+  return { pool: chronological, scannedTxs, truncated }
+}
+
+/**
+ * Hash-only recovery: find all archive streams for a PDF fingerprint on Nimiq
+ * by scanning the service wallet / sink. No DB index and no recovery file required.
+ */
+export async function scanArchiveByPdfHash(
+  pdfSha256: string,
+  options?: {
+    maxTxs?: number
+    pageSize?: number
+    /** Override addresses (defaults: service wallet + attestation sink). */
+    addresses?: string[]
+  },
+): Promise<ScanArchiveResult> {
+  const hash = pdfSha256.toLowerCase()
+  if (!/^[a-f0-9]{64}$/.test(hash)) {
+    return {
+      originalSha256: hash,
+      found: false,
+      framesHex: [],
+      txHashes: [],
+      streamCount: 0,
+      scannedTxs: 0,
+      truncated: false,
+      scanAddresses: [],
+      error: 'SHA-256 must be 64 hex characters',
+    }
+  }
+
+  const { getServiceWalletAddress } = await import('./serviceWallet.js')
+  const service = getServiceWalletAddress()
+  const sink = getExpectedAttestationRecipient()
+  const addresses = (
+    options?.addresses?.length
+      ? options.addresses
+      : [service, sink].filter((a): a is string => Boolean(a))
+  ).map(a => a.replace(/\s+/g, '').toUpperCase())
+
+  if (addresses.length === 0) {
+    return {
+      originalSha256: hash,
+      found: false,
+      framesHex: [],
+      txHashes: [],
+      streamCount: 0,
+      scannedTxs: 0,
+      truncated: false,
+      scanAddresses: [],
+      error: 'No service wallet or attestation sink configured for chain scan',
+    }
+  }
+
+  const byTx = new Map<string, ScannedFrame>()
+  let scannedTxs = 0
+  let truncated = false
+
+  for (const addr of addresses) {
+    try {
+      const part = await scanAddressForArchiveFrames(addr, hash, {
+        maxTxs: options?.maxTxs,
+        pageSize: options?.pageSize,
+      })
+      scannedTxs += part.scannedTxs
+      truncated = truncated || part.truncated
+      for (const f of part.pool) {
+        if (!byTx.has(f.txHash)) byTx.set(f.txHash, f)
+      }
+    } catch (err) {
+      console.warn('[archive-scan] address scan failed', addr.slice(0, 12), err)
+    }
+  }
+
+  // Re-index order by block when available, else keep merge order
+  const pool = [...byTx.values()].sort((a, b) => {
+    const ba = a.blockNumber ?? 0
+    const bb = b.blockNumber ?? 0
+    if (ba !== bb && ba > 0 && bb > 0) return ba - bb
+    return a.order - b.order || a.txHash.localeCompare(b.txHash)
+  })
+  pool.forEach((f, i) => {
+    f.order = i
+  })
+
+  const { frames, streamCount } = assembleArchiveStreamsFromPool(hash, pool)
+  return {
+    originalSha256: hash,
+    found: frames.length > 0,
+    framesHex: frames.map(f => f.hex),
+    txHashes: frames.map(f => f.txHash),
+    streamCount,
+    scannedTxs,
+    truncated,
+    scanAddresses: addresses,
+  }
 }

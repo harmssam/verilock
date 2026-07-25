@@ -27,15 +27,28 @@ import {
 export const STREAM_MAGIC = 0xa1
 export const STREAM_VERSION = 1
 export const FRAME_SIZE = 64
-export const FRAME_HEADER = 9
-export const FRAME_BODY = FRAME_SIZE - FRAME_HEADER
+/**
+ * Frame header (new layout, 2026-07):
+ * [0] magic  [1] version  [2] type  [3] seq  [4] total
+ * [5..12] 8-byte association id = first 8 bytes of PDF SHA-256
+ * [13..63] body (51 B)
+ *
+ * Legacy layout used a 4-byte hash prefix and body at offset 9 — still readable
+ * via detectFrameLayout() for older on-chain frames.
+ */
+export const ASSOC_LEN = 8
+export const FRAME_HEADER = 5 + ASSOC_LEN // 13
+export const FRAME_BODY = FRAME_SIZE - FRAME_HEADER // 51
+/** Pre-assoc layout (4-byte prefix, body @ 9). */
+export const FRAME_HEADER_LEGACY = 9
+export const ASSOC_LEN_LEGACY = 4
 export const FRAME_HEAD = 1
 export const FRAME_DATA = 2
 export const FRAME_END = 3
 
 /**
  * Experiment cap (frames = HEAD + DATA* + END).
- * ~55 B payload per DATA frame; free fees make 128 practical for multi-sig paths.
+ * ~51 B payload per DATA frame with 8-byte assoc id; free fees make 128 practical.
  * Abuse still limited by rate limit + service-wallet balance.
  */
 export const MAX_STREAM_FRAMES = 128
@@ -76,6 +89,37 @@ function hexToBytes(hex: string): Buffer {
   return Buffer.from(clean, 'hex')
 }
 
+/** First 8 bytes of the PDF SHA-256 — association id for hash-only chain scan. */
+export function associationIdFromPdfHash(pdfSha256: string | Buffer): Buffer {
+  if (Buffer.isBuffer(pdfSha256)) {
+    if (pdfSha256.length < ASSOC_LEN) throw new Error('pdf hash too short for association id')
+    return pdfSha256.subarray(0, ASSOC_LEN)
+  }
+  const clean = pdfSha256.replace(/^0x/i, '').toLowerCase()
+  if (!/^[a-f0-9]{64}$/.test(clean)) throw new Error('pdf hash must be 64 hex chars')
+  return Buffer.from(clean.slice(0, ASSOC_LEN * 2), 'hex')
+}
+
+export function writeStreamFrameHeader(
+  frame: Buffer,
+  version: number,
+  type: number,
+  seq: number,
+  total: number,
+  pdfHashOrAssoc: Buffer,
+): void {
+  frame[0] = STREAM_MAGIC
+  frame[1] = version & 0xff
+  frame[2] = type
+  frame[3] = seq & 0xff
+  frame[4] = total & 0xff
+  const assoc =
+    pdfHashOrAssoc.length >= ASSOC_LEN
+      ? pdfHashOrAssoc.subarray(0, ASSOC_LEN)
+      : associationIdFromPdfHash(pdfHashOrAssoc)
+  assoc.copy(frame, 5, 0, ASSOC_LEN)
+}
+
 function writeHeader(
   frame: Buffer,
   type: number,
@@ -83,12 +127,47 @@ function writeHeader(
   total: number,
   hashPrefix: Buffer,
 ): void {
-  frame[0] = STREAM_MAGIC
-  frame[1] = STREAM_VERSION
-  frame[2] = type
-  frame[3] = seq & 0xff
-  frame[4] = total & 0xff
-  hashPrefix.copy(frame, 5, 0, 4)
+  writeStreamFrameHeader(frame, STREAM_VERSION, type, seq, total, hashPrefix)
+}
+
+/**
+ * Detect body offset for a frame. When `expectedPdfHash` is known (reconstruct),
+ * match the 8-byte or legacy 4-byte association id. HEAD frames can self-detect.
+ */
+export function detectFrameLayout(
+  frame: Buffer,
+  expectedPdfHash?: string | null,
+): { header: number; assocLen: number } {
+  if (frame.length !== FRAME_SIZE || frame[0] !== STREAM_MAGIC) {
+    return { header: FRAME_HEADER, assocLen: ASSOC_LEN }
+  }
+  if (expectedPdfHash) {
+    const want = associationIdFromPdfHash(expectedPdfHash)
+    if (frame.subarray(5, 5 + ASSOC_LEN).equals(want)) {
+      return { header: FRAME_HEADER, assocLen: ASSOC_LEN }
+    }
+    if (frame.subarray(5, 5 + ASSOC_LEN_LEGACY).equals(want.subarray(0, ASSOC_LEN_LEGACY))) {
+      return { header: FRAME_HEADER_LEGACY, assocLen: ASSOC_LEN_LEGACY }
+    }
+  }
+  if (frame[2] === FRAME_HEAD) {
+    const fullAtNew = frame.subarray(FRAME_HEADER, FRAME_HEADER + 32)
+    const fullAtLegacy = frame.subarray(FRAME_HEADER_LEGACY, FRAME_HEADER_LEGACY + 32)
+    if (frame.subarray(5, 5 + ASSOC_LEN).equals(fullAtNew.subarray(0, ASSOC_LEN))) {
+      return { header: FRAME_HEADER, assocLen: ASSOC_LEN }
+    }
+    if (
+      frame.subarray(5, 5 + ASSOC_LEN_LEGACY).equals(fullAtLegacy.subarray(0, ASSOC_LEN_LEGACY))
+    ) {
+      return { header: FRAME_HEADER_LEGACY, assocLen: ASSOC_LEN_LEGACY }
+    }
+  }
+  // Default to new layout for freshly packed frames
+  return { header: FRAME_HEADER, assocLen: ASSOC_LEN }
+}
+
+export function frameAssociationHex(frame: Buffer, assocLen = ASSOC_LEN): string {
+  return frame.subarray(5, 5 + assocLen).toString('hex')
 }
 
 /** Shorten floats in wire JSON (big win for long signature paths). */
@@ -297,11 +376,12 @@ export function unpackAnnotationStream(framesIn: Buffer[]): {
     seen.add(seq)
   }
 
-  const hash = head.subarray(FRAME_HEADER, FRAME_HEADER + 32)
-  const hashPrefix = hash.subarray(0, 4)
-  const payloadLen = head.readUInt32BE(FRAME_HEADER + 32)
-  const annCount = head.readUInt16BE(FRAME_HEADER + 36)
-  const checksum = head.readUInt32BE(FRAME_HEADER + 38)
+  const { header: hdr, assocLen } = detectFrameLayout(head)
+  const hash = head.subarray(hdr, hdr + 32)
+  const assoc = hash.subarray(0, assocLen)
+  const payloadLen = head.readUInt32BE(hdr + 32)
+  const annCount = head.readUInt16BE(hdr + 36)
+  const checksum = head.readUInt32BE(hdr + 38)
   const pdfSha256 = hash.toString('hex')
 
   const parts: Buffer[] = []
@@ -309,13 +389,14 @@ export function unpackAnnotationStream(framesIn: Buffer[]): {
     const f = frames[i]!
     if (f[0] !== STREAM_MAGIC) throw new Error(`Bad magic on frame ${i}`)
     if (f[1] !== STREAM_VERSION) throw new Error(`Bad version on frame ${i}`)
-    if (!f.subarray(5, 9).equals(hashPrefix)) {
-      throw new Error(`Hash prefix mismatch on frame ${i}`)
+    if (!f.subarray(5, 5 + assocLen).equals(assoc)) {
+      throw new Error(`Association id mismatch on frame ${i}`)
     }
-    if (f[2] === FRAME_DATA) parts.push(f.subarray(FRAME_HEADER))
+    const { header: fh } = detectFrameLayout(f, pdfSha256)
+    if (f[2] === FRAME_DATA) parts.push(f.subarray(fh))
     else if (f[2] === FRAME_END) {
-      const endLen = f.readUInt32BE(FRAME_HEADER)
-      const endCrc = f.readUInt32BE(FRAME_HEADER + 4)
+      const endLen = f.readUInt32BE(fh)
+      const endCrc = f.readUInt32BE(fh + 4)
       if (endLen !== payloadLen || endCrc !== checksum) {
         throw new Error('END frame checksum mismatch')
       }
@@ -713,10 +794,31 @@ export interface BroadcastStreamOptions {
 }
 
 /**
+ * Serialize multi-tx stream broadcasts so frames for one archive stay contiguous
+ * on the service wallet. That lets hash-only chain scanners assemble streams by
+ * walking chronological 0xA1 frames after each matching HEAD (no recovery file).
+ */
+let streamBroadcastQueue: Promise<unknown> = Promise.resolve()
+
+/**
  * Broadcast pre-packed 64-byte frames via the service wallet (one basic tx each).
  * Shared by annotation-stream experiment and paid document data-archive upsell.
  */
 export async function broadcastStreamFrames(
+  frames: Buffer[],
+  options?: BroadcastStreamOptions,
+): Promise<BroadcastStreamResult> {
+  const run = () => broadcastStreamFramesUnlocked(frames, options)
+  const result = streamBroadcastQueue.then(run, run)
+  // Keep queue alive even if this job fails
+  streamBroadcastQueue = result.then(
+    () => undefined,
+    () => undefined,
+  )
+  return result
+}
+
+async function broadcastStreamFramesUnlocked(
   frames: Buffer[],
   options?: BroadcastStreamOptions,
 ): Promise<BroadcastStreamResult> {

@@ -474,6 +474,66 @@ function plainDetailsToNimiqTx(details: {
   }
 }
 
+function mapRpcTransaction(raw: Record<string, unknown>): NimiqTransaction {
+  let recipientData = ''
+  if (typeof raw.recipientData === 'string') {
+    recipientData = raw.recipientData
+  } else if (raw.data && typeof raw.data === 'object' && raw.data !== null && 'raw' in raw.data) {
+    recipientData = String((raw.data as { raw?: string }).raw ?? '')
+  } else if (typeof raw.data === 'string') {
+    recipientData = raw.data
+  }
+  return {
+    hash: String(raw.hash ?? raw.transactionHash ?? ''),
+    from: String(raw.from ?? raw.sender ?? ''),
+    to: String(raw.to ?? raw.recipient ?? ''),
+    value: Number(raw.value ?? 0),
+    recipientData,
+    executionResult: raw.executionResult !== false,
+    confirmations: Number(raw.confirmations ?? 0),
+    blockNumber:
+      raw.blockNumber != null
+        ? Number(raw.blockNumber)
+        : raw.blockHeight != null
+          ? Number(raw.blockHeight)
+          : undefined,
+  }
+}
+
+/**
+ * List transactions involving an address (newest first).
+ * Nimiq RPC: getTransactionsByAddress(address, max, startAt)
+ */
+export async function fetchTransactionsByAddress(
+  address: string,
+  max = 50,
+  startAt: string | null = null,
+): Promise<NimiqTransaction[]> {
+  const addr = normalizeAddress(address)
+  if (!addr.startsWith('NQ') || addr.replace(/\s/g, '').length < 36) {
+    throw new Error('Invalid Nimiq address for transaction scan')
+  }
+  const limit = Math.min(Math.max(1, Math.floor(max)), 500)
+  const start =
+    startAt == null || startAt === ''
+      ? null
+      : normalizeTxHash(startAt)
+  if (start != null && !/^[a-f0-9]{64}$/.test(start)) {
+    throw new Error('startAt must be a 64-character hex transaction hash')
+  }
+  const raw = await rpcCall<unknown>('getTransactionsByAddress', [addr, limit, start], {
+    allowEmpty: true,
+  })
+  const list = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === 'object' && Array.isArray((raw as { data?: unknown }).data)
+      ? (raw as { data: unknown[] }).data
+      : []
+  return list
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map(mapRpcTransaction)
+}
+
 export async function fetchTransaction(hash: string): Promise<NimiqTransaction | null> {
   const cleanHash = normalizeTxHash(hash)
 

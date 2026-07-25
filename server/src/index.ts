@@ -34,6 +34,7 @@ import {
   getMyDocuments,
   prepareLock,
   setCreatorNotifyEmail,
+  setMyDocumentListArchived,
   viewerMayAccessSignatureImage,
 } from './documents.js'
 import { emailFeaturesPublic } from './email/config.js'
@@ -560,7 +561,9 @@ app.get('/api/chain-data/:sha256', publicReadLimit, async (req, res) => {
 
 /**
  * Public reconstruct: unpack archive for a fingerprint.
- * Query: ?source=wire (default, stored frames) | ?source=chain (re-read Nimiq txs)
+ * Query: ?source=auto|wire|chain|scan
+ *   auto (default) — server index if present, else Nimiq scan by 8-byte association id
+ *   scan — hash-only discovery (no recovery file; works after purge if frames are still on-chain)
  */
 app.get('/api/chain-data/:sha256/reconstruct', publicReadLimit, async (req, res) => {
   const sha = routeParam(req.params.sha256).toLowerCase()
@@ -568,15 +571,19 @@ app.get('/api/chain-data/:sha256/reconstruct', publicReadLimit, async (req, res)
     res.status(400).json({ error: 'Valid sha256 required' })
     return
   }
-  const sourceRaw = String(req.query.source ?? 'wire').toLowerCase()
-  const source = sourceRaw === 'chain' ? 'chain' : 'wire'
+  const sourceRaw = String(req.query.source ?? 'auto').toLowerCase()
+  const source =
+    sourceRaw === 'chain' || sourceRaw === 'wire' || sourceRaw === 'scan' || sourceRaw === 'auto'
+      ? sourceRaw
+      : 'auto'
   try {
     const { reconstructArchiveBySha256 } = await import('./documentDataArchive.js')
     const result = await reconstructArchiveBySha256(sha, { source })
     res.json(result)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Reconstruct failed'
-    const status = message.includes('No on-chain data') ? 404 : 400
+    const status =
+      /no archive|no stored|no on-chain|not found/i.test(message) ? 404 : 400
     res.status(status).json({ error: message })
   }
 })
@@ -1044,6 +1051,42 @@ app.delete('/api/documents/:id', docLimit, authMiddleware, requireVerifiedWallet
   }
 })
 
+/**
+ * Soft-archive / restore for the authenticated wallet’s agreements list only.
+ * Does not touch on-chain data archive or server purge.
+ */
+app.put(
+  '/api/documents/:id/list-archive',
+  docLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  (req, res) => {
+    const address = res.locals.address as string
+    const body = (req.body ?? {}) as { archived?: unknown }
+    if (typeof body.archived !== 'boolean') {
+      res.status(400).json({ error: 'archived must be a boolean' })
+      return
+    }
+    try {
+      const document = setMyDocumentListArchived(
+        routeParam(req.params.id),
+        address,
+        body.archived,
+      )
+      res.json({ document })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not update list archive'
+      const status =
+        message === 'Document not found'
+          ? 404
+          : message.startsWith('Only participants')
+            ? 403
+            : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
+
 app.post('/api/documents/:id/signatures', docLimit, authMiddleware, requireVerifiedWallet, (req, res) => {
   const { partyId, signatureType, clientSha256, displayName, signatureImage } = req.body as {
     partyId?: string
@@ -1307,6 +1350,137 @@ app.post(
           ? 403
           : 400
       res.status(status).json({ error: message })
+    }
+  },
+)
+
+/**
+ * /pdf2 lab: accept pre-packed multi-stream frames (annotation + manifest),
+ * index under documentId `lab:<sha256>`, optional multi-tx broadcast.
+ * No seal credits. Gated by PDF_ANNOTATION_UI.
+ */
+app.post(
+  '/api/lab/stream-broadcast',
+  annotationStreamLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  async (req, res) => {
+    if (pdfLabDisabled(res)) return
+    try {
+      const body = (req.body ?? {}) as {
+        originalSha256?: string
+        framesHex?: string[]
+        broadcast?: boolean
+      }
+      const sha = String(body.originalSha256 ?? '').toLowerCase()
+      if (!/^[a-f0-9]{64}$/.test(sha)) {
+        res.status(400).json({ error: 'Valid originalSha256 required' })
+        return
+      }
+      const framesHex = Array.isArray(body.framesHex)
+        ? body.framesHex
+            .filter(h => typeof h === 'string' && /^[a-f0-9]{128}$/i.test(h))
+            .map(h => h.toLowerCase())
+        : []
+      if (framesHex.length === 0) {
+        res.status(400).json({ error: 'framesHex required (64-byte hex frames)' })
+        return
+      }
+      if (framesHex.length > 128) {
+        res.status(400).json({ error: 'Too many frames (max 128)' })
+        return
+      }
+
+      const {
+        STREAM_MAGIC,
+        isAnnotationStreamBroadcastEnabled,
+        broadcastStreamFrames,
+      } = await import('./annotationStream.js')
+      const { getServiceWalletAddress, isServiceWalletConfigured } = await import(
+        './serviceWallet.js'
+      )
+      const { upsertDocumentDataArchive } = await import('./db.js')
+
+      for (let i = 0; i < framesHex.length; i++) {
+        const buf = Buffer.from(framesHex[i]!, 'hex')
+        if (buf.length !== 64 || buf[0] !== STREAM_MAGIC) {
+          res.status(400).json({ error: `Invalid stream frame at index ${i}` })
+          return
+        }
+      }
+
+      const documentId = `lab:${sha}`
+      const now = Date.now()
+      let txHashes: string[] = []
+      let onChain = false
+      let confirmedFrames = 0
+      let broadcastError: string | undefined
+
+      const wantBroadcast = body.broadcast !== false
+      const broadcastEnabled = isAnnotationStreamBroadcastEnabled()
+      const serviceWalletConfigured = isServiceWalletConfigured()
+
+      if (wantBroadcast && broadcastEnabled && serviceWalletConfigured) {
+        const frames = framesHex.map(h => {
+          const raw = Buffer.from(h, 'hex')
+          const f = Buffer.alloc(64)
+          raw.copy(f, 0, 0, 64)
+          return f
+        })
+        const result = await broadcastStreamFrames(frames, {
+          skipVisibilityWait: false,
+          interFrameDelayMs: 120,
+        })
+        txHashes = result.hashes
+        confirmedFrames = result.confirmed
+        onChain =
+          result.hashes.length === frames.length &&
+          !result.partial &&
+          result.confirmed > 0
+        if (result.error) broadcastError = result.error
+        if (result.hashes.length === frames.length && result.confirmed < frames.length) {
+          onChain = result.confirmed >= Math.min(2, frames.length)
+          broadcastError =
+            result.error ??
+            `Broadcast all frames; ${result.confirmed} visible so far (RPC lag ok)`
+        }
+      } else if (wantBroadcast) {
+        broadcastError = !broadcastEnabled
+          ? 'On-chain broadcast disabled (set ANNOTATION_STREAM_BROADCAST=true)'
+          : 'Service wallet not configured (SERVICE_WALLET_PRIVATE_KEY)'
+      }
+
+      upsertDocumentDataArchive({
+        documentId,
+        originalSha256: sha,
+        source: 'annotations',
+        frameCount: framesHex.length,
+        creditsCharged: 0,
+        framesHex,
+        txHashes,
+        onChain,
+        confirmedFrames,
+        error: broadcastError ?? null,
+        jobStatus: onChain ? 'complete' : broadcastError ? 'failed' : 'idle',
+        createdAt: now,
+        updatedAt: now,
+      })
+
+      res.json({
+        originalSha256: sha,
+        documentId,
+        frameCount: framesHex.length,
+        txHashes,
+        onChain,
+        confirmedFrames,
+        broadcastError,
+        broadcastEnabled,
+        serviceWalletConfigured,
+        serviceWalletAddress: getServiceWalletAddress(),
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Lab broadcast failed'
+      res.status(400).json({ error: message })
     }
   },
 )

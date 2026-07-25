@@ -227,9 +227,10 @@ export function DataArchiveModal({
               </ul>
 
               <p className="muted data-archive-note">
-                The PDF never leaves your devices. Overlay data (ink, names, wallets)
-                is written as multi-tx frames on Nimiq. After it finishes, download a
-                recovery file so you can reconstruct without VeriLock servers.
+                The PDF never leaves your devices. Overlay data is written as multi-tx
+                frames on Nimiq, each tagged with the first 8 bytes of your file&apos;s
+                fingerprint so reconstruction only needs the PDF (or its hash) + the
+                chain. A recovery file is optional convenience, not required.
               </p>
 
               {showEmailUi && (

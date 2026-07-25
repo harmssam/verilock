@@ -1,4 +1,6 @@
 import {
+  Archive,
+  ArchiveRestore,
   Database,
   FilePlus,
   LoaderCircle,
@@ -14,18 +16,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { shortAddress } from '../addresses'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
 import {
-  BUCKET_LABELS,
-  BUCKET_ORDER,
+  BUCKET_PILL_LABELS,
+  LIST_MODE_LABELS,
+  LIST_MODE_ORDER,
   canDeleteDocument,
   canPurgeServerCopy,
   countActionable,
   filterAgreements,
   getAgreementView,
-  groupAgreements,
   isDocumentCreator,
   isFullyOnChain,
+  isListArchived,
   isLockCta,
-  type AgreementBucket,
+  partitionByListMode,
+  sortAgreementsForMode,
+  type AgreementListMode,
 } from '../agreements'
 import { api } from '../api'
 import { writeCreditsBalanceCache } from '../creditsBalanceCache'
@@ -45,16 +50,9 @@ import { LoginSheet } from './LoginSheet'
 const PAGE_SIZE = 8
 const SERVER_LIST_CAP = 100
 
-type BucketFilter = 'all' | AgreementBucket
-
-/** Compact chip copy - section headings still use BUCKET_LABELS. */
-const CHIP_OPTIONS: Array<{ key: BucketFilter; label: string }> = [
-  { key: 'all', label: 'All' },
-  { key: 'needs_you', label: 'Needs you' },
-  { key: 'ready_to_seal', label: 'All signed' },
-  { key: 'waiting', label: 'Waiting' },
-  { key: 'locked', label: 'Locked' },
-]
+const MODE_OPTIONS: Array<{ key: AgreementListMode; label: string }> = LIST_MODE_ORDER.map(
+  key => ({ key, label: LIST_MODE_LABELS[key] }),
+)
 
 /** Title with file extension (drops the separate filename line). */
 function agreementListTitle(doc: SealDocument): string {
@@ -117,16 +115,6 @@ interface AgreementsPageProps {
   onCreate: () => void
   /** Optional: send user to pricing when they need credits for data archive. */
   onGetCredits?: () => void
-}
-
-function sortBucket(docs: SealDocument[], bucket: AgreementBucket): SealDocument[] {
-  const copy = [...docs]
-  if (bucket === 'locked') {
-    copy.sort((a, b) => (b.lockedAt ?? b.createdAt) - (a.lockedAt ?? a.createdAt))
-  } else {
-    copy.sort((a, b) => b.createdAt - a.createdAt)
-  }
-  return copy
 }
 
 function AgreementsLoginGate({
@@ -226,10 +214,9 @@ export function AgreementsPage({
   /** False when user dismissed the modal while work continues in background. */
   const archiveModalOpenRef = useRef(false)
   const [query, setQuery] = useState('')
-  const [bucketFilter, setBucketFilter] = useState<BucketFilter>('all')
-  const [visibleByBucket, setVisibleByBucket] = useState<Partial<Record<AgreementBucket, number>>>(
-    {},
-  )
+  const [listMode, setListMode] = useState<AgreementListMode>('inbox')
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [listArchiveBusyId, setListArchiveBusyId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!token) {
@@ -273,10 +260,10 @@ export function AgreementsPage({
     }
   }, [])
 
-  // Reset progressive reveal when search or status filter changes.
+  // Reset progressive reveal when search or list mode changes.
   useEffect(() => {
-    setVisibleByBucket({})
-  }, [query, bucketFilter])
+    setVisibleCount(PAGE_SIZE)
+  }, [query, listMode])
 
   const requestCancel = (doc: SealDocument) => {
     if (!token || !canDeleteDocument(doc, address)) return
@@ -590,38 +577,52 @@ export function AgreementsPage({
   }
 
   const filtered = useMemo(() => filterAgreements(documents, query), [documents, query])
-  const groups = useMemo(() => groupAgreements(filtered, address), [filtered, address])
+  const byMode = useMemo(() => partitionByListMode(filtered, address), [filtered, address])
   const actionable = useMemo(() => countActionable(filtered, address), [filtered, address])
-  const sealedCount = groups.locked.length
+  const modeItems = useMemo(
+    () => sortAgreementsForMode(byMode[listMode], listMode, address),
+    [byMode, listMode, address],
+  )
   const queryTrimmed = query.trim()
-  const hasActiveFilters = queryTrimmed.length > 0 || bucketFilter !== 'all'
+  const hasActiveFilters = queryTrimmed.length > 0 || listMode !== 'inbox'
 
-  const visibleBuckets = useMemo((): AgreementBucket[] => {
-    if (bucketFilter === 'all') return BUCKET_ORDER
-    return [bucketFilter]
-  }, [bucketFilter])
+  const modeCounts = useMemo(
+    () => ({
+      inbox: byMode.inbox.length,
+      completed: byMode.completed.length,
+      archived: byMode.archived.length,
+    }),
+    [byMode],
+  )
 
-  const chipCounts = useMemo(() => {
-    const counts: Record<BucketFilter, number> = {
-      all: filtered.length,
-      needs_you: groups.needs_you.length,
-      ready_to_seal: groups.ready_to_seal.length,
-      waiting: groups.waiting.length,
-      locked: groups.locked.length,
-    }
-    return counts
-  }, [filtered.length, groups])
-
-  const showMore = (bucket: AgreementBucket, total: number) => {
-    setVisibleByBucket(prev => {
-      const current = prev[bucket] ?? PAGE_SIZE
-      return { ...prev, [bucket]: Math.min(current + PAGE_SIZE, total) }
-    })
+  const showMore = () => {
+    setVisibleCount(prev => Math.min(prev + PAGE_SIZE, modeItems.length))
   }
 
   const clearFilters = () => {
     setQuery('')
-    setBucketFilter('all')
+    setListMode('inbox')
+  }
+
+  const setListArchived = async (doc: SealDocument, archived: boolean) => {
+    if (!token) return
+    setListArchiveBusyId(doc.id)
+    setError(null)
+    try {
+      const { document: updated } = await api.setDocumentListArchived(token, doc.id, archived)
+      setDocuments(prev => prev.map(d => (d.id === updated.id ? { ...d, ...updated } : d)))
+      // If archive emptied inbox but completed has items, stay put; user chose the mode.
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : archived
+            ? 'Could not archive agreement'
+            : 'Could not restore agreement',
+      )
+    } finally {
+      setListArchiveBusyId(null)
+    }
   }
 
   if (!token || !address) {
@@ -698,11 +699,32 @@ export function AgreementsPage({
   if (actionable > 0) {
     subtitleParts.push(`${actionable} need${actionable === 1 ? 's' : ''} your action`)
   }
-  if (sealedCount > 0 && !queryTrimmed) {
-    subtitleParts.push(`${sealedCount} sealed`)
+  if (modeCounts.completed > 0 && !queryTrimmed) {
+    subtitleParts.push(`${modeCounts.completed} completed`)
   }
 
-  const anyVisibleItems = visibleBuckets.some(b => groups[b].length > 0)
+  const shown = modeItems.slice(0, visibleCount)
+  const remaining = modeItems.length - shown.length
+  const needsBackupCount = byMode.completed.filter(doc => {
+    if (!isDocumentCreator(doc, address)) return false
+    const archive = doc.dataArchive
+    return archive && !archive.onChain && archive.eligible
+  }).length
+
+  const emptyCopy = (() => {
+    if (queryTrimmed) {
+      return `No agreements match “${queryTrimmed.length > 40 ? `${queryTrimmed.slice(0, 40)}…` : queryTrimmed}” in ${LIST_MODE_LABELS[listMode].toLowerCase()}.`
+    }
+    if (listMode === 'inbox') {
+      return actionable === 0 && modeCounts.completed > 0
+        ? 'Inbox is clear — completed agreements are under Completed.'
+        : 'Nothing needs your attention right now.'
+    }
+    if (listMode === 'completed') {
+      return 'No completed agreements yet. Locked fingerprints show up here.'
+    }
+    return 'Nothing archived. Hide completed agreements from Inbox and Completed with Archive.'
+  })()
 
   return (
     <section className="agreements-page card" aria-label="Your agreements">
@@ -749,17 +771,18 @@ export function AgreementsPage({
           )}
         </div>
 
-        <div className="agreements-page-chips" role="group" aria-label="Filter by status">
-          {CHIP_OPTIONS.map(({ key, label }) => {
-            const count = chipCounts[key]
-            const pressed = bucketFilter === key
+        <div className="agreements-page-chips" role="tablist" aria-label="Agreement list">
+          {MODE_OPTIONS.map(({ key, label }) => {
+            const count = modeCounts[key]
+            const pressed = listMode === key
             return (
               <button
                 key={key}
                 type="button"
+                role="tab"
                 className={`agreements-page-chip${pressed ? ' agreements-page-chip--active' : ''}`}
-                aria-pressed={pressed}
-                onClick={() => setBucketFilter(key)}
+                aria-selected={pressed}
+                onClick={() => setListMode(key)}
               >
                 <span className="agreements-page-chip-label">{label}</span>
                 <span className="agreements-page-chip-count">{count}</span>
@@ -769,249 +792,314 @@ export function AgreementsPage({
         </div>
       </div>
 
-      {!anyVisibleItems ? (
+      {error && (
+        <p className="muted agreements-page-inline-error" role="alert">
+          {error}
+        </p>
+      )}
+
+      {listMode === 'completed' && needsBackupCount > 0 && (
+        <p className="agreements-page-banner" role="status">
+          <Database size={14} strokeWidth={2.25} aria-hidden />
+          {needsBackupCount === 1
+            ? '1 agreement can store signatures & fields on the blockchain.'
+            : `${needsBackupCount} agreements can store signatures & fields on the blockchain.`}
+        </p>
+      )}
+
+      {modeItems.length === 0 ? (
         <div className="agreements-page-no-match">
           <p className="muted" style={{ margin: 0 }}>
-            {queryTrimmed
-              ? `No agreements match “${queryTrimmed.length > 40 ? `${queryTrimmed.slice(0, 40)}…` : queryTrimmed}”.`
-              : 'No agreements in this status.'}
+            {emptyCopy}
           </p>
-          {hasActiveFilters && (
+          {listMode === 'inbox' && modeCounts.completed > 0 && !queryTrimmed && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setListMode('completed')}
+            >
+              View completed
+            </button>
+          )}
+          {hasActiveFilters && listMode !== 'inbox' && (
             <button type="button" className="btn btn-secondary" onClick={clearFilters}>
-              Clear filters
+              Back to Inbox
+            </button>
+          )}
+          {queryTrimmed && (
+            <button type="button" className="btn btn-secondary" onClick={clearFilters}>
+              Clear search
             </button>
           )}
         </div>
       ) : (
-        visibleBuckets.map(bucket => {
-          const items = sortBucket(groups[bucket], bucket)
-          if (items.length === 0) return null
-          const limit = visibleByBucket[bucket] ?? PAGE_SIZE
-          const shown = items.slice(0, limit)
-          const remaining = items.length - shown.length
-
-          return (
-            <div key={bucket} className="agreements-page-group">
-              <h3 className="agreements-page-label">
-                {BUCKET_LABELS[bucket]}
-                <span className="agreements-page-count">{items.length}</span>
-              </h3>
-              <ul className="agreements-page-list">
-                {shown.map(doc => {
-                  const view = getAgreementView(doc, address)
-                  const creator = isDocumentCreator(doc, address)
-                  const preferSeal = isLockCta(view.cta) && creator
-                  const freeComplete =
-                    creator &&
-                    view.bucket === 'ready_to_seal' &&
-                    view.cta === 'View & print'
-                  const canCancel = canDeleteDocument(doc, address)
-                  const canPurge = canPurgeServerCopy(doc, address)
-                  const cancelling = cancellingId === doc.id
-                  const archive = creator ? doc.dataArchive : null
-                  const fullyOnChain = isFullyOnChain(doc)
-                  const fingerprintLocked =
-                    bucket === 'locked' ||
-                    doc.status === 'locked' ||
-                    doc.attestation?.status === 'confirmed'
-                  const showArchiveUpsell =
-                    creator &&
-                    bucket === 'locked' &&
-                    archive &&
-                    !archive.onChain &&
-                    archive.eligible
-                  const completedAt = agreementCompletedAt(doc)
-                  const whenAt = completedAt ?? doc.createdAt
-                  const whenLabel = completedAt
-                    ? fingerprintLocked
-                      ? 'Locked'
-                      : 'Completed'
-                    : 'Created'
-                  return (
-                    <li
-                      key={doc.id}
-                      className={[
-                        'agreements-page-item',
-                        bucket === 'ready_to_seal' ? 'agreements-page-item--seal' : '',
-                        showArchiveUpsell ? 'agreements-page-item--archive' : '',
-                        fullyOnChain ? 'agreements-page-item--backed-up' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                    >
-                      <button
-                        type="button"
-                        className="agreements-page-main"
-                        onClick={() => onOpen(doc, preferSeal)}
-                      >
-                        <span className="agreements-page-title-row">
-                          {fullyOnChain && (
-                            <span
-                              className="agreements-page-backed-icon"
-                              title="Fingerprint and data stored on the Nimiq blockchain"
-                            >
-                              <ShieldCheck size={15} strokeWidth={2.25} aria-hidden />
-                            </span>
-                          )}
-                          <strong className="agreements-page-title">
-                            {agreementListTitle(doc)}
-                          </strong>
-                          <span className="agreements-page-type">{documentTypeLabel(doc.type)}</span>
-                        </span>
-                        <span className="muted agreements-page-meta">
-                          {creator ? 'You created' : "You're a signer"}
-                          {' · '}
-                          {view.detail}
-                          {' · '}
-                          <time
-                            className="agreements-page-when"
-                            dateTime={new Date(whenAt).toISOString()}
-                            title={`${whenLabel} ${formatAgreementWhenFull(whenAt)}`}
-                          >
-                            {formatAgreementWhen(whenAt)}
-                          </time>
-                          {' · '}
-                          <code className="mono">{shortHash(doc.originalSha256)}</code>
-                        </span>
-                        <span className="agreements-page-headline">{view.headline}</span>
-                        {fingerprintLocked && (
-                          <span className="agreements-page-tags">
-                            <span className="agreements-page-archive-badge agreements-page-archive-badge--lock">
-                              <Lock size={11} strokeWidth={2.5} aria-hidden />
-                              Fingerprint locked
-                            </span>
-                            {fullyOnChain && (
-                              <span className="agreements-page-archive-badge agreements-page-archive-badge--data">
-                                <Database size={11} strokeWidth={2.5} aria-hidden />
-                                Data on blockchain
-                              </span>
-                            )}
-                          </span>
-                        )}
-                      </button>
-                      <div className="agreements-page-actions">
-                        <button
-                          type="button"
-                          className={`btn ${preferSeal ? 'btn-primary' : freeComplete ? 'btn-primary' : 'btn-secondary'} agreements-page-cta`}
-                          onClick={() => onOpen(doc, preferSeal)}
-                        >
-                          {preferSeal ? (
-                            <>
-                              <Lock size={14} strokeWidth={2.25} aria-hidden />
-                              {view.cta}
-                            </>
-                          ) : freeComplete ? (
-                            view.cta
-                          ) : view.cta === 'Sign now' ? (
-                            <>
-                              <PenLine size={14} strokeWidth={2.25} aria-hidden />
-                              Sign now
-                            </>
-                          ) : (
-                            view.cta
-                          )}
-                        </button>
-                        {freeComplete && (
-                          <button
-                            type="button"
-                            className="btn btn-secondary agreements-page-cta"
-                            onClick={() => onOpen(doc, true)}
-                            title="Lock fingerprint on the Nimiq blockchain (1 credit)"
-                          >
-                            <Lock size={14} strokeWidth={2.25} aria-hidden />
-                            Lock (1 credit)
-                          </button>
-                        )}
-                        {showArchiveUpsell && (
-                          <button
-                            type="button"
-                            className="btn btn-primary agreements-page-archive-btn agreements-page-cta"
-                            onClick={() => void requestArchive(doc)}
-                            title={
-                              archive.credits > 0
-                                ? `Store signatures & fields on the Nimiq blockchain (${formatDataArchiveCredits(archive.credits)})`
-                                : 'Store signatures & fields on the Nimiq blockchain'
-                            }
-                          >
-                            <Database size={14} strokeWidth={2.25} aria-hidden />
-                            {archive.credits > 0
-                              ? `Store forever · ${formatDataArchiveCredits(archive.credits)}`
-                              : 'Store forever'}
-                          </button>
-                        )}
-                        {canPurge && (
-                          <button
-                            type="button"
-                            className={`btn btn-ghost agreements-page-purge${cancelling ? ' btn--busy' : ''}`}
-                            disabled={Boolean(cancellingId)}
-                            onClick={() => requestPurgeServer(doc)}
-                            title="Removes the agreement from VeriLock’s server list. On-chain fingerprint and multi-tx data stay on Nimiq."
-                          >
-                            {cancelling ? (
-                              <>
-                                <LoaderCircle
-                                  className="btn-spinner"
-                                  size={14}
-                                  strokeWidth={2.5}
-                                  aria-hidden
-                                />
-                                Removing…
-                              </>
-                            ) : (
-                              <>
-                                <Trash2 size={14} strokeWidth={2.25} aria-hidden />
-                                Remove
-                              </>
-                            )}
-                          </button>
-                        )}
-                        {canCancel && (
-                          <button
-                            type="button"
-                            className={`btn btn-ghost agreements-page-cancel${cancelling ? ' btn--busy' : ''}`}
-                            disabled={Boolean(cancellingId)}
-                            onClick={() => requestCancel(doc)}
-                          >
-                            {cancelling ? (
-                              <>
-                                <LoaderCircle
-                                  className="btn-spinner"
-                                  size={14}
-                                  strokeWidth={2.5}
-                                  aria-hidden
-                                />
-                                Cancelling…
-                              </>
-                            ) : (
-                              <>
-                                <Trash2 size={14} strokeWidth={2.25} aria-hidden />
-                                Cancel
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-              {remaining > 0 && (
-                <div className="agreements-page-more">
-                  <p className="muted agreements-page-more-meta">
-                    Showing {shown.length} of {items.length}
-                  </p>
+        <div className="agreements-page-group">
+          <ul className="agreements-page-list">
+            {shown.map(doc => {
+              const view = getAgreementView(doc, address)
+              const creator = isDocumentCreator(doc, address)
+              const preferSeal = isLockCta(view.cta) && creator
+              const freeComplete =
+                creator &&
+                view.bucket === 'ready_to_seal' &&
+                view.cta === 'View & print'
+              const canCancel = canDeleteDocument(doc, address)
+              const canPurge = canPurgeServerCopy(doc, address)
+              const cancelling = cancellingId === doc.id
+              const listArchiving = listArchiveBusyId === doc.id
+              const archived = isListArchived(doc)
+              const archive = creator ? doc.dataArchive : null
+              const fullyOnChain = isFullyOnChain(doc)
+              const fingerprintLocked =
+                view.bucket === 'locked' ||
+                doc.status === 'locked' ||
+                doc.attestation?.status === 'confirmed'
+              const showDataArchiveUpsell =
+                creator &&
+                fingerprintLocked &&
+                !archived &&
+                archive &&
+                !archive.onChain &&
+                archive.eligible
+              const completedAt = agreementCompletedAt(doc)
+              const whenAt = completedAt ?? doc.createdAt
+              const whenLabel = completedAt
+                ? fingerprintLocked
+                  ? 'Locked'
+                  : 'Completed'
+                : 'Created'
+              const statusPill = BUCKET_PILL_LABELS[view.bucket]
+              return (
+                <li
+                  key={doc.id}
+                  className={[
+                    'agreements-page-item',
+                    view.bucket === 'ready_to_seal' && !archived
+                      ? 'agreements-page-item--seal'
+                      : '',
+                    showDataArchiveUpsell ? 'agreements-page-item--archive' : '',
+                    fullyOnChain ? 'agreements-page-item--backed-up' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                >
                   <button
                     type="button"
-                    className="btn btn-secondary agreements-page-more-btn"
-                    onClick={() => showMore(bucket, items.length)}
+                    className="agreements-page-main"
+                    onClick={() => onOpen(doc, preferSeal)}
                   >
-                    Show {Math.min(PAGE_SIZE, remaining)} more
+                    <span className="agreements-page-title-row">
+                      {fullyOnChain && (
+                        <span
+                          className="agreements-page-backed-icon"
+                          title="Fingerprint and data stored on the Nimiq blockchain"
+                        >
+                          <ShieldCheck size={15} strokeWidth={2.25} aria-hidden />
+                        </span>
+                      )}
+                      <strong className="agreements-page-title">
+                        {agreementListTitle(doc)}
+                      </strong>
+                      <span className="agreements-page-type">{documentTypeLabel(doc.type)}</span>
+                      <span
+                        className={`agreements-page-status-pill agreements-page-status-pill--${view.bucket}`}
+                      >
+                        {statusPill}
+                      </span>
+                    </span>
+                    <span className="muted agreements-page-meta">
+                      {creator ? 'You created' : "You're a signer"}
+                      {' · '}
+                      {view.detail}
+                      {' · '}
+                      <time
+                        className="agreements-page-when"
+                        dateTime={new Date(whenAt).toISOString()}
+                        title={`${whenLabel} ${formatAgreementWhenFull(whenAt)}`}
+                      >
+                        {formatAgreementWhen(whenAt)}
+                      </time>
+                      {' · '}
+                      <code className="mono">{shortHash(doc.originalSha256)}</code>
+                    </span>
+                    {(view.bucket === 'needs_you' ||
+                      view.bucket === 'ready_to_seal' ||
+                      view.cta === 'Retry lock') && (
+                      <span className="agreements-page-headline">{view.headline}</span>
+                    )}
                   </button>
-                </div>
-              )}
+                  <div className="agreements-page-actions">
+                    <button
+                      type="button"
+                      className={`btn ${preferSeal ? 'btn-primary' : freeComplete ? 'btn-primary' : 'btn-secondary'} agreements-page-cta`}
+                      onClick={() => onOpen(doc, preferSeal)}
+                    >
+                      {preferSeal ? (
+                        <>
+                          <Lock size={14} strokeWidth={2.25} aria-hidden />
+                          {view.cta}
+                        </>
+                      ) : freeComplete ? (
+                        view.cta
+                      ) : view.cta === 'Sign now' ? (
+                        <>
+                          <PenLine size={14} strokeWidth={2.25} aria-hidden />
+                          Sign now
+                        </>
+                      ) : (
+                        view.cta
+                      )}
+                    </button>
+                    {freeComplete && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary agreements-page-cta"
+                        onClick={() => onOpen(doc, true)}
+                        title="Lock fingerprint on the Nimiq blockchain (1 credit)"
+                      >
+                        <Lock size={14} strokeWidth={2.25} aria-hidden />
+                        Lock (1 credit)
+                      </button>
+                    )}
+                    {showDataArchiveUpsell && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary agreements-page-archive-btn agreements-page-cta"
+                        onClick={() => void requestArchive(doc)}
+                        title={
+                          archive.credits > 0
+                            ? `Store signatures & fields on the Nimiq blockchain (${formatDataArchiveCredits(archive.credits)})`
+                            : 'Store signatures & fields on the Nimiq blockchain'
+                        }
+                      >
+                        <Database size={14} strokeWidth={2.25} aria-hidden />
+                        {archive.credits > 0
+                          ? `Store forever · ${formatDataArchiveCredits(archive.credits)}`
+                          : 'Store forever'}
+                      </button>
+                    )}
+                    {archived ? (
+                      <button
+                        type="button"
+                        className={`btn btn-ghost agreements-page-list-archive${listArchiving ? ' btn--busy' : ''}`}
+                        disabled={Boolean(listArchiveBusyId)}
+                        onClick={() => void setListArchived(doc, false)}
+                        title="Show this agreement in Inbox or Completed again"
+                      >
+                        {listArchiving ? (
+                          <>
+                            <LoaderCircle
+                              className="btn-spinner"
+                              size={14}
+                              strokeWidth={2.5}
+                              aria-hidden
+                            />
+                            Restoring…
+                          </>
+                        ) : (
+                          <>
+                            <ArchiveRestore size={14} strokeWidth={2.25} aria-hidden />
+                            Restore
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`btn btn-ghost agreements-page-list-archive${listArchiving ? ' btn--busy' : ''}`}
+                        disabled={Boolean(listArchiveBusyId)}
+                        onClick={() => void setListArchived(doc, true)}
+                        title="Hide from Inbox and Completed (you can restore anytime)"
+                      >
+                        {listArchiving ? (
+                          <>
+                            <LoaderCircle
+                              className="btn-spinner"
+                              size={14}
+                              strokeWidth={2.5}
+                              aria-hidden
+                            />
+                            Archiving…
+                          </>
+                        ) : (
+                          <>
+                            <Archive size={14} strokeWidth={2.25} aria-hidden />
+                            Archive
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {canPurge && (
+                      <button
+                        type="button"
+                        className={`btn btn-ghost agreements-page-purge${cancelling ? ' btn--busy' : ''}`}
+                        disabled={Boolean(cancellingId)}
+                        onClick={() => requestPurgeServer(doc)}
+                        title="Removes the agreement from VeriLock’s server list. On-chain fingerprint and multi-tx data stay on Nimiq."
+                      >
+                        {cancelling ? (
+                          <>
+                            <LoaderCircle
+                              className="btn-spinner"
+                              size={14}
+                              strokeWidth={2.5}
+                              aria-hidden
+                            />
+                            Removing…
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 size={14} strokeWidth={2.25} aria-hidden />
+                            Remove
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {canCancel && (
+                      <button
+                        type="button"
+                        className={`btn btn-ghost agreements-page-cancel${cancelling ? ' btn--busy' : ''}`}
+                        disabled={Boolean(cancellingId)}
+                        onClick={() => requestCancel(doc)}
+                      >
+                        {cancelling ? (
+                          <>
+                            <LoaderCircle
+                              className="btn-spinner"
+                              size={14}
+                              strokeWidth={2.5}
+                              aria-hidden
+                            />
+                            Cancelling…
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 size={14} strokeWidth={2.25} aria-hidden />
+                            Cancel
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+          {remaining > 0 && (
+            <div className="agreements-page-more">
+              <p className="muted agreements-page-more-meta">
+                Showing {shown.length} of {modeItems.length}
+              </p>
+              <button
+                type="button"
+                className="btn btn-secondary agreements-page-more-btn"
+                onClick={showMore}
+              >
+                Show {Math.min(PAGE_SIZE, remaining)} more
+              </button>
             </div>
-          )
-        })
+          )}
+        </div>
       )}
 
       {documents.length >= SERVER_LIST_CAP && (

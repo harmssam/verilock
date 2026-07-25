@@ -7,8 +7,12 @@ import type { PdfAnnotation, SignaturePathData } from './annotations'
 export const STREAM_MAGIC = 0xa1
 export const STREAM_VERSION = 1
 export const FRAME_SIZE = 64
-export const FRAME_HEADER = 9
-export const FRAME_BODY = FRAME_SIZE - FRAME_HEADER // 55
+/** 8-byte association id (first 8 of PDF hash) + body @ 13. Legacy: 4-byte @5 + body @9. */
+export const ASSOC_LEN = 8
+export const FRAME_HEADER = 5 + ASSOC_LEN // 13
+export const FRAME_BODY = FRAME_SIZE - FRAME_HEADER // 51
+export const FRAME_HEADER_LEGACY = 9
+export const ASSOC_LEN_LEGACY = 4
 /** Keep in sync with server MAX_STREAM_FRAMES. */
 export const MAX_STREAM_FRAMES = 128
 
@@ -179,17 +183,53 @@ function writeHeader(
   type: number,
   seq: number,
   total: number,
-  hashPrefix: Uint8Array,
+  pdfHash: Uint8Array,
 ): void {
   frame[0] = STREAM_MAGIC
   frame[1] = STREAM_VERSION
   frame[2] = type
   frame[3] = seq & 0xff
   frame[4] = total & 0xff
-  frame[5] = hashPrefix[0]!
-  frame[6] = hashPrefix[1]!
-  frame[7] = hashPrefix[2]!
-  frame[8] = hashPrefix[3]!
+  for (let i = 0; i < ASSOC_LEN; i++) {
+    frame[5 + i] = pdfHash[i]!
+  }
+}
+
+function eqBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+  return true
+}
+
+function detectFrameLayout(
+  frame: Uint8Array,
+  expectedPdfHash?: string | null,
+): { header: number; assocLen: number } {
+  if (frame.length !== FRAME_SIZE || frame[0] !== STREAM_MAGIC) {
+    return { header: FRAME_HEADER, assocLen: ASSOC_LEN }
+  }
+  if (expectedPdfHash) {
+    const clean = expectedPdfHash.replace(/^0x/i, '').toLowerCase()
+    const hash = new Uint8Array(32)
+    for (let i = 0; i < 32; i++) hash[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16)
+    if (eqBytes(frame.subarray(5, 5 + ASSOC_LEN), hash.subarray(0, ASSOC_LEN))) {
+      return { header: FRAME_HEADER, assocLen: ASSOC_LEN }
+    }
+    if (eqBytes(frame.subarray(5, 9), hash.subarray(0, ASSOC_LEN_LEGACY))) {
+      return { header: FRAME_HEADER_LEGACY, assocLen: ASSOC_LEN_LEGACY }
+    }
+  }
+  if (frame[2] === FRAME_HEAD) {
+    const fullNew = frame.subarray(FRAME_HEADER, FRAME_HEADER + 32)
+    const fullLegacy = frame.subarray(FRAME_HEADER_LEGACY, FRAME_HEADER_LEGACY + 32)
+    if (eqBytes(frame.subarray(5, 5 + ASSOC_LEN), fullNew.subarray(0, ASSOC_LEN))) {
+      return { header: FRAME_HEADER, assocLen: ASSOC_LEN }
+    }
+    if (eqBytes(frame.subarray(5, 9), fullLegacy.subarray(0, ASSOC_LEN_LEGACY))) {
+      return { header: FRAME_HEADER_LEGACY, assocLen: ASSOC_LEN_LEGACY }
+    }
+  }
+  return { header: FRAME_HEADER, assocLen: ASSOC_LEN }
 }
 
 /** Pack annotations into fixed 64-byte frames (HEAD + DATA* + END). */
@@ -294,12 +334,13 @@ export function unpackAnnotationStream(framesIn: Uint8Array[]): UnpackedStream {
     if (frames[i]![3] !== i) throw new Error(`Frame sequence gap at ${i}`)
   }
 
-  const hash = head.subarray(FRAME_HEADER, FRAME_HEADER + 32)
-  const hashPrefix = hash.subarray(0, 4)
+  const { header: hdr, assocLen } = detectFrameLayout(head)
+  const hash = head.subarray(hdr, hdr + 32)
+  const assoc = hash.subarray(0, assocLen)
   const view = new DataView(head.buffer, head.byteOffset, head.byteLength)
-  const payloadLen = view.getUint32(FRAME_HEADER + 32, false)
-  const annCount = view.getUint16(FRAME_HEADER + 36, false)
-  const checksum = view.getUint32(FRAME_HEADER + 38, false)
+  const payloadLen = view.getUint32(hdr + 32, false)
+  const annCount = view.getUint16(hdr + 36, false)
+  const checksum = view.getUint32(hdr + 38, false)
   const pdfSha256 = bytesToHex(hash)
 
   const parts: Uint8Array[] = []
@@ -307,16 +348,17 @@ export function unpackAnnotationStream(framesIn: Uint8Array[]): UnpackedStream {
     const f = frames[i]!
     if (f[0] !== STREAM_MAGIC) throw new Error(`Bad magic on frame ${i}`)
     if (f[1] !== STREAM_VERSION) throw new Error(`Bad version on frame ${i}`)
-    for (let b = 0; b < 4; b++) {
-      if (f[5 + b] !== hashPrefix[b]) throw new Error(`Hash prefix mismatch on frame ${i}`)
+    for (let b = 0; b < assocLen; b++) {
+      if (f[5 + b] !== assoc[b]) throw new Error(`Association id mismatch on frame ${i}`)
     }
+    const { header: fh } = detectFrameLayout(f, pdfSha256)
     if (f[2] === FRAME_DATA) {
       // body may be zero-padded
-      parts.push(f.subarray(FRAME_HEADER))
+      parts.push(f.subarray(fh))
     } else if (f[2] === FRAME_END) {
       const endView = new DataView(f.buffer, f.byteOffset, f.byteLength)
-      const endLen = endView.getUint32(FRAME_HEADER, false)
-      const endCrc = endView.getUint32(FRAME_HEADER + 4, false)
+      const endLen = endView.getUint32(fh, false)
+      const endCrc = endView.getUint32(fh + 4, false)
       if (endLen !== payloadLen || endCrc !== checksum) {
         throw new Error('END frame checksum mismatch')
       }

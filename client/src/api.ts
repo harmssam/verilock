@@ -253,6 +253,31 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  /**
+   * /pdf2 lab: broadcast pre-packed 0xA1 frames (8-byte assoc layout).
+   * No seal credits. Stores lab index under documentId lab:&lt;sha&gt; for wire reconstruct.
+   */
+  labBroadcastFrames: (
+    token: string,
+    body: { originalSha256: string; framesHex: string[]; broadcast?: boolean },
+  ) =>
+    request<{
+      originalSha256: string
+      frameCount: number
+      txHashes: string[]
+      onChain: boolean
+      confirmedFrames: number
+      broadcastError?: string
+      broadcastEnabled: boolean
+      serviceWalletConfigured: boolean
+      serviceWalletAddress: string | null
+      documentId: string
+    }>('/api/lab/stream-broadcast', {
+      method: 'POST',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+
   /** Experiment: pack annotations into 64B frames, index by PDF hash, optional on-chain broadcast. */
   publishAnnotationStream: (
     token: string,
@@ -399,6 +424,17 @@ export const api = {
     request<{ ok: boolean }>(`/api/documents/${docId}`, {
       method: 'DELETE',
       headers: withAuth(token),
+    }),
+
+  /**
+   * Soft-archive / restore on this wallet’s agreements list only
+   * (not on-chain data archive, not server purge).
+   */
+  setDocumentListArchived: (token: string, docId: string, archived: boolean) =>
+    request<{ document: SealDocument }>(`/api/documents/${docId}/list-archive`, {
+      method: 'PUT',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archived }),
     }),
 
   signDocument: (token: string, docId: string, body: SignDocumentBody) =>
@@ -630,18 +666,27 @@ export const api = {
 
   /**
    * Public reconstruct of on-chain data archive by PDF fingerprint.
-   * source=wire uses stored frames; source=chain re-reads Nimiq txs.
+   * auto = server index or Nimiq scan; scan = hash-only (8-byte association id).
    */
-  reconstructChainData: (sha256: string, options?: { source?: 'wire' | 'chain' }) => {
-    const source = options?.source === 'chain' ? 'chain' : 'wire'
+  reconstructChainData: (
+    sha256: string,
+    options?: { source?: 'auto' | 'wire' | 'chain' | 'scan' },
+  ) => {
+    const source = options?.source ?? 'auto'
     return request<{
       originalSha256: string
-      source: 'wire' | 'chain'
+      source: 'wire' | 'chain' | 'scan'
       onChain: boolean
       frameCount: number
       txHashes: string[]
       integrityOk: boolean
       chainError?: string
+      scanMeta?: {
+        scannedTxs: number
+        truncated: boolean
+        streamCount: number
+        scanAddresses: string[]
+      }
       unpacked: {
         originalSha256: string
         source: string
