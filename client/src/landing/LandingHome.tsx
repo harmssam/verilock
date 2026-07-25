@@ -134,12 +134,13 @@ export function LandingHome({
       <section className="lr-hero-band" aria-labelledby="lr-hero-headline">
         <div className="lr-hero-copy">
           <h1 id="lr-hero-headline" className="lr-hero-headline">
-            Sign a document together.{' '}
+            Multi-party PDF signing.{' '}
             <span className="lr-hero-headline-em">Free.</span>
           </h1>
           <p className="lr-hero-sub">
-            Co-sign PDFs with your Nimiq wallet - free. Your document stays on your device. Print when
-            everyone has signed. Upgrade anytime: lock a permanent proof on the blockchain for 1 credit.
+            Co-sign PDFs with your Nimiq wallet - completely free. Your document stays on your device.
+            Print when everyone has signed. Upgrade anytime: lock a permanent proof on the blockchain for
+            1 credit.
           </p>
           {/*
             One primary CTA only. Paths below cover Create / Invited / Verify.
