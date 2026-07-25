@@ -46,6 +46,40 @@
     font-weight: 700;
   }
 
+  .price-page-tier {
+    border-color: var(--tier-border);
+    background:
+      linear-gradient(165deg, var(--tier-soft) 0%, #ffffff 52%),
+      #ffffff;
+    box-shadow: 0 8px 22px color-mix(in srgb, var(--tier-accent) 12%, rgba(15, 23, 42, 0.04));
+  }
+
+  .price-page-tier--free {
+    --tier-accent: #14b8a6;
+    --tier-accent-deep: #0f766e;
+    --tier-soft: #f0fdfa;
+  }
+
+  .price-page-tier--lock {
+    --tier-accent: #0ea5e9;
+    --tier-accent-deep: #0369a1;
+    --tier-soft: #f0f9ff;
+  }
+
+  .price-page-tier--data {
+    --tier-accent: #8b5cf6;
+    --tier-accent-deep: #6d28d9;
+    --tier-soft: #f5f3ff;
+  }
+
+  .price-page-tier-name {
+    color: var(--lr-text, #0f172a);
+  }
+
+  .price-page-tier-list li {
+    color: var(--lr-muted, #64748b);
+  }
+
   .price-page-nimiq-link {
     color: var(--lr-accent, #0d9488);
     font-weight: 600;
