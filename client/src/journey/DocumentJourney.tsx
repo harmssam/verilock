@@ -1683,7 +1683,7 @@ export function DocumentJourney({
         })
         setActiveFromSeal(signedDoc, doc.fileSize)
         // Keep the matched file in this session for share / any return to sign.
-        // Re-upload is only needed after a full leave (reload) drops local File state.
+        // Re-selecting the local file is only needed after a full leave (reload) drops File state.
         setSignerName('')
         setSigBlob(null)
         setSigPadKey(k => k + 1)
