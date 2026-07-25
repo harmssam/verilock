@@ -37,7 +37,7 @@ export function isDocumentCreator(
  * Creator or any party/signer wallet may see display names + signature images.
  * Prefer server `participantDetailsRevealed` when present (authoritative).
  * When the flag is missing (older payloads), fall back to local wallet match.
- * Re-fetch with a session token if the open doc is still redacted — see useRevealDocumentOnAuth.
+ * Re-fetch with a session token if the open doc is still redacted - see useRevealDocumentOnAuth.
  */
 export function canRevealParticipantDetails(
   doc: Pick<SealDocument, 'creatorAddress' | 'parties' | 'signatures' | 'participantDetailsRevealed'>,
@@ -170,7 +170,7 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
       }
       return {
         bucket: 'ready_to_seal',
-        headline: 'All signed — free complete',
+        headline: 'All signed - free complete',
         detail: progress,
         cta: 'View & print',
       }
@@ -196,7 +196,7 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
     if (resolution.hint === 'already_signed') {
       return {
         bucket: 'waiting',
-        headline: 'You signed — waiting on others',
+        headline: 'You signed - waiting on others',
         detail: progress,
         cta: 'View & share',
       }
@@ -212,7 +212,7 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
             }
           : {
               bucket: 'ready_to_seal',
-              headline: 'All signed — free complete',
+              headline: 'All signed - free complete',
               detail: progress,
               cta: 'View & print',
             }

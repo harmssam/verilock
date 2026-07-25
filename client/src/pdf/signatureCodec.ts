@@ -1,5 +1,5 @@
 /**
- * Signature encoding experiments — strokes, simplification, size estimates.
+ * Signature encoding experiments - strokes, simplification, size estimates.
  * Pure helpers (no React). Used by SignatureLab demo.
  */
 

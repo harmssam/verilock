@@ -16,7 +16,7 @@ interface SignaturePadProps {
 type Point = { x: number; y: number }
 type Stroke = Point[]
 
-/** Draw-to-sign pad — image stays local until submit. Supports undo last stroke. */
+/** Draw-to-sign pad - image stays local until submit. Supports undo last stroke. */
 export function SignaturePad({
   onChange,
   disabled,

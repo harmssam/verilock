@@ -1,5 +1,5 @@
 /**
- * Signature encoding lab — draw once, compare raster vs path simplification.
+ * Signature encoding lab - draw once, compare raster vs path simplification.
  * Route: /pdf/lab
  */
 import { Eraser, PenLine } from 'lucide-react'
@@ -290,7 +290,7 @@ export function SignatureLab() {
         <h2>Size comparison</h2>
         <p className="sig-lab-card-meta">
           Sorted smallest first. Binary path sizes are structured estimates (delta + fixed-bit
-          coords), not a final wire codec — good enough to rank methods.
+          coords), not a final wire codec - good enough to rank methods.
         </p>
         {rawPts === 0 ? (
           <p className="sig-lab-card-meta">Draw a signature to populate the table.</p>
@@ -320,7 +320,7 @@ export function SignatureLab() {
                     </td>
                     <td className="muted">{row.detail}</td>
                     <td className="num">{formatBytes(row.bytes)}</td>
-                    <td className="num">{row.points ?? '—'}</td>
+                    <td className="num">{row.points ?? '-'}</td>
                     <td className="num">{row.frames}</td>
                   </tr>
                 ))}

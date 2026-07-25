@@ -46,24 +46,24 @@ export interface UseJourneyWalletResult {
   /** User is inside Nimiq Pay WebView (host probe or window.nimiq). */
   inNimiqPay: boolean
   /**
-   * Mobile device, not in Pay, not connected — use “Open in Nimiq Pay” copy
+   * Mobile device, not in Pay, not connected - use “Open in Nimiq Pay” copy
    * and deeplink-first connect (legacy mobilePayConnect).
    */
   mobilePayConnect: boolean
   /**
    * True after deeplink launch truly fails (page stayed in foreground).
-   * Surfaces install / copy / Hub options — not set after a successful handoff.
+   * Surfaces install / copy / Hub options - not set after a successful handoff.
    */
   showOpenInPay: boolean
 }
 
 const PAY_DEEPLINK_FALLBACK_MS = 2500
-/** Shown only when the page stayed foreground after launch — app likely missing. */
+/** Shown only when the page stayed foreground after launch - app likely missing. */
 const PAY_INSTALL_HINT =
-  'Nimiq Pay did not open. Install the app for the best experience, then try again — or continue with Nimiq Hub.'
+  'Nimiq Pay did not open. Install the app for the best experience, then try again - or continue with Nimiq Hub.'
 /**
  * After the browser tab left the foreground (Pay handoff), remind that login
- * lives in the Pay WebView — this tab has a separate sessionStorage.
+ * lives in the Pay WebView - this tab has a separate sessionStorage.
  */
 const PAY_HANDOFF_HINT =
   'Continue in Nimiq Pay to finish login. This browser tab stays separate and will not show that session.'
@@ -104,7 +104,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
   const skipPayAutoConnectRef = useRef(false)
   /** Mobile browser launched `nimiqpay://` and is waiting to see if the OS left this tab. */
   const payDeeplinkPendingRef = useRef(false)
-  /** Page went hidden after deeplink — treat as successful handoff, not install failure. */
+  /** Page went hidden after deeplink - treat as successful handoff, not install failure. */
   const payDeeplinkLeftPageRef = useRef(false)
 
   walletStatusRef.current = walletStatus
@@ -179,7 +179,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
   /**
    * Hub login uses a full-page redirect. If the user hits Back (or the tab is
    * restored from bfcache) without Hub return params, React state can still
-   * say “Logging in…”. Clear only abandoned Hub redirect UI — not in-Pay
+   * say “Logging in…”. Clear only abandoned Hub redirect UI - not in-Pay
    * approve dialogs (those also use `connecting`).
    */
   const resetAbandonedHubRedirect = useCallback(() => {
@@ -311,14 +311,14 @@ export function useJourneyWallet(): UseJourneyWalletResult {
    * even though login succeeded inside the Pay WebView (separate sessionStorage).
    *
    * Only treat as failure if this tab stayed visible the whole time. If the page
-   * hid, handoff worked — show a neutral "continue in Pay" note instead.
+   * hid, handoff worked - show a neutral "continue in Pay" note instead.
    */
   const showPayHandoffHint = useCallback(() => {
     setError(prev => (prev === PAY_INSTALL_HINT ? null : prev))
     setShowOpenInPay(false)
     setWalletStatus(PAY_HANDOFF_HINT)
     setConnecting(false)
-    // Soft note only — do not leave the Login control stuck in a busy state.
+    // Soft note only - do not leave the Login control stuck in a busy state.
     window.setTimeout(() => {
       setWalletStatus(prev => (prev === PAY_HANDOFF_HINT ? null : prev))
     }, 8000)
@@ -338,7 +338,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
       clearPayDeeplinkPending()
       return
     }
-    // User came back to the browser after leaving for Pay — not a failed install.
+    // User came back to the browser after leaving for Pay - not a failed install.
     if (payDeeplinkLeftPageRef.current) {
       clearPayDeeplinkPending()
       showPayHandoffHint()
@@ -379,7 +379,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     deeplinkFallbackTimerRef.current = window.setTimeout(() => {
       deeplinkFallbackTimerRef.current = null
       if (!payDeeplinkPendingRef.current) return
-      // Left the tab / app — handoff, not failure (timers often fire only on resume).
+      // Left the tab / app - handoff, not failure (timers often fire only on resume).
       if (payDeeplinkLeftPageRef.current || document.visibilityState !== 'visible') {
         if (payDeeplinkLeftPageRef.current || document.visibilityState === 'hidden') {
           markPayDeeplinkHandoff()
@@ -390,7 +390,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
         clearPayDeeplinkPending()
         return
       }
-      // Still foreground after launch — OS never switched; app likely missing.
+      // Still foreground after launch - OS never switched; app likely missing.
       payDeeplinkPendingRef.current = false
       setShowOpenInPay(true)
       setError(PAY_INSTALL_HINT)
@@ -446,7 +446,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
 
           // Mobile default: try Nimiq Pay deeplink first. Explicit useRedirect skips to Hub
           // (NimiqPayOpenPanel “Continue via Hub redirect”). Note: shouldUseHubRedirect() is
-          // true by default for desktop Hub reliability — do not gate Pay on that flag.
+          // true by default for desktop Hub reliability - do not gate Pay on that flag.
           if (isMobileDevice() && !explicitHubRedirect) {
             setWalletStatus('Opening Nimiq Pay…')
             // Full path+query so invite /d/:slug?party= survives Pay open (not just origin → home).
@@ -459,7 +459,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
               scheduleDeeplinkFallback()
               return
             }
-            // Deeplink unavailable — show panel, do not fall through to Hub on mobile.
+            // Deeplink unavailable - show panel, do not fall through to Hub on mobile.
             setShowOpenInPay(true)
             setWalletStatus(null)
             setError(PAY_INSTALL_HINT)
@@ -562,7 +562,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     token,
     address,
     nimiq,
-    // Handoff note is informational — must not keep Login looking busy forever.
+    // Handoff note is informational - must not keep Login looking busy forever.
     connecting:
       connecting ||
       Boolean(walletStatus && !address && walletStatus !== PAY_HANDOFF_HINT),

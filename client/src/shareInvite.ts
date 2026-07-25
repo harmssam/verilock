@@ -102,7 +102,7 @@ export function buildShareInviteContent(
 export interface ShareEmailBodyOptions extends ShareInviteOptions {
   /**
    * When set (mailto + separate PDF download), tell the signer to attach this
-   * just-downloaded filename — Apple Mail cannot open mailto: with attachments.
+   * just-downloaded filename - Apple Mail cannot open mailto: with attachments.
    */
   pdfDownloadName?: string
 }
@@ -164,7 +164,7 @@ export function buildShareEmailBody(
     ...content.detailLines.map(line => `• ${line}`),
     ...(content.waitingOn.length > 0 ? [`• Still waiting on: ${content.waitingOn.join(', ')}`] : []),
     '',
-    '—',
+    '-',
     'VeriLock · Sign today. Prove forever.',
   ]
 
@@ -182,7 +182,7 @@ export function buildShareSheetText(
 ): string {
   const content = buildShareInviteContent(doc, shareUrl, options)
   const pdfLine = content.pdfAttached
-    ? `The agreement file (${content.pdfName}) is attached — use that exact file when you sign.`
+    ? `The agreement file (${content.pdfName}) is attached - use that exact file when you sign.`
     : `You'll need the agreement file (${content.pdfName}) to verify the fingerprint.`
 
   return [
@@ -195,7 +195,7 @@ export function buildShareSheetText(
     'How to sign:',
     ...content.signingSteps.map((step, index) => `${index + 1}. ${step}`),
     '',
-    'VeriLock never hosts the file — it only travels with this share.',
+    'VeriLock never hosts the file - it only travels with this share.',
   ].join('\n')
 }
 
@@ -207,7 +207,7 @@ export function buildShareMailtoUrl(
 ): string {
   const content = buildShareInviteContent(doc, shareUrl, options)
   const body = buildShareEmailBody(doc, shareUrl, options)
-  // Validated emails only — leave @ and commas unencoded for mail clients.
+  // Validated emails only - leave @ and commas unencoded for mail clients.
   const to = recipients.map(e => e.trim()).filter(Boolean).join(',')
   return `mailto:${to}?subject=${encodeURIComponent(content.subject)}&body=${encodeURIComponent(body)}`
 }
@@ -369,9 +369,9 @@ function rfc2822Date(date = new Date()): string {
  * PDF bytes stay on-device; VeriLock never receives the file.
  *
  * Important headers:
- * - `X-Unsent: 1` — Outlook opens as editable draft
- * - `X-Uniform-Type-Identifier: com.apple.mail-draft` — Apple Mail draft hint
- * - `To:` — pre-filled when recipients are known
+ * - `X-Unsent: 1` - Outlook opens as editable draft
+ * - `X-Uniform-Type-Identifier: com.apple.mail-draft` - Apple Mail draft hint
+ * - `To:` - pre-filled when recipients are known
  *
  * Note: Apple Mail often ignores To: on imported .eml drafts. Prefer mailto compose
  * for reliable To pre-fill on macOS (see ShareInviteCard “Open in Mail”).
@@ -398,7 +398,7 @@ export async function buildShareEmlBlob(
     `Message-ID: ${messageId}`,
     formatToHeader(recipients),
     `Subject: ${encodeRfc2047Subject(content.subject)}`,
-    // Draft / unsent — open in compose mode, not as a sealed inbox message
+    // Draft / unsent - open in compose mode, not as a sealed inbox message
     'X-Unsent: 1',
     // Apple Mail: open as editable draft (alongside X-Unsent for Outlook)
     'X-Uniform-Type-Identifier: com.apple.mail-draft',
@@ -453,7 +453,7 @@ function isUserShareCancel(err: unknown): boolean {
 
 /**
  * Desktop Safari on macOS reports canShare({ files }) but many targets (especially
- * Messages) open with an empty compose — no text, no PDF. Treat as unsupported so
+ * Messages) open with an empty compose - no text, no PDF. Treat as unsupported so
  * the UI does not offer “Share file + invite” there. iOS/iPadOS keep file share.
  */
 export function isDesktopMacWebShareUnreliable(
@@ -476,7 +476,7 @@ export function canShareFiles(files: File[]): boolean {
   // macOS desktop: share sheet targets (Messages) often receive empty payload.
   if (isDesktopMacWebShareUnreliable()) return false
   if (typeof navigator.canShare !== 'function') {
-    // Older Safari: share exists but canShare may be missing — try files optimistically
+    // Older Safari: share exists but canShare may be missing - try files optimistically
     // only when we know Level 2 is common; without canShare, avoid claiming support.
     return false
   }
@@ -489,7 +489,7 @@ export function canShareFiles(files: File[]): boolean {
 
 /**
  * Share the local document file + short invite text via the OS share sheet.
- * Bytes never leave the device for VeriLock — only the app the user picks receives them.
+ * Bytes never leave the device for VeriLock - only the app the user picks receives them.
  */
 export async function shareInviteWithPdf(
   doc: SealDocument,
@@ -500,7 +500,7 @@ export async function shareInviteWithPdf(
   if (isDesktopMacWebShareUnreliable()) return 'unsupported'
 
   const pdfName = pdfFile.name || doc.originalFilename || 'agreement.pdf'
-  // Always materialize a named File with explicit MIME — some share targets ignore
+  // Always materialize a named File with explicit MIME - some share targets ignore
   // File/Blob objects without an explicit type or with empty names.
   const file = new File([pdfFile], pdfName, {
     type: mimeForDocumentFile(pdfFile),
@@ -517,7 +517,7 @@ export async function shareInviteWithPdf(
     { title: content.subject, text, url: shareUrl, files: [file] },
     { title: content.subject, text, files: [file] },
     { title: content.subject, files: [file] },
-    // Last resort: link only — better empty failure on mobile than silent miss.
+    // Last resort: link only - better empty failure on mobile than silent miss.
     { title: content.subject, text, url: shareUrl },
   ]
 

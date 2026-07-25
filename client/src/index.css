@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   VeriLock global tokens — light production shell (mint on white).
+   VeriLock global tokens - light production shell (mint on white).
    Dark navy defaults archived: archive/dark-journey-css-2026-07-17/
    ═══════════════════════════════════════════════════════════ */
 
@@ -42,7 +42,7 @@
   --shadow-glow-mint: 0 0 40px rgba(13, 148, 136, 0.12);
   --shadow-glow-blue: 0 0 40px rgba(13, 148, 136, 0.12);
 
-  /* Shell (lr-*) — same light system */
+  /* Shell (lr-*) - same light system */
   --lr-ink: #fafdfc;
   --lr-ink-mid: #ffffff;
   --lr-surface: #ffffff;

@@ -28,7 +28,7 @@
   gap: 0.75rem;
 }
 
-/* Light card rows — never dark glass (reads as muddy grey on the production shell). */
+/* Light card rows - never dark glass (reads as muddy grey on the production shell). */
 .signatures-panel-item {
   display: flex;
   flex-wrap: wrap;
@@ -93,7 +93,7 @@
   text-underline-offset: 0.15em;
 }
 
-/* Status / loading line — plain text only, never a filled box. */
+/* Status / loading line - plain text only, never a filled box. */
 .signatures-panel-typed {
   display: block;
   margin: 0.15rem 0 0;

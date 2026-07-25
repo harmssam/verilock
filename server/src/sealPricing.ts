@@ -16,7 +16,7 @@ import { getSealFeeLuna } from './shared/sealPricing.js'
 import { CREDIT_PROOF_VALUE_LUNA } from './creditsConfig.js'
 
 /**
- * Historical underpriced amounts — no longer accepted for *new* unpaid seals.
+ * Historical underpriced amounts - no longer accepted for *new* unpaid seals.
  * Kept only for reference / migration notes. Credit seals use CREDIT_PROOF_VALUE_LUNA
  * with an active reservation + service wallet (see verifyAttestation).
  */
@@ -27,7 +27,7 @@ export function isValidDirectSealFeeLuna(value: number, now = new Date()): boole
   return value === getSealFeeLuna(now)
 }
 
-/** @deprecated Prefer isValidDirectSealFeeLuna — legacy free amounts are no longer accepted. */
+/** @deprecated Prefer isValidDirectSealFeeLuna - legacy free amounts are no longer accepted. */
 export function isValidSealFeeLuna(value: number, now = new Date()): boolean {
   return isValidDirectSealFeeLuna(value, now)
 }

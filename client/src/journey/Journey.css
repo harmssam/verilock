@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════
-   VeriLock journey — light production styles
+   VeriLock journey - light production styles
    (Dark navy base archived: archive/dark-journey-css-2026-07-17/)
    ═══════════════════════════════════════════ */
 
@@ -54,7 +54,7 @@
 }
 
 /*
- * Glow only on the mark — never combine filter + background-clip:text on the
+ * Glow only on the mark - never combine filter + background-clip:text on the
  * wordmark (Safari/mobile GPU layers flash when animated blobs repaint behind).
  */
 .exp-brand-mark {
@@ -62,7 +62,7 @@
   width: 4.5rem;
   height: 4.5rem;
   object-fit: contain;
-  /* Fixed −2° tilt — scale only on hover */
+  /* Fixed −2° tilt - scale only on hover */
   transform: rotate(-2deg) scale(1);
   filter:
     drop-shadow(0 0 4px rgba(94, 234, 212, 0.2))
@@ -94,7 +94,7 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  /* No filter here — keeps gradient text stable on mobile compositors */
+  /* No filter here - keeps gradient text stable on mobile compositors */
 }
 
 .exp-brand-text p {
@@ -181,7 +181,7 @@
   padding: 0.55rem 0.9rem !important;
 }
 
-/* Official Nimiq hexagon (design kit) — keep aspect ratio in buttons */
+/* Official Nimiq hexagon (design kit) - keep aspect ratio in buttons */
 .nimiq-hexagon-icon {
   display: inline-block;
   flex-shrink: 0;
@@ -506,7 +506,7 @@
   border-radius: var(--radius-pill);
   background: rgba(18, 26, 56, 0.88);
   border: 1px solid var(--border-bright);
-  /* Solid fill instead of backdrop-filter — avoids flash against animated blobs */
+  /* Solid fill instead of backdrop-filter - avoids flash against animated blobs */
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.78rem;
   color: var(--mint);
@@ -1132,7 +1132,7 @@ a.exp-account-menu-full:focus-visible {
   color: var(--lime);
 }
 
-/* Toolbar — sits at top of .action-dock-head */
+/* Toolbar - sits at top of .action-dock-head */
 
 .journey-toolbar {
   display: flex;
@@ -2006,7 +2006,7 @@ a.hash-chip.text-link:focus-visible {
 }
 
 .journey-agreements-all {
-  /* Override .text-btn (margin-left + padding: 0) — this is a card CTA, not inline text */
+  /* Override .text-btn (margin-left + padding: 0) - this is a card CTA, not inline text */
   margin: 0;
   padding: 0.2rem 0.15rem;
   flex-shrink: 0;
@@ -2106,7 +2106,7 @@ a.hash-chip.text-link:focus-visible {
   box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
-/* Hide native clear on search inputs — we provide our own */
+/* Hide native clear on search inputs - we provide our own */
 .agreements-page-search-input::-webkit-search-cancel-button,
 .agreements-page-search-input::-webkit-search-decoration {
   -webkit-appearance: none;
@@ -3348,7 +3348,7 @@ a.hash-chip.text-link:focus-visible {
   line-height: 1.45;
 }
 
-/* Ready-to-lock notification email — explicit Save + success state */
+/* Ready-to-lock notification email - explicit Save + success state */
 .notify-email-field {
   gap: 0.4rem;
 }
@@ -3449,7 +3449,7 @@ a.hash-chip.text-link:focus-visible {
   color: var(--text-muted);
 }
 
-/* Inline links inside muted copy (explorer, etc.) — not browser-default blue */
+/* Inline links inside muted copy (explorer, etc.) - not browser-default blue */
 .inline-link,
 .done-banner a,
 .result-banner a,
@@ -4114,7 +4114,7 @@ a.hash-chip.text-link:focus-visible {
   line-height: 1.4;
 }
 
-/* How it works — scroll story (light shell first; no dark glass slabs) */
+/* How it works - scroll story (light shell first; no dark glass slabs) */
 
 .how-block {
   border-radius: 12px;
@@ -4315,7 +4315,7 @@ a.hash-chip.text-link:focus-visible {
   line-height: 1.4;
 }
 
-/* ── Visual scenes (mint tiles on white — never dark grey slabs) ── */
+/* ── Visual scenes (mint tiles on white - never dark grey slabs) ── */
 
 .how-visual {
   position: relative;
@@ -6190,7 +6190,7 @@ a.hash-chip.text-link:focus-visible {
     background: rgba(13, 148, 136, 0.04);
 }
 
-/* Document stage (fingerprint drop zone) — was black glass */
+/* Document stage (fingerprint drop zone) - was black glass */
 
 .doc-stage,
   .document-stage {
@@ -6555,7 +6555,7 @@ a.hash-chip.text-link:focus-visible {
     background: rgba(13, 148, 136, 0.06);
 }
 
-/* Credit seal wait panel (seal step review) — not dark glass */
+/* Credit seal wait panel (seal step review) - not dark glass */
 
 .credit-seal-progress {
   border-color: rgba(13, 148, 136, 0.22);

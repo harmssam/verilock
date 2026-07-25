@@ -83,7 +83,7 @@ function canonicalizePlan(plan) {
       w: q(Math.max(1e-9, clamp01(s.width))),
       h: q(Math.max(1e-9, clamp01(s.height))),
     }))
-  // Match production placements.ts — always include creatorSigningAs as `cs`
+  // Match production placements.ts - always include creatorSigningAs as `cs`
   const row = { v: 2, pdf: normalizeHex64(plan.pdfSha256), people, places }
   if (plan.creatorSigningAs == null) row.cs = null
   else row.cs = plan.creatorSigningAs | 0

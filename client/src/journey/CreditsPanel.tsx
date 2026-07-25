@@ -29,7 +29,7 @@ interface CreditsPanelProps {
   /** Prefer showing card price on pack chips (pricing page). */
   preferCardPrice?: boolean
   /**
-   * Balance only — hide pack selection and NIM/card purchase actions.
+   * Balance only - hide pack selection and NIM/card purchase actions.
    * Use on the seal step when the user already has enough credits.
    */
   balanceOnly?: boolean

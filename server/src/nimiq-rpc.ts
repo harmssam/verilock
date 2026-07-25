@@ -48,7 +48,7 @@ export function getExpectedAttestationRecipient(): string | null {
 }
 
 function getServiceWalletAddressFromEnv(): string | null {
-  // Lazy import avoided — address is set when service wallet module loads; pass via expectation.
+  // Lazy import avoided - address is set when service wallet module loads; pass via expectation.
   const raw = process.env.SERVICE_WALLET_ADDRESS?.trim()
   return raw ? normalizeAddress(raw) : null
 }
@@ -135,7 +135,7 @@ export function decodeRecipientDataBytes(raw: string): Buffer {
   return Buffer.from(raw, 'utf8')
 }
 
-/** @deprecated Use decodeRecipientDataBytes — kept for certificate display helpers */
+/** @deprecated Use decodeRecipientDataBytes - kept for certificate display helpers */
 export function decodeRecipientData(raw: string): string {
   const bytes = decodeRecipientDataBytes(raw)
   if (bytes.length === ATTESTATION_PAYLOAD_SIZE && bytes[0] === ATTESTATION_PAYLOAD_VERSION) {
@@ -241,7 +241,7 @@ export async function getBlockNumber(): Promise<number> {
 
 export async function getWalletBalanceLuna(address: string): Promise<number> {
   const normalized = normalizeAddress(address)
-  // Prefer public JSON-RPC — light client can report 0 before consensus is warm
+  // Prefer public JSON-RPC - light client can report 0 before consensus is warm
   // (false "balance too low" kills multi-tx archive / annotation stream).
   try {
     const account = await rpcCall<{ balance?: number }>('getAccountByAddress', [normalized])

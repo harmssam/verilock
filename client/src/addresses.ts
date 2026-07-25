@@ -4,7 +4,7 @@ export function normalizeAddress(address: string): string {
 
 /**
  * Lightweight Nimiq basic-address shape check (NQ + 34 alphanumerics).
- * Does not verify checksum — enough to reject typos at construction time.
+ * Does not verify checksum - enough to reject typos at construction time.
  */
 export function isValidNimiqAddress(address: string | null | undefined): boolean {
   if (address == null || !String(address).trim()) return false

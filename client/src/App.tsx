@@ -1,5 +1,5 @@
 /**
- * Production shell — light landing home + journey product flow.
+ * Production shell - light landing home + journey product flow.
  * DocumentJourney owns path stages after path pick / deep links.
  */
 import { Fingerprint, ScanSearch, Users, type LucideIcon } from 'lucide-react'
@@ -66,7 +66,7 @@ import { FEATURES } from './features'
 import { LOGIN_CANCELED_MESSAGE } from './nimiq'
 import { SignMobilePage } from './SignMobilePage'
 
-/** Path card labels — stills + placement from pathMedia. */
+/** Path card labels - stills + placement from pathMedia. */
 const TRACK_META: Record<
   PathRole,
   {
@@ -78,7 +78,7 @@ const TRACK_META: Record<
 > = {
   creator: {
     title: 'Create & sign',
-    detail: 'Start free: invite co-signers, print when done — lock on-chain when you want',
+    detail: 'Start free: invite co-signers, print when done - lock on-chain when you want',
     icon: Fingerprint,
     accent: 'creator',
   },
@@ -123,7 +123,7 @@ function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotation
   if (isSupportPath(pathname)) return 'support'
   if (isAgreementsPath(pathname)) return 'agreements'
   if (isBlogPath(pathname)) return 'blog'
-  // PDF lab is parallel to seal — only mount when flag allows
+  // PDF lab is parallel to seal - only mount when flag allows
   if (pdfLabEnabled && isPdfLabPath(pathname)) return 'pdf-lab'
   if (pdfLabEnabled && isPdfPath(pathname)) return 'pdf'
   if (!isKnownAppPath(pathname)) return 'not-found'
@@ -294,7 +294,7 @@ export function App() {
     setScreen('journey')
     clearJourneyIntent()
     journeyReturnPathRef.current = '/'
-    // Push clean home — do not replaceState the track entry (that would break Back).
+    // Push clean home - do not replaceState the track entry (that would break Back).
     pushShellUrl('/')
     setNavEpoch(n => n + 1)
     // Remount + clear title at blend mid so the current track fades out cleanly.
@@ -342,7 +342,7 @@ export function App() {
     setScreen('blog')
     const next = slug ? `/blog/${slug}` : '/blog'
     // pushState does not re-render React. When already on screen === 'blog',
-    // setScreen('blog') is a no-op — bump navEpoch so BlogPage re-reads pathname
+    // setScreen('blog') is a no-op - bump navEpoch so BlogPage re-reads pathname
     // (index ↔ post and post ↔ post would otherwise stick on the old view).
     pushShellUrl(next)
     setNavEpoch(n => n + 1)
@@ -366,7 +366,7 @@ export function App() {
   const startCreate = useCallback(() => {
     clearJourneyIntent()
     saveJourneyIntent('creator')
-    // Do NOT syncIntentToUrl before push — replaceState would overwrite landing `/`.
+    // Do NOT syncIntentToUrl before push - replaceState would overwrite landing `/`.
     setTrackRole('creator')
     setScreen('journey')
     setJourneyEpoch(n => n + 1)
@@ -571,7 +571,7 @@ export function App() {
     screen === 'pdf-lab' ||
     screen === 'not-found'
 
-  // Focused mobile ink capture — no shell chrome / wallet header.
+  // Focused mobile ink capture - no shell chrome / wallet header.
   if (screen === 'sign-mobile') {
     return <SignMobilePage />
   }
@@ -615,7 +615,7 @@ export function App() {
               .filter(Boolean)
               .join(' ')}
           >
-            {/* Logged-in: Agreements nav (hidden on narrow — also in AccountMenu). */}
+            {/* Logged-in: Agreements nav (hidden on narrow - also in AccountMenu). */}
             {wallet.account && (
               <AppLink
                 to="/agreements"
@@ -815,7 +815,7 @@ export function App() {
               onHome={goJourney}
               onStartCreate={startCreate}
               onSwitchPath={role => pickRole(role, { remount: false })}
-              /* Shell LandingHome owns the path picker — never double it under keep-alive. */
+              /* Shell LandingHome owns the path picker - never double it under keep-alive. */
             />
           </div>
         </div>

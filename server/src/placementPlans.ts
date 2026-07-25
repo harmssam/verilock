@@ -1,5 +1,5 @@
 /**
- * Construction placement plans — structure + content hashes only.
+ * Construction placement plans - structure + content hashes only.
  * No PDF bytes, no signature ink. Mirrors client canonicalize for planRoot.
  */
 import { createHash } from 'node:crypto'
@@ -15,7 +15,7 @@ import {
 } from './db.js'
 import { canRevealParticipantDetails } from './documents.js'
 
-/** Require a real agreement id — plans are document-scoped (same PDF may have many). */
+/** Require a real agreement id - plans are document-scoped (same PDF may have many). */
 function requireDocumentId(documentId: string | null | undefined): string {
   const id = documentId?.trim()
   if (!id) {
@@ -120,7 +120,7 @@ export interface SanitizedPlan {
   creatorSigningAs?: number | null
 }
 
-/** Canonical plan object — must match client/src/pdf/placements.ts canonicalizePlan. */
+/** Canonical plan object - must match client/src/pdf/placements.ts canonicalizePlan. */
 export function canonicalizePlan(plan: {
   pdfSha256: string
   people: SanitizedPerson[]
@@ -372,7 +372,7 @@ function recordToPublic(
     createdAt: rec.createdAt,
     updatedAt: rec.updatedAt,
     plan: plan ? planToPublic(plan) : null,
-    // frames omitted for public viewers — hashes-only surface
+    // frames omitted for public viewers - hashes-only surface
     hasBatch0Frames: rec.batch0FramesHex.length > 0,
     batch0FrameCount: rec.batch0FramesHex.length,
     // Wire frames (BLOB payloads) only for creator / parties so they can rebuild
@@ -482,7 +482,7 @@ export function unlockPlan(input: {
     throw new Error('Only the plan owner can unlock this placement plan')
   }
   if (existing.status !== 'locked') {
-    // Already editable — return current public view.
+    // Already editable - return current public view.
     return recordToPublic(existing)
   }
   if ((existing.fillBatches ?? []).length > 0) {
@@ -574,7 +574,7 @@ export function lockPlan(input: {
   const expectedRoot = computePlanRoot(sanitized.plan)
   const clientRoot = (input.planRoot || sanitized.plan.planRoot || '').toLowerCase()
   if (clientRoot && clientRoot !== expectedRoot) {
-    throw new Error('planRoot mismatch — recompute after last edit')
+    throw new Error('planRoot mismatch - recompute after last edit')
   }
 
   const now = Date.now()
@@ -688,7 +688,7 @@ export function appendFillBatch(input: {
       ? existing.fillBatches[existing.fillBatches.length - 1]!.batchRoot
       : existing.batch0Root || existing.planRoot
   if (expectedPrev && input.prevRoot.toLowerCase() !== expectedPrev.toLowerCase()) {
-    throw new Error('prevRoot does not match latest batch — refresh and retry')
+    throw new Error('prevRoot does not match latest batch - refresh and retry')
   }
 
   const expectedIndex = existing.fillBatches.length + 1
@@ -792,7 +792,7 @@ export function appendFillBatch(input: {
       if (recomputed) batchRoot = recomputed
     } catch (err) {
       if (err instanceof Error && err.message.includes('batchRoot')) throw err
-      // Malformed frames — still store roots if client hash is well-formed
+      // Malformed frames - still store roots if client hash is well-formed
     }
   }
 

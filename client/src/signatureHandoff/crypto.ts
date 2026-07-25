@@ -82,7 +82,7 @@ export async function decryptPayload(
       toArrayBuffer(ciphertext),
     )
   } catch {
-    throw new Error('Could not decrypt signature — wrong key or tampered data')
+    throw new Error('Could not decrypt signature - wrong key or tampered data')
   }
   const text = new TextDecoder().decode(plainBuf)
   let parsed: unknown
@@ -151,9 +151,9 @@ function assertPayload(raw: unknown, sessionId: string): SigHandoffPayload {
   if (!raw || typeof raw !== 'object') throw new Error('Invalid signature payload')
   const o = raw as Record<string, unknown>
 
-  // Legacy PNG-only packages are no longer accepted — re-scan with a new QR.
+  // Legacy PNG-only packages are no longer accepted - re-scan with a new QR.
   if (o.v === 1) {
-    throw new Error('Outdated phone link — open a new QR code on your computer')
+    throw new Error('Outdated phone link - open a new QR code on your computer')
   }
   if (o.v !== 2) throw new Error('Unsupported payload version')
   if (o.format !== 'vector') throw new Error('Unsupported signature format')
@@ -330,7 +330,7 @@ export async function ensureHandoffBlob(result: HandoffInkResult): Promise<Hando
   return { ...result, imageDataUrl, blob }
 }
 
-/** @deprecated Prefer strokeResultToPayload — kept name for call-site clarity. */
+/** @deprecated Prefer strokeResultToPayload - kept name for call-site clarity. */
 export function payloadToBlob(payload: SigHandoffPayload): Blob | null {
   return payloadToHandoffResult(payload).blob
 }

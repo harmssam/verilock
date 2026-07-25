@@ -70,7 +70,7 @@ export function SealCard({
           <p className="muted seal-card-subtitle">
             {document.signingProgress.required === 0
               ? 'Direct lock'
-              : `${document.signingProgress.signed}/${document.signingProgress.required} signed`} —{' '}
+              : `${document.signingProgress.signed}/${document.signingProgress.required} signed`} -{' '}
             {busy
               ? 'approve the wallet prompt to finish.'
               : insufficientFunds
@@ -78,7 +78,7 @@ export function SealCard({
                 : failedPrior
                   ? (document.signingProgress.required === 0
                       ? 'the last transaction never reached the blockchain.'
-                      : 'your signatures are safe — the last transaction never reached the blockchain.')
+                      : 'your signatures are safe - the last transaction never reached the blockchain.')
                   : interrupted
                     ? 'the last lock attempt did not finish. Try again.'
                     : `approve one Nimiq transaction (${formatSealFeeSummary(pricing)}) to permanently lock this document's fingerprint on the blockchain. Your file stays on your computer.`}

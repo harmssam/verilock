@@ -1,5 +1,5 @@
 /**
- * Placement stream v2 — BLOB / PLACE / FILL batches on 0xA1 Nimiq frames.
+ * Placement stream v2 - BLOB / PLACE / FILL batches on 0xA1 Nimiq frames.
  *
  * Version byte = 2 (v1 free-form annotation streams remain STREAM_VERSION 1).
  * Each batch is its own HEAD+DATA*+END multi-tx sequence, chained by prevRoot.
@@ -535,7 +535,7 @@ export function expandMergedToAnnotations(state: MergedPlacementState): PdfAnnot
     const blobId = state.fills.get(slot.id)
     if (blobId) {
       const payload = state.blobs.get(blobId)
-      if (!payload) continue // missing blob — caller can warn via missingBlobIds
+      if (!payload) continue // missing blob - caller can warn via missingBlobIds
       if (payload.kind === 'ink') {
         out.push({
           id: slot.id,

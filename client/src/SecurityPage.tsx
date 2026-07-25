@@ -1,5 +1,5 @@
 /**
- * Security & integrity — product-true trust page.
+ * Security & integrity - product-true trust page.
  * No invented certifications or legal “we comply with X” claims.
  */
 import { Fingerprint, Link2, Shield, Wallet } from 'lucide-react'
@@ -19,7 +19,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
         <h1 id="security-title">How VeriLock protects your document</h1>
         <p className="security-lead">
           VeriLock is built so your file stays on your device, your wallet proves who you are, and only a
-          fingerprint is anchored on Nimiq. This page explains that model in plain language — not a
+          fingerprint is anchored on Nimiq. This page explains that model in plain language - not a
           certificate wall.
         </p>
         <p className="security-updated">Last updated: July 15, 2026</p>
@@ -57,7 +57,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
       <section id="what-is-locked" className="security-section">
         <h2>What is locked on the blockchain</h2>
         <p>
-          An on-chain lock records the <strong>SHA-256 fingerprint</strong> of the document bytes you chose — a
+          An on-chain lock records the <strong>SHA-256 fingerprint</strong> of the document bytes you chose - a
           fixed-length digest computed in your browser. When parties co-sign, the agreement record ties wallet
           signatures to that fingerprint. Locking on Nimiq anchors the hash so anyone can compare a later
           copy of the file against what was locked.
@@ -73,7 +73,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
         <p>
           Fingerprinting, signing, and verification process the document <strong>in your browser</strong>. VeriLock
           does not upload or host your document content. If you share the file with co-signers, that handoff is
-          out-of-band (email, chat, AirDrop) — you control who receives the bytes.
+          out-of-band (email, chat, AirDrop) - you control who receives the bytes.
         </p>
       </section>
 
@@ -114,7 +114,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
           >
             VeriLock Offline
           </a>{' '}
-          — hash on your device and check a Nimiq lock transaction or certificate without uploading the
+          - hash on your device and check a Nimiq lock transaction or certificate without uploading the
           file. Source and desktop builds (macOS, Windows, Linux) are on GitHub.
         </p>
       </section>
@@ -169,7 +169,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
           <li>We do not display SOC 2, ISO, HIPAA, or similar badges without real certifications.</li>
           <li>
             A matching fingerprint proves byte integrity against an on-chain lock; court outcomes depend on your
-            jurisdiction and counsel — not on a marketing badge.
+            jurisdiction and counsel - not on a marketing badge.
           </li>
         </ul>
       </section>

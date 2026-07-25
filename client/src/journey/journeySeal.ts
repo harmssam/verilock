@@ -66,7 +66,7 @@ export type SealJourneyResult =
   | { ok: false; redirecting: false; message: string }
 
 /**
- * Seal using 1 prepaid credit — server posts the on-chain proof (no NIM required).
+ * Seal using 1 prepaid credit - server posts the on-chain proof (no NIM required).
  */
 export async function sealJourneyDocumentWithCredit(args: {
   token: string
@@ -77,7 +77,7 @@ export async function sealJourneyDocumentWithCredit(args: {
   const finalHash = doc.finalSha256 ?? doc.originalSha256
 
   try {
-    onProgress('Reserving 1 credit — you can leave this page anytime…')
+    onProgress('Reserving 1 credit - you can leave this page anytime…')
     const result = await api.payWithCredit(token, doc.id, finalHash)
 
     if (result.status === 'failed') {
@@ -89,14 +89,14 @@ export async function sealJourneyDocumentWithCredit(args: {
     }
 
     if (result.status === 'pending') {
-      onProgress('Proof submitted — waiting for Nimiq to confirm…')
+      onProgress('Proof submitted - waiting for Nimiq to confirm…')
       await pollAttestation({
         token,
         txHash: result.txHash,
         onStatus: s => {
           onProgress?.(
             s.status === 'pending'
-              ? 'Confirming on Nimiq — safe to close this tab…'
+              ? 'Confirming on Nimiq - safe to close this tab…'
               : 'Confirmed on Nimiq!',
           )
         },
@@ -117,7 +117,7 @@ export async function sealJourneyDocumentWithCredit(args: {
       }
     }
 
-    // Authenticated read: seal completes as creator — unlock participant details.
+    // Authenticated read: seal completes as creator - unlock participant details.
     const { document } = await api.getDocument(doc.id, token)
     clearSealInFlight()
     onProgress('Locked forever on Nimiq (1 credit).')

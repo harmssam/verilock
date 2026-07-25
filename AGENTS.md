@@ -1,4 +1,4 @@
-# VeriLock — agent / contributor instructions
+# VeriLock - agent / contributor instructions
 
 ## Production UI is one SPA only
 
@@ -13,7 +13,7 @@
 | **PRIMARY Vite config** | `client/vite.config.ts` | Default `npm run dev` / `npm run build` |
 | **PRIMARY production URL** | `https://verilock.online` | Packaged into `client/dist` as root SPA |
 | **Shared libraries** | `client/src/*.ts(x)` except archive | `nimiq.ts`, `api.ts`, seal helpers, pricing, etc. |
-| **LOCAL ONLY (gitignored)** | `client/src/archive/`, blog trees | Historical snapshots + blog content — never push |
+| **LOCAL ONLY (gitignored)** | `client/src/archive/`, blog trees | Historical snapshots + blog content - never push |
 
 ### Commands (always prefer these)
 
@@ -44,10 +44,10 @@ vite --config vite.experiment.config.ts  # removed
 
 1. **Shell / home** → `client/src/App.tsx`, `client/src/landing/`, `client/src/App.css`.
 2. **Path stages / dock / wallet** → `client/src/journey/` (`DocumentJourney.tsx`, etc.).
-3. **Reuse** shared modules under `client/src/` — do not reimplement seal, wallet, or pricing.
+3. **Reuse** shared modules under `client/src/` - do not reimplement seal, wallet, or pricing.
 4. **Never** treat `client/src/archive/` as the active product.
 5. Journey **flow / information architecture** (path picker → stage rail → action dock → document stage) stays unless the user asks to redesign it.
-6. Server APIs live under `server/` — shared; API changes must not assume a second client.
+6. Server APIs live under `server/` - shared; API changes must not assume a second client.
 
 ### How to tell you are on production
 
@@ -93,6 +93,6 @@ Interpret as **`client/src/App.tsx` + `client/src/journey/` + `client/src/landin
   - Production chrome: light shell tokens throughout (dark journey CSS archived under `client/src/archive/dark-journey-css-2026-07-17/`)
   - Negative bans: purple SaaS gradients, glass-everywhere, generic feature cards, fake testimonials, crypto-neon gimmick
   - Pre-ship self-check + ugly-state tests + copy-paste agent prompt block
-- Impeccable skills (if installed): `.github/skills/impeccable/` — always load `PRODUCT.md` first, then `docs/journey-anti-slop.md`
+- Impeccable skills (if installed): `.github/skills/impeccable/` - always load `PRODUCT.md` first, then `docs/journey-anti-slop.md`
 
 Follow these instructions exactly. When working in subdirectories not listed above, check for additional project instruction files (AGENTS.md, Claude.md, etc.).

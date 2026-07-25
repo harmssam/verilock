@@ -32,7 +32,7 @@ export function rateLimit(max: number, windowMs: number) {
     if (bucket.count >= max) {
       const retryAfter = Math.ceil((bucket.resetAt - now) / 1000)
       res.setHeader('Retry-After', String(retryAfter))
-      res.status(429).json({ error: 'Too many requests — slow down and retry shortly.' })
+      res.status(429).json({ error: 'Too many requests - slow down and retry shortly.' })
       return
     }
 

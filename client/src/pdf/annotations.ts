@@ -1,12 +1,12 @@
 /**
- * PDF annotations stored server-side as JSON — never requires pdf-lib.
+ * PDF annotations stored server-side as JSON - never requires pdf-lib.
  * Coordinates are normalized fractions of the rendered page (origin top-left),
  * so placement is independent of zoom/DPI when reconstructing with pdf.js.
  */
 
 export type PdfAnnotationType = 'signature' | 'text' | 'checkmark' | 'cross'
 
-/** Shared geometry — all values are normalized [0, 1] relative to page size. */
+/** Shared geometry - all values are normalized [0, 1] relative to page size. */
 export interface AnnotationGeometry {
   /** 0-based page index */
   pageIndex: number
@@ -52,7 +52,7 @@ export interface SignaturePathData {
 export interface SignatureAnnotation extends AnnotationGeometry {
   id: string
   type: 'signature'
-  /** data:image/png;base64,... — UI preview / fallback when path missing */
+  /** data:image/png;base64,... - UI preview / fallback when path missing */
   imageDataUrl: string
   /** Simplified vector ink (RDP). Primary for reconstruction / future chain. */
   path?: SignaturePathData
@@ -67,7 +67,7 @@ export interface TextAnnotation extends AnnotationGeometry {
   color?: string
 }
 
-/** Simple vector mark — no image payload; ideal for on-chain. */
+/** Simple vector mark - no image payload; ideal for on-chain. */
 export interface MarkAnnotation extends AnnotationGeometry {
   id: string
   type: 'checkmark' | 'cross'

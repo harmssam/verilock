@@ -6,7 +6,7 @@ import { documentTypeUsesNotes, type VerifyResult } from './types'
 import './VerifyMatchesPanel.css'
 
 function formatTimestamp(value: number | null): string {
-  return value ? new Date(value).toLocaleString() : '—'
+  return value ? new Date(value).toLocaleString() : '-'
 }
 
 function formatStatus(status: string): string {
@@ -47,7 +47,7 @@ export function VerifyMatchesPanel({
           This fingerprint matches {matches.length} agreements on VeriLock. Compare dates and IDs
           below
           {matches.some(match => match.status === 'locked')
-            ? ' — prefer a locked on-chain record when one exists.'
+            ? ' - prefer a locked on-chain record when one exists.'
             : '.'}
         </p>
       )}

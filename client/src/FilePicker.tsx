@@ -17,7 +17,7 @@ export function FilePicker({
   file,
   onChange,
 }: FilePickerProps) {
-  // Avoid bare React useId (":r0:") in htmlFor — some browsers flag those labels.
+  // Avoid bare React useId (":r0:") in htmlFor - some browsers flag those labels.
   const reactId = useId().replace(/:/g, '')
   const id = `file-picker-${reactId}`
   const inputRef = useRef<HTMLInputElement>(null)
@@ -67,7 +67,7 @@ export function FilePicker({
         )}
       </div>
       <p className="file-picker-privacy muted" role="note">
-        Your file never leaves your computer — only the fingerprint is saved on our servers.
+        Your file never leaves your computer - only the fingerprint is saved on our servers.
       </p>
     </div>
   )

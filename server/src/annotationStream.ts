@@ -2,7 +2,7 @@
  * Pack/unpack annotation streams into 64-byte Nimiq basic-tx frames.
  * Keep framing compatible with client/src/pdf/annotationStream.ts.
  *
- * Magic 0xA1 — distinct from seal attestation 0x01 (37-byte).
+ * Magic 0xA1 - distinct from seal attestation 0x01 (37-byte).
  */
 import { createHash } from 'node:crypto'
 import { Address, TransactionBuilder } from '@nimiq/core'
@@ -42,7 +42,7 @@ export const MAX_STREAM_FRAMES = 128
 /** Match credit seal dust value so sinks/network treat frames like paid proofs. */
 export const STREAM_FRAME_VALUE_LUNA = 1
 const STREAM_FEE_BUFFER_LUNA = 10
-/** Per-frame visibility wait after broadcast (keep short — many frames). */
+/** Per-frame visibility wait after broadcast (keep short - many frames). */
 const VISIBILITY_TIMEOUT_MS = 4_000
 const VISIBILITY_POLL_MS = 800
 /** After all broadcasts, one quick pass over hashes (no multi-minute waits). */
@@ -348,7 +348,7 @@ function assertSignaturesHavePathForBroadcast(annotations: unknown[]): void {
     const path = a.path as { strokes?: unknown[] } | undefined
     if (!path || !Array.isArray(path.strokes) || path.strokes.length === 0) {
       throw new Error(
-        `Signature annotation ${i} has no vector path — draw with the stroke pad before on-chain publish`,
+        `Signature annotation ${i} has no vector path - draw with the stroke pad before on-chain publish`,
       )
     }
   }
@@ -453,7 +453,7 @@ export async function publishAnnotationStream(input: {
         'On-chain annotation broadcast is disabled (set ANNOTATION_STREAM_BROADCAST=true)'
     } else if (!isServiceWalletConfigured()) {
       broadcastError =
-        'Service wallet not configured — stream stored locally; set SERVICE_WALLET_PRIVATE_KEY to publish on-chain'
+        'Service wallet not configured - stream stored locally; set SERVICE_WALLET_PRIVATE_KEY to publish on-chain'
     } else {
       try {
         assertSignaturesHavePathForBroadcast(
@@ -525,7 +525,7 @@ export function getStreamByHash(originalSha256: string): AnnotationStreamRecord 
  * Reconstruct overlays for a PDF hash.
  *
  * Strategy (avoids Nimiq RPC 429 on 20+ frame streams):
- * 1. Unpack stored wire frames (same bytes we broadcast) — CRC-checked.
+ * 1. Unpack stored wire frames (same bytes we broadcast) - CRC-checked.
  * 2. Optionally sample 1–2 on-chain txs (HEAD + END) when not rate-limited.
  * 3. Full chain re-read only when framesHex missing or caller forces it.
  */
@@ -567,7 +567,7 @@ export async function reconstructFromStoredOrChain(
         throw new Error('Stored stream hash does not match PDF fingerprint')
       }
 
-      // Optional light chain sample (HEAD + END only) — ignore 429
+      // Optional light chain sample (HEAD + END only) - ignore 429
       let chainSampleOk: boolean | undefined
       let chainError: string | undefined
       if (stored.txHashes.length >= 2) {
@@ -589,7 +589,7 @@ export async function reconstructFromStoredOrChain(
         } catch (err) {
           chainError = err instanceof Error ? err.message : String(err)
           chainSampleOk = false
-          // 429 / rate limit: still return wire reconstruct — not a hard failure
+          // 429 / rate limit: still return wire reconstruct - not a hard failure
           console.warn('[annotation-stream] chain sample skipped', chainError)
         }
       }
@@ -612,7 +612,7 @@ export async function reconstructFromStoredOrChain(
     }
   }
 
-  // ── Full chain re-read (throttled) — only when forced or no framesHex ──
+  // ── Full chain re-read (throttled) - only when forced or no framesHex ──
   if (stored.txHashes.length > 0 && (preferFullChain || stored.framesHex.length === 0)) {
     try {
       if (
@@ -904,7 +904,7 @@ export async function broadcastStreamFrames(
         }
       : confirmed < hashes.length
         ? {
-            error: `All ${hashes.length} frames broadcast; ${confirmed} visible so far (RPC lag is OK — hashes saved)`,
+            error: `All ${hashes.length} frames broadcast; ${confirmed} visible so far (RPC lag is OK - hashes saved)`,
           }
         : {}),
   }

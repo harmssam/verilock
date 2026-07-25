@@ -1,6 +1,6 @@
 /**
  * Wait UI while multi-tx data archive runs on the server (same spirit as CreditSealProgress).
- * Uses optimistic % progress — server does not stream per-frame updates yet.
+ * Uses optimistic % progress - server does not stream per-frame updates yet.
  */
 import {
   Check,
@@ -44,7 +44,7 @@ const PHASE_META: Record<
 }
 
 const WAIT_TIPS = [
-  'You do not need to stay on this page — work continues on VeriLock’s servers.',
+  'You do not need to stay on this page - work continues on VeriLock’s servers.',
   'The PDF never leaves your devices. Only signatures and form fields go on-chain.',
   'This can take a few minutes for larger agreements. Leaving is fine.',
   'Come back anytime under My agreements to see the “Data on blockchain” badge.',
@@ -275,7 +275,7 @@ export function DataArchiveProgress({
           <div>
             <strong>You do not need to wait here</strong>
             <p className="muted">
-              Writing runs on VeriLock&apos;s servers. Close this window or switch apps —
+              Writing runs on VeriLock&apos;s servers. Close this window or switch apps -
               reopen My agreements anytime for the status
               {notifyEmail ? ', or check your email when it finishes' : ''}.
             </p>

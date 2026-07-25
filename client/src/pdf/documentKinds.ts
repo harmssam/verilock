@@ -35,7 +35,7 @@ export function detectDocumentKind(file: File): DocumentKind | null {
   if (IMAGE_EXTS.includes(ext as (typeof IMAGE_EXTS)[number]) || IMAGE_MIMES.has(type)) {
     return 'image'
   }
-  // Some browsers report empty type for dropped files — trust extension only.
+  // Some browsers report empty type for dropped files - trust extension only.
   return null
 }
 

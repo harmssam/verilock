@@ -139,7 +139,7 @@ export interface PlacementEditorProps {
   pageWidth?: number
   /**
    * Read-only revisit (e.g. co-signer Done step). Locked layout with
-   * copy that explains boxes were designed earlier — not for filling now.
+   * copy that explains boxes were designed earlier - not for filling now.
    */
   reviewMode?: boolean
   /** Slot ids already filled on the server (review summary). */
@@ -189,7 +189,7 @@ export function PlacementEditor({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [tool, setTool] = useState<Tool>('select')
-  /** No person pre-selected — user must choose Person 1/2/… before tools unlock. */
+  /** No person pre-selected - user must choose Person 1/2/… before tools unlock. */
   const [activePerson, setActivePerson] = useState<number | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [placeError, setPlaceError] = useState<string | null>(null)
@@ -386,7 +386,7 @@ export function PlacementEditor({
 
   const onPeopleCountInputChange = (raw: string) => {
     // Digits only (no signs, decimals, or letters).
-    // Draft-only — do not commit plan until blur/Enter/+/-/wheel.
+    // Draft-only - do not commit plan until blur/Enter/+/-/wheel.
     // Live-committing each digit (e.g. typing "10") briefly set count=1 and
     // deleted persons 2–N and their placement boxes.
     let digits = raw.replace(/\D/g, '')
@@ -591,7 +591,7 @@ export function PlacementEditor({
       height: clamp01(geo.height),
       ...(kind === 'text' && label
         ? {
-            // Field label only (e.g. "Date") — fill value comes later at sign time
+            // Field label only (e.g. "Date") - fill value comes later at sign time
             lockedContent: { text: label, fontSizeRatio: 0.018, color: '#64748b' },
           }
         : {}),
@@ -633,7 +633,7 @@ export function PlacementEditor({
         setPlaceError('Select a person first, then place their boxes.')
         return
       }
-      // Do not place or preventDefault here — mobile needs pointerdown+move to
+      // Do not place or preventDefault here - mobile needs pointerdown+move to
       // scroll the stage. Place only on a short pointerup (see onStagePointerUp).
       const p = pointerToLocal(e)
       placeGestureRef.current = {
@@ -663,7 +663,7 @@ export function PlacementEditor({
       }
     }
 
-    // Ghost follows pointer only for true hover / stationary tap preview — not while panning.
+    // Ghost follows pointer only for true hover / stationary tap preview - not while panning.
     if (!toolsDisabled && tool !== 'select' && !placeGesture?.cancelled) {
       const p = pointerToLocal(e)
       setPlacing({ type: tool, x: p.x, y: p.y })
@@ -907,7 +907,7 @@ export function PlacementEditor({
                   tabIndex={0}
                   onClick={() => selectPerson(p.slotIndex)}
                   onKeyDown={e => {
-                    // Space/Enter activate the person tab for a11y — but must not steal
+                    // Space/Enter activate the person tab for a11y - but must not steal
                     // keystrokes from nested name/wallet inputs (e.g. typing "Sam Harms").
                     const t = e.target as HTMLElement | null
                     if (
@@ -1113,7 +1113,7 @@ export function PlacementEditor({
           title={
             activePerson == null
               ? 'Select a person first'
-              : 'Place empty checkbox — click the box to toggle check on or off'
+              : 'Place empty checkbox - click the box to toggle check on or off'
           }
           aria-label="Checkbox"
           aria-pressed={tool === 'checkmark'}
@@ -1129,7 +1129,7 @@ export function PlacementEditor({
           title={
             activePerson == null
               ? 'Select a person first'
-              : 'Place empty X box — click the box to toggle X on or off'
+              : 'Place empty X box - click the box to toggle X on or off'
           }
           aria-label="X mark"
           aria-pressed={tool === 'cross'}
@@ -1203,7 +1203,7 @@ export function PlacementEditor({
         <p className="placement-editor-hint placement-editor-hint--design" role="status">
           <strong>Designing, not signing.</strong> These boxes mark where people will sign later.
           No ink or wallet signature is collected on this step. Tap to place a field; drag to pan the
-          page. Check and X boxes start empty — click a placed box to toggle the mark.
+          page. Check and X boxes start empty - click a placed box to toggle the mark.
         </p>
       )}
       {reviewMode && (
@@ -1212,7 +1212,7 @@ export function PlacementEditor({
           {filledSlotIds && filledSlotIds.size > 0
             ? ` · ${filledSlotIds.size} field${filledSlotIds.size === 1 ? '' : 's'} recorded as filled`
             : ''}
-          . Signature images appear under Recorded signatures — not redrawn on this preview.
+          . Signature images appear under Recorded signatures - not redrawn on this preview.
         </p>
       )}
       {locked && !reviewMode && (

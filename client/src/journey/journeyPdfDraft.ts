@@ -1,6 +1,6 @@
 /**
  * Persist create-path PDF draft across Hub/Pay login redirects.
- * File objects only live in React memory — a full-page Hub return remounts the SPA.
+ * File objects only live in React memory - a full-page Hub return remounts the SPA.
  *
  * IndexedDB (binary-safe). Writes wait for transaction complete before resolving
  * so a Hub redirect does not race an incomplete put.
@@ -8,7 +8,7 @@
  * Form fields (agreement type, title, names, notes) also live in sessionStorage so
  * they survive Hub remounts without re-writing the PDF blob on every keystroke.
  * Header Login (shell AccountMenu) does not go through DocumentJourney.disconnect
- * flush paths — the form cache is the reliable channel for those fields.
+ * flush paths - the form cache is the reliable channel for those fields.
  */
 
 import type { DocumentType } from '../types'
@@ -21,7 +21,7 @@ const CREATE_KEY = 'create-pdf'
 /** Drop drafts older than 24h (stale tab after abandon). */
 const MAX_AGE_MS = 24 * 60 * 60 * 1000
 
-/** Lightweight form sidecar — survives full-page Hub return in the same tab. */
+/** Lightweight form sidecar - survives full-page Hub return in the same tab. */
 const CREATE_FORM_CACHE_KEY = 'verilock-create-form-v1'
 
 export interface CreatePdfDraftMeta {
@@ -167,7 +167,7 @@ export async function saveCreatePdfDraft(draft: CreatePdfDraftInput): Promise<vo
     }
     await withStore('readwrite', store => store.put(payload, CREATE_KEY))
   } catch {
-    /* private mode / quota — non-fatal */
+    /* private mode / quota - non-fatal */
   }
 }
 

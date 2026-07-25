@@ -32,7 +32,7 @@ interface LoginSheetProps {
 /**
  * Explains Nimiq + how to connect, then runs the real wallet connect on proceed.
  *
- * Mobile (`pay-open` / `hub-fallback`): dual choice — Nimiq Pay app or Hub in browser.
+ * Mobile (`pay-open` / `hub-fallback`): dual choice - Nimiq Pay app or Hub in browser.
  * Desktop Hub path usually skips this sheet entirely (see AccountMenu / login gates).
  */
 export function LoginSheet({

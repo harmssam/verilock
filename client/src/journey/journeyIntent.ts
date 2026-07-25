@@ -65,7 +65,7 @@ export function intentFromUrl(search = window.location.search): PathRole | null 
  * Resolve active path intent.
  *
  * URL wins when present. On a clean home URL (no `?intent=`), sticky
- * sessionStorage is cleared so removing the query param actually sticks —
+ * sessionStorage is cleared so removing the query param actually sticks -
  * otherwise boot code kept re-writing `?intent=signer` from storage.
  *
  * Deep links (/d/, /v/) do not need intent in the URL.

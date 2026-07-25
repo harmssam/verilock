@@ -1,9 +1,9 @@
 /**
- * PDF annotation lab + Nimiq stream — parallel to the seal product path.
+ * PDF annotation lab + Nimiq stream - parallel to the seal product path.
  * Seal (attestations, credits, DocumentJourney) never depends on these flags.
  *
- * PDF_ANNOTATION_UI — serve /pdf SPA + stream APIs (default: on)
- * ANNOTATION_STREAM_BROADCAST — multi-tx on-chain publish (prod: explicit true)
+ * PDF_ANNOTATION_UI - serve /pdf SPA + stream APIs (default: on)
+ * ANNOTATION_STREAM_BROADCAST - multi-tx on-chain publish (prod: explicit true)
  */
 import { isAnnotationStreamBroadcastEnabled } from './annotationStream.js'
 import { isServiceWalletConfigured } from './serviceWallet.js'

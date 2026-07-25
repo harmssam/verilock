@@ -16,7 +16,7 @@ export function NimiqLockInfo({ onOpenPricing }: NimiqLockInfoProps) {
       </h2>
       <p className="muted nimiq-info-lead">
         VeriLock uses the Nimiq blockchain to permanently record your document&apos;s fingerprint. Your
-        File never leaves your computer — only a SHA-256 hash is written on-chain.
+        File never leaves your computer - only a SHA-256 hash is written on-chain.
       </p>
 
       <details className="nimiq-info-details">
@@ -35,7 +35,7 @@ export function NimiqLockInfo({ onOpenPricing }: NimiqLockInfoProps) {
                   When all signatures are in, approve one Nimiq transaction that embeds the document hash
                   in the transaction data.
                 </li>
-                <li>Anyone can verify later by fingerprinting their copy of the file — no wallet needed.</li>
+                <li>Anyone can verify later by fingerprinting their copy of the file - no wallet needed.</li>
               </ol>
             </section>
 
@@ -46,16 +46,16 @@ export function NimiqLockInfo({ onOpenPricing }: NimiqLockInfoProps) {
               </h3>
               <ul className="nimiq-info-list">
                 <li>
-                  <strong>Nimiq wallet</strong> — Nimiq Pay on mobile, or Nimiq Hub on desktop.
+                  <strong>Nimiq wallet</strong> - Nimiq Pay on mobile, or Nimiq Hub on desktop.
                 </li>
                 <li>
-                  <strong>NIM balance</strong> — for the lock fee below.
+                  <strong>NIM balance</strong> - for the lock fee below.
                 </li>
                 <li>
-                  <strong>Document on your device</strong> — the same file every signer uses.
+                  <strong>Document on your device</strong> - the same file every signer uses.
                 </li>
                 <li>
-                  <strong>All required signatures</strong> — locking starts once everyone has signed.
+                  <strong>All required signatures</strong> - locking starts once everyone has signed.
                 </li>
               </ul>
             </section>

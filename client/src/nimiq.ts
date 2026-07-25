@@ -39,7 +39,7 @@ export function getWalletMode(): WalletMode {
   return 'hub'
 }
 
-/** Nimiq Pay injects `window.nimiqPay` before page scripts — reliable host detection. */
+/** Nimiq Pay injects `window.nimiqPay` before page scripts - reliable host detection. */
 export function isNimiqPayHost(): boolean {
   return typeof window !== 'undefined' && Boolean(window.nimiqPay)
 }
@@ -117,7 +117,7 @@ export function isPopupBlockedError(err: unknown): boolean {
 export function popupBlockedHelp(): string {
   return (
     'Pop-up blocked. Allow pop-ups for this site in your browser settings, ' +
-    'or open VeriLock inside the Nimiq Pay app (recommended — no pop-ups needed).'
+    'or open VeriLock inside the Nimiq Pay app (recommended - no pop-ups needed).'
   )
 }
 
@@ -257,7 +257,7 @@ async function refreshBlockHeight(): Promise<number> {
 }
 
 /** Sync read of recent block (or triggers background refresh). Used to avoid await before Hub sign in gesture.
- *  Falls back to lastKnown (possibly slightly stale) rather than blocking — Hub/Keyguard tolerate it.
+ *  Falls back to lastKnown (possibly slightly stale) rather than blocking - Hub/Keyguard tolerate it.
  */
 function getRecentBlockHeightSync(): number | null {
   const now = Date.now()
@@ -275,7 +275,7 @@ function getRecentBlockHeightSync(): number | null {
   return lastKnownBlock
 }
 
-/** Hub checkout payload for seal — checkout() signs and broadcasts. */
+/** Hub checkout payload for seal - checkout() signs and broadcasts. */
 export type HubLockCheckoutRequest = {
   appName: string
   sender: string
@@ -289,7 +289,7 @@ export type HubLockCheckoutRequest = {
 }
 
 /**
- * Hub checkout request for seal (sync — safe on user-gesture path).
+ * Hub checkout request for seal (sync - safe on user-gesture path).
  *
  * Per Nimiq Hub docs, checkout() signs **and broadcasts**. Prefer this over
  * signTransaction(), which only returns a signed payload and often fails to
@@ -492,7 +492,7 @@ export async function relaySignedTransaction(
   }
   if (broadcastAttempted) {
     sealWarn('hub:relayProceedingBeforeVisible', { hash })
-    reportSealProgress('Broadcast submitted — confirming on-chain…')
+    reportSealProgress('Broadcast submitted - confirming on-chain…')
     return hash
   }
   throw new Error('Could not broadcast transaction to the Nimiq network.')
@@ -513,7 +513,7 @@ export async function finalizeHubLockTransaction(
 
   if (options?.hubBroadcast) {
     sealLog('hub:checkoutAwaitNetwork', { hash })
-    reportSealProgress('Hub signed your transaction — waiting for network confirmation…')
+    reportSealProgress('Hub signed your transaction - waiting for network confirmation…')
     if (await waitForTransactionOnNetwork(hash, HUB_CHECKOUT_NETWORK_WAIT_MS)) {
       return hash
     }
@@ -525,7 +525,7 @@ export async function finalizeHubLockTransaction(
     } catch (err) {
       sealWarn('hub:checkoutRelayFallbackFailed', err)
       // Still return hash so the server poller can confirm if Hub broadcast was slow.
-      reportSealProgress('Transaction submitted — confirming on-chain…')
+      reportSealProgress('Transaction submitted - confirming on-chain…')
       return hash
     }
   }
@@ -577,7 +577,7 @@ function registerHubEventHandlers(
   hub.on(RequestType.SIGN_MESSAGE, (signed, state) => {
     try {
       const token = state?.token as string | undefined
-      if (!token) throw new Error('Login session expired — try again.')
+      if (!token) throw new Error('Login session expired - try again.')
       const msg = signed as SignedMessage
       onComplete({
         token,
@@ -598,7 +598,7 @@ function registerHubEventHandlers(
     try {
       const token = state?.token as string | undefined
       const docId = state?.docId as string | undefined
-      if (!token || !docId) throw new Error('Lock session expired — try again.')
+      if (!token || !docId) throw new Error('Lock session expired - try again.')
       sealLog('hub:lockTxSigned', { docId, hash: signed.hash, hubBroadcast })
       const lockWork = finalizeHubLockTransaction(signed, {
         hubBroadcast,
@@ -621,7 +621,7 @@ function registerHubEventHandlers(
   ) => {
     try {
       const token = state?.token as string | undefined
-      if (!token) throw new Error('Credit top-up session expired — try again.')
+      if (!token) throw new Error('Credit top-up session expired - try again.')
       sealLog('hub:creditTopupTxSigned', { hash: signed.hash, hubBroadcast })
       const work = finalizeHubLockTransaction(signed, {
         hubBroadcast,
@@ -804,7 +804,7 @@ export async function setupHubRedirectHandlers(
  *
  * Previously: chooseAddress → return → challenge → signMessage → return (two full
  * redirects / two popups). Hub's signMessage without `signer` shows the address
- * picker and signs in a single Keyguard flow — the pattern we want on verilock.online.
+ * picker and signs in a single Keyguard flow - the pattern we want on verilock.online.
  *
  * Flow: server challenge (no address) → signMessage(nonce) → verify binds address
  * from the public key.
@@ -823,7 +823,7 @@ export async function connectViaHub(
   const preferRedirect = options?.preferRedirect ?? true
 
   clearStaleHubRpcStateIfIdle()
-  // Challenge without address — Hub will let the user pick a wallet when signing.
+  // Challenge without address - Hub will let the user pick a wallet when signing.
   const { token, nonce } = await getChallenge(null)
 
   if (preferRedirect) {
@@ -874,7 +874,7 @@ export function normalizeMiniAppUrl(appUrl: string): string {
     const base =
       typeof window !== 'undefined' ? window.location.href : 'https://verilock.online/'
     const parsed = new URL(appUrl, base)
-    // Path + query only (no hash) — SPA deep links use pathname/search.
+    // Path + query only (no hash) - SPA deep links use pathname/search.
     const path = parsed.pathname === '/' ? '' : parsed.pathname
     const search = parsed.search || ''
     return `${parsed.origin}${path}${search}`
@@ -911,7 +911,7 @@ export function getMiniAppWebUrl(appUrl?: string): string {
 
 /**
  * `nimiqpay://miniapp?url=<https url>`
- * @see https://www.nimiq.dev/mini-apps — Sharing Your Mini App
+ * @see https://www.nimiq.dev/mini-apps - Sharing Your Mini App
  */
 export function nimiqPayDeepLink(appUrl: string): string {
   const target = normalizeMiniAppUrl(appUrl)
@@ -920,7 +920,7 @@ export function nimiqPayDeepLink(appUrl: string): string {
 
 export type NimiqPayLaunchResult = 'already-in-pay' | 'launched' | 'unavailable'
 
-/** Only attempts nimiqpay:// on mobile — desktop browsers have no registered handler. */
+/** Only attempts nimiqpay:// on mobile - desktop browsers have no registered handler. */
 export function launchNimiqPayMiniApp(appUrl?: string): NimiqPayLaunchResult {
   if (isNimiqPayHost()) return 'already-in-pay'
   if (!isMobileDevice()) return 'unavailable'
@@ -937,7 +937,7 @@ export function launchNimiqPayMiniApp(appUrl?: string): NimiqPayLaunchResult {
   return 'launched'
 }
 
-/** @deprecated Use launchNimiqPayMiniApp — avoids desktop scheme errors */
+/** @deprecated Use launchNimiqPayMiniApp - avoids desktop scheme errors */
 export function openNimiqPayMiniApp(appUrl?: string): void {
   launchNimiqPayMiniApp(appUrl)
 }
@@ -999,7 +999,7 @@ export async function sendLockAttestation(
   return txHash as string
 }
 
-/** Credit top-up payload: version=2, kind=1 — must match server creditTopup.ts */
+/** Credit top-up payload: version=2, kind=1 - must match server creditTopup.ts */
 export const TOPUP_PAYLOAD_VERSION = 2
 export const TOPUP_PAYLOAD_KIND = 1
 
@@ -1111,7 +1111,7 @@ export async function sendCreditTopupViaHub(
 }
 
 /**
- * Seal via Nimiq Hub using checkout() — signs and broadcasts (official path).
+ * Seal via Nimiq Hub using checkout() - signs and broadcasts (official path).
  * signTransaction is only kept as a handler for in-flight legacy redirects.
  */
 export async function sendLockAttestationViaHub(

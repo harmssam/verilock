@@ -6,7 +6,7 @@ import './PdfAnnotator.css'
 interface PdfReconstructorProps {
   file: File
   annotations: PdfAnnotation[]
-  /** CSS target width for each page (default 640 — matches signing surface). */
+  /** CSS target width for each page (default 640 - matches signing surface). */
   pageWidth?: number
   className?: string
   /** Fires when page canvases are ready (or cleared on error/loading). */
@@ -142,7 +142,7 @@ function waitForImage(img: HTMLImageElement): Promise<void> {
 
 /**
  * Open a print dialog with the rendered page canvases (signatures already painted).
- * Prints from the current window (no pop-up) so mobile Safari/Chrome work —
+ * Prints from the current window (no pop-up) so mobile Safari/Chrome work -
  * window.open print sheets are blocked or unusable on many phones.
  */
 export async function printRenderedPages(

@@ -65,8 +65,8 @@ export function NimiqPayOpenPanel({
               ? 'Open VeriLock in Nimiq Pay for the best experience, or connect via Nimiq Hub.'
               : 'Wallet actions work best inside the Nimiq Pay app.'
             : showHubFallback
-              ? 'Connect your Nimiq wallet in the browser — no app install needed.'
-              : 'Nimiq Pay runs on your phone — use a mobile browser to open the app there.'}
+              ? 'Connect your Nimiq wallet in the browser - no app install needed.'
+              : 'Nimiq Pay runs on your phone - use a mobile browser to open the app there.'}
         </p>
       )}
 
@@ -155,7 +155,7 @@ export function NimiqPayOpenPanel({
           ) : (
             <>
               <li>Click Connect via Nimiq Hub to sign in with your wallet.</li>
-              <li>No phone or app install required — Hub works right in your browser.</li>
+              <li>No phone or app install required - Hub works right in your browser.</li>
             </>
           )}
         </ol>

@@ -126,7 +126,7 @@ export function useCreatePdfDraft({
   const restoreAttemptedRef = useRef(false)
 
   // Mirror form fields to sessionStorage whenever the create path is active.
-  // Cheap (no PDF blob) — covers type/title changes before/after file select.
+  // Cheap (no PDF blob) - covers type/title changes before/after file select.
   useEffect(() => {
     if (!enabled) return
     saveCreateFormCache(formFieldsFromMeta(meta))
@@ -197,7 +197,7 @@ export function useCreatePdfDraft({
     }
   }, [bootReady, canRestore, pdfFile, setPdfFile, applyRestoredMeta, ensureCreatorRole])
 
-  // Persist when the File identity changes (blob write — not every meta keystroke).
+  // Persist when the File identity changes (blob write - not every meta keystroke).
   useEffect(() => {
     if (!enabled || !pdfFile) return
     const key = fileKey(pdfFile)
@@ -209,7 +209,7 @@ export function useCreatePdfDraft({
   }, [enabled, pdfFile])
 
   // After restore, keep IndexedDB draft meta in sync when form fields change
-  // (still only when a file is present — uses current blob, not a re-read).
+  // (still only when a file is present - uses current blob, not a re-read).
   // Debounce slightly so title typing does not thrash large puts.
   useEffect(() => {
     if (!enabled || !pdfFile) return

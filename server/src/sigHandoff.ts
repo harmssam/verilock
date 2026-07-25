@@ -1,6 +1,6 @@
 /**
  * Cross-device signature ink handoff.
- * Server stores SDP/ICE signaling and optional encrypted deposits only — never plaintext ink.
+ * Server stores SDP/ICE signaling and optional encrypted deposits only - never plaintext ink.
  */
 import { randomBytes } from 'node:crypto'
 import {
@@ -29,7 +29,7 @@ export function generateSigHandoffId(): string {
 
 export function assertRoomOpen(room: SigHandoffRoom | null): asserts room is SigHandoffRoom {
   if (!room) throw new Error('Session not found')
-  if (room.status === 'expired') throw new Error('Session expired — show a new QR code')
+  if (room.status === 'expired') throw new Error('Session expired - show a new QR code')
   if (room.status === 'completed') throw new Error('Session already completed')
 }
 
@@ -141,7 +141,7 @@ export function takeDeposit(
   if (normalizeAddress(room.creatorAddress) !== normalizeAddress(requesterAddress)) {
     throw new Error('Only the session host can retrieve the deposit')
   }
-  if (room.status === 'expired') throw new Error('Session expired — show a new QR code')
+  if (room.status === 'expired') throw new Error('Session expired - show a new QR code')
   if (room.status === 'completed') return null
   const pair = peekSigHandoffDeposit(roomId)
   if (!pair) return null

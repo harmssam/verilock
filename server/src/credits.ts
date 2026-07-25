@@ -247,7 +247,7 @@ export function reserveCreditForDocument(
     return { balance: getCreditBalance(wallet), reservation: existing }
   }
 
-  // Expired hold still has a debit — release (refund) before taking a new hold.
+  // Expired hold still has a debit - release (refund) before taking a new hold.
   if (existing?.status === 'held' && existing.expiresAt < now) {
     releaseCreditReservation(documentId, 'reservation_expired')
   }

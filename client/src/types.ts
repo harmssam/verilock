@@ -125,7 +125,7 @@ export interface SealDocument {
   metadata: Record<string, unknown> | null
   /**
    * Client PDF annotations for reconstruction (null/omitted when none).
-   * Server never stores the PDF file — only hash + these overlays.
+   * Server never stores the PDF file - only hash + these overlays.
    */
   annotations?: DocumentAnnotation[] | null
   createdAt: number

@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   Shell page chrome — pricing, credits pack, 404.
+   Shell page chrome - pricing, credits pack, 404.
    Nested under .lr-app (import after App.css).
    ═══════════════════════════════════════════════════════════ */
 
@@ -56,7 +56,7 @@
     text-decoration-color: rgba(13, 148, 136, 0.5);
   }
 
-  /* Seal model block — light cards */
+  /* Seal model block - light cards */
 
   .price-page-model {
     gap: 1.1rem;
@@ -171,7 +171,7 @@
     border-top-color: var(--lr-line);
   }
 
-  /* Buy credits — same Stripe + NIM flow as production CreditsPanel */
+  /* Buy credits - same Stripe + NIM flow as production CreditsPanel */
 
   .price-page-credits {
     margin-top: 1.5rem;
@@ -284,7 +284,7 @@
     color: #b91c1c;
   }
 
-  /* Pricing CTAs: card (Stripe) primary, NIM half-price secondary — same APIs as production */
+  /* Pricing CTAs: card (Stripe) primary, NIM half-price secondary - same APIs as production */
 
   &--pricing .btn-primary {
     background: var(--lr-accent);
@@ -319,7 +319,7 @@
     min-height: 2.75rem;
   }
 
-  /* Why Nimiq — scannable card grid on the light shell */
+  /* Why Nimiq - scannable card grid on the light shell */
 
   .price-page-why {
     margin-top: 1.75rem;
@@ -397,7 +397,7 @@
   }
 
   /* ═══════════════════════════════════════════════════════════
-     404 / missing agreement — light shell card
+     404 / missing agreement - light shell card
      ═══════════════════════════════════════════════════════════ */
 
   .not-found-page.card {

@@ -17,7 +17,7 @@ export interface ShareActionPlan {
   primary: ShareActionId[]
   /** Always-visible secondary actions (e.g. copy link). */
   secondary: ShareActionId[]
-  /** Reliable but secondary paths — shown under “More ways to share”. */
+  /** Reliable but secondary paths - shown under “More ways to share”. */
   more: ShareActionId[]
 }
 
@@ -43,7 +43,7 @@ export function isMobileSharePlatform(platform: SharePlatform): boolean {
 
 /**
  * Rank share actions for the current device.
- * @param webShareFiles — result of canShareFiles([pdf]); re-evaluate if share fails.
+ * @param webShareFiles - result of canShareFiles([pdf]); re-evaluate if share fails.
  */
 export function buildShareActionPlan(options: {
   webShareFiles: boolean
@@ -116,7 +116,7 @@ export function shareIntroForPlan(plan: ShareActionPlan, pdfName: string): strin
     return `Use the invite email above if you want Mail pre-filled, then share ${pdfName} via the system share sheet. VeriLock never hosts the file.`
   }
   if (plan.platform === 'windows') {
-    return `Use the invite email above, then download the .eml package — Outlook opens a draft with ${pdfName} attached. VeriLock never hosts the file.`
+    return `Use the invite email above, then download the .eml package - Outlook opens a draft with ${pdfName} attached. VeriLock never hosts the file.`
   }
   if (plan.platform === 'mac') {
     return `Use the invite email above, then open Mail with To filled and download ${pdfName} to attach. VeriLock never hosts the file.`
@@ -133,7 +133,7 @@ export function shareHintForPlan(plan: ShareActionPlan, pdfName: string): string
     return `Open in Mail starts a compose window with To filled and downloads ${pdfName} so you can attach it. Browsers cannot put attachments on mailto. VeriLock never uploads the file.`
   }
   if (plan.platform === 'windows') {
-    return `The .eml package is a single draft with To set and ${pdfName} inside — best for Outlook. Open in Mail uses your default client without an attachment (attach the file yourself). VeriLock never uploads the file.`
+    return `The .eml package is a single draft with To set and ${pdfName} inside - best for Outlook. Open in Mail uses your default client without an attachment (attach the file yourself). VeriLock never uploads the file.`
   }
   if (plan.platform === 'mac') {
     return `Open in Mail is the reliable path on Apple Mail: a real compose window with To filled, and ${pdfName} downloads for you to attach (browsers cannot put attachments on mailto). VeriLock never uploads the file.`

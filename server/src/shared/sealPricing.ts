@@ -37,14 +37,14 @@ export function getSealPricing(now = new Date()): SealPricing {
     feeLuna: getSealFeeLuna(now),
     baseFeeNim: BASE_SEAL_FEE_NIM,
     promoActive,
-    promoLabel: promoActive ? '95% off — July only' : null,
+    promoLabel: promoActive ? '95% off - July only' : null,
     promoEndsLabel: promoActive ? 'Promo ends August 1' : null,
   }
 }
 
 /**
  * Extra luna historically reserved for a Nimiq network fee buffer.
- * Network fees are not required for our balance gate — keep 0.
+ * Network fees are not required for our balance gate - keep 0.
  */
 export const SEAL_TX_FEE_BUFFER_LUNA = 0
 

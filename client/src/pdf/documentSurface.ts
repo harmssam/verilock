@@ -98,7 +98,7 @@ async function loadImageBitmap(file: File): Promise<ImageBitmap> {
         return
       }
       // Manual canvas copy as ImageBitmap stand-in is not available without createImageBitmap.
-      // Draw path uses HTMLImageElement via Offscreen-less path below — reject so caller can message.
+      // Draw path uses HTMLImageElement via Offscreen-less path below - reject so caller can message.
       URL.revokeObjectURL(url)
       reject(new Error('This browser cannot decode images for placement preview'))
     }

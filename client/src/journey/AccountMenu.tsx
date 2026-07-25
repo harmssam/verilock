@@ -114,7 +114,7 @@ export function AccountMenu({
           type="button"
           className="exp-credits-chip"
           onClick={onCredits}
-          title="Seal credits — buy more on Pricing"
+          title="Seal credits - buy more on Pricing"
           aria-label={`${creditBalance} seal credit${creditBalance === 1 ? '' : 's'}`}
         >
           <Coins size={14} strokeWidth={2.25} aria-hidden />
@@ -165,7 +165,7 @@ export function AccountMenu({
                   <Tag size={15} strokeWidth={2.25} />
                 )}
                 {showCredits
-                  ? `${creditBalance} credit${creditBalance === 1 ? '' : 's'} — buy more`
+                  ? `${creditBalance} credit${creditBalance === 1 ? '' : 's'} - buy more`
                   : 'Pricing'}
               </button>
             )}

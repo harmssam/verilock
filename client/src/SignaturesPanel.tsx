@@ -27,7 +27,7 @@ interface SignaturesPanelProps {
    * Prefer server `participantDetailsRevealed`; this is defense-in-depth.
    */
   revealPrivate?: boolean
-  /** Session token — required to load private signature images / fill frames. */
+  /** Session token - required to load private signature images / fill frames. */
   authToken?: string | null
   /**
    * Document fingerprint (original sha256). When set with authToken, prefer full
@@ -35,7 +35,7 @@ interface SignaturesPanelProps {
    * incorrectly be initials from older clients).
    */
   fingerprint?: string | null
-  /** Agreement id — required when the same PDF is used on multiple agreements. */
+  /** Agreement id - required when the same PDF is used on multiple agreements. */
   documentId?: string | null
 }
 

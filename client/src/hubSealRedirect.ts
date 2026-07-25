@@ -151,7 +151,7 @@ export function processLenientHubRedirect(
   const request = loadStoredRpcRequest(redirect.id)
   const lockFromRequest = request ? lockContextFromRequest(request, deps.isLockHubCommand) : null
   // When rpcRequests is lost after cross-site redirect, sealInFlight identifies lock round-trips
-  // (including Hub error responses — not only successful signed transactions).
+  // (including Hub error responses - not only successful signed transactions).
   const lockFromFallback = !request ? lockContextFromSealInFlight() : null
   const lockCtx = lockFromRequest ?? lockFromFallback
   sealLog('hub:lenientRedirect', {
@@ -216,7 +216,7 @@ export function processLenientHubRedirect(
   if (request!.command === RequestType.SIGN_MESSAGE) {
     try {
       const token = request!.state?.token as string | undefined
-      if (!token) throw new Error('Login session expired — try again.')
+      if (!token) throw new Error('Login session expired - try again.')
       const msg = redirect.result as SignedMessage
       onComplete({
         token,

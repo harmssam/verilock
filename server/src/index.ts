@@ -125,7 +125,7 @@ app.use((req, res, next) => {
   })(req, res, next)
 })
 
-// Stripe webhooks need the raw body for signature verification — register before json parser.
+// Stripe webhooks need the raw body for signature verification - register before json parser.
 const stripeWebhookLimit = rateLimit(60, 60_000)
 app.post(
   '/api/stripe/webhook',
@@ -154,19 +154,19 @@ const authVerifyLimit = rateLimit(24, 60_000)
 const docLimit = rateLimit(30, 60_000)
 const attestLimit = rateLimit(24, 60_000)
 const walletBalanceLimit = rateLimit(30, 60_000)
-/** Mutations / checkout — keep tight. */
+/** Mutations / checkout - keep tight. */
 const creditsLimit = rateLimit(30, 60_000)
-/** Cheap SQLite balance reads — header + panel may both load. */
+/** Cheap SQLite balance reads - header + panel may both load. */
 const creditsBalanceLimit = rateLimit(120, 60_000)
 const publicReadLimit = rateLimit(60, 60_000)
-/** Multi-tx annotation stream broadcast — tight (service wallet cost). */
+/** Multi-tx annotation stream broadcast - tight (service wallet cost). */
 const annotationStreamLimit = rateLimit(6, 60_000)
 /** Multi-tx data archive is expensive (service wallet + credits); keep tight. */
 const dataArchiveLimit = rateLimit(6, 60_000)
 const dataArchiveQuoteLimit = rateLimit(30, 60_000)
 // Hash verify is read-only and easy to double-fire from UI retries; allow a higher burst.
 const verifyHashLimit = rateLimit(60, 60_000)
-/** Public contact form — tight limit against spam floods. */
+/** Public contact form - tight limit against spam floods. */
 const supportContactLimit = rateLimit(5, 15 * 60_000)
 /** Per-person invite emails via Resend. */
 const inviteEmailLimit = rateLimit(12, 60_000)
@@ -198,7 +198,7 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
 }
 
 /**
- * Optional session for public reads — never 401s.
+ * Optional session for public reads - never 401s.
  * Only returns an address for a *verified* wallet login (challenge alone is not enough),
  * so private fields (names, ink images, placement fill frames) cannot be unlocked by
  * POSTing /auth/challenge as a public creator/signer address.
@@ -545,7 +545,7 @@ app.post(
           }),
         )
       } else if (notifyEmail && result.accepted) {
-        // Stash on archive error field is wrong — use in-memory map + complete hook.
+        // Stash on archive error field is wrong - use in-memory map + complete hook.
         notifyEmailQueued = true
         const { registerArchiveNotifyEmail } = await import('./documentDataArchive.js')
         registerArchiveNotifyEmail(docId, notifyEmail)
@@ -632,7 +632,7 @@ app.post('/api/auth/verify', authVerifyLimit, authMiddleware, async (req, res) =
     return
   }
 
-  // Single-trip Hub: session has no address yet — derive and bind from public key.
+  // Single-trip Hub: session has no address yet - derive and bind from public key.
   const pendingAddress = !session.address || String(session.address).trim() === ''
   let resolvedAddress = session.address
   if (pendingAddress) {
@@ -727,7 +727,7 @@ app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req
     creatorRole?: string
     creatorDisplayName?: string
     creatorNotifyEmail?: string
-    /** Client PDF overlays only — never PDF file bytes. */
+    /** Client PDF overlays only - never PDF file bytes. */
     annotations?: unknown
   }
 
@@ -740,7 +740,7 @@ app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req
   const pdfByteKeys = ['pdf', 'pdfBytes', 'file', 'fileBytes', 'documentBytes', 'content'] as const
   for (const key of pdfByteKeys) {
     if (key in body && (body as Record<string, unknown>)[key] != null) {
-      res.status(400).json({ error: 'PDF file bytes are not accepted — send hash + annotations only' })
+      res.status(400).json({ error: 'PDF file bytes are not accepted - send hash + annotations only' })
       return
     }
   }
@@ -1031,7 +1031,7 @@ app.get('/api/documents/:docId/signatures/:sigId/image', (req, res) => {
 
   res.setHeader('Content-Type', image.contentType)
   res.setHeader('Content-Length', String(image.byteSize))
-  // Private images — do not cache on shared CDNs / public browsers as anonymous.
+  // Private images - do not cache on shared CDNs / public browsers as anonymous.
   res.setHeader('Cache-Control', 'private, max-age=3600')
   res.setHeader('ETag', `"${image.imageSha256}"`)
   if (req.headers['if-none-match'] === `"${image.imageSha256}"`) {
@@ -1315,7 +1315,7 @@ app.post(
  * Experiment: pack annotations into 64-byte frames, index by PDF hash,
  * optionally broadcast each frame via service wallet (on-chain).
  * Owner-scoped: only the publishing wallet may overwrite a hash.
- * Parallel to seal — not used by DocumentJourney seal flow.
+ * Parallel to seal - not used by DocumentJourney seal flow.
  */
 app.post(
   '/api/annotation-streams',
@@ -1379,7 +1379,7 @@ app.get('/api/annotation-streams/:sha256', publicReadLimit, (req, res) => {
     frameCount: stream.framesHex.length,
     payloadBytes: stream.payloadBytes,
     annotationCount: stream.annotationCount,
-    // framesHex omitted from public GET — use reconstruct for verified payload
+    // framesHex omitted from public GET - use reconstruct for verified payload
     txHashes: stream.txHashes,
     onChain: stream.onChain,
     confirmedFrames: stream.confirmedFrames,
@@ -1392,7 +1392,7 @@ app.get('/api/annotation-streams/:sha256', publicReadLimit, (req, res) => {
 })
 
 /**
- * Reconstruct annotations for a PDF hash — prefers stored wire frames, optional chain sample.
+ * Reconstruct annotations for a PDF hash - prefers stored wire frames, optional chain sample.
  * Query: ?fallback=index (default) | ?fallback=none (fail closed on chain errors)
  */
 app.get('/api/annotation-streams/:sha256/reconstruct', publicReadLimit, async (req, res) => {

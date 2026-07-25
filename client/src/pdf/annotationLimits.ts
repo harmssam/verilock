@@ -8,12 +8,12 @@ export const SIGNATURE_RDP_EPSILON_PX = 1.5
 
 /**
  * Text stamps allowed on one sealed agreement (1 credit = 1 seal).
- * Enough for names, dates, initials, short notes across a few pages —
+ * Enough for names, dates, initials, short notes across a few pages -
  * not a free-form document editor.
  */
 export const MAX_TEXT_ANNOTATIONS = 12
 
-/** Signature placements — matches product max co-signers (1 creator + up to 3). */
+/** Signature placements - matches product max co-signers (1 creator + up to 3). */
 export const MAX_SIGNATURE_ANNOTATIONS = 4
 
 /** Checkmarks + crosses (compact vector marks). */

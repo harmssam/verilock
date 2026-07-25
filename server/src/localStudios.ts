@@ -1,6 +1,6 @@
 /**
  * Optional local content studios (Blog Studio, X Post Studio).
- * Module files are gitignored — production and clean checkouts skip them.
+ * Module files are gitignored - production and clean checkouts skip them.
  */
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -27,7 +27,7 @@ export async function attachLocalStudios(app: Express): Promise<void> {
       mod.attachBlogStudio(app)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      console.warn('  blog studio: failed to load —', message)
+      console.warn('  blog studio: failed to load -', message)
     }
   } else {
     console.log('  blog studio: not present (local-only gitignored module)')
@@ -39,7 +39,7 @@ export async function attachLocalStudios(app: Express): Promise<void> {
       mod.attachXPostStudio(app)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      console.warn('  x-post studio: failed to load —', message)
+      console.warn('  x-post studio: failed to load -', message)
     }
   } else {
     console.log('  x-post studio: not present (local-only gitignored module)')

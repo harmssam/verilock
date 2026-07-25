@@ -1,8 +1,8 @@
 const SEAL_IN_FLIGHT_KEY = 'verilock-seal-in-flight'
 const LEGACY_SEAL_IN_FLIGHT_KEY = 'nimiq-seal-seal-in-flight'
-/** @deprecated migrated on read — remove after a few releases */
+/** @deprecated migrated on read - remove after a few releases */
 const LEGACY_PENDING_SEAL_KEY = 'nimiq-seal-pending-seal'
-/** @deprecated migrated on read — remove after a few releases */
+/** @deprecated migrated on read - remove after a few releases */
 const LEGACY_SEAL_REDIRECT_KEY = 'nimiq-seal-seal-redirect'
 const LEGACY_SESSION_KEY = 'nimiq-seal-session'
 
@@ -170,8 +170,8 @@ export function shouldResumeHubSeal(): boolean {
 
 export function staleSealMessage(docStatus: string): string {
   return docStatus === 'locking'
-    ? 'Seal was interrupted in Hub. Your signatures are still saved — tap Retry seal to continue.'
-    : 'Previous Hub redirect did not finish. Your signatures are still saved — tap Seal via Hub to try again.'
+    ? 'Seal was interrupted in Hub. Your signatures are still saved - tap Retry seal to continue.'
+    : 'Previous Hub redirect did not finish. Your signatures are still saved - tap Seal via Hub to try again.'
 }
 
 /** Returns false in private mode, storage blocked, or quota issues (common on iOS Safari PWA/WebView). */

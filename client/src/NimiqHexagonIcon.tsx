@@ -1,6 +1,6 @@
 /**
  * Official Nimiq colored hexagon mark from the design kit
- * (https://nimiq.dev/design-kit — logos/nimiq/hexagon.svg).
+ * (https://nimiq.dev/design-kit - logos/nimiq/hexagon.svg).
  * Served from /nimiq-hexagon.svg so gradient IDs stay unique per image paint.
  */
 interface NimiqHexagonIconProps {

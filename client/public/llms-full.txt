@@ -1,4 +1,4 @@
-# VeriLock — Full Documentation for AI Crawlers
+# VeriLock - Full Documentation for AI Crawlers
 
 ## Overview
 
@@ -7,15 +7,15 @@ VeriLock is a browser-based document signing application that permanently anchor
 ### The Core Promise
 1. **Your file never leaves your device.** Fingerprinting happens locally in the browser.
 2. **Sign today.** Invite co-signers; each signs with their Nimiq wallet.
-3. **Prove forever.** The final fingerprint is locked on the Nimiq blockchain. Anyone can verify it later — no wallet, no account, no subscription.
+3. **Prove forever.** The final fingerprint is locked on the Nimiq blockchain. Anyone can verify it later - no wallet, no account, no subscription.
 
 ## Pages
 
 ### Home (`/`)
 The landing page. Three paths:
-- **Create & Lock** — Start a new agreement, upload a PDF/image, fingerprint it, invite co-signers, lock the proof.
-- **I was invited** — Sign an existing document via an invite link.
-- **Verify a file** — Drop any file to check if its fingerprint matches a locked proof on-chain.
+- **Create & Lock** - Start a new agreement, upload a PDF/image, fingerprint it, invite co-signers, lock the proof.
+- **I was invited** - Sign an existing document via an invite link.
+- **Verify a file** - Drop any file to check if its fingerprint matches a locked proof on-chain.
 
 ### Pricing (`/pricing`)
 - Signing is free. No subscription.
@@ -77,7 +77,7 @@ Privacy policy detailing data handling, cookie usage, and Nimiq blockchain inter
 - **Date:** 2026-07-13
 - **Slug:** what-is-verilock
 - **Tags:** guide
-- Introduction to VeriLock — what it is, why it was built, and who it's for.
+- Introduction to VeriLock - what it is, why it was built, and who it's for.
 
 ### How VeriLock Works
 - **Date:** 2026-07-13
@@ -95,7 +95,7 @@ Privacy policy detailing data handling, cookie usage, and Nimiq blockchain inter
 - **Date:** 2026-07-09
 - **Slug:** wallet-scoped-agreements-history
 - **Tags:** feature
-- Per-wallet agreement history — see all documents linked to your Nimiq address.
+- Per-wallet agreement history - see all documents linked to your Nimiq address.
 
 ### Private Signatures, Public Proof
 - **Date:** 2026-07-09
@@ -137,7 +137,7 @@ Privacy policy detailing data handling, cookie usage, and Nimiq blockchain inter
 - **Date:** 2026-07-06
 - **Slug:** is-this-the-same-file
 - **Tags:** guide
-- How file integrity checking works — comparing two files to determine if they're identical.
+- How file integrity checking works - comparing two files to determine if they're identical.
 
 ## Key Differentiators vs Competitors
 
@@ -145,10 +145,10 @@ Privacy policy detailing data handling, cookie usage, and Nimiq blockchain inter
 - **No subscription.** Pay per-lock, not per-month. Prepaid credits available.
 - **Wallet-based identity.** No email/password account. Your Nimiq wallet is your identity.
 - **Independent verification.** Anyone can verify a locked document without creating an account, installing software, or owning crypto.
-- **On-chain proof.** The document fingerprint lives on the Nimiq blockchain — not in a company database that could disappear.
+- **On-chain proof.** The document fingerprint lives on the Nimiq blockchain - not in a company database that could disappear.
 
 ## Open Source
-- **Offline verifier:** https://github.com/clevertech-os/verilock-offline — verify locked documents completely offline
+- **Offline verifier:** https://github.com/clevertech-os/verilock-offline - verify locked documents completely offline
 - **GitHub org:** https://github.com/clevertech-os
 
 ## Social

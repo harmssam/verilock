@@ -137,7 +137,7 @@ function resolveRequiredSignatureCount(doc: DocumentRecord, parties: PartyRecord
 
 /**
  * Count required parties that have a real signature row.
- * Party status alone is not enough — status can drift without a signature record.
+ * Party status alone is not enough - status can drift without a signature record.
  */
 function countSignedRequiredParties(
   parties: PartyRecord[],
@@ -252,7 +252,7 @@ export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOpti
       signerAddress: sig.signerAddress,
       signatureType: sig.signatureType,
       signedAt: sig.signedAt,
-      // Ink images are only for creator / signees — not public share links.
+      // Ink images are only for creator / signees - not public share links.
       imageUrl:
         revealPrivate && signatureImageIds.has(sig.id)
           ? signatureImageUrl(doc.id, sig.id)
@@ -294,7 +294,7 @@ function reconcileDocumentParties(documentId: string): void {
     if (party.status === 'pending' && hasSig) {
       markPartySigned(party.id)
     } else if (party.status === 'signed' && !hasSig) {
-      // Orphan "signed" status without a signature row — treat as still pending.
+      // Orphan "signed" status without a signature row - treat as still pending.
       markPartyUnsigned(party.id)
     }
   }
@@ -339,7 +339,7 @@ export function createDocument(input: {
   creatorNotifyEmail?: string | null
   /**
    * Optional client PDF annotations (normalized geometry + signature/text).
-   * Never includes PDF file bytes — only overlay data for reconstruction.
+   * Never includes PDF file bytes - only overlay data for reconstruction.
    */
   annotations?: unknown
 }) {
@@ -376,12 +376,12 @@ export function createDocument(input: {
     lockedAt: null,
     creatorNotifyEmail: input.creatorNotifyEmail ?? null,
     readyToSealEmailSentAt: null,
-    // Survives roster rebuild — invite emails always know who organized.
+    // Survives roster rebuild - invite emails always know who organized.
     creatorDisplayName: isDirectSeal ? null : organizerLabel,
   }
   insertDocument(doc)
 
-  // For direct seal (0 signatures), we skip parties entirely — creator seals directly.
+  // For direct seal (0 signatures), we skip parties entirely - creator seals directly.
   if (!isDirectSeal) {
     const creatorParty: PartyRecord = {
       id: uuid(),
@@ -478,7 +478,7 @@ export function configureSigningRoster(
       }
     }
 
-    // Drop all existing parties (unsigned — already checked)
+    // Drop all existing parties (unsigned - already checked)
     for (const p of getPartiesForDocument(documentId)) {
       deletePartyById(p.id)
     }
@@ -579,7 +579,7 @@ export function configureDocumentCosigners(
     }
     if (nextRequired < signedRequired) {
       throw new Error(
-        `Cannot set required signatures below ${signedRequired} — that many parties have already signed`,
+        `Cannot set required signatures below ${signedRequired} - that many parties have already signed`,
       )
     }
 
@@ -727,11 +727,11 @@ function resolveAndClaimParty(
         if (normalizeAddress(preferred.walletAddress) === signer) {
           return preferred
         }
-        // Preferred slot belongs to someone else — fall through to next open.
+        // Preferred slot belongs to someone else - fall through to next open.
       } else {
         const claimed = tryClaim(preferred.id)
         if (claimed) return claimed
-        // Lost the race for the preferred slot — claim another open party.
+        // Lost the race for the preferred slot - claim another open party.
       }
     }
   }
@@ -793,7 +793,7 @@ export function addSignature(input: {
       }
 
       if (input.clientSha256.toLowerCase() !== doc.originalSha256) {
-        throw new Error('Document hash mismatch — reload the PDF before signing')
+        throw new Error('Document hash mismatch - reload the PDF before signing')
       }
 
       const signer = normalizeAddress(input.signerAddress)
@@ -805,7 +805,7 @@ export function addSignature(input: {
       if (existingForParty) {
         markPartySigned(party.id)
         reconcileDocumentParties(input.documentId)
-        throw new Error('This party already signed — refresh the page to continue.')
+        throw new Error('This party already signed - refresh the page to continue.')
       }
 
       // Refresh display-name needs from post-claim row.
@@ -848,7 +848,7 @@ export function addSignature(input: {
       const updatedSignatures = getSignaturesForDocument(input.documentId)
       const updatedDoc = getDocumentById(input.documentId)!
       if (signaturesComplete(updatedDoc, updatedParties, updatedSignatures)) {
-        // Already filtered out locked/locking above — only notify on first transition.
+        // Already filtered out locked/locking above - only notify on first transition.
         becameReadyToLock = doc.status !== 'ready_to_lock'
         updateDocumentStatus(input.documentId, 'ready_to_lock')
       } else if (doc.status === 'draft') {
@@ -936,7 +936,7 @@ export function getDocumentPublic(idOrSlug: string, viewerAddress?: string | nul
   return publicDocument(doc, { viewerAddress })
 }
 
-/** Used by signature-image route — load raw records and check membership. */
+/** Used by signature-image route - load raw records and check membership. */
 export function viewerMayAccessSignatureImage(
   documentId: string,
   viewerAddress: string | null | undefined,

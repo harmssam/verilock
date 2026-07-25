@@ -14,7 +14,7 @@ const TITLE_SUFFIX = ` · ${SITE_NAME}`
 
 export const PAGE_META = {
   home: {
-    title: `${SITE_NAME} — Free PDF Signing & Optional On-Chain Lock`,
+    title: `${SITE_NAME} - Free PDF Signing & Optional On-Chain Lock`,
     description:
       'Sign PDFs free with multi-party Nimiq wallet signatures. Your file never leaves your device. Print when done, or lock a permanent fingerprint on Nimiq for 1 credit. Verify locked proofs anytime without a wallet.',
     path: '/',
@@ -40,7 +40,7 @@ export const PAGE_META = {
   support: {
     title: `Support${TITLE_SUFFIX}`,
     description:
-      'Contact VeriLock support about signing, locking, verification, or billing. Your file stays on your device — describe the issue without attaching files.',
+      'Contact VeriLock support about signing, locking, verification, or billing. Your file stays on your device - describe the issue without attaching files.',
     path: '/support',
   },
   blog: {
@@ -52,7 +52,7 @@ export const PAGE_META = {
   verify: {
     title: `Verify a Document${TITLE_SUFFIX}`,
     description:
-      'Check whether a document matches a locked VeriLock agreement. Fingerprint your file locally in the browser — no wallet required.',
+      'Check whether a document matches a locked VeriLock agreement. Fingerprint your file locally in the browser - no wallet required.',
     path: '/',
   },
   agreements: {
@@ -82,7 +82,7 @@ export const PAGE_META = {
   pdf: {
     title: `PDF annotations (experiment)${TITLE_SUFFIX}`,
     description:
-      'Place signatures and text on a local PDF, store only the hash and overlay data. Experiment — not the main product flow.',
+      'Place signatures and text on a local PDF, store only the hash and overlay data. Experiment - not the main product flow.',
     path: '/pdf',
     noindex: true,
   },

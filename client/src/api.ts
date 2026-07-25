@@ -53,7 +53,7 @@ export interface CreateDocumentBody {
   /** Optional ready-to-seal notification email (UI hidden until domain ready). */
   creatorNotifyEmail?: string
   /**
-   * Optional PDF overlays (signature/text). Never include PDF file bytes —
+   * Optional PDF overlays (signature/text). Never include PDF file bytes -
    * only hash + annotations are accepted by the API.
    */
   annotations?: DocumentAnnotation[]
@@ -197,7 +197,7 @@ export const api = {
       } | null
       hasBatch0Frames: boolean
       batch0FrameCount: number
-      /** Present only for creator / parties — wire frames for reconstruction. */
+      /** Present only for creator / parties - wire frames for reconstruction. */
       batch0FramesHex?: string[]
       fillBatchCount?: number
       lastBatchRoot?: string | null
@@ -317,7 +317,7 @@ export const api = {
       turnstileRequired?: boolean
       turnstileSiteKey?: string | null
       supportSendEnabled?: boolean
-      /** PDF lab (/pdf) — parallel to seal product path */
+      /** PDF lab (/pdf) - parallel to seal product path */
       pdfAnnotationUi?: boolean
       annotationStreamBroadcast?: boolean
       annotationStreamServiceWallet?: boolean
@@ -328,7 +328,7 @@ export const api = {
     email: string
     subject: string
     message: string
-    /** Honeypot — leave empty. */
+    /** Honeypot - leave empty. */
     website?: string
     formStartedAt: number
     turnstileToken?: string

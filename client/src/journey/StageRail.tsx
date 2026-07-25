@@ -170,7 +170,7 @@ export function StageRail({
                 type="button"
                 className="stage-rail-select"
                 aria-current={current ? 'step' : undefined}
-                aria-label={`${s.label}${current ? ' (current)' : done ? ' (completed — go back)' : ''}`}
+                aria-label={`${s.label}${current ? ' (current)' : done ? ' (completed - go back)' : ''}`}
                 onClick={() => onStepSelect?.(s.id)}
               >
                 <span className="stage-rail-dot">

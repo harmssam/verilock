@@ -419,7 +419,7 @@ async function clawbackFromCharge(
   }
 
   if (!wallet || credits < 1) {
-    console.warn('[stripe] clawback skipped — could not resolve credits', {
+    console.warn('[stripe] clawback skipped - could not resolve credits', {
       chargeId: charge.id,
       reason,
     })

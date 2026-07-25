@@ -385,7 +385,7 @@ export function SignerFillView({
       else setSharedInk(result)
       setLocalFills(nextFills)
       setLocalError(null)
-      // Back to the document view — user picks the next field deliberately.
+      // Back to the document view - user picks the next field deliberately.
       closeModal()
     },
     [activeSlot, localFills, myInitialSlots, mySignatureSlots, isServerFilled, closeModal],
@@ -436,7 +436,7 @@ export function SignerFillView({
     setLocalError(null)
     const fills: SignerFillResult['fills'] = []
     let printedName: string | undefined
-    /** Full signature stroke only — never overwrite with initials. */
+    /** Full signature stroke only - never overwrite with initials. */
     let signaturePath: SignaturePathData | undefined
     let signatureImageDataUrl: string | undefined
     /** Initials as last-resort wallet image when the plan has no signature box. */
@@ -595,7 +595,7 @@ export function SignerFillView({
           Tap each <strong>highlighted</strong> box on the document. Signing opens in a panel so you stay
           with the document
           {sigCount > 1 || initCount > 1
-            ? ' — each signature and each initial is reused on every matching box after the first.'
+            ? ' - each signature and each initial is reused on every matching box after the first.'
             : '.'}{' '}
           Other people&apos;s fields stay locked.
         </p>
@@ -680,7 +680,7 @@ export function SignerFillView({
                     onClick={() => openSlot(slot)}
                     aria-label={
                       mine
-                        ? `${slot.kind} field${serverDone || draft ? ' (filled — tap to edit)' : ' (tap to fill)'}`
+                        ? `${slot.kind} field${serverDone || draft ? ' (filled - tap to edit)' : ' (tap to fill)'}`
                         : `Reserved for person ${slot.personSlotIndex}`
                     }
                   >
@@ -925,7 +925,7 @@ export function SignerFillView({
           onClose={() => setSignOnMobileOpen(false)}
           onSignature={result => {
             if (!result.path?.strokes?.length) {
-              setLocalError('Mobile signature had no strokes — try again.')
+              setLocalError('Mobile signature had no strokes - try again.')
               setSignOnMobileOpen(false)
               return
             }
@@ -970,7 +970,7 @@ export function SignerFillView({
         </button>
         {myFillable.length === 0 && (
           <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-            No page fields were assigned to you — continue to submit your signature.
+            No page fields were assigned to you - continue to submit your signature.
           </p>
         )}
       </div>

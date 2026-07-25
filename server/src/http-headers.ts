@@ -3,7 +3,7 @@ import helmet from 'helmet'
 
 /**
  * Security headers for JSON API responses only.
- * The SPA is served separately — see spaSecurityHeaders.
+ * The SPA is served separately - see spaSecurityHeaders.
  */
 const apiSecurityHeaders: RequestHandler = helmet({
   contentSecurityPolicy: false,
@@ -14,7 +14,7 @@ const apiSecurityHeaders: RequestHandler = helmet({
 
 /**
  * Minimal headers for the React SPA.
- * Avoid COOP/CORP/strict CSP here — they break Nimiq Hub popup postMessage.
+ * Avoid COOP/CORP/strict CSP here - they break Nimiq Hub popup postMessage.
  * Referrer must be sent on cross-origin navigations to hub.nimiq.com; Nimiq's
  * redirect RPC rejects requests when document.referrer is empty (request-error).
  */

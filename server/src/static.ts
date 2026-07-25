@@ -14,7 +14,7 @@ function isKnownAppPath(path: string): boolean {
   if (/^\/support\/?$/.test(path)) return true
   // Blog index + post slugs (SPA deep links must get index.html, not 404.html)
   if (/^\/blog(?:\/[a-zA-Z0-9_-]+)?\/?$/.test(path)) return true
-  // PDF lab (parallel to seal) — kill-switch via PDF_ANNOTATION_UI=false
+  // PDF lab (parallel to seal) - kill-switch via PDF_ANNOTATION_UI=false
   if (isPdfAnnotationUiEnabled()) {
     if (/^\/pdf\/?$/.test(path)) return true
     if (/^\/pdf\/lab\/?$/.test(path)) return true
@@ -30,11 +30,11 @@ const SEO_STATIC_FILES = ['sitemap.xml', 'robots.txt'] as const
 export function attachClientStatic(app: Express): boolean {
   const distDir = getClientDistDir()
   if (!existsSync(join(distDir, 'index.html'))) {
-    console.warn(`Client dist not found at ${distDir} — API-only mode`)
+    console.warn(`Client dist not found at ${distDir} - API-only mode`)
     return false
   }
 
-  // Express route patterns treat a trailing slash as optional — use exact path checks.
+  // Express route patterns treat a trailing slash as optional - use exact path checks.
   app.use((req, res, next) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       next()
@@ -76,7 +76,7 @@ export function attachClientStatic(app: Express): boolean {
 
   const notFoundPage = join(distDir, '404.html')
 
-  // SPA fallback — never serve index.html for missing static assets (avoids MIME errors in module scripts).
+  // SPA fallback - never serve index.html for missing static assets (avoids MIME errors in module scripts).
   app.get(/^\/(?!api\/).*/, (req, res) => {
     if (/\.[a-z0-9]+$/i.test(req.path)) {
       res.status(404).type('text/plain').send('Not found')
