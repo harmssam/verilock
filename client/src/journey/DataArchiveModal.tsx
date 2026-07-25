@@ -12,6 +12,10 @@ import { DataArchiveProgress } from './DataArchiveProgress'
 export interface DataArchiveModalProps {
   document: SealDocument | null
   frameCount: number
+  /** Frames already broadcast (real progress). */
+  framesDone?: number | null
+  /** write | confirm while job runs. */
+  jobPhase?: 'write' | 'confirm' | 'done' | 'failed' | null
   credits: number
   balance: number | null
   busy?: boolean
@@ -32,6 +36,8 @@ export interface DataArchiveModalProps {
 export function DataArchiveModal({
   document: doc,
   frameCount,
+  framesDone = null,
+  jobPhase = null,
   credits,
   balance,
   busy = false,
@@ -163,6 +169,8 @@ export function DataArchiveModal({
               title={doc.title}
               credits={credits}
               frameCount={frameCount}
+              framesDone={framesDone}
+              jobPhase={jobPhase}
               done={done}
               notifyEmail={wantEmail && email.trim() ? email.trim().toLowerCase() : null}
               message={

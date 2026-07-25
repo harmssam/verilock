@@ -33,7 +33,7 @@ import {
   type AgreementListMode,
 } from '../agreements'
 import { api } from '../api'
-import { writeCreditsBalanceCache } from '../creditsBalanceCache'
+import { publishCreditsBalance, writeCreditsBalanceCache } from '../creditsBalanceCache'
 import { formatDataArchiveCredits } from '../dataArchivePricing'
 import { shortHash } from '../pdf/hashPdf'
 import { documentTypeLabel, type SealDocument } from '../types'
@@ -200,6 +200,11 @@ export function AgreementsPage({
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [pendingArchive, setPendingArchive] = useState<SealDocument | null>(null)
   const [archiveFrameCount, setArchiveFrameCount] = useState(0)
+  /** Real broadcast progress (tx hashes recorded on server). */
+  const [archiveFramesDone, setArchiveFramesDone] = useState(0)
+  const [archiveJobPhase, setArchiveJobPhase] = useState<
+    'write' | 'confirm' | 'done' | 'failed' | null
+  >(null)
   const [archiveCredits, setArchiveCredits] = useState(0)
   const [archiveBalance, setArchiveBalance] = useState<number | null>(null)
   const [archiveBusy, setArchiveBusy] = useState(false)
@@ -207,6 +212,36 @@ export function AgreementsPage({
   const [archiveError, setArchiveError] = useState<string | null>(null)
   const [archiveEmailAvailable, setArchiveEmailAvailable] = useState(false)
   const [recoveryBusy, setRecoveryBusy] = useState(false)
+
+  const applyArchiveProgressFromQuote = useCallback(
+    (quote: {
+      frameCount?: number
+      confirmedFrames?: number
+      txHashes?: string[]
+      onChain?: boolean
+      jobStatus?: string
+      progressPercent?: number
+    }) => {
+      const total = Math.max(0, Number(quote.frameCount) || 0)
+      const doneFromHashes = Array.isArray(quote.txHashes) ? quote.txHashes.length : 0
+      const doneFromConfirmed = Math.max(0, Number(quote.confirmedFrames) || 0)
+      const done = Math.max(doneFromHashes, doneFromConfirmed)
+      if (total > 0) setArchiveFrameCount(total)
+      setArchiveFramesDone(Math.min(total > 0 ? total : done, done))
+      if (quote.onChain || quote.jobStatus === 'complete') {
+        setArchiveJobPhase('done')
+      } else if (quote.jobStatus === 'failed') {
+        setArchiveJobPhase('failed')
+      } else if (total > 0 && done >= total) {
+        setArchiveJobPhase('confirm')
+      } else if (quote.jobStatus === 'processing' || done > 0) {
+        setArchiveJobPhase('write')
+      } else {
+        setArchiveJobPhase('write')
+      }
+    },
+    [],
+  )
   /** Sync guard - React state alone can miss double-clicks before re-render. */
   const archiveInFlightRef = useRef(false)
   /** Doc id being archived so background completion still updates the list. */
@@ -325,11 +360,14 @@ export function AgreementsPage({
     // Prefer list summary; refresh quote for live balance + frame count.
     const summary = doc.dataArchive
     setArchiveFrameCount(summary?.frameCount ?? 0)
+    setArchiveFramesDone(0)
+    setArchiveJobPhase(null)
     setArchiveCredits(summary?.credits ?? 0)
     setArchiveBalance(null)
     try {
       const quote = await api.getOnChainDataQuote(token, doc.id)
       setArchiveFrameCount(quote.frameCount)
+      applyArchiveProgressFromQuote(quote)
       // alreadyPaid → show free resume in the modal (credits already held).
       setArchiveCredits(quote.alreadyPaid ? 0 : quote.credits)
       setArchiveBalance(quote.balance)
@@ -361,6 +399,8 @@ export function AgreementsPage({
         )
         // Keep modal open in "done" state so creator can download recovery file.
         setArchiveFrameCount(quote.frameCount)
+        setArchiveFramesDone(quote.frameCount)
+        setArchiveJobPhase('done')
         setArchiveDone(true)
         setArchiveBusy(false)
         setPendingArchive(doc)
@@ -381,6 +421,8 @@ export function AgreementsPage({
       setArchiveDone(false)
       setArchiveBusy(false)
       setRecoveryBusy(false)
+      setArchiveFramesDone(0)
+      setArchiveJobPhase(null)
     }
   }
 
@@ -460,15 +502,22 @@ export function AgreementsPage({
         notifyEmail: options?.notifyEmail ?? null,
       })
       if (typeof started.balance === 'number') {
-        writeCreditsBalanceCache(token, started.balance)
+        // Spend happens at job start — push header balance immediately.
+        publishCreditsBalance(token, started.balance)
         setArchiveBalance(started.balance)
       }
       setArchiveFrameCount(started.frameCount || archiveFrameCount)
       setArchiveCredits(started.alreadyPaid ? 0 : started.credits || archiveCredits)
+      applyArchiveProgressFromQuote(started)
 
       if (started.onChain) {
         applyArchiveQuoteToDocs(docId, started)
+        if (typeof started.balance === 'number') {
+          publishCreditsBalance(token, started.balance)
+          setArchiveBalance(started.balance)
+        }
         setArchiveBusy(false)
+        setArchiveJobPhase('done')
         if (archiveModalOpenRef.current) {
           setArchiveDone(true)
           setPendingArchive(docSnapshot)
@@ -477,20 +526,27 @@ export function AgreementsPage({
       }
 
       // Poll until complete / failed (or max ~8 minutes for large streams).
+      // ~1.5s so TX n of m updates feel live while server persists per frame.
       const deadline = Date.now() + 8 * 60_000
       let last: typeof started | null = started
       while (Date.now() < deadline) {
-        await new Promise(r => setTimeout(r, 2000))
+        await new Promise(r => setTimeout(r, 1500))
         const quote = await api.getOnChainDataQuote(token, docId)
         last = quote as typeof started
-        setArchiveFrameCount(quote.frameCount || archiveFrameCount)
+        applyArchiveProgressFromQuote(quote)
         if (typeof quote.balance === 'number') {
+          // Keep cache warm; re-broadcast on terminal states so refunds update the header.
           writeCreditsBalanceCache(token, quote.balance)
           setArchiveBalance(quote.balance)
         }
         if (quote.onChain || quote.jobStatus === 'complete') {
           applyArchiveQuoteToDocs(docId, quote)
+          if (typeof quote.balance === 'number') {
+            publishCreditsBalance(token, quote.balance)
+            setArchiveBalance(quote.balance)
+          }
           setArchiveBusy(false)
+          setArchiveJobPhase('done')
           if (archiveModalOpenRef.current) {
             setArchiveDone(true)
             setPendingArchive(docSnapshot)
@@ -498,9 +554,14 @@ export function AgreementsPage({
           return
         }
         if (quote.jobStatus === 'failed' && !quote.alreadyPaid) {
-          // Failed and refunded - show error.
+          // Failed and refunded - show error + restore header credits.
           applyArchiveQuoteToDocs(docId, quote)
+          if (typeof quote.balance === 'number') {
+            publishCreditsBalance(token, quote.balance)
+            setArchiveBalance(quote.balance)
+          }
           setArchiveBusy(false)
+          setArchiveJobPhase('failed')
           setArchiveError(
             quote.error ||
               quote.reason ||
@@ -512,7 +573,12 @@ export function AgreementsPage({
         if (quote.jobStatus === 'failed' && quote.alreadyPaid) {
           // Partial - can resume free; stop busy and show resume message.
           applyArchiveQuoteToDocs(docId, { ...quote, eligible: true })
+          if (typeof quote.balance === 'number') {
+            publishCreditsBalance(token, quote.balance)
+            setArchiveBalance(quote.balance)
+          }
           setArchiveBusy(false)
+          setArchiveJobPhase('failed')
           setArchiveError(
             quote.error ||
               quote.reason ||
@@ -521,11 +587,15 @@ export function AgreementsPage({
           if (archiveModalOpenRef.current) setPendingArchive(docSnapshot)
           return
         }
-        // Still processing - keep UI busy
+        // Still processing - keep UI busy with live TX counts
       }
 
       // Timed out polling (job may still be running server-side).
       applyArchiveQuoteToDocs(docId, last ?? started)
+      if (typeof last?.balance === 'number') {
+        publishCreditsBalance(token, last.balance)
+        setArchiveBalance(last.balance)
+      }
       setArchiveBusy(false)
       setArchiveError(
         'Still writing in the background. Close this window and reopen Store forever later - if credits were charged, resume is free.',
@@ -537,7 +607,7 @@ export function AgreementsPage({
       try {
         const quote = await api.getOnChainDataQuote(token, docId)
         if (typeof quote.balance === 'number') {
-          writeCreditsBalanceCache(token, quote.balance)
+          publishCreditsBalance(token, quote.balance)
           setArchiveBalance(quote.balance)
         }
         applyArchiveQuoteToDocs(docId, quote)
@@ -981,51 +1051,49 @@ export function AgreementsPage({
                     {archived ? (
                       <button
                         type="button"
-                        className={`btn btn-ghost agreements-page-list-archive${listArchiving ? ' btn--busy' : ''}`}
+                        className={`btn btn-ghost agreements-page-list-archive agreements-page-icon-btn${listArchiving ? ' btn--busy' : ''}`}
                         disabled={Boolean(listArchiveBusyId)}
                         onClick={() => void setListArchived(doc, false)}
-                        title="Show this agreement in Inbox or Completed again"
+                        title="Restore — show in Inbox or Completed again"
+                        aria-label={
+                          listArchiving
+                            ? 'Restoring agreement'
+                            : 'Restore agreement to Inbox or Completed'
+                        }
                       >
                         {listArchiving ? (
-                          <>
-                            <LoaderCircle
-                              className="btn-spinner"
-                              size={14}
-                              strokeWidth={2.5}
-                              aria-hidden
-                            />
-                            Restoring…
-                          </>
+                          <LoaderCircle
+                            className="btn-spinner"
+                            size={16}
+                            strokeWidth={2.5}
+                            aria-hidden
+                          />
                         ) : (
-                          <>
-                            <ArchiveRestore size={14} strokeWidth={2.25} aria-hidden />
-                            Restore
-                          </>
+                          <ArchiveRestore size={16} strokeWidth={2.25} aria-hidden />
                         )}
                       </button>
                     ) : (
                       <button
                         type="button"
-                        className={`btn btn-ghost agreements-page-list-archive${listArchiving ? ' btn--busy' : ''}`}
+                        className={`btn btn-ghost agreements-page-list-archive agreements-page-icon-btn${listArchiving ? ' btn--busy' : ''}`}
                         disabled={Boolean(listArchiveBusyId)}
                         onClick={() => void setListArchived(doc, true)}
-                        title="Hide from Inbox and Completed (you can restore anytime)"
+                        title="Archive — hide from Inbox and Completed (restore anytime)"
+                        aria-label={
+                          listArchiving
+                            ? 'Archiving agreement'
+                            : 'Archive agreement from Inbox and Completed'
+                        }
                       >
                         {listArchiving ? (
-                          <>
-                            <LoaderCircle
-                              className="btn-spinner"
-                              size={14}
-                              strokeWidth={2.5}
-                              aria-hidden
-                            />
-                            Archiving…
-                          </>
+                          <LoaderCircle
+                            className="btn-spinner"
+                            size={16}
+                            strokeWidth={2.5}
+                            aria-hidden
+                          />
                         ) : (
-                          <>
-                            <Archive size={14} strokeWidth={2.25} aria-hidden />
-                            Archive
-                          </>
+                          <Archive size={16} strokeWidth={2.25} aria-hidden />
                         )}
                       </button>
                     )}
@@ -1120,6 +1188,8 @@ export function AgreementsPage({
       <DataArchiveModal
         document={pendingArchive}
         frameCount={archiveFrameCount}
+        framesDone={archiveFramesDone}
+        jobPhase={archiveJobPhase}
         credits={archiveCredits}
         balance={archiveBalance}
         busy={archiveBusy}

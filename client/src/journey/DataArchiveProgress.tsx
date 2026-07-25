@@ -1,6 +1,7 @@
 /**
- * Wait UI while multi-tx data archive runs on the server (same spirit as CreditSealProgress).
- * Uses optimistic % progress - server does not stream per-frame updates yet.
+ * Wait UI while multi-tx data archive runs on the server.
+ * Prefer real TX counts from the server poll (e.g. TX 12 of 80); fall back to a
+ * soft timer only when no counts are available yet.
  */
 import {
   Check,
@@ -28,12 +29,12 @@ const PHASE_META: Record<
   },
   write: {
     label: 'Write to blockchain',
-    detail: 'VeriLock posts signatures and fields on Nimiq',
+    detail: 'VeriLock posts each data transaction on Nimiq',
     Icon: Server,
   },
   confirm: {
     label: 'Confirm on chain',
-    detail: 'Waiting for the network to accept the data',
+    detail: 'Checking that posted transactions are visible',
     Icon: Link2,
   },
   done: {
@@ -46,7 +47,7 @@ const PHASE_META: Record<
 const WAIT_TIPS = [
   'You do not need to stay on this page - work continues on VeriLock’s servers.',
   'The PDF never leaves your devices. Only signatures and form fields go on-chain.',
-  'This can take a few minutes for larger agreements. Leaving is fine.',
+  'Larger agreements need more transactions. Leaving is fine.',
   'Come back anytime under My agreements to see the “Data on blockchain” badge.',
 ]
 
@@ -56,26 +57,6 @@ function phaseIndex(phase: DataArchivePhase): number {
 
 function maxPhase(a: DataArchivePhase, b: DataArchivePhase): DataArchivePhase {
   return phaseIndex(a) >= phaseIndex(b) ? a : b
-}
-
-/** Rough duration scales with frame count (multi-tx). */
-function estimateDurationSec(frameCount: number): number {
-  // ~0.4s per frame + overhead; clamp for tiny / huge streams
-  return Math.min(180, Math.max(25, Math.round(frameCount * 0.45 + 12)))
-}
-
-function optimisticPhase(elapsedSec: number, durationSec: number): DataArchivePhase {
-  const t = elapsedSec / durationSec
-  if (t >= 0.82) return 'confirm'
-  if (t >= 0.12) return 'write'
-  return 'charge'
-}
-
-function optimisticPercent(elapsedSec: number, durationSec: number, done: boolean): number {
-  if (done) return 100
-  // Ease toward ~92% while waiting so we never fake 100% before success.
-  const raw = 1 - Math.exp(-elapsedSec / (durationSec * 0.55))
-  return Math.min(92, Math.max(3, Math.round(raw * 92)))
 }
 
 function phaseFromMessage(message: string | null): DataArchivePhase | null {
@@ -88,7 +69,12 @@ function phaseFromMessage(message: string | null): DataArchivePhase | null {
   ) {
     return 'done'
   }
-  if (m.includes('confirm') || m.includes('visible') || m.includes('safe to leave')) {
+  if (
+    m.includes('confirm') ||
+    m.includes('visible') ||
+    m.includes('sample') ||
+    m.includes('re-check')
+  ) {
     return 'confirm'
   }
   if (m.includes('write') || m.includes('broadcast') || m.includes('post')) {
@@ -103,7 +89,18 @@ function phaseFromMessage(message: string | null): DataArchivePhase | null {
 interface DataArchiveProgressProps {
   title?: string
   credits?: number
+  /** Total multi-tx frames to write (from quote). */
   frameCount?: number
+  /**
+   * Frames already broadcast (tx hashes recorded). Real progress.
+   * When set with frameCount, UI shows "TX n of total".
+   */
+  framesDone?: number | null
+  /**
+   * Optional server phase hint: processing write vs post-broadcast confirm.
+   * 'write' | 'confirm' | 'done' | 'failed' | null
+   */
+  jobPhase?: 'write' | 'confirm' | 'done' | 'failed' | null
   message?: string | null
   /** Force done state (API returned success). */
   done?: boolean
@@ -114,26 +111,63 @@ export function DataArchiveProgress({
   title,
   credits,
   frameCount = 0,
+  framesDone = null,
+  jobPhase = null,
   message = null,
   done = false,
   notifyEmail = null,
 }: DataArchiveProgressProps) {
   const [tipIndex, setTipIndex] = useState(0)
   const [elapsedSec, setElapsedSec] = useState(0)
-  const durationSec = useMemo(() => estimateDurationSec(frameCount), [frameCount])
 
-  const phase = useMemo(() => {
-    if (done) return 'done' as const
+  const total = Math.max(0, Math.floor(frameCount))
+  const doneCount =
+    framesDone != null && Number.isFinite(framesDone)
+      ? Math.max(0, Math.min(total || Math.floor(framesDone), Math.floor(framesDone)))
+      : null
+  const hasRealProgress = total > 0 && doneCount != null
+
+  const phase = useMemo((): DataArchivePhase => {
+    if (done || jobPhase === 'done') return 'done'
+    if (jobPhase === 'confirm') return 'confirm'
+    if (jobPhase === 'write') return 'write'
+    if (jobPhase === 'failed') return 'confirm'
+
     const fromMsg = phaseFromMessage(message)
     if (fromMsg === 'done') return 'done'
-    const optimistic = optimisticPhase(elapsedSec, durationSec)
-    return fromMsg ? maxPhase(fromMsg, optimistic) : optimistic
-  }, [done, message, elapsedSec, durationSec])
 
-  const percent = useMemo(
-    () => optimisticPercent(elapsedSec, durationSec, phase === 'done'),
-    [elapsedSec, durationSec, phase],
-  )
+    // Real counts: all txs submitted → confirming samples
+    if (hasRealProgress && doneCount! >= total && total > 0) {
+      return 'confirm'
+    }
+    if (hasRealProgress && doneCount! > 0) {
+      return 'write'
+    }
+    if (hasRealProgress && doneCount === 0) {
+      return elapsedSec < 2 ? 'charge' : 'write'
+    }
+
+    // Soft fallback when poll has not reported counts yet
+    if (elapsedSec < 3) return 'charge'
+    if (elapsedSec < 8) return 'write'
+    return fromMsg ? maxPhase(fromMsg, 'write') : 'write'
+  }, [done, jobPhase, message, hasRealProgress, doneCount, total, elapsedSec])
+
+  const percent = useMemo(() => {
+    if (phase === 'done') return 100
+    if (hasRealProgress && total > 0) {
+      // Write phase: 0–90% from submitted txs; confirm phase: 90–99% until done
+      if (doneCount! >= total) {
+        // Gentle pulse in confirm without faking 100
+        const confirmBoost = Math.min(9, Math.floor(elapsedSec / 3))
+        return Math.min(99, 90 + confirmBoost)
+      }
+      return Math.min(90, Math.round((doneCount! / total) * 90))
+    }
+    // Soft timer only when we lack server counts
+    const raw = 1 - Math.exp(-elapsedSec / 40)
+    return Math.min(88, Math.max(3, Math.round(raw * 88)))
+  }, [phase, hasRealProgress, doneCount, total, elapsedSec])
 
   const active = phaseIndex(phase)
 
@@ -158,11 +192,29 @@ export function DataArchiveProgress({
     if (phase === 'done') {
       return message?.trim() || 'Stored forever on the Nimiq blockchain.'
     }
-    // Prefer short, calm status over long server diagnostics while in progress.
-    if (phase === 'confirm') return 'Confirming on the Nimiq blockchain…'
+    if (phase === 'confirm') {
+      if (hasRealProgress) {
+        return `All ${total} transactions submitted — confirming on Nimiq…`
+      }
+      return 'Confirming on the Nimiq blockchain…'
+    }
+    if (phase === 'write' && hasRealProgress) {
+      return `Writing transaction ${Math.min(doneCount! + (doneCount! < total ? 1 : 0), total) || 1} of ${total}…`
+    }
     if (phase === 'write') return 'Writing to the Nimiq blockchain…'
     return 'Getting ready…'
-  }, [message, phase])
+  }, [phase, message, hasRealProgress, doneCount, total])
+
+  const progressCaption = useMemo(() => {
+    if (phase === 'done') return 'Done'
+    if (hasRealProgress) {
+      if (phase === 'confirm') {
+        return `TX ${total} of ${total} submitted · Confirming…`
+      }
+      return `TX ${doneCount} of ${total}`
+    }
+    return 'Starting…'
+  }, [phase, hasRealProgress, doneCount, total])
 
   const creditLabel =
     credits != null && credits > 0
@@ -189,6 +241,11 @@ export function DataArchiveProgress({
         >
           {phase === 'done' ? (
             <Database size={28} strokeWidth={2.25} />
+          ) : hasRealProgress ? (
+            <span className="data-archive-progress-tx" aria-hidden>
+              <span className="data-archive-progress-tx-num">{doneCount}</span>
+              <span className="data-archive-progress-tx-of">/{total}</span>
+            </span>
           ) : (
             <span className="data-archive-progress-pct">{percent}%</span>
           )}
@@ -209,20 +266,20 @@ export function DataArchiveProgress({
         </h3>
         {title && <p className="credit-seal-progress-doc muted">{title}</p>}
         <p className="credit-seal-progress-status">{statusLine}</p>
-        <p className="credit-seal-progress-elapsed muted">
-          {phase === 'done'
-            ? 'Done'
-            : `${percent}% complete · This can take a few minutes`}
-        </p>
+        <p className="credit-seal-progress-elapsed muted">{progressCaption}</p>
       </div>
 
       <div
         className="data-archive-progress-bar"
         role="progressbar"
         aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent}
-        aria-label="Archive progress"
+        aria-valuemax={total > 0 ? total : 100}
+        aria-valuenow={hasRealProgress ? (doneCount ?? 0) : percent}
+        aria-label={
+          hasRealProgress
+            ? `Transaction ${doneCount} of ${total}`
+            : 'Archive progress'
+        }
       >
         <div
           className="data-archive-progress-bar-fill"
@@ -262,7 +319,11 @@ export function DataArchiveProgress({
               </span>
               <span className="credit-seal-progress-step-text">
                 <strong>{meta.label}</strong>
-                <span className="muted">{meta.detail}</span>
+                <span className="muted">
+                  {p === 'write' && hasRealProgress && phase === 'write'
+                    ? `TX ${doneCount} of ${total}`
+                    : meta.detail}
+                </span>
               </span>
             </li>
           )
