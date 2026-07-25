@@ -14,18 +14,30 @@ When a redesign task is scoped only to pricing marketing copy, that slice may us
 
 | Priority | Who | Context |
 |----------|-----|---------|
-| Primary | People who need a permanent integrity proof of a document | Remote parties, rental/contract/NDA flows, no shared document store |
+| Primary | People who need free multi-party PDF signing (optional permanent proof later) | Remote parties, rental/contract/NDA flows |
 | Secondary | Co-signers who received a document + invite link | Match file, sign with wallet, leave |
 | Secondary | Anyone verifying a sealed document later | No account required |
-| Tertiary | Pricing visitors | Buy seal credits |
+| Tertiary | Pricing visitors | Buy seal credits for lock / data archive |
 
 ## Purpose
 
-Fingerprint a document **on-device** (PDF or image), optionally collect multi-party wallet signatures, then **anchor only the hash** on Nimiq so anyone can re-verify the same bytes later. The file never uploads.
+Fingerprint a document **on-device** (PDF or image), collect multi-party wallet signatures **for free**, print when complete, then **optionally anchor the hash** on Nimiq so anyone can re-verify the same bytes later. The file never uploads.
 
 ## Positioning
 
-**Wallet identity + local document fingerprint + on-chain hash lock** — multi-party agreements without uploading files to VeriLock.
+**Free multi-party sign (wallet identity + local fingerprint) + optional paid on-chain lock** — agreements without uploading files to VeriLock.
+
+### Freemium tiers (product language)
+
+| Level | User-facing name | What they get | Price |
+|-------|------------------|---------------|-------|
+| **0** | **Sign free** | Create, arrange fields, invite, co-sign with wallets, My agreements, print signed copy | **$0** |
+| **1** | **Lock on blockchain** | Permanent fingerprint anchor on Nimiq; re-verify without trusting VeriLock alone | **1 credit** (or live NIM fee) |
+| **2** | **On-chain data backup** | Signatures / initials / text placements multi-tx archive so proof can outlive servers | **Credits by frame count** |
+
+**Honest free disclaimer:** free signing stores agreement metadata on VeriLock servers. It is **not** a permanent public proof until locked. Files stay on each party’s device.
+
+After all parties sign (multi-party): **print / free complete is primary**; lock is a clear secondary upsell. Direct seal (0 required signatures) stays lock-first.
 
 ## Brand personality
 
@@ -73,8 +85,9 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 
 ### Acceptance checklist (redesign done only if all true)
 
-- [ ] Path picker still offers exactly: **Create & seal**, **I was invited**, **Verify a file**
-- [ ] Creator stages still: Fingerprint → Sign → Share → Seal → Verify (wallet login is a gate, not a rail step)
+- [ ] Path picker still offers exactly: **Create & sign**, **I was invited**, **Verify a file**
+- [ ] Creator stages still: Fingerprint → Arrange → Sign → Seal → Verify (wallet login is a gate, not a rail step)
+- [ ] After multi-party all-signed: free complete (print primary, lock secondary) still available; seal payment path intact
 - [ ] Signer stages still: Sign → Done (wallet login is a gate on submit, not a rail step)
 - [ ] Verifier stages still: Verify only (wallet optional)
 - [ ] Deep links `/d/:slug`, `/v/:slug`, `?intent=`, `?preferSeal=1` still work
@@ -137,7 +150,7 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 | Feature | Notes |
 |---------|--------|
 | Hero status claims | Rotating trust / fee lines under CTAs |
-| Path: Create & seal | Role `creator` |
+| Path: Create & sign | Role `creator` — free multi-party; optional lock |
 | Path: I was invited | Role `signer` |
 | Path: Verify a file | Role `verifier` |
 | How VeriLock works | Collapsible multi-beat story, role-aware |
@@ -151,7 +164,7 @@ Wallet login (LoginSheet / Hub / Pay) is a **gate** when creating, signing, or s
 1. **Fingerprint** — Document drop/browse (PDF or image), local SHA-256, agreement type (rental/contract/nda/other), rental landlord/tenant, full name, optional email notify (flag), optional title, **direct seal** checkbox, required signer count 1–4, optional co-signer names, optional notes (type-dependent), create CTA (prompts login if needed)
 2. **Sign** — Creator signs first: signature progress, party list, cancel (creator), match document, signature pad / image, optional **Sign on mobile** (QR handoff), sign CTA
 3. **Share** — After creator signed: party list, ShareInviteCard (copy link / email package), wait for co-signers, cancel until first signature (if still allowed)
-4. **Seal** — Pricing display, credits panel / NIM pay / credit seal progress, lock on chain
+4. **Seal / free complete** — After multi-party all signed: free complete (print primary, lock secondary upsell). Choosing lock (or direct seal) shows pricing, credits / NIM pay, credit seal progress.
 5. **Verify** — Re-drop document to confirm match after seal / done
 
 ### Signer path stages

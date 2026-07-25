@@ -77,8 +77,8 @@ const TRACK_META: Record<
   }
 > = {
   creator: {
-    title: 'Create & lock',
-    detail: 'Start an agreement, invite co-signers, lock a permanent proof',
+    title: 'Create & sign',
+    detail: 'Start free: invite co-signers, print when done — lock on-chain when you want',
     icon: Fingerprint,
     accent: 'creator',
   },

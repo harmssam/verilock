@@ -56,7 +56,8 @@ export const CREATOR_STAGES: JourneyStage[] = [
     id: 'seal',
     label: 'Lock',
     verb: 'Lock on the blockchain',
-    blurb: 'One Nimiq transaction locks the fingerprint forever (a small network fee applies).',
+    blurb:
+      'Optional upgrade: one credit locks the fingerprint forever on Nimiq. Signing and print are free without a lock.',
     privacyNote: 'The chain stores a hash string - never the document.',
   },
   {

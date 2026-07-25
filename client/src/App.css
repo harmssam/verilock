@@ -578,6 +578,29 @@
   margin-top: 0.15rem;
 }
 
+/* Freemium pitch under CTAs — quiet, not a gradient banner */
+.lr-promo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin: 0.1rem 0 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--lr-muted);
+}
+
+.lr-promo-free {
+  color: var(--lr-accent);
+  font-weight: 750;
+}
+
+.lr-promo-sep {
+  color: var(--lr-dim);
+  font-weight: 500;
+}
+
 .lr-cta {
   display: inline-flex;
   align-items: center;

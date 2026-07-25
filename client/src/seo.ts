@@ -1,5 +1,5 @@
 export const SITE_NAME = 'VeriLock'
-export const SITE_TAGLINE = 'Sign today. Prove forever.'
+export const SITE_TAGLINE = 'Sign free. Lock when it matters.'
 export const DEFAULT_ORIGIN = 'https://verilock.online'
 export const DEFAULT_OG_IMAGE = '/verilock-mark.png'
 
@@ -14,15 +14,15 @@ const TITLE_SUFFIX = ` · ${SITE_NAME}`
 
 export const PAGE_META = {
   home: {
-    title: `${SITE_NAME} — Sign Documents & Lock Proof on Nimiq`,
+    title: `${SITE_NAME} — Free PDF Signing & Optional On-Chain Lock`,
     description:
-      'Sign documents today (PDF or image) and permanently anchor fingerprints on the Nimiq blockchain. Your file never leaves your device — verify integrity anytime without a wallet.',
+      'Sign PDFs free with multi-party Nimiq wallet signatures. Your file never leaves your device. Print when done, or lock a permanent fingerprint on Nimiq for 1 credit. Verify locked proofs anytime without a wallet.',
     path: '/',
   },
   pricing: {
     title: `Pricing${TITLE_SUFFIX}`,
     description:
-      'One flat fee locks your signed document fingerprint on the Nimiq blockchain forever. Your file stays on your device — only its SHA-256 hash is recorded.',
+      'Free multi-party PDF signing. Lock a permanent document fingerprint on Nimiq for 1 credit. Optional on-chain backup of signatures and field data. Your file stays on your device.',
     path: '/pricing',
   },
   privacy: {

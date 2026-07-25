@@ -20,7 +20,7 @@ export const BUCKET_ORDER: AgreementBucket[] = [
 
 export const BUCKET_LABELS: Record<AgreementBucket, string> = {
   needs_you: 'Needs your action',
-  ready_to_seal: 'Ready to lock',
+  ready_to_seal: 'All signed',
   waiting: 'Waiting on others',
   locked: 'Locked',
 }
@@ -158,20 +158,26 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
 
   if (readyToLock || doc.status === 'ready_to_lock') {
     if (creator) {
-      const headline =
-        doc.signingProgress.required === 0
-          ? 'Ready to lock on-chain'
-          : 'All signed — lock on-chain'
+      // Free complete: multi-party signed; lock is optional upgrade.
+      // Direct seal (required === 0) stays lock-first.
+      if (doc.signingProgress.required === 0) {
+        return {
+          bucket: 'ready_to_seal',
+          headline: 'Ready to lock on-chain',
+          detail: progress,
+          cta: 'Lock now',
+        }
+      }
       return {
         bucket: 'ready_to_seal',
-        headline,
+        headline: 'All signed — free complete',
         detail: progress,
-        cta: 'Lock now',
+        cta: 'View & print',
       }
     }
     return {
       bucket: 'waiting',
-      headline: 'Waiting to lock',
+      headline: 'Everyone signed',
       detail: progress,
       cta: 'View',
     }
@@ -197,18 +203,22 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
     }
     if (resolution.hint === 'complete') {
       return creator
-        ? {
-            bucket: 'ready_to_seal',
-            headline:
-              doc.signingProgress.required === 0
-                ? 'Ready to lock on-chain'
-                : 'All signed — lock on-chain',
-            detail: progress,
-            cta: 'Lock now',
-          }
+        ? doc.signingProgress.required === 0
+          ? {
+              bucket: 'ready_to_seal',
+              headline: 'Ready to lock on-chain',
+              detail: progress,
+              cta: 'Lock now',
+            }
+          : {
+              bucket: 'ready_to_seal',
+              headline: 'All signed — free complete',
+              detail: progress,
+              cta: 'View & print',
+            }
         : {
             bucket: 'waiting',
-            headline: 'Waiting to lock',
+            headline: 'Everyone signed',
             detail: progress,
             cta: 'View',
           }
