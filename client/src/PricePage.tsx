@@ -18,7 +18,6 @@ import { SealPricingDisplay } from './SealPricingDisplay'
 import { getSealPricing } from './sealPricing'
 import { CreditsPanel } from './journey/CreditsPanel'
 import {
-  journeyLoginEntryLabels,
   journeyLoginNeedsSheet,
   type JourneyConnectMode,
   type JourneyConnectRequest,
@@ -68,6 +67,7 @@ export function PricePage({
   const pricing = getSealPricing()
   const [creditsInfo, setCreditsInfo] = useState<CreditsPublicInfo | null>(null)
   const [quoteRefreshKey, setQuoteRefreshKey] = useState(0)
+  const [buyLoginOpen, setBuyLoginOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -152,6 +152,10 @@ export function PricePage({
     unitBelowStripeMin &&
     minPackUsd != null &&
     Number.isFinite(minPackUsd)
+
+  useEffect(() => {
+    if (signedIn) setBuyLoginOpen(false)
+  }, [signedIn])
 
   return (
     <div className="card price-page">
@@ -377,31 +381,45 @@ export function PricePage({
             <p className="muted price-page-credits-lead">
               Packs of{' '}
               {creditsInfo?.packs && creditsInfo.packs.length >= 2
-                ? `${creditsInfo.packs[0]}–${creditsInfo.packs[creditsInfo.packs.length - 1]}`
-                : '10–100'}
-              .
+                ? `${creditsInfo.packs[0]}-${creditsInfo.packs[creditsInfo.packs.length - 1]}`
+                : '10-100'}
+              . Wallet only when you purchase.
             </p>
           </div>
 
-          {!signedIn && onConnect && (
-            <PriceCreditsLogin
-              connectMode={connectMode}
-              connecting={connecting}
-              onConnect={onConnect}
-            />
-          )}
+          <CreditsPanel
+            token={token}
+            address={address}
+            nimiq={nimiq}
+            setNimiq={setNimiq}
+            preferCardPrice
+            onRequestLogin={
+              onConnect
+                ? () => {
+                    if (!journeyLoginNeedsSheet(connectMode)) {
+                      onConnect()
+                      return
+                    }
+                    setBuyLoginOpen(true)
+                  }
+                : undefined
+            }
+            onBalanceChange={() => {
+              onCreditsPurchased?.()
+            }}
+          />
 
-          {signedIn && (
-            <CreditsPanel
-              token={token}
-              address={address}
-              nimiq={nimiq}
-              setNimiq={setNimiq}
-              preferCardPrice
-              onBalanceChange={() => {
-                onCreditsPurchased?.()
-              }}
-            />
+          {!signedIn && onConnect && buyLoginOpen && journeyLoginNeedsSheet(connectMode) && (
+            <div className="price-page-credits-connect">
+              <LoginSheet
+                open
+                connectMode={connectMode}
+                connecting={connecting}
+                onClose={() => setBuyLoginOpen(false)}
+                onProceed={onConnect}
+                placement="inline"
+              />
+            </div>
           )}
         </section>
       )}
@@ -455,62 +473,4 @@ export function PricePage({
   )
 }
 
-function PriceCreditsLogin({
-  connectMode,
-  connecting,
-  onConnect,
-}: {
-  connectMode: JourneyConnectMode
-  connecting: boolean
-  onConnect: (options?: JourneyConnectRequest) => void
-}) {
-  const [loginOpen, setLoginOpen] = useState(false)
-  const entry = journeyLoginEntryLabels()
-  const needsSheet = journeyLoginNeedsSheet(connectMode)
 
-  return (
-    <div className="price-page-credits-connect">
-      {!needsSheet || !loginOpen ? (
-        <>
-          <p className="muted" style={{ margin: 0, fontSize: '0.86rem' }}>
-            Log in with your Nimiq wallet to buy packs.
-          </p>
-          <button
-            type="button"
-            data-login-trigger
-            className={`btn btn-primary${connecting ? ' btn--busy' : ''}`}
-            disabled={connecting}
-            onClick={() => {
-              if (!needsSheet) {
-                onConnect()
-                return
-              }
-              setLoginOpen(true)
-            }}
-          >
-            {connecting ? (
-              <>
-                <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
-                {entry.busy}
-              </>
-            ) : (
-              <>
-                <NimiqHexagonIcon size={16} />
-                {entry.idle}
-              </>
-            )}
-          </button>
-        </>
-      ) : (
-        <LoginSheet
-          open
-          connectMode={connectMode}
-          connecting={connecting}
-          onClose={() => setLoginOpen(false)}
-          onProceed={onConnect}
-          placement="inline"
-        />
-      )}
-    </div>
-  )
-}

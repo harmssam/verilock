@@ -35,6 +35,11 @@ interface CreditsPanelProps {
   balanceOnly?: boolean
   /** Called when the known balance changes (load, top-up, purchase). */
   onBalanceChange?: (balance: number) => void
+  /**
+   * Guest buy path: open wallet login. Packs stay visible without signing in;
+   * purchase buttons call this when there is no session yet.
+   */
+  onRequestLogin?: () => void
 }
 
 export function CreditsPanel({
@@ -47,9 +52,12 @@ export function CreditsPanel({
   preferCardPrice = false,
   balanceOnly = false,
   onBalanceChange,
+  onRequestLogin,
 }: CreditsPanelProps) {
-  const [enabled, setEnabled] = useState(false)
-  const [stripeEnabled, setStripeEnabled] = useState(false)
+  const signedIn = Boolean(token)
+  const [enabled, setEnabled] = useState(true)
+  const [configReady, setConfigReady] = useState(false)
+  const [stripeEnabled, setStripeEnabled] = useState(preferCardPrice)
   const [balance, setBalance] = useState(0)
   const [packs, setPacks] = useState<number[]>(DEFAULT_PACKS)
   const [selectedPack, setSelectedPack] = useState(10)
@@ -72,11 +80,71 @@ export function CreditsPanel({
     onBalanceChangeRef.current?.(next)
   }, [])
 
-  const refresh = useCallback(
+  // Public: pack sizes + Stripe flag (no wallet).
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const cfg = await api.creditsConfig()
+        if (cancelled) return
+        setEnabled(cfg.enabled)
+        setStripeEnabled(cfg.stripeEnabled)
+        if (Array.isArray(cfg.packs) && cfg.packs.length > 0) {
+          setPacks(cfg.packs)
+          setSelectedPack(prev => (cfg.packs.includes(prev) ? prev : cfg.packs[0]!))
+        }
+      } catch {
+        /* keep defaults */
+      } finally {
+        if (!cancelled) setConfigReady(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Public: live pack prices (no wallet).
+  useEffect(() => {
+    if (balanceOnly) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const catalog = await api.creditsPackQuotes()
+        if (cancelled) return
+        setPackQuotes(
+          catalog.packs.map(p => ({
+            pack: p.pack,
+            creditNimCostTotal: p.creditNimCostTotal,
+            creditStripeUsdTotal: p.creditStripeUsdTotal,
+            totalUsdCents: p.totalUsdCents,
+            meetsStripeMinimum: p.meetsStripeMinimum,
+          })),
+        )
+        if (catalog.packs.length > 0) {
+          setPacks(catalog.packs.map(p => p.pack))
+          setSelectedPack(prev =>
+            catalog.packs.some(p => p.pack === prev)
+              ? prev
+              : catalog.packs[0]!.pack,
+          )
+        }
+        if (typeof catalog.stripeMarkup === 'number') {
+          /* stripe flag comes from config; pack catalog confirms Stripe pricing exists */
+        }
+      } catch {
+        if (!cancelled) setPackQuotes([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [balanceOnly])
+
+  const refreshBalance = useCallback(
     async (force = false) => {
       if (!token) {
         setBalance(0)
-        setEnabled(false)
         notifyBalance(0)
         return
       }
@@ -102,8 +170,8 @@ export function CreditsPanel({
   )
 
   useEffect(() => {
-    void refresh(refreshKey > 0)
-  }, [refresh, refreshKey])
+    void refreshBalance(refreshKey > 0)
+  }, [refreshBalance, refreshKey])
 
   useEffect(() => {
     const onTopup = (ev: Event) => {
@@ -129,31 +197,6 @@ export function CreditsPanel({
     return () => window.removeEventListener('verilock:credits-topup', onTopup)
   }, [notifyBalance, token])
 
-  useEffect(() => {
-    if (!token || !enabled || balanceOnly) return
-    let cancelled = false
-    void (async () => {
-      try {
-        const catalog = await api.creditsPackQuotes()
-        if (cancelled) return
-        setPackQuotes(
-          catalog.packs.map(p => ({
-            pack: p.pack,
-            creditNimCostTotal: p.creditNimCostTotal,
-            creditStripeUsdTotal: p.creditStripeUsdTotal,
-            totalUsdCents: p.totalUsdCents,
-            meetsStripeMinimum: p.meetsStripeMinimum,
-          })),
-        )
-      } catch {
-        if (!cancelled) setPackQuotes([])
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [enabled, token, balanceOnly])
-
   const packPriceLabel = (pack: number): string => {
     const q = packQuotes.find(p => p.pack === pack)
     if (!q) return '…'
@@ -164,11 +207,20 @@ export function CreditsPanel({
     return formatSealFeeNim(q.creditNimCostTotal)
   }
 
-  const buyWithNim = async () => {
-    if (!token || !address) {
-      setError('Connect your wallet first')
-      return
+  const requireLogin = (): boolean => {
+    if (token && address) return false
+    setError(null)
+    if (onRequestLogin) {
+      onRequestLogin()
+      return true
     }
+    setError('Connect your wallet to buy')
+    return true
+  }
+
+  const buyWithNim = async () => {
+    if (requireLogin()) return
+    if (!token || !address) return
     setBusy('nim')
     setError(null)
     setStatus(null)
@@ -202,6 +254,7 @@ export function CreditsPanel({
   }
 
   const buyWithCard = async () => {
+    if (requireLogin()) return
     if (!token) return
     setBusy('card')
     setError(null)
@@ -215,31 +268,13 @@ export function CreditsPanel({
     }
   }
 
-  if (!token) {
-    return (
-      <div
-        className={[
-          'journey-credits',
-          'journey-credits--guest',
-          compact ? 'journey-credits--compact' : '',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        <div className="journey-credits-top-label">
-          <Coins size={15} strokeWidth={2.25} aria-hidden />
-          Credits
-        </div>
-        <p className="muted journey-credits-guest-text">
-          Connect your wallet to buy packs. 1 credit = 1 document verified and locked.
-        </p>
-      </div>
-    )
-  }
+  if (configReady && !enabled) return null
 
-  if (!enabled) return null
+  // Balance-only guests have nothing to show.
+  if (balanceOnly && !signedIn) return null
 
   const busyAny = busy != null
+  const showCard = stripeEnabled || preferCardPrice
 
   return (
     <div
@@ -247,6 +282,7 @@ export function CreditsPanel({
         'journey-credits',
         compact ? 'journey-credits--compact' : '',
         balanceOnly ? 'journey-credits--balance-only' : '',
+        !signedIn ? 'journey-credits--guest' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -254,14 +290,20 @@ export function CreditsPanel({
       <div className="journey-credits-top">
         <div className="journey-credits-top-label">
           <Coins size={15} strokeWidth={2.25} aria-hidden />
-          Your balance
+          {signedIn ? 'Your balance' : 'Credit packs'}
         </div>
-        <div className="journey-credits-balance">
-          <span className="journey-credits-balance-n">{balance}</span>
-          <span className="journey-credits-balance-unit">
-            credit{balance === 1 ? '' : 's'}
-          </span>
-        </div>
+        {signedIn ? (
+          <div className="journey-credits-balance">
+            <span className="journey-credits-balance-n">{balance}</span>
+            <span className="journey-credits-balance-unit">
+              credit{balance === 1 ? '' : 's'}
+            </span>
+          </div>
+        ) : (
+          <p className="muted journey-credits-guest-text">
+            Pick a pack. Connect only when you buy.
+          </p>
+        )}
       </div>
 
       {!balanceOnly && (
@@ -289,12 +331,12 @@ export function CreditsPanel({
           <div
             className={[
               'journey-credits-actions',
-              !stripeEnabled ? 'journey-credits-actions--single' : '',
+              !showCard ? 'journey-credits-actions--single' : '',
             ]
               .filter(Boolean)
               .join(' ')}
           >
-            {stripeEnabled && (
+            {showCard && (
               <button
                 type="button"
                 className={`btn btn-primary${busy === 'card' ? ' btn--busy' : ''}`}
@@ -313,10 +355,10 @@ export function CreditsPanel({
             )}
             <button
               type="button"
-              className={`btn ${stripeEnabled ? 'btn-secondary' : 'btn-primary'}${
+              className={`btn ${showCard ? 'btn-secondary' : 'btn-primary'}${
                 busy === 'nim' ? ' btn--busy' : ''
               }`}
-              disabled={busyAny || !address}
+              disabled={busyAny}
               onClick={() => void buyWithNim()}
             >
               {busy === 'nim' ? (
