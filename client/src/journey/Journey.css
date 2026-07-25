@@ -3815,7 +3815,7 @@ a.hash-chip.text-link:focus-visible {
   border-color: rgba(248, 113, 113, 0.45);
 }
 
-/* Single info + drop surface for re-upload (sign after leave/return) */
+/* Single info + drop surface to re-select the local file (sign after leave/return) */
 .doc-stage-expect {
   width: 100%;
   display: flex;

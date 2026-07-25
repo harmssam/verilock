@@ -165,7 +165,7 @@ export function useCreatePdfDraft({
       const formCache = loadCreateFormCache()
       if (cancelled) return
 
-      // Apply form fields even when there is no PDF yet (type selected pre-upload).
+      // Apply form fields even when there is no PDF yet (type selected before file pick).
       const form = mergeFormFields(draft ?? undefined, formCache)
       if (draft || formCache) {
         applyRestoredMeta({

@@ -1,4 +1,4 @@
-import { FileText, Upload } from 'lucide-react'
+import { FileText, FolderOpen } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -244,7 +244,7 @@ export function PdfDropZone({
         ) : (
           <div className="pdf-drop-empty">
             <span className="pdf-drop-icon" aria-hidden>
-              <Upload size={size === 'hero' ? 28 : 22} strokeWidth={2.25} />
+              <FolderOpen size={size === 'hero' ? 28 : 22} strokeWidth={2.25} />
             </span>
             <strong className="pdf-drop-label">{label}</strong>
             <span className="pdf-drop-hint muted">{hint}</span>

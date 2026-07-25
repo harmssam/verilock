@@ -1,4 +1,4 @@
-import { FileText, Lock, ShieldCheck, Sparkles, Upload } from 'lucide-react'
+import { FileText, FolderOpen, Lock, ShieldCheck, Sparkles } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -211,7 +211,7 @@ export function DocumentStage({
           ? hasFile
             ? `Selected ${displayName}. Click to choose a different file, or drop a new one.`
             : needsLocalCopy
-              ? `Upload required. Drop your local copy of ${doc?.fileName ?? 'the file'} or press Enter to browse.`
+              ? `Local file needed. Drop your copy of ${doc?.fileName ?? 'the file'} or press Enter to browse. It stays on this device.`
               : 'Drop a document here or press Enter to browse'
           : undefined
       }
@@ -240,14 +240,14 @@ export function DocumentStage({
 
       {needsLocalCopy && doc && (
         <div className="doc-stage-expect" role="note">
-          <span className="doc-stage-expect-label">Upload your copy of the file</span>
+          <span className="doc-stage-expect-label">Choose your copy of the file</span>
           <strong className="doc-stage-expect-title">{doc.title}</strong>
           <span className="doc-stage-expect-file">
             Expected file: <code className="mono">{doc.fileName}</code>
           </span>
           <span className="doc-stage-expect-hint">
             Drop the same file from this device so we can match the fingerprint. Required after
-            leaving and returning. The file never leaves your computer.
+            leaving and returning. The file stays on your computer - nothing is sent to VeriLock.
           </span>
         </div>
       )}
@@ -263,7 +263,7 @@ export function DocumentStage({
           {!hasFile ? (
             <div className="doc-card-empty">
               {canInteract ? (
-                <Upload size={36} strokeWidth={1.75} />
+                <FolderOpen size={36} strokeWidth={1.75} />
               ) : (
                 <FileText size={36} strokeWidth={1.75} />
               )}
@@ -350,7 +350,7 @@ export function DocumentStage({
               openPicker()
             }}
           >
-            <Upload size={15} strokeWidth={2.25} aria-hidden />
+            <FolderOpen size={15} strokeWidth={2.25} aria-hidden />
             {needsLocalCopy ? 'Choose file on this device' : 'Browse files'}
           </button>
           {file && (
