@@ -310,11 +310,7 @@ export function CreditsPanel({
               credit{balance === 1 ? '' : 's'}
             </span>
           </div>
-        ) : (
-          <p className="muted journey-credits-guest-text">
-            Pick a pack. Connect only when you buy.
-          </p>
-        )}
+        ) : null}
       </div>
 
       {!balanceOnly && (

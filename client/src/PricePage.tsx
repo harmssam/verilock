@@ -312,7 +312,7 @@ export function PricePage({
               {creditsInfo?.packs && creditsInfo.packs.length >= 2
                 ? `${creditsInfo.packs[0]}-${creditsInfo.packs[creditsInfo.packs.length - 1]}`
                 : '10-100'}
-              . Wallet only when you purchase.
+              .
             </p>
           </header>
 
