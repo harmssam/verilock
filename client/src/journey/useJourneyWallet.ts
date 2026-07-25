@@ -93,6 +93,8 @@ export function useJourneyWallet(): UseJourneyWalletResult {
   const [showOpenInPay, setShowOpenInPay] = useState(false)
 
   const hubConnectInFlightRef = useRef(false)
+  /** Any connect() path in flight (Pay dialogs or Hub) - blocks concurrent Login taps. */
+  const connectInFlightRef = useRef(false)
   const walletStatusRef = useRef<string | null>(null)
   const lockCompleteRef = useRef<
     ((result: { txHash: string; token: string; docId: string }) => Promise<void>) | null
@@ -159,6 +161,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     setWalletStatus(null)
     setShowOpenInPay(false)
     hubConnectInFlightRef.current = false
+    connectInFlightRef.current = false
     clearPayDeeplinkPending()
   }, [clearPayDeeplinkPending])
 
@@ -317,6 +320,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     setError(prev => (prev === PAY_INSTALL_HINT ? null : prev))
     setShowOpenInPay(false)
     setWalletStatus(PAY_HANDOFF_HINT)
+    connectInFlightRef.current = false
     setConnecting(false)
     // Soft note only - do not leave the Login control stuck in a busy state.
     window.setTimeout(() => {
@@ -392,9 +396,11 @@ export function useJourneyWallet(): UseJourneyWalletResult {
       }
       // Still foreground after launch - OS never switched; app likely missing.
       payDeeplinkPendingRef.current = false
+      connectInFlightRef.current = false
       setShowOpenInPay(true)
       setError(PAY_INSTALL_HINT)
       setWalletStatus(null)
+      setConnecting(false)
     }, PAY_DEEPLINK_FALLBACK_MS)
   }, [clearDeeplinkFallbackTimer, clearPayDeeplinkPending, markPayDeeplinkHandoff])
 
@@ -404,7 +410,11 @@ export function useJourneyWallet(): UseJourneyWalletResult {
         setWalletStatus(HUB_REDIRECT_MESSAGE)
         return
       }
+      // Pay (and Hub popup) show native sheets - a second concurrent connect()
+      // steals focus and can bury the Approve step under the mini-app WebView.
+      if (connectInFlightRef.current) return
 
+      connectInFlightRef.current = true
       setConnecting(true)
       clearLoginCanceledTimer()
       setError(null)
@@ -417,23 +427,22 @@ export function useJourneyWallet(): UseJourneyWalletResult {
         const explicitHubRedirect = options?.useRedirect === true
         setWalletStatus(
           payHost
-            ? 'Waiting for Nimiq Pay wallet… approve the dialog when it appears.'
+            ? 'Waiting for Nimiq Pay wallet… approve each dialog when it appears.'
             : isMobileDevice() && !explicitHubRedirect
               ? 'Opening Nimiq Pay…'
               : 'Connecting via Nimiq Hub…',
         )
 
         // window.nimiq may lag behind window.nimiqPay inside the Nimiq Pay WebView.
+        // Always await the provider when the host is present so we never fall through
+        // to deeplink / Hub while already inside Pay.
         let inPay = payHost || Boolean(typeof window !== 'undefined' && window.nimiq)
-        if (!inPay && payHost) {
-          void probeNimiqPay(30_000)
-            .then(d => {
-              if (d && window.nimiq) {
-                setNimiq(window.nimiq)
-                setInNimiqPay(true)
-              }
-            })
-            .catch(() => {})
+        if (payHost && !window.nimiq) {
+          const detected = await probeNimiqPay(30_000)
+          if (detected && window.nimiq) {
+            setNimiq(window.nimiq)
+            inPay = true
+          }
         }
         setInNimiqPay(inPay || payHost)
 
@@ -485,10 +494,17 @@ export function useJourneyWallet(): UseJourneyWalletResult {
           return
         }
 
-        setWalletStatus('Approve account access in Nimiq Pay…')
-        const { nimiq: provider, address: addr } = await connectNimiq()
-        const { token: sessionToken, nonce } = await api.challenge(addr)
-        setWalletStatus('Approve the login signature in Nimiq Pay…')
+        /**
+         * Nimiq Pay login shows two native sheets: account access, then sign-in.
+         * Issue the server challenge *before* those sheets so we never await a
+         * network call between them - that gap let the mini-app WebView reclaim
+         * focus and hide the second (Approve) step.
+         * Address is bound from the public key on verify (same as Hub single-trip).
+         */
+        setWalletStatus('Approve each Nimiq Pay prompt when it appears…')
+        const { token: sessionToken, nonce } = await api.challenge(null)
+        const { nimiq: provider } = await connectNimiq()
+        // Keep connect → sign consecutive: no setState / fetch between native sheets.
         const { publicKey, signature } = await signChallenge(provider, nonce)
         const verified = await api.verify(sessionToken, {
           publicKey,
@@ -516,7 +532,9 @@ export function useJourneyWallet(): UseJourneyWalletResult {
         setWalletStatus(null)
       } finally {
         // Keep "Opening Nimiq Pay…" while we wait to see if the OS switches apps.
+        // Keep connecting UI during Hub redirect (full navigation leaves this tab).
         if (!hubConnectInFlightRef.current && !payDeeplinkPendingRef.current) {
+          connectInFlightRef.current = false
           setConnecting(false)
         }
       }
@@ -533,6 +551,8 @@ export function useJourneyWallet(): UseJourneyWalletResult {
   /**
    * Inside Nimiq Pay: after boot, if there is no session, run Pay login once so
    * opening verilock.online as a mini app lands logged in (approve dialogs only).
+   * Wait for the injected provider and a short settle so we do not race Pay's own
+   * "open website" handoff (that race buried the second Approve sheet).
    * Does not apply outside Pay; does not re-fire after explicit disconnect.
    */
   useEffect(() => {
@@ -547,7 +567,25 @@ export function useJourneyWallet(): UseJourneyWalletResult {
 
     payHostAutoConnectStarted = true
     setInNimiqPay(true)
-    void connect()
+
+    let cancelled = false
+    const run = async () => {
+      // Ensure window.nimiq is ready before prompting native sheets.
+      await probeNimiqPay(30_000).catch(() => false)
+      if (cancelled || skipPayAutoConnectRef.current || loadSession()?.token) return
+      // Let the mini-app WebView finish appearing after Pay's open-website confirm.
+      await new Promise<void>(resolve => {
+        window.setTimeout(resolve, 450)
+      })
+      if (cancelled || skipPayAutoConnectRef.current || loadSession()?.token) return
+      if (document.visibilityState !== 'visible') return
+      void connect()
+    }
+    void run()
+
+    return () => {
+      cancelled = true
+    }
   }, [bootReady, token, connect])
 
   const account = address ? toJourneyAccount(address) : null

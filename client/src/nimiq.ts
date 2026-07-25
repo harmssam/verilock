@@ -86,6 +86,12 @@ export async function ensureNimiqProvider(existing: Awaited<ReturnType<typeof in
   return nimiq
 }
 
+/**
+ * First native Pay sheet: account access (`connect` → `listAccounts`).
+ * Callers that also need a login signature should issue the server challenge
+ * *before* this, then call `signChallenge` immediately after - never await
+ * network between the two sheets (WebView can reclaim focus and hide Approve).
+ */
 export async function connectNimiq() {
   const timeout = isNimiqPayHost() ? 30_000 : 10_000
   const nimiq = await init({ timeout })
