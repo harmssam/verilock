@@ -169,11 +169,12 @@ export function DocumentStage({
     }
   }
 
+  // Locked status + explorer live in the verify/match banner (“Anchored on Nimiq · View…”)
+  // Integrity for locked docs is the badge below the card, not a second chain line.
+  const showIntegrity = (sealed || (verifying && fingerprinted)) && !localCopyRequired
+
   let caption: string
-  // Sealed status + explorer live in the verify/match banner (“Anchored on Nimiq · View…”)
-  // - keep this caption about the local file, not a second chain line.
-  if (sealed) caption = 'Local fingerprint matches the locked record'
-  else if (needsLocalCopy) {
+  if (needsLocalCopy) {
     caption = 'Drop or browse to select the matching file'
   } else if (localCopyRequired && hasLocalFile && localCopyMatches === false) {
     caption = 'This file does not match the agreement fingerprint. Try the original file.'
@@ -315,24 +316,27 @@ export function DocumentStage({
 
           {sealed && (
             <div className="doc-seal-stamp">
-              <Lock size={18} strokeWidth={2.5} />
-              <span>SEALED</span>
-            </div>
-          )}
-
-          {verifying && fingerprinted && !localCopyRequired && (
-            <div className="doc-verify-badge">
-              <ShieldCheck size={16} strokeWidth={2.5} />
-              Integrity check
+              <Lock size={16} strokeWidth={2.5} />
+              <span className="doc-seal-stamp-text">
+                <span>LOCKED ON</span>
+                <span>BLOCKCHAIN</span>
+              </span>
             </div>
           )}
         </div>
       </div>
 
-      <div className="doc-stage-caption">
-        {sealed || fingerprinted ? <Sparkles size={14} strokeWidth={2.25} aria-hidden /> : null}
-        <span>{caption}</span>
-      </div>
+      {showIntegrity ? (
+        <div className="doc-integrity-check" role="status">
+          <ShieldCheck size={16} strokeWidth={2.5} aria-hidden />
+          <span>Integrity check — local fingerprint matches the locked record</span>
+        </div>
+      ) : (
+        <div className="doc-stage-caption">
+          {fingerprinted ? <Sparkles size={14} strokeWidth={2.25} aria-hidden /> : null}
+          <span>{caption}</span>
+        </div>
+      )}
 
       {canInteract && (
         <div className="doc-stage-actions" onClick={e => e.stopPropagation()}>

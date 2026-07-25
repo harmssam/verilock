@@ -1178,6 +1178,7 @@ html {
 }
 
 /* Agreements page: Create & seal / New agreement - match light CTA style */
+/* Agreements page primary CTAs (header / empty / login) */
 .lr-app .agreements-page .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -1204,6 +1205,19 @@ html {
 .lr-app .agreements-page .btn-primary:focus-visible {
   outline: 2px solid rgba(13, 148, 136, 0.45);
   outline-offset: 2px;
+}
+
+/* List row actions stay compact (overrides the larger page primary above) */
+.lr-app .agreements-page-actions .btn-primary {
+  gap: 0.3rem;
+  padding: 0.38rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.18);
+}
+
+.lr-app .agreements-page-actions .btn-primary:hover:not(:disabled) {
+  box-shadow: 0 3px 10px rgba(13, 148, 136, 0.24);
 }
 
 .lr-app .agreements-page.card {

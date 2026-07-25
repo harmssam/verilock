@@ -528,7 +528,10 @@ export function DocumentJourney({
   /** Derived step from agreement progress (source of truth for “how far” we are). */
   const naturalStep = useMemo<JourneyStepId>(() => {
     if (!role) return 'welcome'
-    if (role === 'verifier') return 'verify'
+    // Verifier: stay on fingerprint until a hash lookup matches a record.
+    if (role === 'verifier') {
+      return verifyOutcome.kind === 'match' ? 'done' : 'verify'
+    }
     // Wallet login is a gate on actions - not a numbered rail step.
     if (role === 'signer') {
       if (!doc) return 'sign'
@@ -607,6 +610,7 @@ export function DocumentJourney({
     constructionPlan?.status,
     constructionPlan?.creatorSigningAs,
     planLoadState,
+    verifyOutcome.kind,
   ])
 
   const pathStages = useMemo(() => stagesForRole(role), [role])
@@ -1351,29 +1355,6 @@ export function DocumentJourney({
     saveJourneyIntent('creator')
     syncIntentToUrl('creator')
     window.history.pushState({}, '', '/?intent=creator')
-  }
-
-  /**
-   * After a successful seal: jump to the verifier path with the same PDF preloaded
-   * so the hash lookup runs without re-dropping the file.
-   */
-  const openVerifyWithLocalPdf = () => {
-    const local = pdfFile ?? signFile
-    if (local) {
-      setVerifyFile(local)
-    }
-    setLocalError(null)
-    setLockMessage(null)
-    setError(null)
-    setRole('verifier')
-    saveJourneyIntent('verifier')
-    if (onSwitchPath) {
-      onSwitchPath('verifier')
-    } else {
-      // Standalone fallback (no shell track title update)
-      window.history.pushState({}, '', '/?intent=verifier')
-    }
-    scrollToJourneyAction('smooth')
   }
 
   const createDoc = async () => {
@@ -2542,17 +2523,15 @@ export function DocumentJourney({
                   !doc.sealed &&
                   !creatorChoseLock
                     ? 'Complete · free'
-                    : step === 'done' && role !== 'signer'
+                    : step === 'done' && role === 'creator'
                       ? 'Complete'
-                      : step === 'verify' && verifyMatched
-                        ? 'Verify'
-                        : inviteWaitingView && activeStage && stepIndex >= 0
-                          ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label} · waiting`
-                          : inviteManageView && activeStage && stepIndex >= 0
-                            ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label} · invites`
-                            : activeStage && stepIndex >= 0
-                              ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label}`
-                              : 'Action'}
+                      : inviteWaitingView && activeStage && stepIndex >= 0
+                        ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label} · waiting`
+                        : inviteManageView && activeStage && stepIndex >= 0
+                          ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label} · invites`
+                          : activeStage && stepIndex >= 0
+                            ? `Step ${stepIndex + 1} of ${pathStages.length} · ${activeStage.label}`
+                            : 'Action'}
                 </p>
                 <h3>
                   {step === 'seal' &&
@@ -2564,11 +2543,11 @@ export function DocumentJourney({
                     ? 'Everyone signed - print free or lock'
                     : step === 'done' && role === 'signer'
                       ? doc?.sealed
-                        ? 'Agreement sealed - your part is done'
+                        ? 'Agreement locked - your part is done'
                         : (activeStage?.verb ?? 'Your signature is recorded')
-                      : step === 'done'
-                        ? 'Agreement sealed'
-                        : step === 'verify' && verifyMatched
+                      : step === 'done' && role === 'creator'
+                        ? 'Agreement locked'
+                        : role === 'verifier' && verifyMatched
                           ? verifyOutcome.kind === 'match' &&
                             verifyOutcome.matches.some(m => m.status === 'locked')
                             ? 'Match confirmed - locked on Nimiq'
@@ -2592,12 +2571,12 @@ export function DocumentJourney({
                         ? 'Your signature is on this agreement. Review parties and recorded ink below. Drop the same file you signed to see the organizer’s field layout (the PDF never left anyone’s device).'
                         : (activeStage?.blurb ??
                           'Your fields and wallet signature are recorded. Review them below; the creator locks when everyone has finished.')
-                      : step === 'done'
+                      : step === 'done' && role === 'creator'
                         ? 'Keep your file. Drop a copy below anytime to verify the fingerprint.'
-                        : step === 'verify' && verifyMatched
+                        : role === 'verifier' && verifyMatched
                           ? verifyPartyView
-                            ? 'Your local file matches. Open the signed document and recorded ink below.'
-                            : 'Your local file matches a VeriLock record. Details below.'
+                            ? 'Your local file matches. Because you are a party, names and recorded ink are available below.'
+                            : 'Your local file matches a VeriLock record. Public lock details are below - names and signatures stay anonymous unless you are an original party.'
                           : inviteWaitingView
                             ? 'Progress updates here as people sign. When everyone is done, you can print free or lock on the blockchain.'
                             : inviteManageView
@@ -2608,8 +2587,7 @@ export function DocumentJourney({
               {activeStage &&
                 !inviteWaitingView &&
                 !inviteManageView &&
-                !(step === 'done' && role === 'creator') &&
-                !(step === 'verify' && verifyMatched) && (
+                !(step === 'done' && role === 'creator') && (
                 <p className="action-privacy">
                   <Shield size={14} strokeWidth={2.25} aria-hidden />
                   {activeStage.privacyNote}
@@ -4346,17 +4324,6 @@ export function DocumentJourney({
                         </section>
                       )}
 
-                      {doc.sealed && (
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={openVerifyWithLocalPdf}
-                        >
-                          <ShieldCheck size={15} strokeWidth={2.25} />
-                          {hasVerifiedLocalPdf ? 'Verify this file on-chain' : 'Open verify path'}
-                        </button>
-                      )}
-
                       <button type="button" className="btn btn-primary" onClick={resetAll}>
                         Finish
                       </button>
@@ -4375,37 +4342,25 @@ export function DocumentJourney({
                         <p className="muted">
                           {doc.sealed ? (
                             <>
-                              {pdfFile || signFile ? (
-                                <>
-                                  Use <strong>Verify this file</strong> to open the verify path with
-                                  your file already loaded.
-                                </>
-                              ) : (
-                                <>
-                                  Drop any copy of <em>{doc.fileName}</em> to check integrity.
-                                </>
-                              )}
-                              {doc.sealed ? (
-                                <>
-                                  {' '}
-                                  <span className="result-banner-chain">
-                                    Anchored on Nimiq
-                                    {doc.source.attestation?.explorerUrl ? (
-                                      <>
-                                        {' · '}
-                                        <a
-                                          className="inline-link"
-                                          href={doc.source.attestation.explorerUrl}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                        >
-                                          View on-chain attestation
-                                        </a>
-                                      </>
-                                    ) : null}
-                                  </span>
-                                </>
-                              ) : null}
+                              Keep your copy of <em>{doc.fileName}</em>. Drop it below anytime to
+                              re-check integrity against the on-chain record.
+                              <span className="result-banner-chain">
+                                {' '}
+                                Anchored on Nimiq
+                                {doc.source.attestation?.explorerUrl ? (
+                                  <>
+                                    {' · '}
+                                    <a
+                                      className="inline-link"
+                                      href={doc.source.attestation.explorerUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      View on-chain attestation
+                                    </a>
+                                  </>
+                                ) : null}
+                              </span>
                             </>
                           ) : (
                             <>
@@ -4415,17 +4370,6 @@ export function DocumentJourney({
                         </p>
                       </div>
                     </div>
-                  )}
-
-                  {step === 'done' && doc?.sealed && role !== 'signer' && (
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={openVerifyWithLocalPdf}
-                    >
-                      <ShieldCheck size={15} strokeWidth={2.25} />
-                      {pdfFile || signFile ? 'Verify this file' : 'Go to verify'}
-                    </button>
                   )}
 
                   {/*
@@ -4473,7 +4417,8 @@ export function DocumentJourney({
                   {(step === 'verify' || (step === 'done' && role !== 'signer')) &&
                     !verifyMatched && (
                     <p className="muted" style={{ margin: 0 }}>
-                      We hash the file locally, then look up sealed fingerprints on the server.
+                      We hash the file locally, then check VeriLock records and the Nimiq blockchain.
+                      Names and signatures stay anonymous unless you are an original party.
                     </p>
                   )}
 
