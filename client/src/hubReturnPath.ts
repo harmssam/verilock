@@ -7,7 +7,9 @@ const PAY_RETURN_PATH_KEY = 'verilock-pay-return-path'
 
 export function saveHubReturnPath(): void {
   if (typeof window === 'undefined') return
-  const path = `${window.location.pathname}${window.location.search}`
+  // Include hash when present (e.g. /pricing?pack=25#buy-credits) for same-tab restore.
+  // Hub return URL itself may omit hash; pack query is the durable part.
+  const path = `${window.location.pathname}${window.location.search}${window.location.hash}`
   try {
     sessionStorage.setItem(HUB_RETURN_PATH_KEY, path)
   } catch {

@@ -6,6 +6,10 @@ import {
   loadCreditsBalance,
   writeCreditsBalanceCache,
 } from '../creditsBalanceCache'
+import {
+  preparePricingBuyLogin,
+  resolvePricingBuyPack,
+} from '../pricingBuyResume'
 import { formatSealFeeNim } from '../sealPricing'
 import { buyCreditsWithNim } from './journeyCreditTopup'
 
@@ -60,7 +64,9 @@ export function CreditsPanel({
   const [stripeEnabled, setStripeEnabled] = useState(preferCardPrice)
   const [balance, setBalance] = useState(0)
   const [packs, setPacks] = useState<number[]>(DEFAULT_PACKS)
-  const [selectedPack, setSelectedPack] = useState(10)
+  const [selectedPack, setSelectedPack] = useState(() =>
+    resolvePricingBuyPack(10, DEFAULT_PACKS),
+  )
   const [packQuotes, setPackQuotes] = useState<PackQuote[]>([])
   const [busy, setBusy] = useState<'nim' | 'card' | null>(null)
   const [status, setStatus] = useState<string | null>(null)
@@ -91,7 +97,10 @@ export function CreditsPanel({
         setStripeEnabled(cfg.stripeEnabled)
         if (Array.isArray(cfg.packs) && cfg.packs.length > 0) {
           setPacks(cfg.packs)
-          setSelectedPack(prev => (cfg.packs.includes(prev) ? prev : cfg.packs[0]!))
+          setSelectedPack(prev => {
+            const preferred = resolvePricingBuyPack(prev, cfg.packs)
+            return cfg.packs.includes(preferred) ? preferred : cfg.packs[0]!
+          })
         }
       } catch {
         /* keep defaults */
@@ -122,12 +131,12 @@ export function CreditsPanel({
           })),
         )
         if (catalog.packs.length > 0) {
-          setPacks(catalog.packs.map(p => p.pack))
-          setSelectedPack(prev =>
-            catalog.packs.some(p => p.pack === prev)
-              ? prev
-              : catalog.packs[0]!.pack,
-          )
+          const nextPacks = catalog.packs.map(p => p.pack)
+          setPacks(nextPacks)
+          setSelectedPack(prev => {
+            const preferred = resolvePricingBuyPack(prev, nextPacks)
+            return nextPacks.includes(preferred) ? preferred : nextPacks[0]!
+          })
         }
         if (typeof catalog.stripeMarkup === 'number') {
           /* stripe flag comes from config; pack catalog confirms Stripe pricing exists */
@@ -210,6 +219,8 @@ export function CreditsPanel({
   const requireLogin = (): boolean => {
     if (token && address) return false
     setError(null)
+    // Remember pack + #buy-credits so Hub/popup login returns here with selection.
+    preparePricingBuyLogin(selectedPack)
     if (onRequestLogin) {
       onRequestLogin()
       return true
