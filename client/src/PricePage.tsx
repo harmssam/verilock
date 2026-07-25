@@ -288,7 +288,7 @@ export function PricePage({
 
       {creditsEnabled ? (
         <div className="price-page-model" aria-labelledby="price-model-heading">
-          <div className="price-page-model-row">
+          <div className="price-page-model-intro">
             <span className="price-page-model-label" id="price-model-heading">
               How to pay
             </span>
@@ -301,86 +301,89 @@ export function PricePage({
             </p>
           </div>
 
-          <div className="price-page-model-row">
-            <span className="price-page-model-label">
-              <CreditCard size={12} strokeWidth={2.5} aria-hidden />
-              Credit card
-            </span>
-            <div className="price-page-model-value price-page-model-value--card">
-              {!quoteReady ? (
-                <span
-                  className="price-page-model-card-price price-page-model-card-price--pending"
-                  role="status"
-                >
-                  <LoaderCircle
-                    className="btn-spinner"
-                    size={16}
-                    strokeWidth={2.5}
-                    aria-hidden
-                  />
-                  Loading…
-                </span>
-              ) : showPackAsPrimary ? (
-                <span className="price-page-model-card-price">
-                  {formatFiatAmount(minPackUsd!, 'USD')}
-                  <span className="price-page-model-per">for {minPack} credits</span>
-                </span>
-              ) : unitUsd != null ? (
-                <span className="price-page-model-card-price">
-                  {formatFiatAmount(unitUsd, 'USD')}
-                  <span className="price-page-model-per">per credit</span>
-                </span>
-              ) : minPackUsd != null ? (
-                <span className="price-page-model-card-price">
-                  {formatFiatAmount(minPackUsd, 'USD')}
-                  <span className="price-page-model-per">for {minPack} credits</span>
-                </span>
-              ) : (
-                <span className="price-page-model-card-price price-page-model-card-price--pending">
-                  Unavailable
-                  <button
-                    type="button"
-                    className="btn btn-ghost price-page-quote-retry"
-                    onClick={() => {
-                      setCreditsInfo(prev =>
-                        prev
-                          ? { ...prev, quoteReady: false, quoteError: false }
-                          : prev,
-                      )
-                      setQuoteRefreshKey(k => k + 1)
-                    }}
-                  >
-                    Retry
-                  </button>
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="price-page-model-or" role="separator" aria-label="or">
-            <span className="price-page-model-or-text">or</span>
-          </div>
-
-          <div className="price-page-model-row">
-            <span className="price-page-model-label">
-              <NimiqHexagonIcon size={12} />
-              NIM
-            </span>
-            <div className="price-page-model-value price-page-model-value--card">
-              <span className="price-page-model-card-price">
-                {pricing.feeNim} NIM
-                <span className="price-page-model-per">per lock</span>
+          {/* Mobile: stacked + horizontal OR. Desktop: card | vertical OR | NIM. */}
+          <div className="price-page-model-options">
+            <div className="price-page-model-row price-page-model-row--card">
+              <span className="price-page-model-label">
+                <CreditCard size={12} strokeWidth={2.5} aria-hidden />
+                Credit card
               </span>
+              <div className="price-page-model-value price-page-model-value--card">
+                {!quoteReady ? (
+                  <span
+                    className="price-page-model-card-price price-page-model-card-price--pending"
+                    role="status"
+                  >
+                    <LoaderCircle
+                      className="btn-spinner"
+                      size={16}
+                      strokeWidth={2.5}
+                      aria-hidden
+                    />
+                    Loading…
+                  </span>
+                ) : showPackAsPrimary ? (
+                  <span className="price-page-model-card-price">
+                    {formatFiatAmount(minPackUsd!, 'USD')}
+                    <span className="price-page-model-per">for {minPack} credits</span>
+                  </span>
+                ) : unitUsd != null ? (
+                  <span className="price-page-model-card-price">
+                    {formatFiatAmount(unitUsd, 'USD')}
+                    <span className="price-page-model-per">per credit</span>
+                  </span>
+                ) : minPackUsd != null ? (
+                  <span className="price-page-model-card-price">
+                    {formatFiatAmount(minPackUsd, 'USD')}
+                    <span className="price-page-model-per">for {minPack} credits</span>
+                  </span>
+                ) : (
+                  <span className="price-page-model-card-price price-page-model-card-price--pending">
+                    Unavailable
+                    <button
+                      type="button"
+                      className="btn btn-ghost price-page-quote-retry"
+                      onClick={() => {
+                        setCreditsInfo(prev =>
+                          prev
+                            ? { ...prev, quoteReady: false, quoteError: false }
+                            : prev,
+                        )
+                        setQuoteRefreshKey(k => k + 1)
+                      }}
+                    >
+                      Retry
+                    </button>
+                  </span>
+                )}
+              </div>
             </div>
-            {pricing.promoActive ? (
-              <p className="muted price-page-model-hint">
-                Limited promo through July
-                {pricing.baseFeeNim > pricing.feeNim
-                  ? ` (regularly ${pricing.baseFeeNim} NIM)`
-                  : ''}
-                .
-              </p>
-            ) : null}
+
+            <div className="price-page-model-or" role="separator" aria-label="or">
+              <span className="price-page-model-or-text">or</span>
+            </div>
+
+            <div className="price-page-model-row price-page-model-row--nim">
+              <span className="price-page-model-label">
+                <NimiqHexagonIcon size={12} />
+                NIM
+              </span>
+              <div className="price-page-model-value price-page-model-value--card">
+                <span className="price-page-model-card-price">
+                  {pricing.feeNim} NIM
+                  <span className="price-page-model-per">per lock</span>
+                </span>
+              </div>
+              {pricing.promoActive ? (
+                <p className="muted price-page-model-hint">
+                  Limited promo through July
+                  {pricing.baseFeeNim > pricing.feeNim
+                    ? ` (regularly ${pricing.baseFeeNim} NIM)`
+                    : ''}
+                  .
+                </p>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : (
