@@ -11,6 +11,11 @@ export interface AgreementView {
   cta: string
 }
 
+/** CTAs that open the paid on-chain lock flow (first attempt or retry after failure). */
+export function isLockCta(cta: string): boolean {
+  return cta === 'Lock now' || cta === 'Retry lock'
+}
+
 export const BUCKET_ORDER: AgreementBucket[] = [
   'needs_you',
   'ready_to_seal',
@@ -150,9 +155,9 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
   if (doc.attestation?.status === 'failed' && doc.status !== 'locked') {
     return {
       bucket: 'ready_to_seal',
-      headline: 'Lock again',
+      headline: 'Lock failed — try again',
       detail: progress,
-      cta: 'Lock now',
+      cta: 'Retry lock',
     }
   }
 

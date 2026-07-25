@@ -24,6 +24,7 @@ import {
   groupAgreements,
   isDocumentCreator,
   isFullyOnChain,
+  isLockCta,
   type AgreementBucket,
 } from '../agreements'
 import { api } from '../api'
@@ -799,7 +800,7 @@ export function AgreementsPage({
                 {shown.map(doc => {
                   const view = getAgreementView(doc, address)
                   const creator = isDocumentCreator(doc, address)
-                  const preferSeal = view.cta === 'Lock now' && creator
+                  const preferSeal = isLockCta(view.cta) && creator
                   const freeComplete =
                     creator &&
                     view.bucket === 'ready_to_seal' &&
@@ -897,7 +898,7 @@ export function AgreementsPage({
                           {preferSeal ? (
                             <>
                               <Lock size={14} strokeWidth={2.25} aria-hidden />
-                              Lock now
+                              {view.cta}
                             </>
                           ) : freeComplete ? (
                             view.cta
