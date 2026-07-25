@@ -4,8 +4,6 @@ import { getSealPricing } from './sealPricing'
 import { useNimPrices } from './useNimPrices'
 import './SealPricingDisplay.css'
 
-const FASTSPOT_URL = 'https://www.fastspot.io/'
-
 interface SealPricingDisplayProps {
   className?: string
   /**
@@ -20,21 +18,8 @@ interface SealPricingDisplayProps {
   showNote?: boolean
 }
 
-function FastspotRateSource() {
-  return (
-    <p className="muted seal-pricing-fiat-source">
-      Exchange rates are estimates from{' '}
-      <a
-        className="seal-pricing-fastspot-link"
-        href={FASTSPOT_URL}
-        target="_blank"
-        rel="noreferrer"
-      >
-        Fastspot
-      </a>
-      .
-    </p>
-  )
+function RateSourceNote() {
+  return <p className="muted seal-pricing-fiat-source">Live market estimate.</p>
 }
 
 export function SealPricingDisplay({ className, showNote = true }: SealPricingDisplayProps) {
@@ -56,7 +41,7 @@ export function SealPricingDisplay({ className, showNote = true }: SealPricingDi
             />
             <span className="seal-pricing-display-per">per document</span>
           </div>
-          {prices && <FastspotRateSource />}
+          {prices && <RateSourceNote />}
         </div>
       </div>
       {pricing.promoActive && (
