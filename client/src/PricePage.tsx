@@ -13,7 +13,6 @@ import { useEffect, useState } from 'react'
 import { api } from './api'
 import { formatFiatAmount } from './fiatPricing'
 import { NimiqHexagonIcon } from './NimiqHexagonIcon'
-import { SealFeeAmount } from './SealFeeAmount'
 import { SealPricingDisplay } from './SealPricingDisplay'
 import { getSealPricing } from './sealPricing'
 import { CreditsPanel } from './journey/CreditsPanel'
@@ -138,8 +137,6 @@ export function PricePage({
 
   const signedIn = Boolean(token && address)
   const creditsEnabled = creditsInfo?.enabled !== false
-  const stripeMarkup = creditsInfo?.stripeMarkup ?? 2
-  const halfPrice = stripeMarkup === 2
   const stripeMinUsd = (creditsInfo?.stripeMinChargeCents ?? 50) / 100
   const minPack = creditsInfo?.minPack ?? 10
   const unitUsd = creditsInfo?.creditStripeUsd ?? null
@@ -340,32 +337,21 @@ export function PricePage({
               <NimiqHexagonIcon size={12} />
               NIM
             </span>
-            <div className="price-page-model-value">
-              <SealFeeAmount
-                feeNim={pricing.feeNim}
-                baseFeeNim={pricing.baseFeeNim}
-                showWas={pricing.promoActive}
-                showFiatPicker
-              />
-              {halfPrice && (
-                <span className="price-page-model-half-badge" title="NIM is 1/2 price vs credit card">
-                  1/2 price
-                </span>
-              )}
+            <div className="price-page-model-value price-page-model-value--card">
+              <span className="price-page-model-card-price">
+                {pricing.feeNim} NIM
+                <span className="price-page-model-per">per lock</span>
+              </span>
             </div>
-            {pricing.promoActive && (
-              <div className="price-page-model-promo">
-                <span className="price-page-model-promo-badge">{pricing.promoLabel}</span>
-                {pricing.promoEndsLabel && (
-                  <span className="muted price-page-model-promo-note">{pricing.promoEndsLabel}</span>
-                )}
-              </div>
-            )}
-            {!pricing.promoActive && (
+            {pricing.promoActive ? (
               <p className="muted price-page-model-hint">
-                {pricing.feeNim} NIM per document.
+                Limited promo through July
+                {pricing.baseFeeNim > pricing.feeNim
+                  ? ` (regularly ${pricing.baseFeeNim} NIM)`
+                  : ''}
+                .
               </p>
-            )}
+            ) : null}
           </div>
         </div>
       ) : (
