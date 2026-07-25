@@ -85,7 +85,7 @@ import {
   submitAttestation,
 } from './attestations.js'
 import { applySecurityHeaders } from './http-headers.js'
-import { getNimPrices } from './nimPrices.js'
+import { getNimPrices, warmNimPricesCache } from './nimPrices.js'
 import { getWalletBalanceLuna } from './nimiq-rpc.js'
 import { getMinimumSealBalanceLuna, getSealPricing, hasSufficientSealBalance } from './sealPricing.js'
 import { startSessionCleanup } from './session-cleanup.js'
@@ -252,6 +252,8 @@ app.get('/api/seal-pricing', (_req, res) => {
 app.get('/api/nim-prices', async (_req, res) => {
   try {
     const prices = await getNimPrices()
+    // Browser/CDN can reuse briefly; server also keeps a 5-min SWR memory cache.
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=240')
     res.json(prices)
   } catch (err) {
     res.status(502).json({
@@ -329,6 +331,8 @@ app.get('/api/credits/balance', authMiddleware, requireVerifiedWallet, creditsBa
 app.get('/api/credits/quote', creditsLimit, async (req, res) => {
   try {
     const { quoteCredits, quoteCreditPacks } = await import('./credits.js')
+    // Live rates change slowly; let browsers reuse for a minute (server SWR is 5 min).
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=240')
     if (req.query.packs === '1' || req.query.packs === 'true') {
       const catalog = await quoteCreditPacks()
       res.json(catalog)
@@ -1637,6 +1641,9 @@ async function boot(): Promise<void> {
   if (!IS_PRODUCTION) {
     await attachLocalStudios(app)
   }
+
+  // Prefetch NIM→USD so the first pricing/credits quote is not a cold Fastspot wait.
+  warmNimPricesCache()
 
   const server = app.listen(PORT, HOST, () => {
     console.log(`VeriLock listening on http://${HOST}:${PORT}`)

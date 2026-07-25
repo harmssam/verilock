@@ -9,7 +9,16 @@ export interface NimPrices {
   source: 'fastspot' | 'coingecko'
 }
 
+/** Fresh window: use cache without revalidating. */
 const CACHE_TTL_MS = 5 * 60_000
+/**
+ * How long Fastspot is allowed to block a cold request before CoinGecko.
+ * Fastspot can hang ~60s on some hosts; display quotes must stay snappy.
+ */
+const FASTSPOT_TIMEOUT_MS = Math.max(
+  800,
+  Number.parseInt(process.env.FASTSPOT_PRICE_TIMEOUT_MS ?? '2500', 10) || 2500,
+)
 const REFERENCE_NIM = 1000
 const FASTSPOT_API_URL = process.env.FASTSPOT_API_URL?.trim() ?? 'https://api.go.fastspot.io/fast/v1'
 const FRANKFURTER_URL = 'https://api.frankfurter.app/latest?from=USD&to=CAD'
@@ -22,6 +31,24 @@ let inflight: Promise<NimPrices> | null = null
 
 type FastspotEstimate = {
   to?: Array<{ symbol?: string; amount?: string }>
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`))
+    }, ms)
+    promise.then(
+      value => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      err => {
+        clearTimeout(timer)
+        reject(err)
+      },
+    )
+  })
 }
 
 async function fetchNimToAssetRate(asset: 'EUR' | 'USDC'): Promise<number> {
@@ -86,7 +113,7 @@ async function fetchNimPricesFromFastspot(): Promise<NimPrices> {
   }
 }
 
-/** Fallback when Fastspot is unreachable (common on some local IPv6/TLS paths). */
+/** Fallback when Fastspot is slow or unreachable (common on some hosts). */
 async function fetchNimPricesFromCoingecko(): Promise<NimPrices> {
   const res = await fetch(COINGECKO_URL, {
     headers: { Accept: 'application/json' },
@@ -125,37 +152,83 @@ async function fetchNimPricesFromCoingecko(): Promise<NimPrices> {
 }
 
 async function fetchNimPricesFresh(): Promise<NimPrices> {
+  // Start CoinGecko in parallel so a hung Fastspot does not add full timeout latency.
+  const coingecko = fetchNimPricesFromCoingecko()
   try {
-    return await fetchNimPricesFromFastspot()
+    return await withTimeout(
+      fetchNimPricesFromFastspot(),
+      FASTSPOT_TIMEOUT_MS,
+      'Fastspot NIM prices',
+    )
   } catch (err) {
-    console.warn('[nim-prices] Fastspot failed, trying CoinGecko', err)
-    return await fetchNimPricesFromCoingecko()
+    console.warn('[nim-prices] Fastspot failed/timed out, using CoinGecko', err)
+    return await coingecko
   }
 }
 
+function startBackgroundRefresh(): void {
+  if (inflight) return
+  inflight = fetchNimPricesFresh()
+    .then(data => {
+      cache = { data, fetchedAt: Date.now() }
+      return data
+    })
+    .catch(err => {
+      if (cache) {
+        console.warn('[nim-prices] background refresh failed, keeping stale cache', err)
+        return cache.data
+      }
+      throw err
+    })
+    .finally(() => {
+      inflight = null
+    })
+}
+
+function readCache(): { data: NimPrices; fetchedAt: number } | null {
+  return cache
+}
+
+/**
+ * Live NIM fiat rates with in-memory cache.
+ * - Fresh cache (< 5 min): instant
+ * - Expired cache: return last value immediately (stale-while-revalidate)
+ * - No cache: fetch with Fastspot timeout then CoinGecko
+ */
 export async function getNimPrices(): Promise<NimPrices> {
-  if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
-    return cache.data
+  const now = Date.now()
+  const hit = readCache()
+
+  if (hit && now - hit.fetchedAt < CACHE_TTL_MS) {
+    return hit.data
+  }
+
+  // Stale-while-revalidate: never block the request path on a slow refresh.
+  if (hit) {
+    startBackgroundRefresh()
+    return hit.data
   }
 
   if (!inflight) {
-    inflight = fetchNimPricesFresh()
-      .then(data => {
-        cache = { data, fetchedAt: Date.now() }
-        return data
-      })
-      .finally(() => {
-        inflight = null
-      })
+    startBackgroundRefresh()
   }
 
   try {
-    return await inflight
+    return await inflight!
   } catch (err) {
-    if (cache) {
+    // Another request may have filled cache while we awaited.
+    const stale = readCache()
+    if (stale) {
       console.warn('[nim-prices] refresh failed, serving stale cache', err)
-      return cache.data
+      return stale.data
     }
     throw err
   }
+}
+
+/** Optional: warm cache on process boot so the first pricing hit is instant. */
+export function warmNimPricesCache(): void {
+  void getNimPrices().catch(err => {
+    console.warn('[nim-prices] warm cache failed', err instanceof Error ? err.message : err)
+  })
 }

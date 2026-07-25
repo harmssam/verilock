@@ -166,7 +166,7 @@ export async function quoteCredits(credits: number): Promise<CreditQuote> {
   }
 }
 
-/** Quote all fixed packs (for UI / pricing page). */
+/** Quote all fixed packs (for UI / pricing page). One NIM-price fetch for all packs. */
 export async function quoteCreditPacks(): Promise<{
   packs: CreditPackQuote[]
   stripeMinChargeCents: number
@@ -174,6 +174,8 @@ export async function quoteCreditPacks(): Promise<{
   feeNim: number
   promoActive: boolean
 }> {
+  // Warm prices once; quoteCredits reuses the in-memory SWR cache.
+  await getNimPrices()
   const packSizes = getCreditPacks()
   const packs: CreditPackQuote[] = []
   for (const pack of packSizes) {

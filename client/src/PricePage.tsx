@@ -74,30 +74,30 @@ export function PricePage({
     let cancelled = false
     void (async () => {
       try {
-        const [cfg, unitQuote, packCatalog] = await Promise.all([
+        // One pack catalog is enough (includes unit USD + pack totals). Avoid a second
+        // /quote?credits=1 that used to wait on a cold Fastspot path.
+        const [cfg, packCatalog] = await Promise.all([
           api.creditsConfig(),
-          api.creditsQuote(1).catch(() => null),
-          api.creditsPackQuotes().catch(() => null),
+          api.creditsPackQuotes(),
         ])
         if (cancelled) return
         const packs = cfg.packs?.length
           ? cfg.packs
-          : (packCatalog?.packs.map(p => p.pack) ?? [10, 25, 50, 100])
+          : (packCatalog.packs.map(p => p.pack) ?? [10, 25, 50, 100])
         const minPack = packs[0] ?? 10
-        const minPackQuote = packCatalog?.packs.find(p => p.pack === minPack) ?? null
-        // Prefer unit quote; if it failed, back-solve from min pack (pre-floor when possible).
-        let creditStripeUsd =
-          unitQuote != null && Number.isFinite(unitQuote.creditStripeUsd)
-            ? unitQuote.creditStripeUsd
-            : null
-        if (
-          creditStripeUsd == null &&
-          minPackQuote != null &&
-          minPack > 0 &&
-          Number.isFinite(minPackQuote.creditStripeUsdTotal)
-        ) {
-          // Pack total may include Stripe floor - still better than blank.
-          creditStripeUsd = minPackQuote.creditStripeUsdTotal / minPack
+        const minPackQuote = packCatalog.packs.find(p => p.pack === minPack) ?? null
+        // Unit rate from pack row when present; else total/pack (may include Stripe floor).
+        let creditStripeUsd: number | null = null
+        if (minPackQuote) {
+          const row = minPackQuote as {
+            creditStripeUsd?: number
+            creditStripeUsdTotal: number
+          }
+          if (row.creditStripeUsd != null && Number.isFinite(row.creditStripeUsd)) {
+            creditStripeUsd = row.creditStripeUsd
+          } else if (minPack > 0 && Number.isFinite(row.creditStripeUsdTotal)) {
+            creditStripeUsd = row.creditStripeUsdTotal / minPack
+          }
         }
         const minPackStripeUsd =
           minPackQuote != null && Number.isFinite(minPackQuote.creditStripeUsdTotal)
@@ -106,8 +106,8 @@ export function PricePage({
         setCreditsInfo({
           enabled: cfg.enabled,
           stripeEnabled: cfg.stripeEnabled,
-          stripeMarkup: cfg.stripeMarkup,
-          stripeMinChargeCents: cfg.stripeMinChargeCents,
+          stripeMarkup: packCatalog.stripeMarkup ?? cfg.stripeMarkup,
+          stripeMinChargeCents: packCatalog.stripeMinChargeCents ?? cfg.stripeMinChargeCents,
           packs,
           creditStripeUsd,
           minPack,
