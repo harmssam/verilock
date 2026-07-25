@@ -12,12 +12,14 @@ export interface NimPrices {
 /** Fresh window: use cache without revalidating. */
 const CACHE_TTL_MS = 5 * 60_000
 /**
- * How long Fastspot is allowed to block a cold request before CoinGecko.
- * Fastspot can hang ~60s on some hosts; display quotes must stay snappy.
+ * How long we wait on production Fastspot before giving up.
+ * As of 2026-07: api.go.fastspot.io completes TLS then never returns a body
+ * (hangs ~60s+). Request shape is fine — api.test.fastspot.io answers in ~0.5s
+ * with the same payload. Prefer CoinGecko for the hot path.
  */
 const FASTSPOT_TIMEOUT_MS = Math.max(
   800,
-  Number.parseInt(process.env.FASTSPOT_PRICE_TIMEOUT_MS ?? '2500', 10) || 2500,
+  Number.parseInt(process.env.FASTSPOT_PRICE_TIMEOUT_MS ?? '3000', 10) || 3000,
 )
 const REFERENCE_NIM = 1000
 const FASTSPOT_API_URL = process.env.FASTSPOT_API_URL?.trim() ?? 'https://api.go.fastspot.io/fast/v1'
@@ -28,8 +30,12 @@ const COINGECKO_URL =
 
 let cache: { data: NimPrices; fetchedAt: number } | null = null
 let inflight: Promise<NimPrices> | null = null
+/** Last Fastspot error (for ops / logs); not user-facing. */
+let lastFastspotError: string | null = null
+let lastFastspotOkAt: number | null = null
 
 type FastspotEstimate = {
+  from?: Array<{ symbol?: string; amount?: string }>
   to?: Array<{ symbol?: string; amount?: string }>
 }
 
@@ -51,6 +57,13 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   })
 }
 
+/**
+ * FAST estimate: POST /estimates
+ * Docs: https://docs.fastspot.io/ — EstimateRequest does not require API key.
+ * Body shape (validated against api.test.fastspot.io 2026-07):
+ *   { "from": { "NIM": "1000" }, "to": "USDC", "includedFees": "required" }
+ * Response: [{ from: [{symbol,amount}], to: [{symbol,amount}], ... }]
+ */
 async function fetchNimToAssetRate(asset: 'EUR' | 'USDC'): Promise<number> {
   const res = await fetch(`${FASTSPOT_API_URL}/estimates`, {
     method: 'POST',
@@ -66,13 +79,22 @@ async function fetchNimToAssetRate(asset: 'EUR' | 'USDC'): Promise<number> {
   })
 
   if (!res.ok) {
-    throw new Error(`Fastspot request failed (${res.status})`)
+    const detail = await res.text().catch(() => '')
+    throw new Error(
+      `Fastspot request failed (${res.status})${detail ? `: ${detail.slice(0, 200)}` : ''}`,
+    )
   }
 
   const payload = (await res.json()) as FastspotEstimate[]
-  const amount = Number.parseFloat(payload[0]?.to?.[0]?.amount ?? '')
+  const row = Array.isArray(payload) ? payload[0] : null
+  // Prefer matching the requested symbol if multiple `to` entries appear.
+  const toSide =
+    row?.to?.find(t => (t.symbol ?? '').toUpperCase() === asset) ?? row?.to?.[0]
+  const amount = Number.parseFloat(toSide?.amount ?? '')
   if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error(`Unexpected Fastspot estimate for NIM→${asset}`)
+    throw new Error(
+      `Unexpected Fastspot estimate for NIM→${asset}: ${JSON.stringify(row ?? payload).slice(0, 240)}`,
+    )
   }
 
   return amount / REFERENCE_NIM
@@ -104,16 +126,19 @@ async function fetchNimPricesFromFastspot(): Promise<NimPrices> {
     fetchUsdToCadRate(),
   ])
 
-  return {
+  const data: NimPrices = {
     usd,
     eur,
     cad: usd * usdToCad,
     lastUpdatedAt: Math.floor(Date.now() / 1000),
     source: 'fastspot',
   }
+  lastFastspotOkAt = Date.now()
+  lastFastspotError = null
+  return data
 }
 
-/** Fallback when Fastspot is slow or unreachable (common on some hosts). */
+/** Reliable public market rate (primary while go.fastspot.io is unresponsive). */
 async function fetchNimPricesFromCoingecko(): Promise<NimPrices> {
   const res = await fetch(COINGECKO_URL, {
     headers: { Accept: 'application/json' },
@@ -151,19 +176,33 @@ async function fetchNimPricesFromCoingecko(): Promise<NimPrices> {
   }
 }
 
+/**
+ * Hot path: CoinGecko only (reliable, ~sub-second).
+ * Opportunistic: try production Fastspot in the background; if it answers, upgrade
+ * the in-memory cache so subsequent quotes use swap rates.
+ *
+ * Why not block on Fastspot: api.go.fastspot.io currently completes TLS then never
+ * returns a response body (hangs 60s+). The same request shape works in ~0.5s on
+ * api.test.fastspot.io — so this is an upstream go.fastspot outage, not a bad body.
+ */
 async function fetchNimPricesFresh(): Promise<NimPrices> {
-  // Start CoinGecko in parallel so a hung Fastspot does not add full timeout latency.
-  const coingecko = fetchNimPricesFromCoingecko()
-  try {
-    return await withTimeout(
-      fetchNimPricesFromFastspot(),
-      FASTSPOT_TIMEOUT_MS,
-      'Fastspot NIM prices',
-    )
-  } catch (err) {
-    console.warn('[nim-prices] Fastspot failed/timed out, using CoinGecko', err)
-    return await coingecko
-  }
+  const data = await fetchNimPricesFromCoingecko()
+
+  // Non-blocking: upgrade cache if production Fastspot recovers.
+  void withTimeout(fetchNimPricesFromFastspot(), FASTSPOT_TIMEOUT_MS, 'Fastspot NIM prices')
+    .then(fs => {
+      cache = { data: fs, fetchedAt: Date.now() }
+      console.log('[nim-prices] cache upgraded to Fastspot')
+    })
+    .catch(err => {
+      lastFastspotError = err instanceof Error ? err.message : String(err)
+      // Quiet after the first failure each process lifetime to avoid log spam.
+      if (lastFastspotOkAt == null) {
+        console.warn('[nim-prices] Fastspot still unavailable:', lastFastspotError)
+      }
+    })
+
+  return data
 }
 
 function startBackgroundRefresh(): void {
@@ -193,7 +232,7 @@ function readCache(): { data: NimPrices; fetchedAt: number } | null {
  * Live NIM fiat rates with in-memory cache.
  * - Fresh cache (< 5 min): instant
  * - Expired cache: return last value immediately (stale-while-revalidate)
- * - No cache: fetch with Fastspot timeout then CoinGecko
+ * - No cache: CoinGecko + opportunistic Fastspot
  */
 export async function getNimPrices(): Promise<NimPrices> {
   const now = Date.now()
@@ -216,7 +255,6 @@ export async function getNimPrices(): Promise<NimPrices> {
   try {
     return await inflight!
   } catch (err) {
-    // Another request may have filled cache while we awaited.
     const stale = readCache()
     if (stale) {
       console.warn('[nim-prices] refresh failed, serving stale cache', err)
@@ -231,4 +269,22 @@ export function warmNimPricesCache(): void {
   void getNimPrices().catch(err => {
     console.warn('[nim-prices] warm cache failed', err instanceof Error ? err.message : err)
   })
+}
+
+/** Ops helper (tests / debug endpoints). */
+export function getNimPriceSourceDebug(): {
+  cachedSource: NimPrices['source'] | null
+  cacheAgeMs: number | null
+  lastFastspotOkAt: number | null
+  lastFastspotError: string | null
+  fastspotApiUrl: string
+} {
+  const hit = readCache()
+  return {
+    cachedSource: hit?.data.source ?? null,
+    cacheAgeMs: hit ? Date.now() - hit.fetchedAt : null,
+    lastFastspotOkAt,
+    lastFastspotError,
+    fastspotApiUrl: FASTSPOT_API_URL,
+  }
 }
