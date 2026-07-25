@@ -79,7 +79,7 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 3. **Same action-dock steps and controls** (fields, toggles, CTAs, cancel, share, credits, signature pad).
 4. **Same shell screens** (home journey, pricing, privacy, security, support, agreements, 404).
 5. **Same account/login/credits behaviors** (Hub vs Pay modes, balance chip → pricing, Stripe return).
-6. **Same privacy model** in UI copy and structure: document stays local; chain stores hash only.
+6. **Same privacy model** in UI copy and structure: document stays local; chain stores fingerprint lock, plus optional public data backup (signatures / fields) - never the PDF bytes.
 7. **Feature flags stay flags** (`FEATURES.emailNotifyUi`); do not hard-remove optional email when the flag exists.
 8. **Information architecture** from `AGENTS.md` stays: path picker → stage rail → action dock → document stage, unless the user explicitly redesigns IA.
 
