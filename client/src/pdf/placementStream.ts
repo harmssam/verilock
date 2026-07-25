@@ -90,7 +90,8 @@ export type BatchWire = {
   bi: number
   pr: string
   pl: string
-  people?: Array<{ i: number; n: string; r?: string }>
+  /** People roster; `w` is Nimiq address when pre-bound (offline reconstruct). */
+  people?: Array<{ i: number; n: string; r?: string; w?: string }>
   places?: Array<{
     id: string
     p: number
@@ -118,11 +119,13 @@ export function batchToWire(batch: PlacementBatch): BatchWire {
     wire.people = [...batch.people]
       .sort((a, b) => a.slotIndex - b.slotIndex)
       .map(p => {
-        const row: { i: number; n: string; r?: string } = {
+        const row: { i: number; n: string; r?: string; w?: string } = {
           i: p.slotIndex,
           n: String(p.displayName ?? '').trim().slice(0, 80),
         }
         if (p.role) row.r = String(p.role).slice(0, 40)
+        const w = p.walletAddress?.replace(/\s+/g, '').toUpperCase()
+        if (w) row.w = w
         return row
       })
   }
@@ -201,11 +204,16 @@ export function batchToWire(batch: PlacementBatch): BatchWire {
 export function wireToBatch(wire: BatchWire, pdfSha256: string): PlacementBatch {
   if (wire.v !== 2) throw new Error(`Unsupported batch wire version ${wire.v}`)
 
-  const people: ConstructionPerson[] | undefined = wire.people?.map(p => ({
-    slotIndex: p.i,
-    displayName: p.n,
-    ...(p.r ? { role: p.r } : {}),
-  }))
+  const people: ConstructionPerson[] | undefined = wire.people?.map(p => {
+    const person: ConstructionPerson = {
+      slotIndex: p.i,
+      displayName: p.n,
+      ...(p.r ? { role: p.r } : {}),
+    }
+    const w = typeof p.w === 'string' ? p.w.replace(/\s+/g, '').toUpperCase() : ''
+    if (w) person.walletAddress = w
+    return person
+  })
 
   const places: PlacementSlot[] | undefined = wire.places?.map(s => {
     const slot: PlacementSlot = {

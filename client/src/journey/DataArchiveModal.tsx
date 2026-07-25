@@ -1,7 +1,7 @@
 /**
  * Confirm + progress for paid on-chain data archive (signatures, initials, text).
  */
-import { Database, Mail, X } from 'lucide-react'
+import { Database, Download, Mail, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { formatDataArchiveCredits } from '../dataArchivePricing'
@@ -24,6 +24,9 @@ export interface DataArchiveModalProps {
   onGetCredits?: () => void
   /** True when Resend can send completion mail (from /api/features). */
   emailNotifyAvailable?: boolean
+  /** Download recovery package (tx hashes + frames) for offline reconstruct. */
+  onDownloadRecovery?: () => void
+  recoveryBusy?: boolean
 }
 
 export function DataArchiveModal({
@@ -38,6 +41,8 @@ export function DataArchiveModal({
   onConfirm,
   onGetCredits,
   emailNotifyAvailable = false,
+  onDownloadRecovery,
+  recoveryBusy = false,
 }: DataArchiveModalProps) {
   const titleId = useId()
   const descId = useId()
@@ -127,8 +132,9 @@ export function DataArchiveModal({
             <div className="data-archive-head-text">
               <h2 id={titleId}>Store data forever on the Nimiq blockchain</h2>
               <p className="muted data-archive-subtitle">
-                Your fingerprint is already locked. Optionally store signatures,
-                initials, and field text permanently on the Nimiq blockchain too.
+                Your fingerprint is already locked. Push signatures, field layout,
+                wallets, and form text to Nimiq so anyone with the PDF can reconstruct
+                from the chain (e.g. VeriLock Offline).
               </p>
             </div>
             <button
@@ -173,9 +179,22 @@ export function DataArchiveModal({
             )}
             <div className="data-archive-actions data-archive-actions--progress">
               {done ? (
-                <button type="button" className="btn btn-primary" onClick={onClose}>
-                  Done
-                </button>
+                <>
+                  {onDownloadRecovery && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={onDownloadRecovery}
+                      disabled={recoveryBusy}
+                    >
+                      <Download size={16} strokeWidth={2.25} aria-hidden />
+                      {recoveryBusy ? 'Preparing…' : 'Download recovery file'}
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-primary" onClick={onClose}>
+                    Done
+                  </button>
+                </>
               ) : (
                 <button type="button" className="btn btn-secondary" onClick={onClose}>
                   Continue in background
@@ -208,9 +227,9 @@ export function DataArchiveModal({
               </ul>
 
               <p className="muted data-archive-note">
-                The PDF never leaves your devices. Only signatures and form fields
-                are written to the Nimiq blockchain. You do not need to wait on
-                this screen once it starts.
+                The PDF never leaves your devices. Overlay data (ink, names, wallets)
+                is written as multi-tx frames on Nimiq. After it finishes, download a
+                recovery file so you can reconstruct without VeriLock servers.
               </p>
 
               {showEmailUi && (

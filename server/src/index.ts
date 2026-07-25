@@ -506,6 +506,82 @@ app.get(
 )
 
 /**
+ * Download recovery package (tx hashes + wire frames) for offline reconstruct.
+ * Creator only; available once frames are pinned (even mid-job).
+ */
+app.get(
+  '/api/documents/:id/on-chain-data/recovery',
+  dataArchiveQuoteLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  async (req, res) => {
+    try {
+      const { recoveryPackageForDocument } = await import('./documentDataArchive.js')
+      const { assertDocumentCreator } = await import('./documents.js')
+      const address = res.locals.address as string
+      const docId = routeParam(req.params.id)
+      assertDocumentCreator(docId, address)
+      const pack = recoveryPackageForDocument(docId)
+      if (!pack) {
+        res.status(404).json({ error: 'No data archive frames for this document yet' })
+        return
+      }
+      res.json(pack)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Recovery package failed'
+      const status =
+        message.includes('not found')
+          ? 404
+          : message.includes('Only the creator')
+            ? 403
+            : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
+
+/**
+ * Public index: given a PDF fingerprint, list archive tx hashes on Nimiq.
+ * No auth - enables verilock-offline hash-only reconstruct discovery.
+ */
+app.get('/api/chain-data/:sha256', publicReadLimit, async (req, res) => {
+  const sha = routeParam(req.params.sha256).toLowerCase()
+  if (!/^[a-f0-9]{64}$/.test(sha)) {
+    res.status(400).json({ error: 'Valid sha256 required' })
+    return
+  }
+  try {
+    const { publicChainDataIndex } = await import('./documentDataArchive.js')
+    res.json(publicChainDataIndex(sha))
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Lookup failed' })
+  }
+})
+
+/**
+ * Public reconstruct: unpack archive for a fingerprint.
+ * Query: ?source=wire (default, stored frames) | ?source=chain (re-read Nimiq txs)
+ */
+app.get('/api/chain-data/:sha256/reconstruct', publicReadLimit, async (req, res) => {
+  const sha = routeParam(req.params.sha256).toLowerCase()
+  if (!/^[a-f0-9]{64}$/.test(sha)) {
+    res.status(400).json({ error: 'Valid sha256 required' })
+    return
+  }
+  const sourceRaw = String(req.query.source ?? 'wire').toLowerCase()
+  const source = sourceRaw === 'chain' ? 'chain' : 'wire'
+  try {
+    const { reconstructArchiveBySha256 } = await import('./documentDataArchive.js')
+    const result = await reconstructArchiveBySha256(sha, { source })
+    res.json(result)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Reconstruct failed'
+    const status = message.includes('No on-chain data') ? 404 : 400
+    res.status(status).json({ error: message })
+  }
+})
+
+/**
  * Pay credits and broadcast packed annotation / placement frames on Nimiq.
  * Reuses the multi-tx frame pipeline proven in the /pdf experiment.
  * Body: optional { notifyEmail } for completion email after success.

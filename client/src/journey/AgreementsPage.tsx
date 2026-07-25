@@ -217,6 +217,7 @@ export function AgreementsPage({
   const [archiveDone, setArchiveDone] = useState(false)
   const [archiveError, setArchiveError] = useState<string | null>(null)
   const [archiveEmailAvailable, setArchiveEmailAvailable] = useState(false)
+  const [recoveryBusy, setRecoveryBusy] = useState(false)
   /** Sync guard - React state alone can miss double-clicks before re-render. */
   const archiveInFlightRef = useRef(false)
   /** Doc id being archived so background completion still updates the list. */
@@ -370,8 +371,12 @@ export function AgreementsPage({
               : d,
           ),
         )
-        archiveModalOpenRef.current = false
-        setPendingArchive(null)
+        // Keep modal open in "done" state so creator can download recovery file.
+        setArchiveFrameCount(quote.frameCount)
+        setArchiveDone(true)
+        setArchiveBusy(false)
+        setPendingArchive(doc)
+        archiveModalOpenRef.current = true
       } else if (!quote.eligible && quote.reason) {
         setArchiveError(quote.reason)
       }
@@ -387,6 +392,35 @@ export function AgreementsPage({
       setArchiveError(null)
       setArchiveDone(false)
       setArchiveBusy(false)
+      setRecoveryBusy(false)
+    }
+  }
+
+  const downloadArchiveRecovery = async () => {
+    if (!token || !pendingArchive) return
+    setRecoveryBusy(true)
+    setArchiveError(null)
+    try {
+      const pack = await api.getOnChainDataRecovery(token, pendingArchive.id)
+      const blob = new Blob([JSON.stringify(pack, null, 2)], {
+        type: 'application/json',
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const short = pack.originalSha256.slice(0, 12)
+      a.href = url
+      a.download = `verilock-archive-${short}.json`
+      a.rel = 'noopener'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setArchiveError(
+        err instanceof Error ? err.message : 'Could not download recovery file',
+      )
+    } finally {
+      setRecoveryBusy(false)
     }
   }
 
@@ -1005,6 +1039,10 @@ export function AgreementsPage({
         emailNotifyAvailable={archiveEmailAvailable}
         onClose={closeArchiveModal}
         onConfirm={opts => void confirmArchive(opts)}
+        onDownloadRecovery={
+          archiveDone ? () => void downloadArchiveRecovery() : undefined
+        }
+        recoveryBusy={recoveryBusy}
         onGetCredits={
           onGetCredits
             ? () => {

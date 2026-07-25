@@ -170,7 +170,7 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
       }
       return {
         bucket: 'ready_to_seal',
-        headline: 'All signed - free complete',
+        headline: 'Document complete',
         detail: progress,
         cta: 'View & print',
       }
@@ -212,7 +212,7 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
             }
           : {
               bucket: 'ready_to_seal',
-              headline: 'All signed - free complete',
+              headline: 'Document complete',
               detail: progress,
               cta: 'View & print',
             }

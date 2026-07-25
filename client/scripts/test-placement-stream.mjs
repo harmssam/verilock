@@ -70,7 +70,13 @@ function kindFromWire(k) {
 function canonicalizePlan(plan) {
   const people = [...plan.people]
     .sort((a, b) => a.slotIndex - b.slotIndex)
-    .map(p => ({ i: p.slotIndex, n: String(p.displayName ?? '').trim().slice(0, 80) }))
+    .map(p => {
+      const row = { i: p.slotIndex, n: String(p.displayName ?? '').trim().slice(0, 80) }
+      if (p.role) row.r = String(p.role).slice(0, 40)
+      const w = p.walletAddress?.replace(/\s+/g, '').toUpperCase()
+      if (w) row.w = w
+      return row
+    })
   const places = [...plan.slots]
     .sort((a, b) => a.id.localeCompare(b.id))
     .map(s => ({
@@ -163,7 +169,16 @@ function batchToWire(batch) {
   if (batch.people?.length) {
     wire.people = [...batch.people]
       .sort((a, b) => a.slotIndex - b.slotIndex)
-      .map(p => ({ i: p.slotIndex, n: String(p.displayName ?? '').trim().slice(0, 80) }))
+      .map(p => {
+        const row = {
+          i: p.slotIndex,
+          n: String(p.displayName ?? '').trim().slice(0, 80),
+        }
+        if (p.role) row.r = String(p.role).slice(0, 40)
+        const w = p.walletAddress?.replace(/\s+/g, '').toUpperCase()
+        if (w) row.w = w
+        return row
+      })
   }
   if (batch.places?.length) {
     wire.places = [...batch.places]
@@ -339,8 +354,8 @@ async function main() {
   const plan = {
     pdfSha256: PDF,
     people: [
-      { slotIndex: 1, displayName: 'Tom' },
-      { slotIndex: 2, displayName: 'Alex' },
+      { slotIndex: 1, displayName: 'Tom', walletAddress: 'NQ01TESTWALLETTOM0000000000000000' },
+      { slotIndex: 2, displayName: 'Alex', walletAddress: 'NQ02TESTWALLETALEX000000000000000' },
     ],
     slots: [
       {
@@ -411,6 +426,11 @@ async function main() {
   const un0 = await unpackPlacementBatch(frames0)
   assert(un0.batchRoot === batch0Root, 'batchRoot matches after unpack')
   assert(un0.wire.places.length === 3, 'places on wire')
+  assert(un0.wire.people?.length === 2, 'people on wire')
+  assert(
+    un0.wire.people[0].w === 'NQ01TESTWALLETTOM0000000000000000',
+    'wallet address on wire for offline reconstruct',
+  )
 
   // fill: same ink twice + name → 2 blobs not 3
   const inkPath = {

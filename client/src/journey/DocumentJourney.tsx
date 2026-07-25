@@ -127,6 +127,8 @@ interface DocumentJourneyProps {
   onHome?: () => void
   /** Fresh create path after “Start another agreement” (shell remounts journey). */
   onStartCreate?: () => void
+  /** Open My agreements (e.g. after free complete). */
+  onAgreements?: () => void
   /**
    * Switch shell path track without remounting (preserves in-memory PDF).
    * Used after seal → verify with the same file preloaded.
@@ -190,6 +192,7 @@ export function DocumentJourney({
   onPageMeta,
   onHome,
   onStartCreate,
+  onAgreements,
 }: DocumentJourneyProps) {
   const {
     account,
@@ -1339,6 +1342,32 @@ export function DocumentJourney({
     }
   }
 
+  /** Leave free-complete / done flow for My agreements (falls back to home). */
+  const goToMyAgreements = () => {
+    clearJourneyIntent()
+    syncIntentToUrl(null)
+    setLocalError(null)
+    setLockMessage(null)
+    setError(null)
+    if (onAgreements) {
+      onAgreements()
+      return
+    }
+    if (onHome) {
+      if (
+        window.location.pathname.startsWith('/d/') ||
+        window.location.pathname.startsWith('/v/') ||
+        window.location.search.includes('intent=')
+      ) {
+        window.history.pushState({}, '', '/')
+      }
+      onHome()
+      return
+    }
+    window.history.pushState({}, '', '/agreements')
+    clearLocalJourneyState()
+  }
+
   /** Done step: new create flow (not path-picker home). */
   const startAnotherAgreement = () => {
     setLocalError(null)
@@ -1705,14 +1734,16 @@ export function DocumentJourney({
             // Multi-party free complete: clear banner so free-complete dock is not undercut.
             // Solo / direct-ready still nudge toward optional lock.
             if (signedDoc.signingProgress.required <= 1) {
-              setLockMessage('Signature complete. Print free, or lock for 1 credit when ready.')
+              setLockMessage(
+                'Document complete. Print anytime, or lock on the blockchain for permanent proof.',
+              )
             } else {
               setLockMessage(null)
             }
           } else {
             setSharedAck(false)
             setLockMessage(
-              'Your signature is recorded. Invite co-signers below. When everyone has signed, print free or lock for 1 credit.',
+              'Your signature is recorded. Invite co-signers below. When everyone has signed, print anytime or lock on the blockchain for permanent proof.',
             )
           }
         }
@@ -2521,7 +2552,7 @@ export function DocumentJourney({
                   allSigned(doc) &&
                   !doc.sealed &&
                   !creatorChoseLock
-                    ? 'Complete · free'
+                    ? 'Complete'
                     : step === 'done' && role === 'creator'
                       ? 'Complete'
                       : inviteWaitingView && activeStage && stepIndex >= 0
@@ -2539,7 +2570,7 @@ export function DocumentJourney({
                   allSigned(doc) &&
                   !doc.sealed &&
                   !creatorChoseLock
-                    ? 'Everyone signed - print free or lock'
+                    ? 'Document complete'
                     : step === 'done' && role === 'signer'
                       ? doc?.sealed
                         ? 'Agreement locked - your part is done'
@@ -2564,7 +2595,7 @@ export function DocumentJourney({
                   allSigned(doc) &&
                   !doc.sealed &&
                   !creatorChoseLock
-                    ? 'Signing is free. Print a signed copy, keep it in My agreements, or upgrade to lock a permanent proof on Nimiq for 1 credit.'
+                    ? 'All signatures are in. Print a signed copy anytime, or lock on the blockchain for permanent proof.'
                     : step === 'done' && role === 'signer'
                       ? doc?.sealed
                         ? 'Your signature is on this agreement. Review parties and recorded ink below. Drop the same file you signed to see the organizer’s field layout (the PDF never left anyone’s device).'
@@ -2577,7 +2608,7 @@ export function DocumentJourney({
                             ? 'Your local file matches. Because you are a party, names and recorded ink are available below.'
                             : 'Your local file matches a VeriLock record. Public lock details are below - names and signatures stay anonymous unless you are an original party.'
                           : inviteWaitingView
-                            ? 'Progress updates here as people sign. When everyone is done, you can print free or lock on the blockchain.'
+                            ? 'Progress updates here as people sign. When everyone is done, print anytime or lock on the blockchain for permanent proof.'
                             : inviteManageView
                               ? 'Send each person a personal link (and the same document file separately - VeriLock never hosts it). When you are finished inviting, return to the waiting view.'
                               : activeStage?.blurb}
@@ -3029,9 +3060,9 @@ export function DocumentJourney({
                           <Check size={18} strokeWidth={2.5} />
                           {role === 'creator'
                             ? requiredCount(doc) <= 1
-                              ? 'Signature complete. Print free, or lock for 1 credit'
-                              : 'Everyone signed - free complete. Print or lock when ready'
-                            : 'Thanks, your part is complete. The creator can print free or lock on the blockchain.'}
+                              ? 'Document complete. Print anytime, or lock on the blockchain for permanent proof.'
+                              : 'Document complete - all signatures are in. Print anytime, or lock on the blockchain for permanent proof.'
+                            : 'Thanks, your part is complete. The creator can print anytime or lock on the blockchain.'}
                         </div>
                       ) : (
                         <>
@@ -3909,7 +3940,7 @@ export function DocumentJourney({
                               </button>
                             </div>
                             <span id="notify-email-hint" className="muted notify-email-hint">
-                              We only use this to tell you everyone has signed (print free or lock).
+                              We only use this to tell you when everyone has signed.
                               Never required. Press <strong>Save email</strong> so we store it.
                             </span>
                             {notifyEmailError ? (
@@ -3989,10 +4020,10 @@ export function DocumentJourney({
                       <div className="done-banner">
                         <Check size={18} strokeWidth={2.5} />
                         <div>
-                          <strong>Everyone has signed - free complete.</strong>
+                          <strong>Document complete</strong>
                           <p className="muted">
-                            Print a signed copy or keep this agreement in My agreements at no cost.
-                            Locking is optional: a permanent on-chain fingerprint proof costs 1 credit.
+                            All signatures are in. Print a signed copy anytime, or lock on the
+                            blockchain for permanent proof (1 credit).
                           </p>
                         </div>
                       </div>
@@ -4014,10 +4045,6 @@ export function DocumentJourney({
                       >
                         <header className="signatures-config-head">
                           <h3 id="free-complete-print-title">Print signed document</h3>
-                          <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-                            Drop the same file you fingerprinted so signatures paint on the page,
-                            then print. The file never leaves this device.
-                          </p>
                         </header>
                         <DocumentStage
                           step={step}
@@ -4038,6 +4065,7 @@ export function DocumentJourney({
                                 : signFileMatches ||
                                   Boolean(pdfFile && pdfHash === doc.fingerprint)
                           }
+                          localCopyHint="Drop the same file you fingerprinted so signatures paint on the page, then print. The file stays on this device - nothing is sent to VeriLock."
                         />
                         {signFile &&
                           !hasVerifiedLocalPdf &&
@@ -4068,16 +4096,15 @@ export function DocumentJourney({
                         onClick={() => setCreatorChoseLock(true)}
                       >
                         <Lock size={16} strokeWidth={2.25} />
-                        Optional: lock permanently (1 credit)
+                        Lock on the blockchain (1 credit)
                       </button>
                       <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-                        Without a lock, VeriLock keeps the agreement record. The chain does not yet
-                        prove this fingerprint. Use <strong>Print</strong> above when your local
-                        file is matched.
+                        A lock anchors the fingerprint on Nimiq so anyone can verify this document
+                        later. Use <strong>Print</strong> above when your local file is matched.
                       </p>
-                      <button type="button" className="btn btn-ghost" onClick={resetAll}>
+                      <button type="button" className="btn btn-ghost" onClick={goToMyAgreements}>
                         <Check size={15} strokeWidth={2.25} />
-                        Done - keep free
+                        Done - return to My agreements
                       </button>
                     </>
                   ) : (
@@ -4090,7 +4117,7 @@ export function DocumentJourney({
                           style={{ alignSelf: 'flex-start' }}
                         >
                           <ArrowLeft size={14} strokeWidth={2.25} />
-                          Back to free complete
+                          Back
                         </button>
                       )}
                       <DocumentStage
@@ -4272,10 +4299,6 @@ export function DocumentJourney({
                         >
                           <header className="signatures-config-head">
                             <h3 id="signer-review-layout-title">Signed document</h3>
-                            <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-                              Drop the same file you signed to see signatures, initials, and text
-                              fields on the page. Read only - the file never leaves this device.
-                            </p>
                           </header>
                           <DocumentStage
                             step={step}
@@ -4297,6 +4320,7 @@ export function DocumentJourney({
                                   : signFileMatches ||
                                     Boolean(pdfFile && pdfHash === doc.fingerprint)
                             }
+                            localCopyHint="Drop the same file you signed to see signatures, initials, and text fields on the page. Read only - the file stays on this device."
                           />
                           {signFile &&
                             !hasVerifiedLocalPdf &&

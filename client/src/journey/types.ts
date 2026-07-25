@@ -49,7 +49,7 @@ export const CREATOR_STAGES: JourneyStage[] = [
     label: 'Sign',
     verb: 'Sign your fields on the document',
     blurb:
-      'If you are a signer, fill in your applicable fields on the document, then sign. After you sign, invite any co-signers here. When everyone has signed, print free or lock on-chain for 1 credit.',
+      'If you are a signer, fill in your applicable fields on the document, then sign. After you sign, invite any co-signers here. When everyone has signed, print anytime or lock on the blockchain for permanent proof.',
     privacyNote: 'You prove you hold these bytes - still no upload.',
   },
   {
@@ -86,7 +86,7 @@ export const SIGNER_STAGES: JourneyStage[] = [
     label: 'Done',
     verb: 'Your signature is recorded',
     blurb:
-      'Review who signed and your recorded signature below. To see the field layout on the document, drop the same file you signed (VeriLock never stores the PDF). The creator can print free when everyone is finished, or optionally lock on the blockchain.',
+      'Review who signed and your recorded signature below. To see the field layout on the document, drop the same file you signed (VeriLock never stores the PDF). When everyone is finished, the creator can print anytime or lock on the blockchain for permanent proof.',
     privacyNote: 'Keep your document. Anyone can re-check the fingerprint later.',
   },
 ]

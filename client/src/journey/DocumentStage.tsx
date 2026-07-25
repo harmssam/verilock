@@ -35,6 +35,11 @@ interface DocumentStageProps {
   localCopyRequired?: boolean
   /** When localCopyRequired + file selected, whether hash matches the agreement */
   localCopyMatches?: boolean | null
+  /**
+   * Hint under “Choose your copy of the file” when a local file is still needed.
+   * Callers pass purpose-specific copy (print, review layout, re-match after leave).
+   */
+  localCopyHint?: string
 }
 
 function filesFromDataTransfer(dt: DataTransfer): File[] {
@@ -65,6 +70,7 @@ export function DocumentStage({
   disabled = false,
   localCopyRequired = false,
   localCopyMatches = null,
+  localCopyHint,
 }: DocumentStageProps) {
   const inputId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -246,8 +252,8 @@ export function DocumentStage({
             Expected file: <code className="mono">{doc.fileName}</code>
           </span>
           <span className="doc-stage-expect-hint">
-            Drop the same file from this device so we can match the fingerprint. Required after
-            leaving and returning. The file stays on your computer - nothing is sent to VeriLock.
+            {localCopyHint ??
+              'Drop the same file from this device so we can match the fingerprint. The file stays on your computer - nothing is sent to VeriLock.'}
           </span>
         </div>
       )}

@@ -3,6 +3,7 @@
  *
  * Uses the same 64-byte Nimiq frame packing proven in the /pdf experiment:
  * - Production: placement plan batch0 + fill batch frames (signatures, initials, text)
+ * - Plus v3 archive manifest (people, wallets, signature roster) for offline reconstruct
  * - Legacy/experiment: free-form document.annotations packed as v1 annotation stream
  *
  * Pricing: 1 credit per 10 txs, rounded up (ceil). Example: 51 frames → 6 credits.
@@ -13,10 +14,21 @@
  * - Concurrent archives for the same document coalesce (no double broadcast)
  * - After charge, frames are pinned - later fill growth cannot free-ride
  * - Partial broadcast resumes from the first missing frame index
+ * - onChain requires broadcast of all frames + HEAD/END sample verification
  */
-import { createHash } from 'node:crypto'
 import { v4 as uuid } from 'uuid'
 import { normalizeAddress } from './addresses.js'
+import {
+  buildArchiveManifest,
+  contentHashFrames,
+  framesHexToBuffers,
+  packArchiveManifestFrames,
+  splitFrameStreams,
+  STREAM_VERSION_ANNOTATION,
+  STREAM_VERSION_MANIFEST,
+  STREAM_VERSION_PLACEMENT,
+  unpackArchiveFrames,
+} from './archiveStream.js'
 import {
   broadcastStreamFrames,
   isAnnotationStreamBroadcastEnabled,
@@ -33,21 +45,22 @@ import {
   getCreditBalance,
   getDocumentById,
   getDocumentDataArchive,
+  getDocumentDataArchiveBySha256,
   getLedgerByIdempotencyKey,
   resolvePlacementPlan,
   upsertDocumentDataArchive,
   type DocumentDataArchiveRecord,
   type DocumentDataArchiveSource,
 } from './db.js'
+import {
+  decodeRecipientDataBytes,
+  fetchTransaction,
+} from './nimiq-rpc.js'
 import { sanitizeAnnotations } from './security.js'
 import { getSealFeeNim } from './sealPricing.js'
-import { isServiceWalletConfigured } from './serviceWallet.js'
+import { getServiceWalletAddress, isServiceWalletConfigured } from './serviceWallet.js'
 
 const MAX_ARCHIVE_FRAMES = 128
-
-/** Placement stream version byte (v2). Annotation free-form is v1. */
-const STREAM_VERSION_ANNOTATION = 1
-const STREAM_VERSION_PLACEMENT = 2
 
 function assertCreator(documentId: string, requesterAddress: string) {
   const doc = getDocumentById(documentId)
@@ -99,10 +112,10 @@ function resolveSpendAttempt(documentId: string): {
 }
 
 function framesContentHash(framesHex: string[]): string {
-  return createHash('sha256').update(framesHex.join('')).digest('hex')
+  return contentHashFrames(framesHex)
 }
 
-/** Accept well-formed 64-byte VeriLock stream frames (magic 0xA1, version 1 or 2). */
+/** Accept well-formed 64-byte VeriLock stream frames (magic 0xA1, version 1–3). */
 function assertValidStreamFrameHex(hex: string, index: number, _source: DocumentDataArchiveSource): void {
   if (typeof hex !== 'string' || !/^[a-f0-9]{128}$/i.test(hex)) {
     throw new Error(`Invalid frame hex at index ${index}`)
@@ -115,8 +128,12 @@ function assertValidStreamFrameHex(hex: string, index: number, _source: Document
     throw new Error(`Frame ${index} has bad stream magic (expected 0xA1 like /pdf lab)`)
   }
   const ver = buf[1]!
-  // v1 = free-form annotation stream (/pdf lab); v2 = placement construction stream
-  if (ver !== STREAM_VERSION_ANNOTATION && ver !== STREAM_VERSION_PLACEMENT) {
+  // v1 = annotations; v2 = placement; v3 = archive manifest (people/wallets/sigs)
+  if (
+    ver !== STREAM_VERSION_ANNOTATION &&
+    ver !== STREAM_VERSION_PLACEMENT &&
+    ver !== STREAM_VERSION_MANIFEST
+  ) {
     throw new Error(`Frame ${index} has unsupported stream version ${ver}`)
   }
 }
@@ -141,7 +158,24 @@ export interface CollectedFrames {
   contentHash: string
 }
 
-/** Collect packed 64-byte frames for a document (placements preferred). */
+/**
+ * Append v3 archive manifest (people, wallets, signature roster) when missing.
+ * Manifest is required for offline reconstruct of identity; ink lives in placement frames.
+ */
+function withArchiveManifest(documentId: string, framesHex: string[]): string[] {
+  const buffers = framesHexToBuffers(framesHex)
+  try {
+    const streams = splitFrameStreams(buffers)
+    const hasManifest = streams.some(s => s[0]?.[1] === STREAM_VERSION_MANIFEST)
+    if (hasManifest) return framesHex
+  } catch {
+    /* if split fails, still try to append a valid manifest */
+  }
+  const manifestFrames = packArchiveManifestFrames(documentId).map(f => f.toString('hex'))
+  return [...framesHex, ...manifestFrames]
+}
+
+/** Collect packed 64-byte frames for a document (placements preferred + manifest). */
 export function collectDocumentDataFrames(documentId: string): CollectedFrames | null {
   const doc = getDocumentById(documentId)
   if (!doc) return null
@@ -166,13 +200,14 @@ export function collectDocumentDataFrames(documentId: string): CollectedFrames |
       }
     }
     if (frames.length > 0) {
-      validateFramesHex(frames, 'placements')
+      const withManifest = withArchiveManifest(documentId, frames)
+      validateFramesHex(withManifest, 'placements')
       return {
         source: 'placements',
-        framesHex: frames,
-        frameCount: frames.length,
+        framesHex: withManifest,
+        frameCount: withManifest.length,
         originalSha256: hash,
-        contentHash: framesContentHash(frames),
+        contentHash: framesContentHash(withManifest),
       }
     }
   }
@@ -181,6 +216,23 @@ export function collectDocumentDataFrames(documentId: string): CollectedFrames |
   if (annotations && annotations.length > 0) {
     const packed = packAnnotationStream(hash, annotations)
     const framesHex = packed.map(f => f.toString('hex'))
+    const withManifest = withArchiveManifest(documentId, framesHex)
+    validateFramesHex(withManifest, 'annotations')
+    return {
+      source: 'annotations',
+      framesHex: withManifest,
+      frameCount: withManifest.length,
+      originalSha256: hash,
+      contentHash: framesContentHash(withManifest),
+    }
+  }
+
+  // Signatures-only (wallet roster) with no placement ink / annotations still archives.
+  const manifest = buildArchiveManifest(documentId)
+  const hasSigs = Boolean(manifest?.sigs?.length)
+  const hasWallets = Boolean(manifest?.people?.some(p => p.w))
+  if (manifest && (hasSigs || hasWallets)) {
+    const framesHex = packArchiveManifestFrames(documentId).map(f => f.toString('hex'))
     validateFramesHex(framesHex, 'annotations')
     return {
       source: 'annotations',
@@ -192,6 +244,103 @@ export function collectDocumentDataFrames(documentId: string): CollectedFrames |
   }
 
   return null
+}
+
+/**
+ * Verify HEAD + END of each multi-tx stream on Nimiq (payload bytes match).
+ * Full DATA-frame poll is skipped to keep large archives practical.
+ * Retries briefly for RPC/mempool lag after broadcast.
+ */
+async function verifyArchiveHeadEndOnChain(
+  framesHex: string[],
+  txHashes: string[],
+  options?: { attempts?: number; delayMs?: number },
+): Promise<{ ok: boolean; checked: number; matched: number; error?: string }> {
+  if (framesHex.length === 0 || txHashes.length !== framesHex.length) {
+    return {
+      ok: false,
+      checked: 0,
+      matched: 0,
+      error: `Hash count mismatch (${txHashes.length}/${framesHex.length})`,
+    }
+  }
+  let streams: Buffer[][]
+  try {
+    streams = splitFrameStreams(framesHexToBuffers(framesHex))
+  } catch (err) {
+    return {
+      ok: false,
+      checked: 0,
+      matched: 0,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+
+  const sampleIndices: number[] = []
+  let offset = 0
+  for (const stream of streams) {
+    sampleIndices.push(offset)
+    if (stream.length > 1) sampleIndices.push(offset + stream.length - 1)
+    offset += stream.length
+  }
+
+  const attempts = options?.attempts ?? 6
+  const delayMs = options?.delayMs ?? 2_000
+  let lastError: string | undefined
+  let lastChecked = 0
+  let lastMatched = 0
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, delayMs))
+    let checked = 0
+    let matched = 0
+    let failed: string | undefined
+    for (const globalIdx of sampleIndices) {
+      const expected = framesHex[globalIdx]!.toLowerCase()
+      const txHash = txHashes[globalIdx]!
+      checked += 1
+      try {
+        const tx = await fetchTransaction(txHash)
+        if (!tx) {
+          failed = `Tx not found yet: ${txHash.slice(0, 12)}…`
+          break
+        }
+        if (tx.executionResult === false) {
+          failed = `Tx failed execution: ${txHash.slice(0, 12)}…`
+          break
+        }
+        const bytes = decodeRecipientDataBytes(tx.recipientData)
+        const hex = Buffer.from(bytes).toString('hex').toLowerCase()
+        if (hex !== expected) {
+          failed = `Frame payload mismatch at index ${globalIdx}`
+          break
+        }
+        matched += 1
+      } catch (err) {
+        failed = err instanceof Error ? err.message : String(err)
+        break
+      }
+    }
+    lastChecked = checked
+    lastMatched = matched
+    lastError = failed
+    if (!failed && matched === checked && checked > 0) {
+      return { ok: true, checked, matched }
+    }
+    // Permanent payload/execution failures should not spin retries
+    if (
+      failed &&
+      (failed.includes('payload mismatch') || failed.includes('failed execution'))
+    ) {
+      break
+    }
+  }
+  return {
+    ok: false,
+    checked: lastChecked,
+    matched: lastMatched,
+    error: lastError ?? 'Chain sample verification failed',
+  }
 }
 
 /**
@@ -587,12 +736,29 @@ async function runBackgroundBroadcast(input: {
   try {
     if (remainingHex.length === 0) {
       if (txHashes.length === collected.framesHex.length && collected.framesHex.length > 0) {
+        const verify = await verifyArchiveHeadEndOnChain(collected.framesHex, txHashes)
+        const permanentFail =
+          Boolean(verify.error) &&
+          (verify.error!.includes('payload mismatch') ||
+            verify.error!.includes('failed execution'))
+        if (permanentFail) {
+          persist({
+            txHashes,
+            confirmedFrames: verify.matched,
+            onChain: false,
+            jobStatus: 'failed',
+            error: verify.error ?? 'On-chain frame sample verification failed',
+          })
+          return
+        }
         persist({
           txHashes,
-          confirmedFrames: txHashes.length,
+          confirmedFrames: verify.ok ? txHashes.length : verify.matched,
           onChain: true,
           jobStatus: 'complete',
-          error: null,
+          error: verify.ok
+            ? null
+            : `Broadcast complete; ${verify.matched}/${verify.checked} chain samples visible`,
         })
         fireArchiveNotifyEmail(documentId, txHashes.length, chargedCredits)
         return
@@ -661,17 +827,49 @@ async function runBackgroundBroadcast(input: {
     txHashes = allHashes
 
     if (allHashes.length === collected.framesHex.length) {
+      // HEAD+END sample: prefer hard match; permanent payload errors fail the job.
+      const verify = await verifyArchiveHeadEndOnChain(collected.framesHex, allHashes)
+      const permanentFail =
+        Boolean(verify.error) &&
+        (verify.error!.includes('payload mismatch') ||
+          verify.error!.includes('failed execution'))
+      if (permanentFail) {
+        console.error('[data-archive] chain sample permanent failure', {
+          documentId,
+          error: verify.error,
+        })
+        persist({
+          txHashes: allHashes,
+          confirmedFrames: verify.matched,
+          onChain: false,
+          jobStatus: 'failed',
+          error: verify.error ?? 'On-chain frame sample verification failed',
+        })
+        return
+      }
+      if (!verify.ok) {
+        console.warn('[data-archive] chain sample lagging; marking complete on broadcast', {
+          documentId,
+          checked: verify.checked,
+          matched: verify.matched,
+          error: verify.error,
+        })
+      }
       persist({
         txHashes: allHashes,
-        confirmedFrames: allHashes.length,
+        confirmedFrames: verify.ok ? allHashes.length : verify.matched,
         onChain: true,
         jobStatus: 'complete',
-        error: result.error ?? null,
+        error: verify.ok
+          ? result.error ?? null
+          : `Broadcast complete; ${verify.matched}/${verify.checked} chain samples visible (${verify.error ?? 'RPC lag'})`,
       })
       console.log('[data-archive] complete', {
         documentId,
         frames: allHashes.length,
         credits: chargedCredits,
+        chainSamples: verify.matched,
+        samplesOk: verify.ok,
       })
       fireArchiveNotifyEmail(documentId, allHashes.length, chargedCredits)
       return
@@ -868,6 +1066,13 @@ export function dataArchiveSummaryForDocument(documentId: string): {
       // credits so UI still surfaces upsell - requestArchive loads the real quote.
       frameHint = -1
     }
+    if (frameHint === 0) {
+      // Signatures / wallets only (manifest stream) still worth archiving.
+      const m = buildArchiveManifest(documentId)
+      if (m && (m.sigs.length > 0 || m.people.some(p => p.w))) {
+        frameHint = -1
+      }
+    }
     if (frameHint === 0) return null
 
     const creditsEnabled = isCreditsEnabled()
@@ -892,5 +1097,177 @@ export function dataArchiveSummaryForDocument(documentId: string): {
     }
   } catch {
     return null
+  }
+}
+
+// ── Public chain-data index + reconstruct (hash-only lookup) ───────────────
+
+export function publicChainDataIndex(originalSha256: string): {
+  originalSha256: string
+  found: boolean
+  onChain: boolean
+  frameCount: number
+  confirmedFrames: number
+  txHashes: string[]
+  source: DocumentDataArchiveSource | null
+  documentId: string | null
+  serviceWalletAddress: string | null
+  updatedAt: number | null
+} {
+  const hash = originalSha256.toLowerCase()
+  const row = getDocumentDataArchiveBySha256(hash)
+  if (!row) {
+    return {
+      originalSha256: hash,
+      found: false,
+      onChain: false,
+      frameCount: 0,
+      confirmedFrames: 0,
+      txHashes: [],
+      source: null,
+      documentId: null,
+      serviceWalletAddress: getServiceWalletAddress(),
+      updatedAt: null,
+    }
+  }
+  return {
+    originalSha256: row.originalSha256,
+    found: true,
+    onChain: row.onChain,
+    frameCount: row.frameCount,
+    confirmedFrames: row.confirmedFrames,
+    txHashes: row.txHashes,
+    source: row.source,
+    documentId: row.documentId,
+    serviceWalletAddress: getServiceWalletAddress(),
+    updatedAt: row.updatedAt,
+  }
+}
+
+/**
+ * Reconstruct archive payload for a PDF fingerprint.
+ * - source=wire: unpack stored frames (fast, same bytes we broadcast)
+ * - source=chain: re-read recipientData from each tx hash (offline-grade)
+ */
+export async function reconstructArchiveBySha256(
+  originalSha256: string,
+  options?: { source?: 'wire' | 'chain' },
+): Promise<{
+  originalSha256: string
+  source: 'wire' | 'chain'
+  onChain: boolean
+  frameCount: number
+  txHashes: string[]
+  integrityOk: boolean
+  unpacked: ReturnType<typeof unpackArchiveFrames>
+  chainError?: string
+}> {
+  const hash = originalSha256.toLowerCase()
+  const row = getDocumentDataArchiveBySha256(hash)
+  if (!row || row.framesHex.length === 0) {
+    throw new Error('No on-chain data archive for this fingerprint')
+  }
+  if (row.originalSha256 !== hash) {
+    throw new Error('Archive hash mismatch')
+  }
+
+  const preferChain = options?.source === 'chain'
+  let framesHex = row.framesHex
+  let used: 'wire' | 'chain' = 'wire'
+  let chainError: string | undefined
+
+  if (preferChain) {
+    if (row.txHashes.length !== row.framesHex.length) {
+      throw new Error(
+        `Incomplete tx set: ${row.txHashes.length}/${row.framesHex.length} frames broadcast`,
+      )
+    }
+    try {
+      const fromChain: string[] = []
+      for (let i = 0; i < row.txHashes.length; i++) {
+        const txHash = row.txHashes[i]!
+        if (i > 0) await new Promise(r => setTimeout(r, 150))
+        const tx = await fetchTransaction(txHash)
+        if (!tx) throw new Error(`Tx not found: ${txHash.slice(0, 12)}…`)
+        if (tx.executionResult === false) {
+          throw new Error(`Tx ${txHash.slice(0, 12)}… failed execution`)
+        }
+        const bytes = decodeRecipientDataBytes(tx.recipientData)
+        if (bytes.length !== 64) {
+          throw new Error(`Invalid frame size ${bytes.length} for ${txHash.slice(0, 12)}…`)
+        }
+        fromChain.push(Buffer.from(bytes).toString('hex').toLowerCase())
+      }
+      framesHex = fromChain
+      used = 'chain'
+    } catch (err) {
+      chainError = err instanceof Error ? err.message : String(err)
+      // Fall back to wire unless strictly chain-only was required
+      if (options?.source === 'chain') {
+        // still try wire for response integrity note
+        try {
+          const unpacked = unpackArchiveFrames(row.framesHex)
+          return {
+            originalSha256: hash,
+            source: 'wire',
+            onChain: row.onChain,
+            frameCount: row.framesHex.length,
+            txHashes: row.txHashes,
+            integrityOk: false,
+            unpacked,
+            chainError,
+          }
+        } catch {
+          throw new Error(`Chain reconstruct failed: ${chainError}`)
+        }
+      }
+    }
+  }
+
+  const unpacked = unpackArchiveFrames(framesHex)
+  if (unpacked.originalSha256 !== hash) {
+    throw new Error('Unpacked stream fingerprint does not match request')
+  }
+
+  return {
+    originalSha256: hash,
+    source: used,
+    onChain: row.onChain,
+    frameCount: framesHex.length,
+    txHashes: row.txHashes,
+    integrityOk: !chainError,
+    unpacked,
+    ...(chainError ? { chainError } : {}),
+  }
+}
+
+/** Recovery package for download after archive completes (offline companion). */
+export function recoveryPackageForDocument(documentId: string): {
+  version: 1
+  kind: 'verilock_data_archive_recovery'
+  originalSha256: string
+  documentId: string
+  onChain: boolean
+  frameCount: number
+  txHashes: string[]
+  framesHex: string[]
+  source: DocumentDataArchiveSource
+  serviceWalletAddress: string | null
+  exportedAt: number
+} | null {
+  const row = getDocumentDataArchive(documentId)
+  if (!row || row.framesHex.length === 0) return null
+  return {
+    version: 1,
+    kind: 'verilock_data_archive_recovery',
+    originalSha256: row.originalSha256,
+    documentId: row.documentId,
+    onChain: row.onChain,
+    frameCount: row.frameCount,
+    txHashes: row.txHashes,
+    framesHex: row.framesHex,
+    source: row.source,
+    serviceWalletAddress: getServiceWalletAddress(),
+    exportedAt: Date.now(),
   }
 }
