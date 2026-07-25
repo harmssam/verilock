@@ -50,7 +50,7 @@ type BucketFilter = 'all' | AgreementBucket
 const CHIP_OPTIONS: Array<{ key: BucketFilter; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'needs_you', label: 'Needs you' },
-  { key: 'ready_to_seal', label: 'Ready to lock' },
+  { key: 'ready_to_seal', label: 'All signed' },
   { key: 'waiting', label: 'Waiting' },
   { key: 'locked', label: 'Locked' },
 ]
