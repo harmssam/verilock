@@ -14,9 +14,9 @@ const TITLE_SUFFIX = ` · ${SITE_NAME}`
 
 export const PAGE_META = {
   home: {
-    title: `${SITE_NAME} - Free PDF Signing & Optional On-Chain Lock`,
+    title: `${SITE_NAME} – Free private multi-party PDF signing`,
     description:
-      'Sign PDFs free with multi-party Nimiq wallet signatures. Your file never leaves your device. Print when done, or lock a permanent fingerprint on Nimiq for 1 credit. Verify locked proofs anytime without a wallet.',
+      'Sign agreements with anyone—no upload required. Free wallet-backed co-signing. Upgrade anytime to lock a permanent fingerprint on the blockchain.',
     path: '/',
   },
   pricing: {
