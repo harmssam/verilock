@@ -636,6 +636,8 @@ export const api = {
         pack: number
         credits: number
         creditNimCostTotal: number
+        /** Unit (1 credit) Stripe USD at live NIM rate, before pack floor. */
+        creditStripeUsd?: number
         creditStripeUsdTotal: number
         totalUsdCents: number
         meetsStripeMinimum: boolean
