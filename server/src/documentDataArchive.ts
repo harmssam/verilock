@@ -475,16 +475,23 @@ export function quoteDocumentDataArchive(
   const hashes = existing?.txHashes?.length ?? 0
   const progressPercent = onChain
     ? 100
-    : frameCount > 0
-      ? Math.min(99, Math.round((hashes / frameCount) * 100))
-      : 0
+    : frameCount > 0 && hashes >= frameCount
+      ? 95 // all submitted; sample confirm in progress
+      : frameCount > 0
+        ? Math.min(90, Math.round((hashes / frameCount) * 90))
+        : 0
 
   let reason: string | undefined
   let eligible = false
   if (onChain) {
     reason = 'Signatures and fields are already stored on the Nimiq blockchain'
   } else if (jobStatus === 'processing') {
-    reason = 'Writing to the Nimiq blockchain in the background…'
+    reason =
+      frameCount > 0 && hashes >= frameCount
+        ? `All ${frameCount} transactions submitted — confirming on Nimiq…`
+        : frameCount > 0
+          ? `Writing TX ${Math.min(hashes + 1, frameCount)} of ${frameCount}…`
+          : 'Writing to the Nimiq blockchain in the background…'
     eligible = false
   } else if (!locked) {
     reason = 'Lock the fingerprint first, then archive signatures on-chain'

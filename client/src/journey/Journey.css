@@ -2485,14 +2485,27 @@ a.hash-chip.text-link:focus-visible {
 
 .agreements-page-list-archive {
   color: var(--text-muted, #64748b);
-  font-size: 0.76rem;
-  white-space: nowrap;
-  padding: 0.35rem 0.5rem;
 }
 
 .agreements-page-list-archive:hover:not(:disabled) {
   color: var(--mint-deep, #0f766e);
   background: rgba(13, 148, 136, 0.08);
+}
+
+.agreements-page-actions .btn.agreements-page-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border-radius: 0.55rem;
+  white-space: nowrap;
+}
+
+.agreements-page-icon-btn .btn-spinner {
+  margin: 0;
 }
 
 /* Compact action row, right-aligned on desktop */
@@ -2962,6 +2975,27 @@ a.hash-chip.text-link:focus-visible {
 
 .data-archive-actions--progress {
   justify-content: center;
+}
+
+.data-archive-progress-tx {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-archive-progress-tx-num {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.data-archive-progress-tx-of {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.75;
 }
 
 .data-archive-progress-pct {

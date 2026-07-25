@@ -94,3 +94,21 @@ export function writeCreditsBalanceCache(token: string, balance: number): void {
     }
   }
 }
+
+/**
+ * Update cache and notify header / CreditsPanel (same event as top-ups and seal spends).
+ * Use after any credit spend or refund so the UI balance updates live.
+ */
+export function publishCreditsBalance(token: string, balance: number): void {
+  writeCreditsBalanceCache(token, balance)
+  if (typeof window === 'undefined') return
+  try {
+    window.dispatchEvent(
+      new CustomEvent('verilock:credits-topup', {
+        detail: { ok: true, balance, creditsMinted: 0 },
+      }),
+    )
+  } catch {
+    /* ignore (non-browser) */
+  }
+}
