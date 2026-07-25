@@ -190,7 +190,6 @@ export function DocumentJourney({
   onPageMeta,
   onHome,
   onStartCreate,
-  onSwitchPath,
 }: DocumentJourneyProps) {
   const {
     account,

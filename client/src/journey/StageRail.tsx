@@ -36,8 +36,7 @@ function isStepDone(
   }
 
   if (role === 'verifier') {
-    // Fingerprint step is complete once a match advances the journey to `done`.
-    if (stageId === 'verify' && step === 'done') return true
+    // When step is `done` (match found), the early return above marks prior stages complete.
     return false
   }
 
