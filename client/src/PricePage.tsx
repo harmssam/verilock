@@ -268,7 +268,11 @@ export function PricePage({
               How to pay
             </span>
             <p className="muted price-page-model-explain">
-              Credit card or NIM. Same credit either way.
+              Credit card or{' '}
+              <a href="#price-why-nimiq" className="price-page-nimiq-link price-page-nim-jump">
+                NIM
+              </a>
+              .
             </p>
           </div>
 
@@ -419,12 +423,13 @@ export function PricePage({
               Why Nimiq?
             </h3>
             <p className="price-page-why-lead muted">
+              Nimiq is a public blockchain - a shared digital ledger anyone can check.
               Browser-first Layer&nbsp;1
               <a href="#price-why-footnote-l1" className="price-page-why-fn-ref" aria-describedby="price-why-footnote-l1">
                 <sup>1</sup>
                 <span className="visually-hidden"> (explained below)</span>
               </a>
-              . The record lives on the chain, not our servers.{' '}
+              . When you lock, the proof is recorded on that ledger, not only on our servers.{' '}
               <a href={NIMIQ_URL} target="_blank" rel="noreferrer" className="price-page-nimiq-link">
                 nimiq.com
                 <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
@@ -464,10 +469,12 @@ export function PricePage({
               1
             </span>
             <span>
-              <strong>Layer&nbsp;1</strong> means Nimiq is its own public blockchain (not a side
-              system running on top of another chain). <strong>Browser-first</strong> means you can
-              use it from a normal web browser and wallet without installing heavy blockchain
-              software. For VeriLock, that is how your lock is recorded and checked online.
+              A <strong>blockchain</strong> is a public record of transactions that many computers
+              keep in sync - hard to rewrite after the fact.{' '}
+              <strong>Layer&nbsp;1</strong> means Nimiq is that chain itself (not a service built on
+              top of another one). <strong>Browser-first</strong> means you can use it from a normal
+              web browser and wallet without installing heavy software. VeriLock uses it to record
+              and check your lock online.
             </span>
           </p>
         </footer>
