@@ -165,7 +165,7 @@ export function buildShareEmailBody(
     ...(content.waitingOn.length > 0 ? [`• Still waiting on: ${content.waitingOn.join(', ')}`] : []),
     '',
     '-',
-    'VeriLock · Sign today. Prove forever.',
+    'VeriLock · Sign free. Lock when it matters.',
   ]
 
   return lines.join('\n')

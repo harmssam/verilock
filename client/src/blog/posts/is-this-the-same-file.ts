@@ -66,7 +66,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Sign today. Prove forever. Through the end of July, a permanent Nimiq on-chain lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
+      text: 'Sign free. Lock when it matters. Through the end of July, a permanent Nimiq on-chain lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
     },
   ],
 }

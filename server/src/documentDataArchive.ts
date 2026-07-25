@@ -550,6 +550,49 @@ const inflightArchives = new Map<string, Promise<void>>()
 /** Optional completion emails requested at job start (key = documentId). */
 const pendingNotifyEmails = new Map<string, string>()
 
+/**
+ * Live progress subscribers (SSE). In-process only — same process as the
+ * broadcast job. Multi-instance deployments should use sticky routing or fall
+ * back to GET polling (SQLite is shared).
+ */
+type ArchiveProgressListener = (quote: DataArchiveQuote) => void
+const archiveProgressListeners = new Map<string, Set<ArchiveProgressListener>>()
+
+export function subscribeArchiveProgress(
+  documentId: string,
+  listener: ArchiveProgressListener,
+): () => void {
+  let set = archiveProgressListeners.get(documentId)
+  if (!set) {
+    set = new Set()
+    archiveProgressListeners.set(documentId, set)
+  }
+  set.add(listener)
+  return () => {
+    const cur = archiveProgressListeners.get(documentId)
+    if (!cur) return
+    cur.delete(listener)
+    if (cur.size === 0) archiveProgressListeners.delete(documentId)
+  }
+}
+
+function publishArchiveProgress(documentId: string, walletAddress?: string | null): void {
+  const listeners = archiveProgressListeners.get(documentId)
+  if (!listeners || listeners.size === 0) return
+  try {
+    const quote = quoteDocumentDataArchive(documentId, walletAddress)
+    for (const listener of listeners) {
+      try {
+        listener(quote)
+      } catch (err) {
+        console.warn('[data-archive] progress listener failed', err)
+      }
+    }
+  } catch (err) {
+    console.warn('[data-archive] progress publish failed', err)
+  }
+}
+
 export function registerArchiveNotifyEmail(documentId: string, email: string): void {
   pendingNotifyEmails.set(documentId, email.trim().toLowerCase())
 }
@@ -571,7 +614,8 @@ function fireArchiveNotifyEmail(documentId: string, frameCount: number, creditsC
 /**
  * Charge credits (if needed), pin frames, start background multi-tx broadcast.
  * Returns quickly so Cloudflare/proxy (∼100s) never 524s long archives.
- * Client should poll GET .../on-chain-data until jobStatus is complete/failed.
+ * Client should subscribe GET .../on-chain-data/stream (SSE) for live TX
+ * progress, or poll GET .../on-chain-data as a fallback.
  *
  * If credits were already spent (timeout after charge), resume is free.
  */
@@ -672,6 +716,7 @@ export async function archiveDocumentDataOnChain(
     updatedAt: nowPin,
   }
   upsertDocumentDataArchive(existing)
+  publishArchiveProgress(documentId, address)
 
   // Background work - do not await (avoids 524 gateway timeouts on multi-tx).
   const job = runBackgroundBroadcast({
@@ -685,6 +730,8 @@ export async function archiveDocumentDataOnChain(
     if (inflightArchives.get(documentId) === job) {
       inflightArchives.delete(documentId)
     }
+    // Final snapshot for late SSE subscribers (complete / failed).
+    publishArchiveProgress(documentId, address)
   })
   inflightArchives.set(documentId, job)
 
@@ -739,6 +786,8 @@ async function runBackgroundBroadcast(input: {
       ...patch,
       updatedAt: Date.now(),
     })
+    // Push live TX progress to SSE clients (one open stream per watching client).
+    publishArchiveProgress(documentId, walletAddress)
   }
 
   try {

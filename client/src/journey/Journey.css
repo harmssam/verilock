@@ -2924,6 +2924,22 @@ a.hash-chip.text-link:focus-visible {
   color: var(--mint-deep, #0f766e);
 }
 
+.data-archive-public-notice {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid rgba(180, 120, 20, 0.28);
+  background: rgba(245, 180, 40, 0.1);
+  color: var(--lr-ink, #0f172a);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.data-archive-public-notice strong {
+  font-weight: 700;
+  color: #92400e;
+}
+
 .data-archive-note {
   margin: 0;
   font-size: 0.8rem;
@@ -2982,28 +2998,43 @@ a.hash-chip.text-link:focus-visible {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0.1rem;
   line-height: 1.05;
   font-variant-numeric: tabular-nums;
 }
 
+.data-archive-progress-hex {
+  display: block;
+}
+
+.data-archive-progress-hex-sm {
+  display: block;
+  margin-bottom: 0.05rem;
+}
+
 .data-archive-progress-tx-num {
-  font-size: 1.35rem;
+  font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
 .data-archive-progress-tx-of {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 600;
   opacity: 0.75;
 }
 
-.data-archive-progress-pct {
-  font-size: 0.95rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  color: inherit;
+.data-archive-step-dot {
+  display: block;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.35;
+}
+
+.data-archive-progress-tip {
+  text-align: center;
 }
 
 .data-archive-progress-bar {
@@ -3098,6 +3129,8 @@ a.hash-chip.text-link:focus-visible {
 }
 
 .data-archive-modal .credit-seal-progress-core {
+  width: 4.25rem;
+  height: 4.25rem;
   color: var(--mint-deep, #0f766e);
   background: rgba(13, 148, 136, 0.1);
   border-color: rgba(13, 148, 136, 0.35);

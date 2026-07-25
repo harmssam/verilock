@@ -525,22 +525,41 @@ export function AgreementsPage({
         return
       }
 
-      // Poll until complete / failed (or max ~8 minutes for large streams).
-      // ~1.5s so TX n of m updates feel live while server persists per frame.
-      const deadline = Date.now() + 8 * 60_000
-      let last: typeof started | null = started
-      while (Date.now() < deadline) {
-        await new Promise(r => setTimeout(r, 1500))
-        const quote = await api.getOnChainDataQuote(token, docId)
-        last = quote as typeof started
+      /**
+       * Apply a progress snapshot from SSE or poll. Returns true when the wait
+       * loop should stop (terminal success/failure).
+       */
+      const handleArchiveQuote = (
+        quote: {
+          frameCount?: number
+          confirmedFrames?: number
+          txHashes?: string[]
+          onChain?: boolean
+          jobStatus?: string
+          progressPercent?: number
+          balance?: number | null
+          error?: string | null
+          reason?: string
+          alreadyPaid?: boolean
+          eligible?: boolean
+          credits?: number
+        },
+      ): boolean => {
         applyArchiveProgressFromQuote(quote)
         if (typeof quote.balance === 'number') {
-          // Keep cache warm; re-broadcast on terminal states so refunds update the header.
           writeCreditsBalanceCache(token, quote.balance)
           setArchiveBalance(quote.balance)
         }
+        const frameCount = Math.max(0, Number(quote.frameCount) || 0)
+        const credits = Math.max(0, Number(quote.credits) || 0)
         if (quote.onChain || quote.jobStatus === 'complete') {
-          applyArchiveQuoteToDocs(docId, quote)
+          applyArchiveQuoteToDocs(docId, {
+            onChain: true,
+            eligible: false,
+            frameCount,
+            credits,
+            reason: quote.reason,
+          })
           if (typeof quote.balance === 'number') {
             publishCreditsBalance(token, quote.balance)
             setArchiveBalance(quote.balance)
@@ -551,11 +570,16 @@ export function AgreementsPage({
             setArchiveDone(true)
             setPendingArchive(docSnapshot)
           }
-          return
+          return true
         }
         if (quote.jobStatus === 'failed' && !quote.alreadyPaid) {
-          // Failed and refunded - show error + restore header credits.
-          applyArchiveQuoteToDocs(docId, quote)
+          applyArchiveQuoteToDocs(docId, {
+            onChain: false,
+            eligible: Boolean(quote.eligible),
+            frameCount,
+            credits,
+            reason: quote.reason,
+          })
           if (typeof quote.balance === 'number') {
             publishCreditsBalance(token, quote.balance)
             setArchiveBalance(quote.balance)
@@ -568,11 +592,16 @@ export function AgreementsPage({
               'Could not write data to the Nimiq blockchain (credits refunded if nothing was written)',
           )
           if (archiveModalOpenRef.current) setPendingArchive(docSnapshot)
-          return
+          return true
         }
         if (quote.jobStatus === 'failed' && quote.alreadyPaid) {
-          // Partial - can resume free; stop busy and show resume message.
-          applyArchiveQuoteToDocs(docId, { ...quote, eligible: true })
+          applyArchiveQuoteToDocs(docId, {
+            onChain: false,
+            eligible: true,
+            frameCount,
+            credits,
+            reason: quote.reason,
+          })
           if (typeof quote.balance === 'number') {
             publishCreditsBalance(token, quote.balance)
             setArchiveBalance(quote.balance)
@@ -585,22 +614,114 @@ export function AgreementsPage({
               'Partial write saved. Click Store forever again to resume (no extra charge).',
           )
           if (archiveModalOpenRef.current) setPendingArchive(docSnapshot)
-          return
+          return true
         }
-        // Still processing - keep UI busy with live TX counts
+        return false
       }
 
-      // Timed out polling (job may still be running server-side).
-      applyArchiveQuoteToDocs(docId, last ?? started)
-      if (typeof last?.balance === 'number') {
-        publishCreditsBalance(token, last.balance)
-        setArchiveBalance(last.balance)
+      // Prefer SSE: server pushes after each transmitted frame (O(1) connection,
+      // no quote rate-limit risk under many concurrent users). Poll is fallback.
+      // Hard deadline so archiveInFlightRef cannot stick forever if the stream stalls.
+      const waitDeadline = Date.now() + 8 * 60_000
+      let last: typeof started | null = started
+      let finished = false
+      try {
+        let terminalFromEvent = false
+        const sseAbort = new AbortController()
+        const sseTimeoutMs = Math.max(1_000, waitDeadline - Date.now())
+        const sseTimer = window.setTimeout(() => sseAbort.abort(), sseTimeoutMs)
+        let streamResult: 'complete' | 'failed' | 'closed' | 'aborted' = 'closed'
+        try {
+          streamResult = await api.streamOnChainDataProgress(
+            token,
+            docId,
+            quote => {
+              last = quote as typeof started
+              if (handleArchiveQuote(quote)) {
+                terminalFromEvent = true
+              }
+            },
+            { signal: sseAbort.signal },
+          )
+        } finally {
+          window.clearTimeout(sseTimer)
+        }
+        if (terminalFromEvent || streamResult === 'complete' || streamResult === 'failed') {
+          finished = true
+          // If stream ended without a terminal progress payload, pull one quote.
+          if (!terminalFromEvent) {
+            try {
+              const quote = await api.getOnChainDataQuote(token, docId)
+              last = quote as typeof started
+              handleArchiveQuote(quote)
+            } catch {
+              /* UI already reflects last SSE event */
+            }
+          }
+        } else if (streamResult === 'aborted') {
+          console.warn('[data-archive] SSE wait timed out, polling for status')
+        }
+      } catch (streamErr) {
+        // Stream open failed (proxy, old server, etc.) — fall back to poll.
+        console.warn('[data-archive] SSE unavailable, polling', streamErr)
       }
-      setArchiveBusy(false)
-      setArchiveError(
-        'Still writing in the background. Close this window and reopen Store forever later - if credits were charged, resume is free.',
-      )
-      if (archiveModalOpenRef.current) setPendingArchive(docSnapshot)
+
+      if (!finished) {
+        // Slow poll fallback (~8s). Fine for resume / multi-instance / SSE drop.
+        // First poll is immediate so a failed SSE open does not stall the UI.
+        let pollDelayMs = 8000
+        let firstPoll = true
+        while (Date.now() < waitDeadline) {
+          if (!firstPoll) {
+            await new Promise(r => setTimeout(r, pollDelayMs))
+          }
+          firstPoll = false
+          if (Date.now() >= waitDeadline) break
+          try {
+            const quote = await api.getOnChainDataQuote(token, docId)
+            pollDelayMs = 8000
+            last = quote as typeof started
+            if (handleArchiveQuote(quote)) {
+              finished = true
+              break
+            }
+          } catch (pollErr) {
+            const msg = pollErr instanceof Error ? pollErr.message : ''
+            if (/too many requests|slow down|429/i.test(msg)) {
+              pollDelayMs = Math.min(20_000, Math.round(pollDelayMs * 1.5))
+              continue
+            }
+            throw pollErr
+          }
+        }
+      }
+
+      if (!finished) {
+        // One last status pull before giving up (catches jobs that finished during a stall).
+        try {
+          const quote = await api.getOnChainDataQuote(token, docId)
+          last = quote as typeof started
+          if (handleArchiveQuote(quote)) {
+            finished = true
+          }
+        } catch {
+          /* keep timeout path */
+        }
+      }
+
+      if (!finished) {
+        // Timed out waiting (job may still be running server-side).
+        applyArchiveQuoteToDocs(docId, last ?? started)
+        if (typeof last?.balance === 'number') {
+          publishCreditsBalance(token, last.balance)
+          setArchiveBalance(last.balance)
+        }
+        setArchiveBusy(false)
+        setArchiveError(
+          'Still writing in the background. Close this window and reopen Store forever later - if credits were charged, resume is free.',
+        )
+        if (archiveModalOpenRef.current) setPendingArchive(docSnapshot)
+      }
     } catch (err) {
       setArchiveBusy(false)
       // 524 / network: job may still be running or already paid - refresh quote.

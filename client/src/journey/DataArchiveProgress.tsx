@@ -1,55 +1,34 @@
 /**
  * Wait UI while multi-tx data archive runs on the server.
- * Prefer real TX counts from the server poll (e.g. TX 12 of 80); fall back to a
- * soft timer only when no counts are available yet.
+ * Prefer real TX counts from SSE progress events (e.g. TX 12 of 80); fall back
+ * to poll snapshots or a soft timer only when no counts are available yet.
  */
-import {
-  Check,
-  Coins,
-  Database,
-  Link2,
-  LoaderCircle,
-  Server,
-  Sparkles,
-} from 'lucide-react'
+import { Check, LoaderCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
 
 export type DataArchivePhase = 'charge' | 'write' | 'confirm' | 'done'
 
 const PHASE_ORDER: DataArchivePhase[] = ['charge', 'write', 'confirm', 'done']
 
-const PHASE_META: Record<
-  DataArchivePhase,
-  { label: string; detail: string; Icon: typeof Database }
-> = {
+const PHASE_META: Record<DataArchivePhase, { label: string; detail: string }> = {
   charge: {
     label: 'Reserve credits',
-    detail: 'Credits held for permanent storage',
-    Icon: Coins,
+    detail: 'Held for permanent storage',
   },
   write: {
-    label: 'Write to blockchain',
-    detail: 'VeriLock posts each data transaction on Nimiq',
-    Icon: Server,
+    label: 'Write to Nimiq',
+    detail: 'Posting each transaction',
   },
   confirm: {
     label: 'Confirm on chain',
-    detail: 'Checking that posted transactions are visible',
-    Icon: Link2,
+    detail: 'Checking visibility',
   },
   done: {
     label: 'Stored forever',
-    detail: 'Data is permanent on the Nimiq blockchain',
-    Icon: Database,
+    detail: 'Permanent on Nimiq',
   },
 }
-
-const WAIT_TIPS = [
-  'You do not need to stay on this page - work continues on VeriLock’s servers.',
-  'The PDF never leaves your devices. Only signatures and form fields go on-chain.',
-  'Larger agreements need more transactions. Leaving is fine.',
-  'Come back anytime under My agreements to see the “Data on blockchain” badge.',
-]
 
 function phaseIndex(phase: DataArchivePhase): number {
   return PHASE_ORDER.indexOf(phase)
@@ -117,7 +96,6 @@ export function DataArchiveProgress({
   done = false,
   notifyEmail = null,
 }: DataArchiveProgressProps) {
-  const [tipIndex, setTipIndex] = useState(0)
   const [elapsedSec, setElapsedSec] = useState(0)
 
   const total = Math.max(0, Math.floor(frameCount))
@@ -158,7 +136,6 @@ export function DataArchiveProgress({
     if (hasRealProgress && total > 0) {
       // Write phase: 0–90% from submitted txs; confirm phase: 90–99% until done
       if (doneCount! >= total) {
-        // Gentle pulse in confirm without faking 100
         const confirmBoost = Math.min(9, Math.floor(elapsedSec / 3))
         return Math.min(99, 90 + confirmBoost)
       }
@@ -172,49 +149,30 @@ export function DataArchiveProgress({
   const active = phaseIndex(phase)
 
   useEffect(() => {
-    const reduceMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduceMotion) return
-    const id = window.setInterval(() => {
-      setTipIndex(i => (i + 1) % WAIT_TIPS.length)
-    }, 4800)
-    return () => window.clearInterval(id)
-  }, [])
-
-  useEffect(() => {
     setElapsedSec(0)
     const id = window.setInterval(() => setElapsedSec(s => s + 1), 1000)
     return () => window.clearInterval(id)
   }, [])
 
+  /** One status line — no duplicate TX captions below. */
   const statusLine = useMemo(() => {
     if (phase === 'done') {
-      return message?.trim() || 'Stored forever on the Nimiq blockchain.'
+      return message?.trim() || 'Stored forever on Nimiq.'
     }
     if (phase === 'confirm') {
       if (hasRealProgress) {
-        return `All ${total} transactions submitted — confirming on Nimiq…`
+        return `All ${total} transactions submitted — confirming…`
       }
-      return 'Confirming on the Nimiq blockchain…'
+      return 'Confirming on Nimiq…'
     }
     if (phase === 'write' && hasRealProgress) {
-      return `Writing transaction ${Math.min(doneCount! + (doneCount! < total ? 1 : 0), total) || 1} of ${total}…`
+      if (doneCount === 0) return 'Writing to Nimiq…'
+      // Show completed count (matches the logo counter), not next-tx off-by-one.
+      return `Transaction ${doneCount} of ${total}`
     }
-    if (phase === 'write') return 'Writing to the Nimiq blockchain…'
+    if (phase === 'write') return 'Writing to Nimiq…'
     return 'Getting ready…'
   }, [phase, message, hasRealProgress, doneCount, total])
-
-  const progressCaption = useMemo(() => {
-    if (phase === 'done') return 'Done'
-    if (hasRealProgress) {
-      if (phase === 'confirm') {
-        return `TX ${total} of ${total} submitted · Confirming…`
-      }
-      return `TX ${doneCount} of ${total}`
-    }
-    return 'Starting…'
-  }, [phase, hasRealProgress, doneCount, total])
 
   const creditLabel =
     credits != null && credits > 0
@@ -240,33 +198,28 @@ export function DataArchiveProgress({
           }`}
         >
           {phase === 'done' ? (
-            <Database size={28} strokeWidth={2.25} />
+            <NimiqHexagonIcon size={32} className="data-archive-progress-hex" />
           ) : hasRealProgress ? (
             <span className="data-archive-progress-tx" aria-hidden>
+              <NimiqHexagonIcon size={18} className="data-archive-progress-hex-sm" />
               <span className="data-archive-progress-tx-num">{doneCount}</span>
               <span className="data-archive-progress-tx-of">/{total}</span>
             </span>
           ) : (
-            <span className="data-archive-progress-pct">{percent}%</span>
+            <NimiqHexagonIcon size={28} className="data-archive-progress-hex" />
           )}
         </div>
       </div>
 
       <div className="credit-seal-progress-copy">
-        <p className="credit-seal-progress-kicker">
-          <Sparkles size={14} strokeWidth={2.25} aria-hidden />
-          {creditLabel
-            ? `Storing with ${creditLabel}`
-            : 'Storing on the Nimiq blockchain'}
-        </p>
         <h3 className="credit-seal-progress-title">
-          {phase === 'done'
-            ? 'Stored on the Nimiq blockchain'
-            : 'Writing your data on-chain'}
+          {phase === 'done' ? 'Stored on Nimiq' : 'Storing on Nimiq'}
         </h3>
         {title && <p className="credit-seal-progress-doc muted">{title}</p>}
         <p className="credit-seal-progress-status">{statusLine}</p>
-        <p className="credit-seal-progress-elapsed muted">{progressCaption}</p>
+        {creditLabel && phase !== 'done' && (
+          <p className="credit-seal-progress-elapsed muted">{creditLabel}</p>
+        )}
       </div>
 
       <div
@@ -290,7 +243,6 @@ export function DataArchiveProgress({
       <ol className="credit-seal-progress-steps">
         {PHASE_ORDER.filter(p => p !== 'done').map((p, i) => {
           const meta = PHASE_META[p]
-          const Icon = meta.Icon
           const stepDone = active > i || phase === 'done'
           const current = active === i && phase !== 'done'
           return (
@@ -314,16 +266,12 @@ export function DataArchiveProgress({
                     strokeWidth={2.25}
                   />
                 ) : (
-                  <Icon size={16} strokeWidth={2.25} />
+                  <span className="data-archive-step-dot" />
                 )}
               </span>
               <span className="credit-seal-progress-step-text">
                 <strong>{meta.label}</strong>
-                <span className="muted">
-                  {p === 'write' && hasRealProgress && phase === 'write'
-                    ? `TX ${doneCount} of ${total}`
-                    : meta.detail}
-                </span>
+                <span className="muted">{meta.detail}</span>
               </span>
             </li>
           )
@@ -331,28 +279,15 @@ export function DataArchiveProgress({
       </ol>
 
       {phase !== 'done' && (
-        <div className="credit-seal-progress-leave">
-          <Server size={18} strokeWidth={2.25} aria-hidden />
-          <div>
-            <strong>You do not need to wait here</strong>
-            <p className="muted">
-              Writing runs on VeriLock&apos;s servers. Close this window or switch apps -
-              reopen My agreements anytime for the status
-              {notifyEmail ? ', or check your email when it finishes' : ''}.
-            </p>
-          </div>
-        </div>
+        <p className="credit-seal-progress-tip data-archive-progress-tip">
+          Work continues on VeriLock&apos;s servers — you can close this window
+          {notifyEmail ? '; we will email you when it finishes' : ''}.
+        </p>
       )}
 
       {phase === 'done' && notifyEmail && (
         <p className="credit-seal-progress-tip">
           A confirmation email is on its way to <strong>{notifyEmail}</strong>.
-        </p>
-      )}
-
-      {phase !== 'done' && (
-        <p className="credit-seal-progress-tip" key={tipIndex}>
-          {WAIT_TIPS[tipIndex]}
         </p>
       )}
     </div>
