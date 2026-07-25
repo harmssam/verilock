@@ -5,6 +5,8 @@ import {
   getDocumentById,
   getDocumentBySlug,
   getDocumentDataArchive,
+  getDocumentListArchivedAt,
+  getDocumentListArchivedMap,
   getPartiesForDocument,
   getPartyById,
   getSignaturesForDocument,
@@ -18,6 +20,7 @@ import {
   claimPartyWalletIfOpen,
   isUniqueConstraintError,
   runInTransaction,
+  setDocumentListArchived,
   updatePartyDisplayName,
   markPartySigned,
   markPartyUnsigned,
@@ -169,6 +172,11 @@ export interface PublicDocumentOptions {
    * and signature image URLs. Anonymous / unrelated wallets get redacted PII.
    */
   viewerAddress?: string | null
+  /**
+   * Viewer-scoped soft archive timestamp (hide from Inbox / Completed).
+   * Pass from a batch map on list endpoints; omit to look up when viewer is set.
+   */
+  listArchivedAt?: number | null
 }
 
 /**
@@ -206,6 +214,18 @@ export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOpti
     options?.viewerAddress,
   )
 
+  let listArchivedAt: number | null = null
+  if (options?.viewerAddress && revealPrivate) {
+    if (options.listArchivedAt !== undefined) {
+      listArchivedAt =
+        typeof options.listArchivedAt === 'number' && options.listArchivedAt > 0
+          ? options.listArchivedAt
+          : null
+    } else {
+      listArchivedAt = getDocumentListArchivedAt(options.viewerAddress, freshDoc.id)
+    }
+  }
+
   return {
     id: freshDoc.id,
     slug: freshDoc.slug,
@@ -229,6 +249,11 @@ export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOpti
       normalizeAddress(freshDoc.creatorAddress) === normalizeAddress(options.viewerAddress)
         ? dataArchiveSummaryForDocument(freshDoc.id)
         : null,
+    /**
+     * Viewer-scoped soft archive (hide from default agreements list).
+     * Null/omitted when not a participant or not archived. Not on-chain data archive.
+     */
+    listArchivedAt,
     createdAt: freshDoc.createdAt,
     lockedAt: freshDoc.lockedAt,
     requiredSignatures: requiredCount,
@@ -925,9 +950,40 @@ export function beginLock(documentId: string, requesterAddress: string) {
 }
 
 export function getMyDocuments(address: string) {
-  return listDocumentsForAddress(address).map(doc =>
-    publicDocument(doc, { viewerAddress: address }),
+  const docs = listDocumentsForAddress(address)
+  const archivedMap = getDocumentListArchivedMap(
+    address,
+    docs.map(d => d.id),
   )
+  return docs.map(doc =>
+    publicDocument(doc, {
+      viewerAddress: address,
+      listArchivedAt: archivedMap.get(doc.id) ?? null,
+    }),
+  )
+}
+
+/**
+ * Soft-archive (or restore) an agreement on this wallet’s list only.
+ * Distinct from on-chain data archive and from server purge.
+ */
+export function setMyDocumentListArchived(
+  documentId: string,
+  requesterAddress: string,
+  archived: boolean,
+) {
+  const doc = getDocumentById(documentId) ?? getDocumentBySlug(documentId)
+  if (!doc) throw new Error('Document not found')
+  const parties = getPartiesForDocument(doc.id)
+  const signatures = getSignaturesForDocument(doc.id)
+  if (!canRevealParticipantDetails(doc, parties, signatures, requesterAddress)) {
+    throw new Error('Only participants can archive this agreement from their list')
+  }
+  const listArchivedAt = setDocumentListArchived(requesterAddress, doc.id, archived)
+  return publicDocument(doc, {
+    viewerAddress: requesterAddress,
+    listArchivedAt,
+  })
 }
 
 export function getDocumentPublic(idOrSlug: string, viewerAddress?: string | null) {

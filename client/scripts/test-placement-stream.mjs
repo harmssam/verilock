@@ -24,8 +24,9 @@ const ZERO_ROOT =
 const STREAM_MAGIC = 0xa1
 const STREAM_VERSION_V2 = 2
 const FRAME_SIZE = 64
-const FRAME_HEADER = 9
-const FRAME_BODY = 55
+const ASSOC_LEN = 8
+const FRAME_HEADER = 5 + ASSOC_LEN // 13
+const FRAME_BODY = 64 - FRAME_HEADER // 51
 const FRAME_HEAD = 1
 const FRAME_DATA = 2
 const FRAME_END = 3
@@ -271,10 +272,8 @@ function packPlacementBatch(batch) {
     frame[2] = type
     frame[3] = s & 0xff
     frame[4] = tot & 0xff
-    frame[5] = hash[0]
-    frame[6] = hash[1]
-    frame[7] = hash[2]
-    frame[8] = hash[3]
+    // 8-byte association id = first 8 of PDF hash
+    for (let i = 0; i < ASSOC_LEN; i++) frame[5 + i] = hash[i]
   }
   {
     const f = new Uint8Array(FRAME_SIZE)
@@ -423,6 +422,13 @@ async function main() {
   const frames0 = packPlacementBatch(batch0)
   assert(frames0[0][1] === 2, 'stream version 2')
   assert(frames0.length >= 2, 'plan frames')
+  // 8-byte association id on every frame
+  const pdfBytes = hexToBytes(PDF)
+  assert(
+    frames0[0][5] === pdfBytes[0] && frames0[0][12] === pdfBytes[7],
+    '8-byte assoc id on HEAD',
+  )
+  assert(frames0[1][5] === frames0[0][5], 'DATA shares association id')
   const un0 = await unpackPlacementBatch(frames0)
   assert(un0.batchRoot === batch0Root, 'batchRoot matches after unpack')
   assert(un0.wire.places.length === 3, 'places on wire')

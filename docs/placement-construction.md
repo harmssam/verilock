@@ -24,14 +24,16 @@ After **Lock placements**, geometry and assignees are immutable. Fills append on
 Same 64-byte frame layout as v1 annotation streams:
 
 ```
-[0]     MAGIC 0xA1
-[1]     VERSION 2
-[2]     type: HEAD=1 | DATA=2 | END=3
-[3]     seq
-[4]     total frames
-[5..8]  PDF SHA-256 prefix (4 B)
-[9..63] body (55 B)
+[0]      MAGIC 0xA1
+[1]      VERSION 2
+[2]      type: HEAD=1 | DATA=2 | END=3
+[3]      seq
+[4]      total frames
+[5..12]  Association id = first 8 bytes of PDF SHA-256 (hash-only recovery)
+[13..63] body (51 B)
 ```
+
+Legacy frames used a 4-byte prefix at [5..8] and body at [9..63]; unpackers detect both.
 
 HEAD body: full 32B pdf hash + payloadLen u32 + batchIndex u16 + CRC32.
 

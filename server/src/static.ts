@@ -18,6 +18,7 @@ function isKnownAppPath(path: string): boolean {
   if (isPdfAnnotationUiEnabled()) {
     if (/^\/pdf\/?$/.test(path)) return true
     if (/^\/pdf\/lab\/?$/.test(path)) return true
+    if (/^\/pdf2\/?$/.test(path)) return true
   }
   if (/^\/d\/[^/]+\/?$/.test(path)) return true
   if (/^\/v\/[^/]+\/?$/.test(path)) return true

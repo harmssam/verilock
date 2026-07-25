@@ -151,6 +151,11 @@ export interface SealDocument {
    * Null for non-creators or when there is nothing to surface.
    */
   dataArchive?: DocumentDataArchiveSummary | null
+  /**
+   * Viewer-scoped soft archive: hide from Inbox / Completed (still in Archived).
+   * Null/omitted when not archived for this wallet. Not the on-chain data archive.
+   */
+  listArchivedAt?: number | null
 }
 
 /** Lightweight status for the “store data forever” upsell on My Agreements. */

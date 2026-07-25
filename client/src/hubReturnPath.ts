@@ -167,12 +167,17 @@ export function isBlogPath(path: string): boolean {
 
 /** PDF annotation experiment (local overlays, no pdf-lib). */
 export function isPdfPath(path: string): boolean {
-  return /^\/pdf\/?$/.test(path) || isPdfLabPath(path)
+  return /^\/pdf\/?$/.test(path) || isPdfLabPath(path) || isPdf2Path(path)
 }
 
 /** Signature encoding lab under /pdf/lab */
 export function isPdfLabPath(path: string): boolean {
   return /^\/pdf\/lab\/?$/.test(path)
+}
+
+/** Hash-only archive reconstruct demo under /pdf2 */
+export function isPdf2Path(path: string): boolean {
+  return /^\/pdf2\/?$/.test(path)
 }
 
 /** Cross-device mobile signature capture (`/m/sign/:sessionId`). */

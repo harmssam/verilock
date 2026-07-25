@@ -185,11 +185,13 @@ Separate from seals. Multi-tx overlay frames for PDF annotations (path/text/chec
 | Byte | Meaning |
 |------|---------|
 | 0 | Magic **`0xA1`** (never `0x01` - seal verifier will reject stream txs as seals) |
-| 1 | Stream version (`1` free-form annotations, **`2` placement construction batches**) |
+| 1 | Stream version (`1` free-form annotations, **`2` placement**, **`3` archive manifest**) |
 | 2 | Frame type: HEAD / DATA / END |
 | 3–4 | seq / total frames |
-| 5–8 | PDF hash prefix |
-| 9–63 | Body (55 B) |
+| 5–12 | **Association id** = first **8 bytes** of PDF SHA-256 (hash-only chain discovery) |
+| 13–63 | Body (51 B); HEAD body starts with full 32-byte PDF hash |
+
+Legacy frames used a 4-byte prefix at bytes 5–8 and body at 9; unpackers accept both.
 
 - Cap: **128 frames** per stream (`MAX_STREAM_FRAMES`); wire JSON floats quantized to cut path size.
 - Value: **1 luna** per frame (aligned with credit seal dust), fee 0.
@@ -197,7 +199,17 @@ Separate from seals. Multi-tx overlay frames for PDF annotations (path/text/chec
 - Ownership: stream row bound to publisher wallet; overwrite only by same address.
 - Reconstruct: re-read `recipientData` from each tx hash; require `executionResult !== false` and exact 64 B; optional `?fallback=index` vs `?fallback=none`.
 
-**Version 2 (placement construction):** each multi-tx sequence is one **append batch** (plan lock or fill). Payload JSON carries `people`/`places` (geometry only), content-addressed `blobs` (ink/text), and `fills` (slot → blob_id). Identical ink is emitted once (`blob_id = sha256(payload)[0:16]`); batches chain via `prevRoot`. See `docs/placement-construction.md`, `client/src/pdf/placements.ts`, `client/src/pdf/placementStream.ts`.
+**Version 2 (placement construction):** each multi-tx sequence is one **append batch** (plan lock or fill). Payload JSON carries `people`/`places` (geometry + optional wallet `w`), content-addressed `blobs` (ink/text), and `fills` (slot → blob_id). Identical ink is emitted once (`blob_id = sha256(payload)[0:16]`); batches chain via `prevRoot`. See `docs/placement-construction.md`, `client/src/pdf/placements.ts`, `client/src/pdf/placementStream.ts`.
+
+**Version 3 (archive manifest):** paid **Store forever** appends a final HEAD+DATA*+END stream with people, wallets, and signature roster so offline apps can reconstruct identity from the chain (not only ink). Packer: `server/src/archiveStream.ts`.
+
+**Public reconstruct (hash only):**
+
+| Endpoint | Auth | Purpose |
+|----------|------|---------|
+| `GET /api/chain-data/:sha256` | none | Tx hash index for an archived fingerprint |
+| `GET /api/chain-data/:sha256/reconstruct?source=wire\|chain` | none | Unpack placement batches + manifest |
+| `GET /api/documents/:id/on-chain-data/recovery` | creator | Full recovery JSON (frames + hashes) for offline |
 
 Seal verification still requires exact 37-byte `0x01` payload - stream txs cannot satisfy `verifyAttestationPayload`.
 

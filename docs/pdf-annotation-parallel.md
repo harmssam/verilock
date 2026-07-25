@@ -8,6 +8,7 @@ The PDF overlay + Nimiq stream work is a **parallel product path**. It must not 
 |---------|------|
 | `/` … `/d/:slug`, seal, credits | **Active product** - DocumentJourney |
 | `/pdf`, `/pdf/lab` | **Lab** - annotate, pack, on-chain stream, reconstruct |
+| `/pdf2` | **Lab** - hash-only archive demo (8-byte assoc id, multi-tx, scan reconstruct) |
 
 No landing path card points at `/pdf` unless you add one later.
 
@@ -32,7 +33,8 @@ No landing path card points at `/pdf` unless you add one later.
 **Option A - same site, lab URL only (current)**  
 - Product: `https://verilock.online/`  
 - Lab: `https://verilock.online/pdf` (noindex)  
-- Seal path unchanged; only `/pdf` uses lab code.
+- Hash-only archive demo: `http://localhost:5176/pdf2` (or your dev port)  
+- Seal path unchanged; only `/pdf` / `/pdf2` use lab code.
 
 **Option B - Railway staging environment (recommended for risky deploys)**  
 

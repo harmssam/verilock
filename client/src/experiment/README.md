@@ -1,50 +1,30 @@
-# Experiment: PDF annotations (no pdf-lib)
+# Experiment / lab UIs
 
-Local-only PDF overlays stored as JSON on the document record.
+Parallel to production seal. Gated by `PDF_ANNOTATION_UI` / `FEATURES.pdfAnnotationUi`.
 
-## Flow
+| Route | Component | Purpose |
+|-------|-----------|---------|
+| `/pdf` | `DocumentJourney.tsx` | Annotate, pack v1 stream, optional on-chain publish |
+| `/pdf/lab` | `SignatureLab.tsx` | Signature encoding / frame-size estimates |
+| `/pdf2` | `ArchiveLab.tsx` | **Hash-only archive demo**: 8-byte association id, multi-stream pack, service-wallet broadcast, reconstruct via `GET /api/chain-data/:sha?source=scan` |
 
-1. User selects a PDF → rendered with **pdf.js** (never uploaded).
-2. User draws a signature / places text → **normalized coordinates** + image/text payload.
-3. `POST /api/documents` with `originalSha256` + `annotations` only (no PDF bytes).
-4. On verify: re-open the original file locally, fetch annotations from the API, reconstruct via canvas overlay.
-5. **Placement v2 (lab):** client packer for construction plan + fill batches with content-addressed blob dedup (`placements.ts` / `placementStream.ts`). See `docs/placement-construction.md`.
+## Local smoke test for `/pdf2`
 
-## Modules
+```bash
+# terminal 1 - API (from repo root)
+export ANNOTATION_STREAM_BROADCAST=true
+export SERVICE_WALLET_PRIVATE_KEY=<32-byte hex>   # funded, ≠ ATTESTATION_RECIPIENT
+npm run dev   # or server + client separately
 
-| Path | Role |
-|------|------|
-| `client/src/pdf/annotations.ts` | Types + coordinate transform |
-| `client/src/pdf/pdfDocument.ts` | pdf.js load/render helpers |
-| `client/src/pdf/PdfAnnotator.tsx` | Place signature/text on pages |
-| `client/src/pdf/PdfReconstructor.tsx` | Overlay annotations for verify |
-| `client/src/experiment/DocumentJourney.tsx` | Create + verify experiment UI |
-
-## Wiring
-
-Mounted in the production shell (noindex):
-
-| URL | UI |
-|-----|-----|
-| `/pdf` | Annotate PDF + create/verify |
-| `/pdf/lab` | **Signature encoding lab** - draw, RDP simplify, compare PNG vs path sizes / ~Nimiq frames |
-
-```text
-http://localhost:5176/pdf
-http://localhost:5176/pdf/lab
+# browser
+open http://localhost:5176/pdf2
 ```
 
-## Server
+1. Connect wallet (auth only — dust comes from service wallet)  
+2. Drop a PDF → note association id (first 16 hex of fingerprint)  
+3. Draw a signature  
+4. **Pack locally** → frame counts  
+5. **Publish to Nimiq** → tx list  
+6. **Scan Nimiq (hash only)** → painted reconstruct  
 
-- `documents.annotations` TEXT column (nullable JSON) - legacy docs stay `NULL`.
-- `publicDocument()` returns `annotations`.
-- Create route rejects accidental PDF byte fields.
-- Annotation streams (`POST /api/annotation-streams`): owner-scoped, max 32 frames, optional on-chain broadcast (`ANNOTATION_STREAM_BROADCAST` + service wallet).
-- Reconstruct: `GET /api/annotation-streams/:sha256/reconstruct?fallback=index|none`.
-
-## Coordinate system
-
-Normalized fractions of page size, **top-left origin** (CSS-like):
-
-- `x`, `y`, `width`, `height` ∈ [0, 1]
-- Independent of zoom / devicePixelRatio when reconstructing
+No seal credits are charged.

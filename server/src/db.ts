@@ -473,6 +473,11 @@ export function deleteDocumentById(documentId: string): boolean {
     } catch {
       /* optional */
     }
+    try {
+      db.prepare('DELETE FROM document_list_prefs WHERE document_id = ?').run(id)
+    } catch {
+      /* optional table */
+    }
     db.prepare('DELETE FROM documents WHERE id = ?').run(id)
   })
 
@@ -498,6 +503,92 @@ export function listDocumentsForAddress(address: string): DocumentRecord[] {
     )
     .all(wallet, wallet, wallet) as Record<string, unknown>[]
   return rows.map(rowToDocument)
+}
+
+// ── Per-wallet list prefs (soft “hide from default list”) ───────────────────
+// Distinct from on-chain data archive (`document_data_archives`). This only
+// affects how the agreements inbox is organized for one wallet.
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS document_list_prefs (
+    wallet_address TEXT NOT NULL,
+    document_id TEXT NOT NULL,
+    archived_at INTEGER NOT NULL,
+    PRIMARY KEY (wallet_address, document_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_document_list_prefs_wallet
+    ON document_list_prefs(wallet_address);
+`)
+
+/** Soft-archive (or restore) a document for one wallet’s agreements list. */
+export function setDocumentListArchived(
+  walletAddress: string,
+  documentId: string,
+  archived: boolean,
+): number | null {
+  const wallet = normalizeAddress(walletAddress)
+  const id = documentId.trim()
+  if (!id) return null
+  if (archived) {
+    const at = Date.now()
+    db.prepare(
+      `INSERT INTO document_list_prefs (wallet_address, document_id, archived_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(wallet_address, document_id) DO UPDATE SET archived_at = excluded.archived_at`,
+    ).run(wallet, id, at)
+    return at
+  }
+  db.prepare(
+    'DELETE FROM document_list_prefs WHERE wallet_address = ? AND document_id = ?',
+  ).run(wallet, id)
+  return null
+}
+
+/** archived_at timestamps for a wallet across a set of document ids. */
+export function getDocumentListArchivedMap(
+  walletAddress: string,
+  documentIds: string[],
+): Map<string, number> {
+  const out = new Map<string, number>()
+  const wallet = normalizeAddress(walletAddress)
+  const ids = documentIds.map(id => id.trim()).filter(Boolean)
+  if (ids.length === 0) return out
+
+  // Chunk IN queries to stay under SQLite variable limits.
+  const chunkSize = 80
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize)
+    const placeholders = chunk.map(() => '?').join(', ')
+    const rows = db
+      .prepare(
+        `SELECT document_id, archived_at FROM document_list_prefs
+         WHERE wallet_address = ? AND document_id IN (${placeholders})`,
+      )
+      .all(wallet, ...chunk) as Array<{ document_id: string; archived_at: number }>
+    for (const row of rows) {
+      if (typeof row.archived_at === 'number' && row.archived_at > 0) {
+        out.set(row.document_id, row.archived_at)
+      }
+    }
+  }
+  return out
+}
+
+export function getDocumentListArchivedAt(
+  walletAddress: string,
+  documentId: string,
+): number | null {
+  const wallet = normalizeAddress(walletAddress)
+  const id = documentId.trim()
+  if (!id) return null
+  const row = db
+    .prepare(
+      `SELECT archived_at FROM document_list_prefs
+       WHERE wallet_address = ? AND document_id = ?`,
+    )
+    .get(wallet, id) as { archived_at: number } | undefined
+  if (!row || typeof row.archived_at !== 'number' || row.archived_at <= 0) return null
+  return row.archived_at
 }
 
 export function insertParty(party: PartyRecord): void {
@@ -1044,17 +1135,26 @@ export function getDocumentDataArchive(documentId: string): DocumentDataArchiveR
 
 /**
  * Public reconstruct index: latest on-chain archive for a PDF fingerprint.
- * Prefer completed rows; fall back to any row with frames for that hash.
+ *
+ * Lab rows (`lab:<sha>`) are excluded so free /pdf2 publishes never displace
+ * paid production "Store forever" archives for the same fingerprint.
+ * Prefer on_chain complete non-lab rows; fall back to any non-lab row with frames.
  */
 export function getDocumentDataArchiveBySha256(
   originalSha256: string,
 ): DocumentDataArchiveRecord | null {
   const hash = originalSha256.toLowerCase()
+  // Exclude lab: prefix — production document ids are UUIDs (never start with lab:)
   const onChain = db
     .prepare(
       `SELECT * FROM document_data_archives
-       WHERE original_sha256 = ? AND on_chain = 1
-       ORDER BY updated_at DESC LIMIT 1`,
+       WHERE original_sha256 = ?
+         AND on_chain = 1
+         AND document_id NOT LIKE 'lab:%'
+       ORDER BY
+         CASE WHEN credits_charged > 0 THEN 0 ELSE 1 END,
+         updated_at DESC
+       LIMIT 1`,
     )
     .get(hash) as Record<string, unknown> | undefined
   if (onChain) return rowToDataArchive(onChain)
@@ -1062,10 +1162,27 @@ export function getDocumentDataArchiveBySha256(
     .prepare(
       `SELECT * FROM document_data_archives
        WHERE original_sha256 = ?
-       ORDER BY updated_at DESC LIMIT 1`,
+         AND document_id NOT LIKE 'lab:%'
+       ORDER BY
+         CASE WHEN credits_charged > 0 THEN 0 ELSE 1 END,
+         updated_at DESC
+       LIMIT 1`,
     )
     .get(hash) as Record<string, unknown> | undefined
   return any ? rowToDataArchive(any) : null
+}
+
+/** Lab-only lookup by fingerprint (document_id = lab:&lt;sha&gt;). Not used for public product index. */
+export function getLabDocumentDataArchive(
+  originalSha256: string,
+): DocumentDataArchiveRecord | null {
+  const hash = originalSha256.toLowerCase()
+  const row = db
+    .prepare(
+      `SELECT * FROM document_data_archives WHERE document_id = ?`,
+    )
+    .get(`lab:${hash}`) as Record<string, unknown> | undefined
+  return row ? rowToDataArchive(row) : null
 }
 
 export function upsertDocumentDataArchive(rec: DocumentDataArchiveRecord): void {

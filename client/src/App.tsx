@@ -37,6 +37,7 @@ import { AgreementsPage } from './journey/AgreementsPage'
 import { BlogPage } from './journey/BlogPage'
 import { DocumentJourney } from './journey/DocumentJourney'
 import { DocumentJourney as PdfAnnotationJourney } from './experiment/DocumentJourney'
+import { ArchiveLab } from './experiment/ArchiveLab'
 import { SignatureLab } from './experiment/SignatureLab'
 import { NotFoundPage } from './journey/NotFoundPage'
 import { useCreditBalance } from './journey/useCreditBalance'
@@ -112,6 +113,7 @@ type ShellScreen =
   | 'blog'
   | 'pdf'
   | 'pdf-lab'
+  | 'pdf2'
   | 'sign-mobile'
   | 'not-found'
 
@@ -124,6 +126,7 @@ function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotation
   if (isAgreementsPath(pathname)) return 'agreements'
   if (isBlogPath(pathname)) return 'blog'
   // PDF lab is parallel to seal - only mount when flag allows
+  if (pdfLabEnabled && /^\/pdf2\/?$/.test(pathname)) return 'pdf2'
   if (pdfLabEnabled && isPdfLabPath(pathname)) return 'pdf-lab'
   if (pdfLabEnabled && isPdfPath(pathname)) return 'pdf'
   if (!isKnownAppPath(pathname)) return 'not-found'
@@ -284,7 +287,8 @@ export function App() {
       !isAgreementsPath(window.location.pathname) &&
       !isBlogPath(window.location.pathname) &&
       !isPdfPath(window.location.pathname) &&
-      !isPdfLabPath(window.location.pathname)
+      !isPdfLabPath(window.location.pathname) &&
+      !/^\/pdf2\/?$/.test(window.location.pathname)
     ) {
       journeyReturnPathRef.current = path || '/'
     }
@@ -529,7 +533,7 @@ export function App() {
       applyPageMeta({ ...PAGE_META.blog })
       return
     }
-    if (screen === 'pdf' || screen === 'pdf-lab') {
+    if (screen === 'pdf' || screen === 'pdf-lab' || screen === 'pdf2') {
       applyPageMeta({
         ...PAGE_META.pdf,
         ...(screen === 'pdf-lab'
@@ -539,7 +543,15 @@ export function App() {
               description:
                 'Compare signature PNG vs simplified vector paths and estimated Nimiq frame counts.',
             }
-          : {}),
+          : screen === 'pdf2'
+            ? {
+                title: 'Hash-only archive lab · VeriLock',
+                path: '/pdf2',
+                description:
+                  'Demo: pack signatures with 8-byte association ids, publish multi-tx frames, reconstruct from fingerprint alone.',
+                noindex: true,
+              }
+            : {}),
       })
       return
     }
@@ -569,6 +581,7 @@ export function App() {
     screen === 'blog' ||
     screen === 'pdf' ||
     screen === 'pdf-lab' ||
+    screen === 'pdf2' ||
     screen === 'not-found'
 
   // Focused mobile ink capture - no shell chrome / wallet header.
@@ -695,6 +708,7 @@ export function App() {
         screen === 'blog' ||
         screen === 'pdf' ||
         screen === 'pdf-lab' ||
+        screen === 'pdf2' ||
         screen === 'not-found') && (
         <AppLink to="/" onClick={goJourney} className="lr-back">
           ← Back to home
@@ -748,6 +762,7 @@ export function App() {
       )}
       {pdfLabEnabled && screen === 'pdf' && <PdfAnnotationJourney wallet={wallet} />}
       {pdfLabEnabled && screen === 'pdf-lab' && <SignatureLab />}
+      {pdfLabEnabled && screen === 'pdf2' && <ArchiveLab wallet={wallet} />}
       {screen === 'not-found' && (
         <NotFoundPage
           path={typeof window !== 'undefined' ? window.location.pathname : null}

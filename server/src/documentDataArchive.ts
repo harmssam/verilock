@@ -23,6 +23,7 @@ import {
   contentHashFrames,
   framesHexToBuffers,
   packArchiveManifestFrames,
+  scanArchiveByPdfHash,
   splitFrameStreams,
   STREAM_VERSION_ANNOTATION,
   STREAM_VERSION_MANIFEST,
@@ -1147,36 +1148,99 @@ export function publicChainDataIndex(originalSha256: string): {
 /**
  * Reconstruct archive payload for a PDF fingerprint.
  * - source=wire: unpack stored frames (fast, same bytes we broadcast)
- * - source=chain: re-read recipientData from each tx hash (offline-grade)
+ * - source=chain: re-read recipientData from each tx hash in the DB index
+ * - source=scan: discover frames on Nimiq by 8-byte association id (hash-only)
+ * - source=auto (default): wire if indexed, else scan by hash
  */
 export async function reconstructArchiveBySha256(
   originalSha256: string,
-  options?: { source?: 'wire' | 'chain' },
+  options?: { source?: 'wire' | 'chain' | 'scan' | 'auto' },
 ): Promise<{
   originalSha256: string
-  source: 'wire' | 'chain'
+  source: 'wire' | 'chain' | 'scan'
   onChain: boolean
   frameCount: number
   txHashes: string[]
   integrityOk: boolean
   unpacked: ReturnType<typeof unpackArchiveFrames>
   chainError?: string
+  scanMeta?: {
+    scannedTxs: number
+    truncated: boolean
+    streamCount: number
+    scanAddresses: string[]
+  }
 }> {
   const hash = originalSha256.toLowerCase()
+  const mode = options?.source ?? 'auto'
   const row = getDocumentDataArchiveBySha256(hash)
-  if (!row || row.framesHex.length === 0) {
-    throw new Error('No on-chain data archive for this fingerprint')
-  }
-  if (row.originalSha256 !== hash) {
-    throw new Error('Archive hash mismatch')
+
+  const tryUnpack = (
+    framesHex: string[],
+    source: 'wire' | 'chain' | 'scan',
+    txHashes: string[],
+    onChain: boolean,
+    extra?: {
+      chainError?: string
+      scanMeta?: {
+        scannedTxs: number
+        truncated: boolean
+        streamCount: number
+        scanAddresses: string[]
+      }
+    },
+  ) => {
+    const unpacked = unpackArchiveFrames(framesHex)
+    if (unpacked.originalSha256 !== hash) {
+      throw new Error('Unpacked stream fingerprint does not match request')
+    }
+    return {
+      originalSha256: hash,
+      source,
+      onChain,
+      frameCount: framesHex.length,
+      txHashes,
+      integrityOk: !extra?.chainError,
+      unpacked,
+      ...(extra?.chainError ? { chainError: extra.chainError } : {}),
+      ...(extra?.scanMeta ? { scanMeta: extra.scanMeta } : {}),
+    }
   }
 
-  const preferChain = options?.source === 'chain'
-  let framesHex = row.framesHex
-  let used: 'wire' | 'chain' = 'wire'
-  let chainError: string | undefined
+  const fromScan = async () => {
+    const scan = await scanArchiveByPdfHash(hash)
+    if (!scan.found || scan.framesHex.length === 0) {
+      throw new Error(
+        scan.error ||
+          'No archive frames found on Nimiq for this fingerprint (scanned service wallet / sink)',
+      )
+    }
+    return tryUnpack(scan.framesHex, 'scan', scan.txHashes, true, {
+      scanMeta: {
+        scannedTxs: scan.scannedTxs,
+        truncated: scan.truncated,
+        streamCount: scan.streamCount,
+        scanAddresses: scan.scanAddresses,
+      },
+    })
+  }
 
-  if (preferChain) {
+  if (mode === 'scan') {
+    return fromScan()
+  }
+
+  if (mode === 'wire') {
+    if (!row?.framesHex?.length) {
+      throw new Error('No stored archive frames for this fingerprint')
+    }
+    return tryUnpack(row.framesHex, 'wire', row.txHashes, row.onChain)
+  }
+
+  if (mode === 'chain') {
+    if (!row?.txHashes?.length || !row.framesHex?.length) {
+      // No index — fall back to full scan by association id
+      return fromScan()
+    }
     if (row.txHashes.length !== row.framesHex.length) {
       throw new Error(
         `Incomplete tx set: ${row.txHashes.length}/${row.framesHex.length} frames broadcast`,
@@ -1198,47 +1262,22 @@ export async function reconstructArchiveBySha256(
         }
         fromChain.push(Buffer.from(bytes).toString('hex').toLowerCase())
       }
-      framesHex = fromChain
-      used = 'chain'
+      return tryUnpack(fromChain, 'chain', row.txHashes, true)
     } catch (err) {
-      chainError = err instanceof Error ? err.message : String(err)
-      // Fall back to wire unless strictly chain-only was required
-      if (options?.source === 'chain') {
-        // still try wire for response integrity note
-        try {
-          const unpacked = unpackArchiveFrames(row.framesHex)
-          return {
-            originalSha256: hash,
-            source: 'wire',
-            onChain: row.onChain,
-            frameCount: row.framesHex.length,
-            txHashes: row.txHashes,
-            integrityOk: false,
-            unpacked,
-            chainError,
-          }
-        } catch {
-          throw new Error(`Chain reconstruct failed: ${chainError}`)
-        }
+      const chainError = err instanceof Error ? err.message : String(err)
+      try {
+        return tryUnpack(row.framesHex, 'wire', row.txHashes, row.onChain, { chainError })
+      } catch {
+        throw new Error(`Chain reconstruct failed: ${chainError}`)
       }
     }
   }
 
-  const unpacked = unpackArchiveFrames(framesHex)
-  if (unpacked.originalSha256 !== hash) {
-    throw new Error('Unpacked stream fingerprint does not match request')
+  // auto: prefer server index, else hash-only scan
+  if (row?.framesHex?.length) {
+    return tryUnpack(row.framesHex, 'wire', row.txHashes, row.onChain)
   }
-
-  return {
-    originalSha256: hash,
-    source: used,
-    onChain: row.onChain,
-    frameCount: framesHex.length,
-    txHashes: row.txHashes,
-    integrityOk: !chainError,
-    unpacked,
-    ...(chainError ? { chainError } : {}),
-  }
+  return fromScan()
 }
 
 /** Recovery package for download after archive completes (offline companion). */

@@ -30,15 +30,24 @@ export const STREAM_MAGIC = 0xa1
 /** Placement / construction stream version (v1 = free-form annotations). */
 export const STREAM_VERSION_V2 = 2
 export const FRAME_SIZE = 64
-export const FRAME_HEADER = 9
-export const FRAME_BODY = FRAME_SIZE - FRAME_HEADER // 55
+/**
+ * [0] magic [1] version [2] type [3] seq [4] total
+ * [5..12] 8-byte association id = first 8 bytes of PDF SHA-256 (hash-only recovery)
+ * [13..63] body (51 B)
+ * Legacy frames used 4-byte prefix and body @ 9 — detectFrameLayout handles both.
+ */
+export const ASSOC_LEN = 8
+export const FRAME_HEADER = 5 + ASSOC_LEN // 13
+export const FRAME_BODY = FRAME_SIZE - FRAME_HEADER // 51
+export const FRAME_HEADER_LEGACY = 9
+export const ASSOC_LEN_LEGACY = 4
 export const MAX_STREAM_FRAMES = 128
 
 export const FRAME_HEAD = 1
 export const FRAME_DATA = 2
 export const FRAME_END = 3
 
-// --- framing helpers (mirror annotationStream v1 layout) ---
+// --- framing helpers (mirror annotationStream layout) ---
 
 function hexToBytes(hex: string): Uint8Array {
   const clean = normalizeHex64(hex)
@@ -66,22 +75,62 @@ function crc32(data: Uint8Array): number {
   return (c ^ 0xffffffff) >>> 0
 }
 
+function eqBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+  return true
+}
+
+function detectFrameLayout(
+  frame: Uint8Array,
+  expectedPdfHash?: string | null,
+): { header: number; assocLen: number } {
+  if (frame.length !== FRAME_SIZE || frame[0] !== STREAM_MAGIC) {
+    return { header: FRAME_HEADER, assocLen: ASSOC_LEN }
+  }
+  if (expectedPdfHash) {
+    const hash = hexToBytes(expectedPdfHash)
+    if (eqBytes(frame.subarray(5, 5 + ASSOC_LEN), hash.subarray(0, ASSOC_LEN))) {
+      return { header: FRAME_HEADER, assocLen: ASSOC_LEN }
+    }
+    if (eqBytes(frame.subarray(5, 9), hash.subarray(0, ASSOC_LEN_LEGACY))) {
+      return { header: FRAME_HEADER_LEGACY, assocLen: ASSOC_LEN_LEGACY }
+    }
+  }
+  if (frame[2] === FRAME_HEAD) {
+    const fullNew = frame.subarray(FRAME_HEADER, FRAME_HEADER + 32)
+    const fullLegacy = frame.subarray(FRAME_HEADER_LEGACY, FRAME_HEADER_LEGACY + 32)
+    if (eqBytes(frame.subarray(5, 5 + ASSOC_LEN), fullNew.subarray(0, ASSOC_LEN))) {
+      return { header: FRAME_HEADER, assocLen: ASSOC_LEN }
+    }
+    if (eqBytes(frame.subarray(5, 9), fullLegacy.subarray(0, ASSOC_LEN_LEGACY))) {
+      return { header: FRAME_HEADER_LEGACY, assocLen: ASSOC_LEN_LEGACY }
+    }
+  }
+  return { header: FRAME_HEADER, assocLen: ASSOC_LEN }
+}
+
 function writeHeader(
   frame: Uint8Array,
   type: number,
   seq: number,
   total: number,
-  hashPrefix: Uint8Array,
+  pdfHash: Uint8Array,
 ): void {
   frame[0] = STREAM_MAGIC
   frame[1] = STREAM_VERSION_V2
   frame[2] = type
   frame[3] = seq & 0xff
   frame[4] = total & 0xff
-  frame[5] = hashPrefix[0]!
-  frame[6] = hashPrefix[1]!
-  frame[7] = hashPrefix[2]!
-  frame[8] = hashPrefix[3]!
+  // 8-byte association id for hash-only chain scan
+  frame[5] = pdfHash[0]!
+  frame[6] = pdfHash[1]!
+  frame[7] = pdfHash[2]!
+  frame[8] = pdfHash[3]!
+  frame[9] = pdfHash[4]!
+  frame[10] = pdfHash[5]!
+  frame[11] = pdfHash[6]!
+  frame[12] = pdfHash[7]!
 }
 
 /** Wire form of one append batch (canonical JSON keys). */
@@ -393,12 +442,13 @@ export async function unpackPlacementBatch(
     if (frames[i]![3] !== i) throw new Error(`Frame sequence gap at ${i}`)
   }
 
-  const hash = head.subarray(FRAME_HEADER, FRAME_HEADER + 32)
-  const hashPrefix = hash.subarray(0, 4)
+  const { header: hdr, assocLen } = detectFrameLayout(head)
+  const hash = head.subarray(hdr, hdr + 32)
+  const assoc = hash.subarray(0, assocLen)
   const view = new DataView(head.buffer, head.byteOffset, head.byteLength)
-  const payloadLen = view.getUint32(FRAME_HEADER + 32, false)
-  const batchIndexHead = view.getUint16(FRAME_HEADER + 36, false)
-  const checksum = view.getUint32(FRAME_HEADER + 38, false)
+  const payloadLen = view.getUint32(hdr + 32, false)
+  const batchIndexHead = view.getUint16(hdr + 36, false)
+  const checksum = view.getUint32(hdr + 38, false)
   const pdfSha256 = bytesToHex(hash)
 
   const parts: Uint8Array[] = []
@@ -406,15 +456,16 @@ export async function unpackPlacementBatch(
     const f = frames[i]!
     if (f[0] !== STREAM_MAGIC) throw new Error(`Bad magic on frame ${i}`)
     if (f[1] !== STREAM_VERSION_V2) throw new Error(`Bad version on frame ${i}`)
-    for (let b = 0; b < 4; b++) {
-      if (f[5 + b] !== hashPrefix[b]) throw new Error(`Hash prefix mismatch on frame ${i}`)
+    for (let b = 0; b < assocLen; b++) {
+      if (f[5 + b] !== assoc[b]) throw new Error(`Association id mismatch on frame ${i}`)
     }
+    const { header: fh } = detectFrameLayout(f, pdfSha256)
     if (f[2] === FRAME_DATA) {
-      parts.push(f.subarray(FRAME_HEADER))
+      parts.push(f.subarray(fh))
     } else if (f[2] === FRAME_END) {
       const endView = new DataView(f.buffer, f.byteOffset, f.byteLength)
-      const endLen = endView.getUint32(FRAME_HEADER, false)
-      const endCrc = endView.getUint32(FRAME_HEADER + 4, false)
+      const endLen = endView.getUint32(fh, false)
+      const endCrc = endView.getUint32(fh + 4, false)
       if (endLen !== payloadLen || endCrc !== checksum) {
         throw new Error('END frame checksum mismatch')
       }

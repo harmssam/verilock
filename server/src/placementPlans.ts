@@ -634,24 +634,31 @@ function recomputeBatchRootFromFrames(framesHex: string[]): string | null {
   if (head[0] !== 0xa1 || head[1] !== 2 || head[2] !== 1) return null
   const total = head[4]!
   if (frames.length !== total) return null
-  const payloadLen = head.readUInt32BE(9 + 32)
-  const checksum = head.readUInt32BE(9 + 38)
-  const parts: Buffer[] = []
-  for (let i = 1; i < frames.length; i++) {
-    const f = frames[i]!
-    if (f[0] !== 0xa1 || f[1] !== 2) return null
-    if (f[2] === 2) parts.push(f.subarray(9))
+  // New layout: body @ 13 (8-byte assoc); legacy: body @ 9 (4-byte prefix)
+  const tryHeaders = [13, 9]
+  for (const hdr of tryHeaders) {
+    const payloadLen = head.readUInt32BE(hdr + 32)
+    const checksum = head.readUInt32BE(hdr + 38)
+    if (payloadLen <= 0 || payloadLen > 64 * frames.length) continue
+    const parts: Buffer[] = []
+    for (let i = 1; i < frames.length; i++) {
+      const f = frames[i]!
+      if (f[0] !== 0xa1 || f[1] !== 2) return null
+      if (f[2] === 2) parts.push(f.subarray(hdr))
+    }
+    const joined = Buffer.concat(parts).subarray(0, payloadLen)
+    // light CRC check matching packer
+    let c = 0xffffffff
+    for (let i = 0; i < joined.length; i++) {
+      c ^= joined[i]!
+      for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1
+    }
+    const crc = (c ^ 0xffffffff) >>> 0
+    if (crc === checksum) {
+      return createHash('sha256').update(joined).digest('hex')
+    }
   }
-  const joined = Buffer.concat(parts).subarray(0, payloadLen)
-  // light CRC check matching packer
-  let c = 0xffffffff
-  for (let i = 0; i < joined.length; i++) {
-    c ^= joined[i]!
-    for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1
-  }
-  const crc = (c ^ 0xffffffff) >>> 0
-  if (crc !== checksum) return null
-  return createHash('sha256').update(joined).digest('hex')
+  return null
 }
 
 /**

@@ -440,7 +440,11 @@ export function DocumentJourney({ wallet }: ExperimentDocumentJourneyProps) {
             Signature encoding lab →
           </a>
           {' · '}
-          <span className="muted">v2 placement: BLOB/PLACE/FILL + dedup (client packer)</span>
+          <a href="/pdf2" style={{ color: '#0f766e' }}>
+            Hash-only archive demo (/pdf2) →
+          </a>
+          {' · '}
+          <span className="muted">v2 placement packer</span>
         </p>
       </header>
 
