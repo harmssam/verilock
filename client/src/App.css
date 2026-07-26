@@ -521,7 +521,7 @@
   gap: 1.5rem;
 }
 
-/* Full-width hero banner (copy lives in the image) */
+/* Wide hero: marketing copy over the open left of hero-wide.jpg */
 .lr-hero-band {
   display: block;
   padding: 0.25rem 0 0.5rem;
@@ -543,25 +543,205 @@ html {
   }
 }
 
-.lr-hero-visual {
+.lr-hero-frame {
   position: relative;
+  isolation: isolate;
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid var(--lr-line);
   background: var(--lr-surface-2);
   box-shadow: var(--shadow-soft);
-  /* Natural width; height follows image aspect ratio — never crop or stretch */
-  line-height: 0;
 }
 
+/* Mobile: stack copy above the banner so type stays readable */
 .lr-hero-visual-img {
+  display: block;
   width: 100%;
   height: auto;
-  display: block;
-  /* Preserve intrinsic aspect ratio (hero-wide is 2280×720) */
+  /* Natural aspect ratio — never stretch */
   object-fit: contain;
-  object-position: center;
+  object-position: right center;
   filter: none;
+}
+
+.lr-hero-copy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 1.15rem 1.15rem 1.25rem;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(255, 255, 255, 0.82) 100%
+  );
+}
+
+/* Desktop: copy over the empty left of the wide still; lock stays on the right */
+@media (min-width: 860px) {
+  .lr-hero-frame {
+    /* Copy defines height; image fills and may crop, never stretch */
+    min-height: 18.5rem;
+  }
+
+  .lr-hero-visual-img {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: right center;
+  }
+
+  .lr-hero-copy {
+    position: relative;
+    z-index: 1;
+    width: min(52%, 28rem);
+    max-width: 28rem;
+    justify-content: center;
+    min-height: 18.5rem;
+    padding: 1.5rem 1.35rem 1.5rem 1.5rem;
+    /* Soft wash so type stays crisp on the pale left of the still */
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.78) 0%,
+      rgba(255, 255, 255, 0.48) 62%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
+}
+
+.lr-hero-headline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.65rem, 4.2vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: var(--lr-text);
+  text-wrap: balance;
+}
+
+.lr-hero-headline-em {
+  display: inline;
+  color: var(--lr-accent);
+}
+
+.lr-hero-sub {
+  margin: 0;
+  max-width: 34rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--lr-muted);
+}
+
+.lr-hero-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.1rem;
+}
+
+/* Freemium pitch under CTAs - quiet, not a gradient banner */
+.lr-promo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin: 0.05rem 0 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--lr-muted);
+}
+
+.lr-promo-free {
+  color: var(--lr-accent);
+  font-weight: 750;
+}
+
+.lr-promo-sep {
+  color: var(--lr-dim);
+  font-weight: 500;
+}
+
+.lr-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.7rem 1.15rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+/* Anchor secondary CTA uses same .lr-cta chrome as buttons */
+a.lr-cta {
+  box-sizing: border-box;
+}
+
+.lr-cta--primary {
+  border: 1px solid transparent;
+  background: var(--lr-accent);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(13, 148, 136, 0.25);
+}
+
+.lr-cta--primary:hover {
+  background: var(--mint-deep, #0f766e);
+  box-shadow: 0 10px 24px rgba(13, 148, 136, 0.32);
+}
+
+.lr-cta--ghost {
+  border: 1px solid var(--lr-line-strong);
+  background: var(--lr-surface);
+  color: var(--lr-text);
+}
+
+.lr-cta--ghost:hover {
+  border-color: rgba(13, 148, 136, 0.35);
+  color: var(--lr-accent);
+}
+
+.lr-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.35em;
+  margin: 0.15rem 0 0;
+  padding: 0.35rem 0.65rem 0.35rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(13, 148, 136, 0.2);
+  background: rgba(13, 148, 136, 0.08);
+  color: #0f766e;
+  font-size: 0.84rem;
+  font-weight: 650;
+  line-height: 1.35;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  max-width: 100%;
+}
+
+.lr-status--in {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lr-status {
+    opacity: 1;
+    transition: none;
+  }
 }
 
 .lr-paths-section {

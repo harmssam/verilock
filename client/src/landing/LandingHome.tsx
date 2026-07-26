@@ -2,12 +2,14 @@ import {
   ArrowRight,
   ChevronRight,
   Fingerprint,
+  Lock,
   ScanSearch,
   Shield,
+  ShieldCheck,
   Users,
   type LucideIcon,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { formatBlogDate, getAllPosts } from '../blog'
 import type { PathRole } from '../journey/types'
 import { AppLink } from '../AppLink'
@@ -25,6 +27,36 @@ interface LandingHomeProps {
   onOpenBlogPost?: (slug: string) => void
   onOpenBlogIndex?: () => void
 }
+
+/** Hero status line under CTAs (rotating trust / fee beats). */
+interface HeroClaim {
+  icon: LucideIcon
+  status: string
+}
+
+function buildHeroClaims(): HeroClaim[] {
+  return [
+    {
+      icon: ShieldCheck,
+      status: 'Sign documents free - multi-party, wallet-backed.',
+    },
+    {
+      icon: Users,
+      status: 'Your document stays on this device. Always.',
+    },
+    {
+      icon: Lock,
+      status: 'Lock a permanent proof for 1 credit.',
+    },
+    {
+      icon: Fingerprint,
+      status: 'Anyone can re-check a locked proof later',
+    },
+  ]
+}
+
+const ROTATE_MS = 4800
+const FADE_MS = 220
 
 /** Path card icons: thin stroke, no chip chrome. ScanSearch on verify. */
 const PATH_ICON_STROKE = 1.35
@@ -60,6 +92,30 @@ const PATHS: {
   },
 ]
 
+function useHeroClaims() {
+  const claims = useMemo(() => buildHeroClaims(), [])
+  const [index, setIndex] = useState(0)
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    const reduce =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduce) return
+
+    const id = window.setInterval(() => {
+      setVisible(false)
+      window.setTimeout(() => {
+        setIndex(i => (i + 1) % claims.length)
+        setVisible(true)
+      }, FADE_MS)
+    }, ROTATE_MS)
+    return () => window.clearInterval(id)
+  }, [claims.length])
+
+  return { claim: claims[index] ?? claims[0], visible }
+}
+
 export function LandingHome({
   onPickRole,
   onOpenBlogPost,
@@ -68,22 +124,64 @@ export function LandingHome({
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [howOpen, setHowOpen] = useState(false)
   const latestPost = useMemo(() => getAllPosts()[0] ?? null, [])
+  const { claim, visible: claimVisible } = useHeroClaims()
+  const ClaimIcon = claim.icon
 
   return (
     <div className="lr-home">
-      {/* Full-width hero banner (copy is in the image) */}
-      <section className="lr-hero-band" aria-label="VeriLock">
-        <h1 className="sr-only">
-          Multi-party document signing. Free. Co-sign with your Nimiq wallet.
-        </h1>
-        <div className="lr-hero-visual">
+      {/* Wide hero: copy on the open left, lock art on the right */}
+      <section className="lr-hero-band" aria-labelledby="lr-hero-headline">
+        <div className="lr-hero-frame">
+          <div className="lr-hero-copy">
+            <h1 id="lr-hero-headline" className="lr-hero-headline">
+              Multi-party document signing.{' '}
+              <span className="lr-hero-headline-em">Free.</span>
+            </h1>
+            <p className="lr-hero-sub">
+              Co-sign documents with your Nimiq wallet - completely free. Your document stays on your
+              device. Print when everyone has signed. Upgrade anytime: lock a permanent proof on the
+              blockchain for 1 credit.
+            </p>
+            {/*
+              One primary CTA only. Paths below cover Create / Invited / Verify.
+              Secondary jumps to path picker for co-signers and verifiers.
+            */}
+            <div className="lr-hero-ctas">
+              <AppLink
+                to="/?intent=creator"
+                className="lr-cta lr-cta--primary"
+                onClick={() => onPickRole('creator')}
+              >
+                Create &amp; sign free
+                <ArrowRight size={16} strokeWidth={2.25} aria-hidden />
+              </AppLink>
+              <a className="lr-cta lr-cta--ghost" href="#lr-paths">
+                Sign or verify
+              </a>
+            </div>
+            <p className="lr-promo" role="note">
+              <span className="lr-promo-free">100% free to sign</span>
+              <span className="lr-promo-sep" aria-hidden>
+                ·
+              </span>
+              <span>Lock on blockchain for 1 credit</span>
+            </p>
+            <p
+              className={`lr-status${claimVisible ? ' lr-status--in' : ''}`}
+              aria-live="polite"
+            >
+              <ClaimIcon size={15} strokeWidth={2.25} aria-hidden />
+              <span>{claim.status}</span>
+            </p>
+          </div>
           <img
             className="lr-hero-visual-img"
             src={HERO_STILL}
-            alt="Multi-party document signing. Free. Co-sign documents with your Nimiq wallet — completely free. Your document stays on your device. Lock a permanent proof on the blockchain for 1 credit."
+            alt=""
             width={HERO_STILL_SIZE.width}
             height={HERO_STILL_SIZE.height}
             decoding="async"
+            aria-hidden
           />
         </div>
       </section>
