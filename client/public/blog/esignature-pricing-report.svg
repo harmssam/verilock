@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fafdfc"/>
+      <stop offset="100%" stop-color="#f0fdfa"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <!-- Desk surface -->
+  <rect x="0" y="400" width="1280" height="320" fill="#e8e4dc"/>
+  <!-- Paper / report page -->
+  <rect x="340" y="80" width="600" height="440" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+  <!-- Table header bar -->
+  <rect x="340" y="120" width="600" height="40" fill="#0d9488" opacity="0.1"/>
+  <rect x="340" y="120" width="600" height="2" fill="#0d9488"/>
+  <!-- Table rows -->
+  <line x1="340" y1="180" x2="940" y2="180" stroke="#e5e7eb" stroke-width="1"/>
+  <line x1="340" y1="220" x2="940" y2="220" stroke="#e5e7eb" stroke-width="1"/>
+  <line x1="340" y1="260" x2="940" y2="260" stroke="#e5e7eb" stroke-width="1"/>
+  <line x1="340" y1="300" x2="940" y2="300" stroke="#e5e7eb" stroke-width="1"/>
+  <line x1="340" y1="340" x2="940" y2="340" stroke="#e5e7eb" stroke-width="1"/>
+  <line x1="340" y1="380" x2="940" y2="380" stroke="#e5e7eb" stroke-width="1"/>
+  <!-- Highlighted row (VeriLock) -->
+  <rect x="340" y="340" width="600" height="40" fill="#0d9488" opacity="0.06"/>
+  <!-- Column divider -->
+  <line x1="500" y1="120" x2="500" y2="480" stroke="#e5e7eb" stroke-width="1"/>
+  <line x1="640" y1="120" x2="640" y2="480" stroke="#e5e7eb" stroke-width="1"/>
+  <!-- Price highlight in highlighted row -->
+  <rect x="640" y="345" width="60" height="28" rx="4" fill="#0d9488" opacity="0.15"/>
+  <!-- Pen -->
+  <g transform="translate(970, 280) rotate(-35)">
+    <rect x="0" y="0" width="180" height="8" rx="4" fill="#1f2937"/>
+    <polygon points="180,4 195,0 195,8" fill="#1f2937"/>
+    <rect x="0" y="0" width="40" height="8" rx="4" fill="#0d9488"/>
+    <rect x="0" y="0" width="2" height="8" fill="#d1d5db"/>
+  </g>
+  <!-- Subtle teal accent bar at bottom -->
+  <rect x="0" y="716" width="1280" height="4" fill="#0d9488" opacity="0.2"/>
+</svg>
