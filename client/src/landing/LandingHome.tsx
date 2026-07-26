@@ -72,7 +72,7 @@ const PATHS: {
   {
     role: 'creator',
     title: 'Create & sign',
-    detail: 'Start free: invite co-signers, print when done - lock on-chain when you want',
+    detail: 'Start free: invite co-signers — lock on blockchain if needed',
     icon: Fingerprint,
     imageAlt: '',
   },
