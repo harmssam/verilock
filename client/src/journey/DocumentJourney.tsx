@@ -905,10 +905,57 @@ export function DocumentJourney({
    */
   const creatorInviteDock =
     Boolean(doc && showInvitePhase && role === 'creator' && (step === 'share' || step === 'sign'))
-  /** Quiet “come back when everyone signed” view (after Done inviting). */
-  const inviteWaitingView = creatorInviteDock && sharedAck
-  /** Active invite-management form (email/link cards). */
-  const inviteManageView = creatorInviteDock && !sharedAck
+
+  /** Invite targets: all parties when organizer does not sign; else everyone except the creator slot. */
+  const inviteeSlotCount = useMemo(() => {
+    if (!doc) return 0
+    const need = requiredCount(doc)
+    if (
+      FEATURES.pdfAnnotationUi &&
+      constructionPlan?.status === 'locked' &&
+      (constructionPlan.creatorSigningAs == null || constructionPlan.creatorSigningAs === 0)
+    ) {
+      return Math.max(0, need)
+    }
+    return Math.max(0, need - 1)
+  }, [doc, constructionPlan?.status, constructionPlan?.creatorSigningAs])
+
+  /**
+   * Quiet “come back when everyone signed” view (after Done inviting).
+   * Must match the waiting-panel render predicate so we never hide Sign roster
+   * chrome while the waiting panel itself is not on screen.
+   */
+  const inviteWaitingView = Boolean(
+    creatorInviteDock &&
+      sharedAck &&
+      doc &&
+      !allSigned(doc) &&
+      (requiredCount(doc) > 1 || inviteeSlotCount > 0),
+  )
+  /** Active invite-management form (email/link cards) - anything invite-dock that isn’t quiet wait. */
+  const inviteManageView = Boolean(creatorInviteDock && !inviteWaitingView)
+
+  /**
+   * Setup may re-open field layout until the first signature (design mode or invite dock).
+   */
+  const canReopenPlacements = Boolean(
+    FEATURES.pdfAnnotationUi &&
+      step === 'share' &&
+      doc &&
+      constructionPlan?.status === 'locked' &&
+      signedCount(doc) === 0 &&
+      address &&
+      isDocumentCreator(doc.source, address),
+  )
+  /** Full placement editor (PDF stage + people) - not during invite/wait dock. */
+  const showSetupPlacementEditor = Boolean(
+    FEATURES.pdfAnnotationUi &&
+      step === 'share' &&
+      doc &&
+      (pdfFile || signFile) &&
+      constructionPlan &&
+      !creatorInviteDock,
+  )
 
   /** Per-person invite: /d/:slug?party=<partyId> */
   const preferredPartyFromUrl = useMemo(() => {
@@ -966,20 +1013,6 @@ export function DocumentJourney({
     )
     if (next) setSignerName(next)
   }, [signingResolution, signerName, creatorName, resolveSignDisplayName])
-
-  /** Invite targets: all parties when organizer does not sign; else everyone except the creator slot. */
-  const inviteeSlotCount = useMemo(() => {
-    if (!doc) return 0
-    const need = requiredCount(doc)
-    if (
-      FEATURES.pdfAnnotationUi &&
-      constructionPlan?.status === 'locked' &&
-      (constructionPlan.creatorSigningAs == null || constructionPlan.creatorSigningAs === 0)
-    ) {
-      return Math.max(0, need)
-    }
-    return Math.max(0, need - 1)
-  }, [doc, constructionPlan?.status, constructionPlan?.creatorSigningAs])
 
   // Resend invite capability (server RESEND_ENABLED)
   useEffect(() => {
@@ -2817,8 +2850,36 @@ export function DocumentJourney({
 
               {step === 'share' && doc && (
                 <div className="action-stack">
-                  {/* Setup: name people + empty placement slots (before or after first sign). */}
-                  {FEATURES.pdfAnnotationUi && (pdfFile || signFile) && constructionPlan && (
+                  {/*
+                    Setup design UI. Once invites/waiting take over (organizer-only stays
+                    on step 2), hide the PDF stage so “Waiting for co-signers” is not buried
+                    under a locked layout preview. Re-open stays available until first sign.
+                  */}
+                  {canReopenPlacements && (
+                    <div className="journey-setup-continue journey-setup-continue--top">
+                      <button
+                        type="button"
+                        className={`btn btn-secondary${placementLockBusy ? ' btn--busy' : ''}`}
+                        disabled={busy || !token || placementLockBusy}
+                        onClick={() => void unlockPlacements()}
+                      >
+                        {placementLockBusy ? (
+                          <>
+                            <LoaderCircle
+                              className="btn-spinner"
+                              size={16}
+                              strokeWidth={2.5}
+                            />
+                            Re-opening…
+                          </>
+                        ) : (
+                          'Back to edit placements'
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {showSetupPlacementEditor && constructionPlan && (
                     <section className="journey-pdf-editor" aria-labelledby="setup-pdf-title">
                       <header className="signatures-config-head">
                         <h3 id="setup-pdf-title">
@@ -2838,31 +2899,6 @@ export function DocumentJourney({
                           </p>
                         )}
                       </header>
-                      {constructionPlan.status === 'locked' &&
-                        signedCount(doc) === 0 &&
-                        isDocumentCreator(doc.source, address) && (
-                          <div className="journey-setup-continue journey-setup-continue--top">
-                            <button
-                              type="button"
-                              className={`btn btn-secondary${placementLockBusy ? ' btn--busy' : ''}`}
-                              disabled={busy || !token || placementLockBusy}
-                              onClick={() => void unlockPlacements()}
-                            >
-                              {placementLockBusy ? (
-                                <>
-                                  <LoaderCircle
-                                    className="btn-spinner"
-                                    size={16}
-                                    strokeWidth={2.5}
-                                  />
-                                  Re-opening…
-                                </>
-                              ) : (
-                                'Back to edit placements'
-                              )}
-                            </button>
-                          </div>
-                        )}
                       <PlacementEditor
                         file={(pdfFile ?? signFile)!}
                         plan={constructionPlan}
@@ -2915,6 +2951,13 @@ export function DocumentJourney({
                       )}
                     </section>
                   )}
+
+                  {/* Status while re-opening from invite dock (editor is unmounted). */}
+                  {canReopenPlacements && creatorInviteDock && placementStatus ? (
+                    <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                      {placementStatus}
+                    </p>
+                  ) : null}
 
                   {FEATURES.pdfAnnotationUi && !pdfFile && !signFile && (
                     <section className="journey-pdf-editor">
@@ -3017,33 +3060,41 @@ export function DocumentJourney({
 
                   {doc && (
                     <>
-                      <div className="progress-bar-wrap">
-                        <div className="progress-bar-meta">
-                          <span>
-                            Signatures {signedCount(doc)}/{requiredCount(doc)}
-                          </span>
-                          <span className="muted">{doc.title}</span>
-                        </div>
-                        <div className="progress-bar-track">
-                          <div
-                            className="progress-bar-fill"
-                            style={{
-                              width: `${requiredCount(doc) ? (signedCount(doc) / requiredCount(doc)) * 100 : 0}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
+                      {/*
+                        Quiet waiting view already has a slim progress line - skip the Sign
+                        roster / progress chrome so co-signer wait isn’t a wall of people.
+                      */}
+                      {!inviteWaitingView && (
+                        <>
+                          <div className="progress-bar-wrap">
+                            <div className="progress-bar-meta">
+                              <span>
+                                Signatures {signedCount(doc)}/{requiredCount(doc)}
+                              </span>
+                              <span className="muted">{doc.title}</span>
+                            </div>
+                            <div className="progress-bar-track">
+                              <div
+                                className="progress-bar-fill"
+                                style={{
+                                  width: `${requiredCount(doc) ? (signedCount(doc) / requiredCount(doc)) * 100 : 0}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
 
-                      <PartyList
-                        doc={doc}
-                        revealNames={revealParticipantPrivate}
-                        inviteEmailByPartyId={
-                          role === 'creator' ? inviteEmailSent : undefined
-                        }
-                      />
+                          <PartyList
+                            doc={doc}
+                            revealNames={revealParticipantPrivate}
+                            inviteEmailByPartyId={
+                              role === 'creator' ? inviteEmailSent : undefined
+                            }
+                          />
+                        </>
+                      )}
 
                       {/* Creator invites on the share step (after they sign). Never on invited path. */}
-                      {canCancelCurrent && role === 'creator' && (
+                      {canCancelCurrent && role === 'creator' && !inviteWaitingView && (
                         <button
                           type="button"
                           className={`btn btn-ghost${busy || cancelBusy ? ' btn--busy' : ''}`}
@@ -3457,12 +3508,10 @@ export function DocumentJourney({
               )}
 
               {/* Invite co-signers: Setup (organizer-only) or Sign (after creator signed). */}
-              {doc && showInvitePhase && role === 'creator' && (step === 'share' || step === 'sign') && (
+              {doc && creatorInviteDock && (
                 <div className="action-stack">
-                  {/* Waiting room - party progress lives once above (Sign) or here (Setup-only). */}
-                  {sharedAck &&
-                  (requiredCount(doc) > 1 || inviteeSlotCount > 0) &&
-                  !allSigned(doc) ? (
+                  {/* Waiting room - slim progress only (no PartyList / placement people chrome). */}
+                  {inviteWaitingView ? (
                     <section
                       className="invite-waiting"
                       aria-label="Waiting for co-signers"
@@ -3482,36 +3531,27 @@ export function DocumentJourney({
                         </p>
                       )}
 
-                      {/* Setup step has no Sign party block above - show roster here only. */}
-                      {step === 'share' ? (
-                        <>
-                          <div className="progress-bar-wrap">
-                            <div className="progress-bar-meta">
-                              <span>
-                                Signatures {signedCount(doc)}/{requiredCount(doc)}
-                              </span>
-                              <span className="muted">{doc.title}</span>
-                            </div>
-                            <div className="progress-bar-track">
-                              <div
-                                className="progress-bar-fill"
-                                style={{
-                                  width: `${
-                                    requiredCount(doc)
-                                      ? (signedCount(doc) / requiredCount(doc)) * 100
-                                      : 0
-                                  }%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                          <PartyList
-                            doc={doc}
-                            revealNames={revealParticipantPrivate}
-                            inviteEmailByPartyId={inviteEmailSent}
+                      {/* Slim count only - no PartyList / placement people chrome while waiting. */}
+                      <div className="progress-bar-wrap">
+                        <div className="progress-bar-meta">
+                          <span>
+                            Signatures {signedCount(doc)}/{requiredCount(doc)}
+                          </span>
+                          <span className="muted">{doc.title}</span>
+                        </div>
+                        <div className="progress-bar-track">
+                          <div
+                            className="progress-bar-fill"
+                            style={{
+                              width: `${
+                                requiredCount(doc)
+                                  ? (signedCount(doc) / requiredCount(doc)) * 100
+                                  : 0
+                              }%`,
+                            }}
                           />
-                        </>
-                      ) : null}
+                        </div>
+                      </div>
 
                       <div className="invite-waiting-actions">
                         <button
