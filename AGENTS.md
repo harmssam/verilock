@@ -76,7 +76,7 @@ Archive-only (do not invest product work without an explicit request):
 ### Blog
 
 - **In production.** Content: `client/src/blog/`, art: `client/public/blog/`, UI: `client/src/journey/BlogPage.tsx` (+ CSS).
-- Shell routes `/blog` and `/blog/:slug` in `App.tsx`; header + footer Blog links; homepage “From the blog”.
+- Shell routes `/blog` and `/blog/:slug` in `App.tsx`; footer Blog (+ Security) links; homepage “From the blog”.
 - Server SPA deep links: `server/src/static.ts` `isKnownAppPath` must include `/blog`.
 - **Do not ship** Blog Studio / X Post Studio (still gitignored under `server/src/blogStudio*`, etc.).
 

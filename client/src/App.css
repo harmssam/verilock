@@ -1525,23 +1525,19 @@ html {
 }
 
 /*
- * Narrow header collapse (footer keeps Blog / Security):
- *  ≤720: hide Security; when logged in, hide Agreements + Pricing (AccountMenu)
- *  ≤560: hide Blog; tighter brand + account chip
+ * Narrow header collapse:
+ *  ≤720: when logged in, hide Agreements + Pricing (AccountMenu)
+ *  ≤560: tighter brand + account chip
  *  ≤400: hide wordmark if still cramped (mark alone is enough to go home)
+ * Blog / Security are footer-only (not in header).
  */
 @media (max-width: 720px) {
-  .lr-nav--security {
-    display: none;
-  }
-
   /*
-   * Signed-in: Agreements + Pricing already live in AccountMenu (and credits chip);
-   * Blog remains in the footer. Drop the desktop links so address + credits fit.
+   * Signed-in: Agreements + Pricing already live in AccountMenu (and credits chip).
+   * Drop the desktop links so address + credits fit.
    */
   .lr-header-actions--connected .lr-nav--agreements,
-  .lr-header-actions--connected .lr-nav--pricing,
-  .lr-header-actions--connected .lr-nav--blog {
+  .lr-header-actions--connected .lr-nav--pricing {
     display: none;
   }
 
@@ -1567,11 +1563,6 @@ html {
 
 @media (max-width: 560px) {
   .lr-brand-tag {
-    display: none;
-  }
-
-  /* Footer still has Blog */
-  .lr-nav--blog {
     display: none;
   }
 
