@@ -14,6 +14,7 @@ import {
   isPrivacyPath,
   isSecurityPath,
   isSignMobilePath,
+  isStatsPricingPath,
   isSupportPath,
   saveHubReturnPath,
 } from './hubReturnPath'
@@ -31,6 +32,7 @@ import { AppLink } from './AppLink'
 import { PricePage } from './PricePage'
 import { PrivacyPolicyPage } from './PrivacyPolicyPage'
 import { SecurityPage } from './SecurityPage'
+import { StatsPricingPage } from './StatsPricingPage'
 import { SupportPage } from './SupportPage'
 import { AccountMenu } from './journey/AccountMenu'
 import { AgreementsPage } from './journey/AgreementsPage'
@@ -115,6 +117,7 @@ type ShellScreen =
   | 'pdf-lab'
   | 'pdf2'
   | 'sign-mobile'
+  | 'stats-pricing'
   | 'not-found'
 
 function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotationUi): ShellScreen {
@@ -123,6 +126,7 @@ function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotation
   if (isPrivacyPath(pathname)) return 'privacy'
   if (isSecurityPath(pathname)) return 'security'
   if (isSupportPath(pathname)) return 'support'
+  if (isStatsPricingPath(pathname)) return 'stats-pricing'
   if (isAgreementsPath(pathname)) return 'agreements'
   if (isBlogPath(pathname)) return 'blog'
   // PDF lab is parallel to seal - only mount when flag allows
@@ -283,6 +287,7 @@ export function App() {
       !isPricingPath(window.location.pathname) &&
       !isPrivacyPath(window.location.pathname) &&
       !isSecurityPath(window.location.pathname) &&
+      !isStatsPricingPath(window.location.pathname) &&
       !isSupportPath(window.location.pathname) &&
       !isAgreementsPath(window.location.pathname) &&
       !isBlogPath(window.location.pathname) &&
@@ -331,6 +336,13 @@ export function App() {
     rememberJourneyPath()
     setScreen('support')
     pushShellUrl('/support')
+    scrollShellTop()
+  }, [rememberJourneyPath])
+
+  const goStatsPricing = useCallback(() => {
+    rememberJourneyPath()
+    setScreen('stats-pricing')
+    pushShellUrl('/esignature-pricing')
     scrollShellTop()
   }, [rememberJourneyPath])
 
@@ -517,6 +529,10 @@ export function App() {
       applyPageMeta({ ...PAGE_META.support })
       return
     }
+    if (screen === 'stats-pricing') {
+      applyPageMeta({ ...PAGE_META.statsPricing })
+      return
+    }
     if (screen === 'agreements') {
       applyPageMeta({ ...PAGE_META.agreements })
       return
@@ -577,6 +593,7 @@ export function App() {
     screen === 'pricing' ||
     screen === 'privacy' ||
     screen === 'security' ||
+    screen === 'stats-pricing' ||
     screen === 'support' ||
     screen === 'blog' ||
     screen === 'pdf' ||
@@ -598,7 +615,7 @@ export function App() {
         // Home, tracks, and agreements share one desktop content width.
         screen === 'journey' || screen === 'agreements' ? 'lr-app--landing' : '',
         // Pricing + Security: 960px shell (not the wider exp-app--wide content pages).
-        screen === 'pricing' || screen === 'security' ? 'lr-app--pricing' : '',
+        screen === 'pricing' || screen === 'security' || screen === 'stats-pricing' ? 'lr-app--pricing' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -687,6 +704,7 @@ export function App() {
       {(screen === 'pricing' ||
         screen === 'privacy' ||
         screen === 'security' ||
+        screen === 'stats-pricing' ||
         screen === 'support' ||
         screen === 'agreements' ||
         screen === 'blog' ||
@@ -724,6 +742,7 @@ export function App() {
         />
       )}
       {screen === 'privacy' && <PrivacyPolicyPage />}
+      {screen === 'stats-pricing' && <StatsPricingPage />}
       {screen === 'security' && (
         <SecurityPage
           onCreate={() => pickRole('creator')}
@@ -852,6 +871,13 @@ export function App() {
             onClick={goSupport}
           >
             Support
+          </AppLink>
+          <AppLink
+            to="/esignature-pricing"
+            className={`lr-footer-link${screen === 'stats-pricing' ? ' lr-footer-link--active' : ''}`}
+            onClick={goStatsPricing}
+          >
+            Pricing Report
           </AppLink>
           <a
             className="lr-footer-link"

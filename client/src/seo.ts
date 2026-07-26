@@ -79,6 +79,12 @@ export const PAGE_META = {
     noindex: true,
     path: '/',
   },
+  statsPricing: {
+    title: `eSignature Pricing Report 2026 — Compare Costs Per Document${TITLE_SUFFIX}`,
+    description:
+      'Side-by-side pricing comparison of DocuSign, Adobe Sign, PandaDoc, Dropbox Sign, SignNow, and VeriLock. See actual cost per signature at every usage level — subscription vs pay-per-use.',
+    path: '/esignature-pricing',
+  },
   pdf: {
     title: `PDF annotations (experiment)${TITLE_SUFFIX}`,
     description:
