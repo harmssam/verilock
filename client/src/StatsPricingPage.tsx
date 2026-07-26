@@ -1,12 +1,32 @@
 /**
  * eSignature Pricing Report — journalist-keyword resource page.
  * Data-driven comparison for journalists citing e-signature pricing.
- * Last updated: July 2026. Next review: October 2026.
+ * Last updated: July 25, 2026. Next review: October 2026.
+ *
+ * VeriLock USD figures are a market estimate from /pricing as of that date
+ * (lock fee in NIM × NIM/USD). Signing is free; pay only for an optional on-chain lock.
  */
 import { useId } from 'react'
 import './StatsPricingPage.css'
 
-// ── Pricing data (updated July 2026) ──
+// ── VeriLock snapshot as of July 25, 2026 (from /pricing) ──
+// Full list fee: 1000 NIM per lock (not temporary sale pricing).
+// Rate: Fastspot via /api/nim-prices (same source as Pricing).
+
+const VERILOCK_FEE_NIM = 1000
+/** USD per NIM — as of July 25, 2026. */
+const NIM_USD = 0.000408962
+/** Lock estimate (1000 NIM × NIM/USD), rounded for tables. */
+const VERILOCK_USD_PER_DOC = +(VERILOCK_FEE_NIM * NIM_USD).toFixed(2) // $0.41
+/** Annual docs at 8/month (typical workload). */
+const DOCS_PER_YEAR_AT_EIGHT = 8 * 12
+const VERILOCK_ANNUAL_AT_EIGHT = +(DOCS_PER_YEAR_AT_EIGHT * VERILOCK_USD_PER_DOC).toFixed(2)
+
+// Cheapest subscription floor used for crossover callout (SignNow Business $8/mo).
+const CHEAPEST_SUB_MONTHLY = 8
+const CROSSOVER_DOCS = Math.floor(CHEAPEST_SUB_MONTHLY / VERILOCK_USD_PER_DOC) // ~19 at $0.41
+
+// ── Competitor pricing data (updated July 2026) ──
 
 interface ProviderTier {
   name: string
@@ -107,7 +127,11 @@ const PROVIDERS: Provider[] = [
     name: 'VeriLock',
     slug: 'verilock',
     tiers: [
-      { name: 'Pay-per-lock', price: '$0.49/document', notes: 'No subscription. Pay only when you lock on-chain.' },
+      {
+        name: 'Pay-per-lock',
+        price: `$${VERILOCK_USD_PER_DOC.toFixed(2)}/document`,
+        notes: 'No subscription. Pay only when you lock on-chain.',
+      },
     ],
     freeTier: 'Free multi-party signing. Pay only for optional on-chain lock.',
     payPerUse: true,
@@ -132,8 +156,13 @@ interface ScenarioRow {
 }
 
 function calcScenarios(docs: number): ScenarioRow[] {
-  // VeriLock: $0.49 per document
-  const verilockRow: ScenarioRow = { provider: 'VeriLock', tier: 'Pay-per-lock', monthlyCost: +(docs * 0.49).toFixed(2), costPerDoc: 0.49, isVerilock: true }
+  const verilockRow: ScenarioRow = {
+    provider: 'VeriLock',
+    tier: `Pay-per-lock $${VERILOCK_USD_PER_DOC.toFixed(2)}`,
+    monthlyCost: +(docs * VERILOCK_USD_PER_DOC).toFixed(2),
+    costPerDoc: VERILOCK_USD_PER_DOC,
+    isVerilock: true,
+  }
   const subs: ScenarioRow[] = [
     { provider: 'DocuSign', tier: 'Personal $15', monthlyCost: docs <= 5 ? 15 : 45, costPerDoc: +(docs <= 5 ? 15 / docs : 45 / docs).toFixed(2) },
     { provider: 'Adobe Sign', tier: 'Standard $12.99', monthlyCost: 12.99, costPerDoc: +(12.99 / docs).toFixed(2) },
@@ -157,7 +186,11 @@ function fmtMoney(n: number): string {
 // ── Annual cost at 8 docs/month ──
 
 const ANNUAL_EIGHT: { provider: string; annual: number; details: string }[] = [
-  { provider: 'VeriLock', annual: 47.04, details: '$0.49/doc · 96 docs/year · no subscription' },
+  {
+    provider: 'VeriLock',
+    annual: VERILOCK_ANNUAL_AT_EIGHT,
+    details: `$${VERILOCK_USD_PER_DOC.toFixed(2)}/doc · ${DOCS_PER_YEAR_AT_EIGHT} docs/year · no subscription`,
+  },
   { provider: 'SignNow', annual: 96, details: 'Business $8/mo · $96/year' },
   { provider: 'Adobe Sign', annual: 155.88, details: 'Standard $12.99/mo · $155.88/year' },
   { provider: 'Dropbox Sign', annual: 180, details: 'Essentials $15/mo · $180/year' },
@@ -169,6 +202,7 @@ const ANNUAL_EIGHT: { provider: string; annual: number; details: string }[] = [
 
 export function StatsPricingPage() {
   const pricingId = useId()
+  const verilockUsdLabel = fmtMoney(VERILOCK_USD_PER_DOC)
 
   return (
     <article className="stats-page stats-pricing" aria-labelledby="stats-pricing-title">
@@ -185,7 +219,7 @@ export function StatsPricingPage() {
           {'. At 5 documents/month, that\'s '}
           <strong>$4.40 per signature</strong>
           {'. VeriLock costs '}
-          <strong>$0.49 per document</strong>, period.
+          <strong>{verilockUsdLabel} per document</strong>, period.
         </p>
         <p className="stats-hero-updated">
           Last updated: July 25, 2026 · Next review: October 2026
@@ -198,8 +232,14 @@ export function StatsPricingPage() {
         <ul className="stats-takeaways">
           <li>e-signature pricing ranges from <strong>$8 to $60 per user/month</strong> for subscription plans.</li>
           <li>Most providers <strong>lock basic features</strong> (templates, reminders, branding) behind higher tiers — the entry price is a teaser.</li>
-          <li>Pay-per-use alternatives like VeriLock cost <strong>$0.49/document</strong> — no monthly minimum, no feature tiers.</li>
-          <li>For users signing fewer than <strong>30 documents/month</strong>, subscription plans cost more per signature than pay-per-use.</li>
+          <li>
+            Pay-per-use alternatives like VeriLock cost <strong>{verilockUsdLabel}/document</strong>
+            {' '}— no monthly minimum, no feature tiers.
+          </li>
+          <li>
+            For users signing fewer than <strong>{CROSSOVER_DOCS} documents/month</strong>, subscription plans
+            cost more per signature than pay-per-use.
+          </li>
           <li>The average business user signs <strong>5–8 documents per month</strong> — well below most plan break-even points.</li>
         </ul>
       </section>
@@ -347,9 +387,10 @@ export function StatsPricingPage() {
 
         <div className="stats-callout">
           <p>
-            <strong>The crossover point:</strong> VeriLock is cheapest for users signing fewer than ~30 documents/month.
-            Above 30 docs, SignNow Premium and Adobe Pro become cheaper per document — but lock you into a recurring subscription.
-            With VeriLock, <strong>zero documents in a month costs zero dollars</strong>.
+            <strong>The crossover point:</strong> VeriLock is cheapest for users signing fewer than ~
+            {CROSSOVER_DOCS} documents/month. Above that, SignNow Business ($8/mo) becomes cheaper per
+            document — but locks you into a recurring subscription. With VeriLock,{' '}
+            <strong>zero documents in a month costs zero dollars</strong>.
           </p>
         </div>
       </section>
@@ -426,8 +467,16 @@ export function StatsPricingPage() {
         <h2 id={`${pricingId}-method`} className="stats-h2">Methodology</h2>
         <ul className="stats-method-list">
           <li><strong>Pricing data collected:</strong> July 25, 2026, from official provider pricing pages.</li>
-          <li><strong>VeriLock lock cost:</strong> 1,000 NIM per lock. NIM/USD rate: $0.000488 (CoinGecko, July 25, 2026).</li>
-          <li><strong>Cost-per-document scenarios:</strong> Assumes single-signer documents. Multi-party signing adds $0.49 per additional signer on VeriLock.</li>
+          <li>
+            <strong>VeriLock lock cost (as of July 25, 2026):</strong>{' '}
+            {VERILOCK_FEE_NIM.toLocaleString('en-US')} NIM per lock
+            ({verilockUsdLabel} USD estimate at ${NIM_USD.toFixed(6)}/NIM via Fastspot, same rate source as{' '}
+            <a href="/pricing">verilock.online/pricing</a>).
+          </li>
+          <li>
+            <strong>Cost-per-document scenarios:</strong> Assumes one lock per document. Multi-party signing is
+            free on VeriLock; only the optional on-chain lock is paid.
+          </li>
           <li><strong>Enterprise pricing excluded:</strong> Custom quotes vary by organization size, volume commitments, and contract length.</li>
           <li><strong>Annual billing discounts not applied:</strong> Monthly pricing shown throughout for fair comparison. Annual plans are typically 15–30% cheaper.</li>
           <li><strong>Next review:</strong> October 2026. Pricing data is checked quarterly.</li>
@@ -441,14 +490,14 @@ export function StatsPricingPage() {
           <li><a href="https://sign.dropbox.com/products/dropbox-sign/pricing" target="_blank" rel="noopener noreferrer">Dropbox Sign Pricing</a></li>
           <li><a href="https://www.signnow.com/pricing" target="_blank" rel="noopener noreferrer">SignNow Pricing</a></li>
           <li><a href="https://eversign.com/pricing" target="_blank" rel="noopener noreferrer">Xodo Sign Pricing</a></li>
-          <li><a href="https://www.coingecko.com/en/coins/nimiq-2" target="_blank" rel="noopener noreferrer">NIM/USD Rate (CoinGecko)</a></li>
+          <li><a href="/pricing">VeriLock Pricing</a></li>
         </ul>
       </section>
 
       {/* ── Footer CTA ── */}
       <footer className="stats-cta">
         <p className="stats-cta-text">
-          Lock your next document for <strong>$0.49</strong>. No subscription. No upload. Just proof.
+          Lock your next document for <strong>{verilockUsdLabel}</strong>. No subscription. No upload. Just proof.
         </p>
         <a href="/pricing" className="stats-cta-btn">See VeriLock pricing</a>
       </footer>
