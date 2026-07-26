@@ -64,7 +64,7 @@ export function parseFlexibleDateToIso(raw: string): string | null {
   return toIsoDate(d)
 }
 
-/** Field label from Arrange (e.g. "Date", "Signing date") → date picker UI. */
+/** Field label from Setup (e.g. "Date", "Signing date") → date picker UI. */
 export function isDateFieldLabel(label: string | undefined | null): boolean {
   const t = (label ?? '').trim().toLowerCase()
   if (!t) return false

@@ -1658,7 +1658,7 @@ a.exp-account-menu-full:focus-visible {
   outline-offset: 2px;
 }
 
-.journey-arrange-continue {
+.journey-setup-continue {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1666,7 +1666,7 @@ a.exp-account-menu-full:focus-visible {
   margin-top: 0.85rem;
 }
 
-.journey-arrange-continue .btn-lg {
+.journey-setup-continue .btn-lg {
   width: 100%;
 }
 

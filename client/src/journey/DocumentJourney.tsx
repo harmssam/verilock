@@ -264,7 +264,7 @@ export function DocumentJourney({
   const [sigPadKey, setSigPadKey] = useState(0)
   const [signOnMobileOpen, setSignOnMobileOpen] = useState(false)
   const [mobileSigPreview, setMobileSigPreview] = useState<string | null>(null)
-  /** Construction placements (Arrange step) - empty slots until lock; then immutable. */
+  /** Construction placements (Setup step) - empty slots until lock; then immutable. */
   const [constructionPlan, setConstructionPlan] = useState<ConstructionPlan | null>(null)
   /** idle → loading → ready (has plan) | none (404 / no plan). Avoids draft-seed race. */
   const [planLoadState, setPlanLoadState] = useState<'idle' | 'loading' | 'ready' | 'none'>('idle')
@@ -542,24 +542,24 @@ export function DocumentJourney({
       if (doc.sealed || walletHasSignedJourneyDoc(doc, address)) return 'done'
       return 'sign'
     }
-    // Creator path: add PDF → arrange → sign (if organizer is a party) → invite co-signers → seal
+    // Creator path: add PDF → setup → sign (if organizer is a party) → invite co-signers → seal
     if (!doc) return 'fingerprint'
     if (doc.sealed) return 'done'
     // Only the creator may enter the seal step (never co-signers / invitees).
     if (doc.directSeal) {
       return address && isDocumentCreator(doc.source, address) ? 'seal' : 'done'
     }
-    // Construction first (when UI on): freeze placements when continuing past arrange.
+    // Construction first (when UI on): freeze placements when continuing past setup.
     // Wait for plan GET before treating as unlocked draft (avoids flash / wrong step).
     if (FEATURES.pdfAnnotationUi && planLoadState === 'loading' && signedCount(doc) === 0) {
       return 'share'
     }
-    const needsArrange =
+    const needsSetup =
       FEATURES.pdfAnnotationUi &&
       planLoadState !== 'loading' &&
       constructionPlan?.status !== 'locked' &&
       signedCount(doc) === 0
-    if (needsArrange) return 'share'
+    if (needsSetup) return 'share'
 
     // Only the *document creator* who chose “not signing” is blocked from open-slot claim.
     // Invitees must still claim open parties.
@@ -588,15 +588,15 @@ export function DocumentJourney({
       return 'sign'
     }
 
-    // All signatures collected → seal immediately (no bounce back to Arrange/invite).
+    // All signatures collected → seal immediately (no bounce back to Setup/invite).
     if (allSigned(doc)) {
       if (address && isDocumentCreator(doc.source, address)) return 'seal'
       return 'done'
     }
 
     // Waiting on co-signers.
-    // Creator who already signed: stay on Sign (invite UI there) so the rail does not jump back to Arrange.
-    // Organizer-only: invite from the Arrange/share step.
+    // Creator who already signed: stay on Sign (invite UI there) so the rail does not jump back to Setup.
+    // Organizer-only: invite from the Setup/share step.
     if (
       address &&
       isDocumentCreator(doc.source, address) &&
@@ -727,7 +727,7 @@ export function DocumentJourney({
     [naturalStep, canHoldStep, scrollToJourneyAction],
   )
 
-  // Quiet refresh while creator waits for co-signers (invite on Arrange or Sign).
+  // Quiet refresh while creator waits for co-signers (invite on Setup or Sign).
   useEffect(() => {
     if (role !== 'creator' || !doc || doc.sealed) return
     if (step !== 'share' && step !== 'sign') return
@@ -872,7 +872,7 @@ export function DocumentJourney({
     (constructionPlan.creatorSigningAs == null || constructionPlan.creatorSigningAs === 0) &&
     Boolean(doc && address && isDocumentCreator(doc.source, address))
 
-  /** Creator chose a party and still needs to sign - Arrange should not force invite UI. */
+  /** Creator chose a party and still needs to sign - Setup should not force invite UI. */
   const creatorStillNeedsToSign = Boolean(
     doc &&
       address &&
@@ -886,7 +886,7 @@ export function DocumentJourney({
   )
 
   /**
-   * Invite co-signers only after arrange is locked, and never while the creator
+   * Invite co-signers only after setup is locked, and never while the creator
    * still needs to sign their own fields (invites come after their signature).
    */
   const showInvitePhase = Boolean(
@@ -901,7 +901,7 @@ export function DocumentJourney({
 
   /**
    * Creator is past their own signature (or organizer-only) and the dock is in
-   * the invite / waiting UI on Sign or Arrange - used to de-clutter chrome.
+   * the invite / waiting UI on Sign or Setup - used to de-clutter chrome.
    */
   const creatorInviteDock =
     Boolean(doc && showInvitePhase && role === 'creator' && (step === 'share' || step === 'sign'))
@@ -1421,7 +1421,7 @@ export function DocumentJourney({
       setPageFieldsConfirmed(false)
       window.history.pushState({}, '', `/d/${document.slug}`)
       void clearCreatePdfDraftState()
-      // Step advances to Arrange - bring the next actions into view.
+      // Step advances to Setup - bring the next actions into view.
       scrollToJourneyAction('auto')
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Create failed')
@@ -1596,8 +1596,8 @@ export function DocumentJourney({
   }, [doc?.id, doc?.fingerprint, token])
 
   /**
-   * Seed a draft plan only after we know the server has none (create / arrange path).
-   * Never overwrite while loading - that forced invitees into “unlocked arrange” flash.
+   * Seed a draft plan only after we know the server has none (create / setup path).
+   * Never overwrite while loading - that forced invitees into “unlocked setup” flash.
    */
   useEffect(() => {
     if (!FEATURES.pdfAnnotationUi || !doc) return
@@ -1613,7 +1613,7 @@ export function DocumentJourney({
   const personSlotForParty = useCallback(
     (partyId: string | undefined | null): number => {
       if (!doc || !partyId) return 1
-      // Creator explicitly chose a person slot on Arrange
+      // Creator explicitly chose a person slot on Setup
       if (
         constructionPlan?.creatorSigningAs != null &&
         constructionPlan.creatorSigningAs > 0 &&
@@ -2732,7 +2732,7 @@ export function DocumentJourney({
                       maxLength={MAX_DISPLAY_NAME_LENGTH}
                     />
                     <span className="muted" style={{ fontSize: '0.78rem' }}>
-                      Shown on invite emails (“Alex has requested you sign…”). On Arrange you choose
+                      Shown on invite emails (“Alex has requested you sign…”). On Setup you choose
                       whether you sign as one of the people (or none).
                     </span>
                   </label>
@@ -2817,11 +2817,11 @@ export function DocumentJourney({
 
               {step === 'share' && doc && (
                 <div className="action-stack">
-                  {/* Arrange: name people + empty placement slots (before or after first sign). */}
+                  {/* Setup: name people + empty placement slots (before or after first sign). */}
                   {FEATURES.pdfAnnotationUi && (pdfFile || signFile) && constructionPlan && (
-                    <section className="journey-pdf-editor" aria-labelledby="arrange-pdf-title">
+                    <section className="journey-pdf-editor" aria-labelledby="setup-pdf-title">
                       <header className="signatures-config-head">
-                        <h3 id="arrange-pdf-title">
+                        <h3 id="setup-pdf-title">
                           {constructionPlan.status === 'locked'
                             ? 'Field layout'
                             : 'Design the document'}
@@ -2849,7 +2849,7 @@ export function DocumentJourney({
                         lockBusy={placementLockBusy}
                       />
                       {constructionPlan.status !== 'locked' && (
-                        <div className="journey-arrange-continue">
+                        <div className="journey-setup-continue">
                           <button
                             type="button"
                             className={`btn btn-primary btn-lg${placementLockBusy ? ' btn--busy' : ''}`}
@@ -2886,7 +2886,7 @@ export function DocumentJourney({
                       {constructionPlan.status === 'locked' &&
                         signedCount(doc) === 0 &&
                         isDocumentCreator(doc.source, address) && (
-                          <div className="journey-arrange-continue">
+                          <div className="journey-setup-continue">
                             <button
                               type="button"
                               className={`btn btn-secondary${placementLockBusy ? ' btn--busy' : ''}`}
@@ -2919,7 +2919,7 @@ export function DocumentJourney({
                   {FEATURES.pdfAnnotationUi && !pdfFile && !signFile && (
                     <section className="journey-pdf-editor">
                       <p className="muted" style={{ margin: 0 }}>
-                        Re-open the same document to arrange signature lines (bytes stay local).
+                        Re-open the same document to set up signature lines (bytes stay local).
                       </p>
                       <DocumentStage
                         step={step}
@@ -3456,10 +3456,10 @@ export function DocumentJourney({
                 </div>
               )}
 
-              {/* Invite co-signers: Arrange (organizer-only) or Sign (after creator signed). */}
+              {/* Invite co-signers: Setup (organizer-only) or Sign (after creator signed). */}
               {doc && showInvitePhase && role === 'creator' && (step === 'share' || step === 'sign') && (
                 <div className="action-stack">
-                  {/* Waiting room - party progress lives once above (Sign) or here (Arrange-only). */}
+                  {/* Waiting room - party progress lives once above (Sign) or here (Setup-only). */}
                   {sharedAck &&
                   (requiredCount(doc) > 1 || inviteeSlotCount > 0) &&
                   !allSigned(doc) ? (
@@ -3482,7 +3482,7 @@ export function DocumentJourney({
                         </p>
                       )}
 
-                      {/* Arrange step has no Sign party block above - show roster here only. */}
+                      {/* Setup step has no Sign party block above - show roster here only. */}
                       {step === 'share' ? (
                         <>
                           <div className="progress-bar-wrap">
@@ -3554,7 +3554,7 @@ export function DocumentJourney({
                       </p>
                     </header>
 
-                    {/* Arrange-only: roster not already shown in the Sign stack. */}
+                    {/* Setup-only: roster not already shown in the Sign stack. */}
                     {step === 'share' ? (
                       <>
                         <div className="progress-bar-wrap">
@@ -3584,7 +3584,7 @@ export function DocumentJourney({
                     {role === 'creator' && !doc.sealed && (
                       <div className="signatures-config-form">
                         {/**
-                         * Roster count is set on Arrange (placement lock) - do not re-ask here.
+                         * Roster count is set on Setup (placement lock) - do not re-ask here.
                          * Only allow changing count before anyone has signed and before the plan
                          * is locked (legacy / edge cases without a frozen layout).
                          */}
@@ -3644,7 +3644,7 @@ export function DocumentJourney({
                         {/*
                           One card per person who still needs to sign: email + Send email +
                           Copy invite link. Not gated on construction-plan lock - that old
-                          gate left a dead “Invite detail / Mail app only” form after Arrange.
+                          gate left a dead “Invite detail / Mail app only” form after Setup.
                         */}
                         {doc.parties.filter(p => p.required && !p.signed).length > 0 && (
                           <div className="field-stack">

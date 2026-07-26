@@ -32,13 +32,13 @@ export const CREATOR_STAGES: JourneyStage[] = [
     label: 'Add document',
     verb: 'Add the document and fingerprint it locally',
     blurb:
-      'Drop a PDF, PNG, JPEG, or WebP. We only register its fingerprint (no signing yet). Next you arrange who signs where.',
+      'Drop a PDF, PNG, JPEG, or WebP. We only register its fingerprint (no signing yet). Next you set up who signs where.',
     privacyNote:
       'Opened in your browser only - never sent to VeriLock servers. Only the fingerprint is registered.',
   },
   {
     id: 'share',
-    label: 'Arrange',
+    label: 'Setup',
     verb: 'Design where people will sign',
     blurb:
       'This step is design only - not signing. Name each person, place empty signature / initial / name boxes on the document, and choose whether you are one of them (or only organizing). Continue when the layout looks right; signing and invites come next.',
