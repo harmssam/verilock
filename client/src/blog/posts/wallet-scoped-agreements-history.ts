@@ -71,7 +71,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Connect, open Agreements in the header, and keep work moving from one place. Through the end of July, a permanent Nimiq on-chain lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
+      text: 'Connect, open Agreements in the header, and keep work moving from one place. Through the end of July, a permanent Nimiq on-chain lock is 500 NIM (50% off the 1000 NIM list price). Promo ends August 1.',
     },
   ],
 }

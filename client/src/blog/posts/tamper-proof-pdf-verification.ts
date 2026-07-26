@@ -117,7 +117,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Need a check now? Click the Verify a PDF link on the homepage. No wallet is required. When you are ready to lock a new fingerprint, locks are 50 NIM through July. This is 95% off the 1000 NIM list price. The promo ends August 1.',
+      text: 'Need a check now? Click the Verify a PDF link on the homepage. No wallet is required. When you are ready to lock a new fingerprint, locks are 500 NIM through July. This is 50% off the 1000 NIM list price. The promo ends August 1.',
     },
   ],
 }

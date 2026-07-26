@@ -121,7 +121,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'When you are ready to lock a new fingerprint, locks are 50 NIM through the end of July (95% off the 1000 NIM list price). Promo ends August 1.',
+      text: 'When you are ready to lock a new fingerprint, locks are 500 NIM through the end of July (50% off the 1000 NIM list price). Promo ends August 1.',
     },
   ],
 }

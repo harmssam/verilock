@@ -74,7 +74,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Share carefully, lock when ready, verify anytime. Through the end of July, a permanent Nimiq on-chain lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
+      text: 'Share carefully, lock when ready, verify anytime. Through the end of July, a permanent Nimiq on-chain lock is 500 NIM (50% off the 1000 NIM list price). Promo ends August 1.',
     },
   ],
 }

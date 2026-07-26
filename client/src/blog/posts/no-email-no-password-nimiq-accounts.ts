@@ -109,7 +109,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Locking a fingerprint lists at 1000 NIM. Our July promo offers 95% off, reducing the fee to 50 NIM. This offer ends August 1. Visit Pricing for current rates and credit packs.',
+      text: 'Locking a fingerprint lists at 1000 NIM. Our July promo offers 50% off, reducing the fee to 500 NIM. This offer ends August 1. Visit Pricing for current rates and credit packs.',
     },
   ],
 }

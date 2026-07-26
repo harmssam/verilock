@@ -1,7 +1,7 @@
 export const LUNA_PER_NIM = 100_000
 /** List / “was” price used for promo display. */
 export const BASE_SEAL_FEE_NIM = 1000
-export const JULY_PROMO_DISCOUNT = 0.95
+export const JULY_PROMO_DISCOUNT = 0.5
 
 export interface SealPricing {
   feeNim: number
@@ -16,10 +16,10 @@ export function isJulyPromoActive(now = new Date()): boolean {
   return now.getMonth() === 6
 }
 
-/** Product seal fee in NIM (50 during July promo, otherwise base). */
+/** Product seal fee in NIM (500 during July promo, otherwise base). */
 export function getSealFeeNim(now = new Date()): number {
   if (isJulyPromoActive(now)) {
-    // Avoid float noise (e.g. 50.00000000000004)
+    // Avoid float noise (e.g. 500.00000000000004)
     return Math.round(BASE_SEAL_FEE_NIM * (1 - JULY_PROMO_DISCOUNT))
   }
   return BASE_SEAL_FEE_NIM
@@ -37,7 +37,7 @@ export function getSealPricing(now = new Date()): SealPricing {
     feeLuna: getSealFeeLuna(now),
     baseFeeNim: BASE_SEAL_FEE_NIM,
     promoActive,
-    promoLabel: promoActive ? '95% off - July only' : null,
+    promoLabel: promoActive ? '50% off - July only' : null,
     promoEndsLabel: promoActive ? 'Promo ends August 1' : null,
   }
 }

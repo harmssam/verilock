@@ -97,7 +97,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'VeriLock charges per lock, not per month. You pay only when you lock a document on-chain. Through the end of July, a permanent Nimiq lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
+      text: 'VeriLock charges per lock, not per month. You pay only when you lock a document on-chain. Through the end of July, a permanent Nimiq lock is 500 NIM (50% off the 1000 NIM list price). Promo ends August 1.',
     },
   ],
 }

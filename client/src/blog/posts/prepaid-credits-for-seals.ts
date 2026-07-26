@@ -72,7 +72,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Open Pricing for live pack options and fee numbers. Through the end of July, a permanent on-chain lock is 50 NIM, which is 95% off the 1000 NIM list price. The promo ends August 1. After that, use the current figures on Pricing, not this post\'s snapshot.',
+      text: 'Open Pricing for live pack options and fee numbers. Through the end of July, a permanent on-chain lock is 500 NIM, which is 50% off the 1000 NIM list price. The promo ends August 1. After that, use the current figures on Pricing, not this post\'s snapshot.',
     },
   ],
 }
