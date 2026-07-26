@@ -2833,11 +2833,36 @@ export function DocumentJourney({
                           </p>
                         ) : (
                           <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-                            Field positions are set. Signing and invites come next (or edit
-                            placements first if no one has signed yet).
+                            Field positions are set. Signing and invites come next (or go back to
+                            edit placements first if no one has signed yet).
                           </p>
                         )}
                       </header>
+                      {constructionPlan.status === 'locked' &&
+                        signedCount(doc) === 0 &&
+                        isDocumentCreator(doc.source, address) && (
+                          <div className="journey-setup-continue journey-setup-continue--top">
+                            <button
+                              type="button"
+                              className={`btn btn-secondary${placementLockBusy ? ' btn--busy' : ''}`}
+                              disabled={busy || !token || placementLockBusy}
+                              onClick={() => void unlockPlacements()}
+                            >
+                              {placementLockBusy ? (
+                                <>
+                                  <LoaderCircle
+                                    className="btn-spinner"
+                                    size={16}
+                                    strokeWidth={2.5}
+                                  />
+                                  Re-opening…
+                                </>
+                              ) : (
+                                'Back to edit placements'
+                              )}
+                            </button>
+                          </div>
+                        )}
                       <PlacementEditor
                         file={(pdfFile ?? signFile)!}
                         plan={constructionPlan}
@@ -2883,31 +2908,6 @@ export function DocumentJourney({
                           </p>
                         </div>
                       )}
-                      {constructionPlan.status === 'locked' &&
-                        signedCount(doc) === 0 &&
-                        isDocumentCreator(doc.source, address) && (
-                          <div className="journey-setup-continue">
-                            <button
-                              type="button"
-                              className={`btn btn-secondary${placementLockBusy ? ' btn--busy' : ''}`}
-                              disabled={busy || !token || placementLockBusy}
-                              onClick={() => void unlockPlacements()}
-                            >
-                              {placementLockBusy ? (
-                                <>
-                                  <LoaderCircle
-                                    className="btn-spinner"
-                                    size={16}
-                                    strokeWidth={2.5}
-                                  />
-                                  Re-opening…
-                                </>
-                              ) : (
-                                'Edit placements'
-                              )}
-                            </button>
-                          </div>
-                        )}
                       {placementStatus && (
                         <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.8rem' }}>
                           {placementStatus}

@@ -82,6 +82,26 @@
   flex-shrink: 0;
 }
 
+/* Cursive monogram for the initials tool (reads as handwritten, not a glyph icon). */
+.placement-tool-initials {
+  display: block;
+  font-family:
+    'Segoe Script',
+    'Apple Chancery',
+    'Snell Roundhand',
+    'Brush Script MT',
+    'Lucida Handwriting',
+    cursive;
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-style: italic;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: currentColor;
+  white-space: nowrap;
+  user-select: none;
+}
+
 .placement-tool-btn:disabled {
   opacity: 0.42;
   cursor: not-allowed;
