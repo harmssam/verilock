@@ -189,6 +189,10 @@ export function isSignMobilePath(path: string): boolean {
   return /^\/m\/sign\/[^/]+\/?$/.test(path)
 }
 
+export function isFaqPath(path: string): boolean {
+  return /^\/faq\/?$/.test(path)
+}
+
 export function isKnownAppPath(path: string): boolean {
   if (path === '/' || path === '') return true
   if (isAgreementsPath(path)) return true
@@ -197,6 +201,7 @@ export function isKnownAppPath(path: string): boolean {
   if (isSecurityPath(path)) return true
   if (isSupportPath(path)) return true
   if (isStatsPricingPath(path)) return true
+  if (isFaqPath(path)) return true
   if (isBlogPath(path)) return true
   if (isPdfPath(path)) return true
   if (isSignMobilePath(path)) return true

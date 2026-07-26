@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   isAgreementsPath,
   isBlogPath,
+  isFaqPath,
   isKnownAppPath,
   isPdfLabPath,
   isPdfPath,
@@ -32,6 +33,7 @@ import { AppLink } from './AppLink'
 import { PricePage } from './PricePage'
 import { PrivacyPolicyPage } from './PrivacyPolicyPage'
 import { SecurityPage } from './SecurityPage'
+import { FaqPage } from './FaqPage'
 import { StatsPricingPage } from './StatsPricingPage'
 import { SupportPage } from './SupportPage'
 import { AccountMenu } from './journey/AccountMenu'
@@ -118,6 +120,7 @@ type ShellScreen =
   | 'pdf2'
   | 'sign-mobile'
   | 'stats-pricing'
+  | 'faq'
   | 'not-found'
 
 function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotationUi): ShellScreen {
@@ -127,6 +130,7 @@ function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotation
   if (isSecurityPath(pathname)) return 'security'
   if (isSupportPath(pathname)) return 'support'
   if (isStatsPricingPath(pathname)) return 'stats-pricing'
+  if (isFaqPath(pathname)) return 'faq'
   if (isAgreementsPath(pathname)) return 'agreements'
   if (isBlogPath(pathname)) return 'blog'
   // PDF lab is parallel to seal - only mount when flag allows
@@ -288,6 +292,7 @@ export function App() {
       !isPrivacyPath(window.location.pathname) &&
       !isSecurityPath(window.location.pathname) &&
       !isStatsPricingPath(window.location.pathname) &&
+      !isFaqPath(window.location.pathname) &&
       !isSupportPath(window.location.pathname) &&
       !isAgreementsPath(window.location.pathname) &&
       !isBlogPath(window.location.pathname) &&
@@ -343,6 +348,13 @@ export function App() {
     rememberJourneyPath()
     setScreen('stats-pricing')
     pushShellUrl('/esignature-pricing')
+    scrollShellTop()
+  }, [rememberJourneyPath])
+
+  const goFaq = useCallback(() => {
+    rememberJourneyPath()
+    setScreen('faq')
+    pushShellUrl('/faq')
     scrollShellTop()
   }, [rememberJourneyPath])
 
@@ -533,6 +545,10 @@ export function App() {
       applyPageMeta({ ...PAGE_META.statsPricing })
       return
     }
+    if (screen === 'faq') {
+      applyPageMeta({ ...PAGE_META.faq })
+      return
+    }
     if (screen === 'agreements') {
       applyPageMeta({ ...PAGE_META.agreements })
       return
@@ -705,6 +721,7 @@ export function App() {
         screen === 'privacy' ||
         screen === 'security' ||
         screen === 'stats-pricing' ||
+        screen === 'faq' ||
         screen === 'support' ||
         screen === 'agreements' ||
         screen === 'blog' ||
@@ -743,6 +760,7 @@ export function App() {
       )}
       {screen === 'privacy' && <PrivacyPolicyPage />}
       {screen === 'stats-pricing' && <StatsPricingPage />}
+      {screen === 'faq' && <FaqPage />}
       {screen === 'security' && (
         <SecurityPage
           onCreate={() => pickRole('creator')}
@@ -878,6 +896,13 @@ export function App() {
             onClick={goStatsPricing}
           >
             Pricing Report
+          </AppLink>
+          <AppLink
+            to="/faq"
+            className={`lr-footer-link${screen === 'faq' ? ' lr-footer-link--active' : ''}`}
+            onClick={goFaq}
+          >
+            FAQ
           </AppLink>
           <a
             className="lr-footer-link"

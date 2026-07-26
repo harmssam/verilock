@@ -85,6 +85,12 @@ export const PAGE_META = {
       'Side-by-side pricing comparison of DocuSign, Adobe Sign, PandaDoc, Dropbox Sign, SignNow, and VeriLock. See actual cost per signature at every usage level — subscription vs pay-per-use.',
     path: '/esignature-pricing',
   },
+  faq: {
+    title: `FAQ${TITLE_SUFFIX}`,
+    description:
+      'How VeriLock works, pricing, integrations, and how it compares to DocuSign and other e-signature tools. Your document never leaves your device.',
+    path: '/faq',
+  },
   pdf: {
     title: `PDF annotations (experiment)${TITLE_SUFFIX}`,
     description:
