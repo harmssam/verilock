@@ -310,8 +310,6 @@ export function StatsPricingPage() {
               {[
                 { feature: 'E-signatures', map: () => true },
                 { feature: 'Unlimited documents', map: (p: Provider) => p.payPerUse || p.slug === 'pandadoc' || p.slug === 'dropbox', notes: (p: Provider) => p.slug === 'docusign' ? '5 sends' : p.slug === 'adobe' ? '150/yr' : p.payPerUse ? 'Pay per doc' : null },
-                { feature: 'Templates', map: (p: Provider) => p.slug === 'pandadoc', notes: (p: Provider) => p.payPerUse ? 'N/A' : null },
-                { feature: 'Branding', map: (p: Provider) => p.payPerUse, notes: (p: Provider) => p.payPerUse ? 'Always included' : null },
                 { feature: 'Reminders', map: (p: Provider) => p.slug === 'dropbox' || p.slug === 'signnow', notes: (p: Provider) => p.payPerUse ? 'N/A' : null },
                 { feature: 'Multi-party signing', map: (p: Provider) => p.slug !== 'adobe' && p.slug !== 'docusign', notes: (p: Provider) => p.slug === 'adobe' ? 'Limited' : null },
                 { feature: 'Audit trail', map: () => true, notes: (p: Provider) => p.payPerUse ? 'Blockchain' : 'Basic' },
