@@ -1666,6 +1666,12 @@ a.exp-account-menu-full:focus-visible {
   margin-top: 0.85rem;
 }
 
+/* After Continue: re-open layout sits above the locked preview, not buried under it. */
+.journey-setup-continue--top {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
 .journey-setup-continue .btn-lg {
   width: 100%;
 }
