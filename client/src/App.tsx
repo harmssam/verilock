@@ -653,23 +653,7 @@ export function App() {
                 Pricing
               </AppLink>
             )}
-            <AppLink
-              to="/blog"
-              onClick={() => goBlog()}
-              className={`lr-nav lr-nav--blog${screen === 'blog' ? ' lr-nav--active' : ''}`}
-              aria-current={screen === 'blog' ? 'page' : undefined}
-            >
-              Blog
-            </AppLink>
-            {/* Desktop only: on narrow viewports Security lives in the footer (prod parity, less crowding). */}
-            <AppLink
-              to="/security"
-              onClick={goSecurity}
-              className={`lr-nav lr-nav--security${screen === 'security' ? ' lr-nav--active' : ''}`}
-              aria-current={screen === 'security' ? 'page' : undefined}
-            >
-              Security
-            </AppLink>
+            {/* Blog + Security live in the footer (and homepage blog teaser) - keep header product-only. */}
             <AccountMenu
               account={wallet.account}
               connecting={wallet.connecting}
