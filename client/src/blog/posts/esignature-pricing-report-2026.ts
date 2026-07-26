@@ -32,6 +32,7 @@ export const post: BlogPost = {
     {
       type: 'p',
       text: 'We built a full pricing report that lays all of this out: every major provider, every tier, and the cost per document at three usage levels. It covers the hidden costs too -- additional users, branding removal, API access -- that vendors bury in higher tiers.',
+      link: { url: '/esignature-pricing', label: 'See the full eSignature Pricing Report →' },
     },
     {
       type: 'h2',

@@ -86,7 +86,9 @@ function BlogPostBody({ body }: { body: BlogBlock[] }) {
         }
         return (
           <p key={i} className="blog-body-p muted">
-            {block.text}
+            {block.link
+              ? <>{block.text}<br /><a href={block.link.url}>{block.link.label}</a></>
+              : block.text}
           </p>
         )
       })}

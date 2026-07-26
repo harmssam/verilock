@@ -4,7 +4,7 @@ export type BlogTag = 'guide' | 'feature' | 'privacy' | 'verify' | 'pricing'
 export type BlogFigureLayout = 'full' | 'left' | 'right' | 'narrow'
 
 export type BlogBlock =
-  | { type: 'p'; text: string }
+  | { type: 'p'; text: string; link?: { url: string; label: string } }
   | { type: 'h2'; text: string }
   | { type: 'ul'; items: string[] }
   | { type: 'note'; text: string }
