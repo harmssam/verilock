@@ -1,7 +1,7 @@
 export const SITE_NAME = 'VeriLock'
 export const SITE_TAGLINE = 'Sign free. Lock when it matters.'
 export const DEFAULT_ORIGIN = 'https://verilock.online'
-export const DEFAULT_OG_IMAGE = '/verilock-mark.png'
+export const DEFAULT_OG_IMAGE = '/og-hero.png'
 
 export interface PageMeta {
   title: string
@@ -155,6 +155,8 @@ export function applyPageMeta(meta: PageMeta): void {
   setMeta('property', 'og:description', meta.description)
   setMeta('property', 'og:url', url)
   setMeta('property', 'og:image', image)
+  setMeta('property', 'og:image:width', '1200')
+  setMeta('property', 'og:image:height', '630')
   setMeta('property', 'og:locale', 'en_US')
 
   setMeta('name', 'twitter:card', 'summary_large_image')
