@@ -521,114 +521,16 @@
   gap: 1.5rem;
 }
 
-/* DocuSeal-style hero band */
+/* Full-width hero banner (copy lives in the image) */
 .lr-hero-band {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1.5rem;
-  align-items: center;
+  display: block;
   padding: 0.25rem 0 0.5rem;
 }
 
 @media (min-width: 860px) {
   .lr-hero-band {
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-    gap: 2rem;
     padding: 0.5rem 0 1rem;
   }
-}
-
-.lr-hero-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  min-width: 0;
-}
-
-.lr-hero-eyebrow {
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--lr-accent);
-}
-
-.lr-hero-headline {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(1.85rem, 4.6vw, 2.65rem);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 1.1;
-  color: var(--lr-text);
-  text-wrap: balance;
-}
-
-.lr-hero-headline-em {
-  display: inline;
-  color: var(--lr-accent);
-}
-
-.lr-hero-sub {
-  margin: 0;
-  max-width: 34rem;
-  font-size: 1.02rem;
-  line-height: 1.55;
-  color: var(--lr-muted);
-}
-
-.lr-hero-ctas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  margin-top: 0.15rem;
-}
-
-/* Freemium pitch under CTAs - quiet, not a gradient banner */
-.lr-promo {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem 0.5rem;
-  margin: 0.1rem 0 0;
-  font-size: 0.84rem;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--lr-muted);
-}
-
-.lr-promo-free {
-  color: var(--lr-accent);
-  font-weight: 750;
-}
-
-.lr-promo-sep {
-  color: var(--lr-dim);
-  font-weight: 500;
-}
-
-.lr-cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.7rem 1.15rem;
-  border-radius: 10px;
-  font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
-  text-decoration: none;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-/* Anchor secondary CTA uses same .lr-cta chrome as buttons */
-a.lr-cta {
-  box-sizing: border-box;
 }
 
 html {
@@ -641,29 +543,6 @@ html {
   }
 }
 
-.lr-cta--primary {
-  border: 1px solid transparent;
-  background: var(--lr-accent);
-  color: #fff;
-  box-shadow: 0 8px 20px rgba(13, 148, 136, 0.25);
-}
-
-.lr-cta--primary:hover {
-  background: var(--mint-deep, #0f766e);
-  box-shadow: 0 10px 24px rgba(13, 148, 136, 0.32);
-}
-
-.lr-cta--ghost {
-  border: 1px solid var(--lr-line-strong);
-  background: var(--lr-surface);
-  color: var(--lr-text);
-}
-
-.lr-cta--ghost:hover {
-  border-color: rgba(13, 148, 136, 0.35);
-  color: var(--lr-accent);
-}
-
 .lr-hero-visual {
   position: relative;
   border-radius: 16px;
@@ -671,16 +550,17 @@ html {
   border: 1px solid var(--lr-line);
   background: var(--lr-surface-2);
   box-shadow: var(--shadow-soft);
-  min-height: 14rem;
-  aspect-ratio: 16 / 11;
+  /* Natural width; height follows image aspect ratio — never crop or stretch */
+  line-height: 0;
 }
 
 .lr-hero-visual-img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
   display: block;
-  /* Brand hero still (lock + Nimiq hexes): keep color true, no parchment filters */
+  /* Preserve intrinsic aspect ratio (hero-wide is 2280×720) */
+  object-fit: contain;
+  object-position: center;
   filter: none;
 }
 
@@ -812,55 +692,6 @@ html {
 
 .lr-hero {
   padding: 0.15rem 0 0.25rem;
-}
-
-.lr-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  min-height: 1.35em;
-  margin: 0.35rem 0 0;
-  padding: 0.35rem 0.65rem 0.35rem 0.5rem;
-  border-radius: 999px;
-  border: 1px solid rgba(13, 148, 136, 0.2);
-  background: rgba(13, 148, 136, 0.08);
-  color: #0f766e;
-  font-size: 0.84rem;
-  font-weight: 650;
-  line-height: 1.35;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  max-width: 100%;
-}
-
-.lr-status--in {
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lr-status {
-    opacity: 1;
-    transition: none;
-  }
-}
-
-.lr-hero-title {
-  margin: 0 0 0.45rem;
-  font-family: var(--font-display);
-  font-size: clamp(1.55rem, 4.2vw, 2rem);
-  font-weight: 800;
-  letter-spacing: -0.035em;
-  line-height: 1.12;
-  color: var(--lr-text);
-  text-wrap: balance;
-}
-
-.lr-hero-lead {
-  margin: 0 0 1.25rem;
-  max-width: 36rem;
-  font-size: 0.92rem;
-  line-height: 1.5;
-  color: var(--lr-muted);
 }
 
 /* Path cards - still fills card; translucent white label strip overlays the image */

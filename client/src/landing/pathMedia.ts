@@ -33,11 +33,11 @@ export const PATH_STILLS: Record<PathRole, string> = {
   verifier: '/landing/path-verify.jpg',
 }
 
-/** Home hero visual: VeriLock mark + Nimiq hex network (not a path still). */
-export const HERO_STILL = '/landing/hero.jpg'
+/** Home hero banner: full-width marketing still (text baked into image). */
+export const HERO_STILL = '/landing/hero-wide.jpg'
 
-/** object-position for the hero still (lock sits slightly left of center). */
-export const HERO_PLACEMENT: ImagePlacement = { x: 42, y: 48, zoom: 1 }
+/** Intrinsic size of hero-wide.jpg — keep width/height attrs in sync. */
+export const HERO_STILL_SIZE = { width: 2280, height: 720 } as const
 
 export function formatObjectPosition(p: Pick<ImagePlacement, 'x' | 'y'>): string {
   return `${p.x}% ${p.y}%`
