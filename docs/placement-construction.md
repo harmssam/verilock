@@ -1,6 +1,6 @@
 # Placement construction + hashes-only packaging
 
-Two-phase multi-party PDF signing: **arrange** (empty slots + named people) then **fill** (ink/text blobs on Nimiq).
+Two-phase multi-party PDF signing: **setup** (empty slots + named people) then **fill** (ink/text blobs on Nimiq).
 
 ## Phases
 
@@ -13,7 +13,7 @@ After **Lock placements**, geometry and assignees are immutable. Fills append on
 
 ## Product decisions
 
-- Journey: Fingerprint → **Arrange** → Sign → Invite → Seal → Verify
+- Journey: Fingerprint → **Setup** → Sign → Invite → Seal → Verify
 - Name lines: signer types at fill time (creator places empty boxes)
 - Broadcast: plan lock + each fill batch go on-chain when service wallet + stream broadcast are configured
 - Server stores **hashes + structure** (planRoot, batch roots, blob ids); not PDF bytes
@@ -106,4 +106,4 @@ npm run test:placement --prefix client
 
 Lab: `/pdf` → **Pack plan + fill (dedup demo)** (client-only packer).
 
-Production: **Arrange** step → `PlacementEditor` → **Lock placements** → `POST /api/placement-plans` with structure + `planRoot` + batch0 frames (hashes / wire cache; no PDF, no ink).
+Production: **Setup** step → `PlacementEditor` → **Lock placements** → `POST /api/placement-plans` with structure + `planRoot` + batch0 frames (hashes / wire cache; no PDF, no ink).

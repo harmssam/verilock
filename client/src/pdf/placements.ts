@@ -156,7 +156,7 @@ export function newSlotId(): string {
   return `slot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 }
 
-/** Max people on one construction plan (Arrange). Keep in sync with server placementPlans. */
+/** Max people on one construction plan (Setup). Keep in sync with server placementPlans. */
 export const MAX_CONSTRUCTION_PEOPLE = 10
 export const MIN_CONSTRUCTION_PEOPLE = 1
 

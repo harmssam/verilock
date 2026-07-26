@@ -31,7 +31,7 @@ Fingerprint a document **on-device** (PDF or image), collect multi-party wallet 
 
 | Level | User-facing name | What they get | Price |
 |-------|------------------|---------------|-------|
-| **0** | **Sign free** | Create, arrange fields, invite, co-sign with wallets, My agreements, print signed copy | **$0** |
+| **0** | **Sign free** | Create, set up fields, invite, co-sign with wallets, My agreements, print signed copy | **$0** |
 | **1** | **Lock on blockchain** | Permanent fingerprint anchor on Nimiq; re-verify without trusting VeriLock alone | **1 credit** (or live NIM fee) |
 | **2** | **On-chain data backup** | Signatures / initials / text placements multi-tx archive so proof can outlive servers | **Credits by frame count** |
 
@@ -86,7 +86,7 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 ### Acceptance checklist (redesign done only if all true)
 
 - [ ] Path picker still offers exactly: **Create & sign**, **I was invited**, **Verify a file**
-- [ ] Creator stages still: Fingerprint → Arrange → Sign → Seal → Verify (wallet login is a gate, not a rail step)
+- [ ] Creator stages still: Fingerprint → Setup → Sign → Seal → Verify (wallet login is a gate, not a rail step)
 - [ ] After multi-party all-signed: free complete (print primary, lock secondary) still available; seal payment path intact
 - [ ] Signer stages still: Sign → Done (wallet login is a gate on submit, not a rail step)
 - [ ] Verifier stages still: Verify only (wallet optional)

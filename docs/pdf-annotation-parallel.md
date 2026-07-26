@@ -48,10 +48,10 @@ Copy seal-critical vars to staging; use a **separate** funded service wallet if 
 
 ## Product integration (creator path)
 
-On the creator rail, **Arrange** embeds `PlacementEditor` in production `DocumentJourney` when `PDF_ANNOTATION_UI` / `FEATURES.pdfAnnotationUi` is on:
+On the creator rail, **Setup** embeds `PlacementEditor` in production `DocumentJourney` when `PDF_ANNOTATION_UI` / `FEATURES.pdfAnnotationUi` is on:
 
 1. Fingerprint → create  
-2. **Arrange** - name people, place empty signature/name boxes, lock placements (`POST /api/placement-plans`)  
+2. **Setup** - name people, place empty signature/name boxes, lock placements (`POST /api/placement-plans`)  
 3. Sign (wallet + fill slots later in Phase 3)  
 4. Invite / wait for co-signers  
 5. Seal  
