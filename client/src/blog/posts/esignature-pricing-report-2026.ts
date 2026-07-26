@@ -1,6 +1,6 @@
 import type { BlogPost } from '../types'
 
-const cover = '/blog/esignature-pricing-report.jpg'
+const cover = '/blog/esignature-pricing-report.svg'
 
 export const post: BlogPost = {
   slug: 'esignature-pricing-report-2026',
