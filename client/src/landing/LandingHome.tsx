@@ -9,7 +9,7 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { formatBlogDate, getAllPosts } from '../blog'
 import type { PathRole } from '../journey/types'
 import { AppLink } from '../AppLink'
@@ -126,21 +126,33 @@ export function LandingHome({
   const latestPost = useMemo(() => getAllPosts()[0] ?? null, [])
   const { claim, visible: claimVisible } = useHeroClaims()
   const ClaimIcon = claim.icon
+  const heroCopyRef = useRef<HTMLDivElement>(null)
+  const [heroCopyH, setHeroCopyH] = useState(0)
+
+  /* Mobile image band height tracks copy; desktop image is absolute-fill of the same box. */
+  useLayoutEffect(() => {
+    const el = heroCopyRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const measure = () => setHeroCopyH(Math.round(el.getBoundingClientRect().height))
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [claim.status])
 
   return (
     <div className="lr-home">
-      {/* Wide hero: copy on the open left, lock art on the right */}
+      {/* Hero: copy sizes the frame; still covers and may crop top/bottom */}
       <section className="lr-hero-band" aria-labelledby="lr-hero-headline">
         <div
           className="lr-hero-frame"
           style={
             {
-              ['--lr-hero-w']: String(HERO_STILL_SIZE.width),
-              ['--lr-hero-h']: String(HERO_STILL_SIZE.height),
+              ['--lr-hero-copy-h']: heroCopyH > 0 ? `${heroCopyH}px` : undefined,
             } as CSSProperties
           }
         >
-          <div className="lr-hero-copy">
+          <div className="lr-hero-copy" ref={heroCopyRef}>
             <h1 id="lr-hero-headline" className="lr-hero-headline">
               Multi-party document signing.{' '}
               <span className="lr-hero-headline-em">Free.</span>
@@ -182,15 +194,16 @@ export function LandingHome({
               <span>{claim.status}</span>
             </p>
           </div>
-          <img
-            className="lr-hero-visual-img"
-            src={HERO_STILL}
-            alt=""
-            width={HERO_STILL_SIZE.width}
-            height={HERO_STILL_SIZE.height}
-            decoding="async"
-            aria-hidden
-          />
+          <div className="lr-hero-visual" aria-hidden>
+            <img
+              className="lr-hero-visual-img"
+              src={HERO_STILL}
+              alt=""
+              width={HERO_STILL_SIZE.width}
+              height={HERO_STILL_SIZE.height}
+              decoding="async"
+            />
+          </div>
         </div>
       </section>
 

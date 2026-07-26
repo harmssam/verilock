@@ -521,7 +521,7 @@
   gap: 1.5rem;
 }
 
-/* Wide hero: marketing copy over the open left of hero-wide.jpg */
+/* Hero: copy defines height; still covers the box and may crop top/bottom */
 .lr-hero-band {
   display: block;
   padding: 0.25rem 0 0.5rem;
@@ -552,25 +552,6 @@ html {
   /* Match the pale left of hero-wide so gaps never flash a hard plate */
   background: linear-gradient(90deg, #f4f7f4 0%, #eef5f3 45%, #e8f2ef 100%);
   box-shadow: var(--shadow-soft);
-  /* Keep in sync with HERO_STILL_SIZE in pathMedia.ts (set as --lr-hero-w/h too). */
-  --lr-hero-w: 1280;
-  --lr-hero-h: 720;
-}
-
-/* Mobile: stack copy above the banner so type stays readable */
-.lr-hero-visual-img {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-width: 100%;
-  /* Explicit ratio: WebKit often mis-sizes height:auto + object-fit inside overflow:hidden */
-  aspect-ratio: var(--lr-hero-w) / var(--lr-hero-h);
-  object-fit: cover;
-  object-position: right center;
-  filter: none;
-  /* Avoid Safari replaced-element layout thrash */
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .lr-hero-copy {
@@ -580,61 +561,75 @@ html {
   flex-direction: column;
   gap: 0.75rem;
   min-width: 0;
-  padding: 1.15rem 1.15rem 1.25rem;
+  /* Extra vertical padding so type has air and the image band matches */
+  padding: 1.75rem 1.2rem 1.9rem;
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.92) 0%,
-    rgba(255, 255, 255, 0.82) 100%
+    rgba(255, 255, 255, 0.94) 0%,
+    rgba(255, 255, 255, 0.86) 100%
   );
 }
 
 /*
- * Desktop: grid stack so Safari and Chromium share one definite height box.
- * Frame aspect-ratio matches the still — object-fit:cover at the same ratio
- * does not crop; object-position keeps the lock on the right.
+ * Mobile: still sits under the copy. Height tracks copy but is capped at 200px
+ * so the band stays short; object-fit:cover trims top/bottom.
+ */
+.lr-hero-visual {
+  position: relative;
+  z-index: 0;
+  width: 100%;
+  height: min(var(--lr-hero-copy-h, 12rem), 200px);
+  max-height: 200px;
+  overflow: hidden;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+/* Narrow phones: shorter image band under the copy */
+@media (max-width: 449px) {
+  .lr-hero-visual {
+    height: min(var(--lr-hero-copy-h, 10rem), 130px);
+    max-height: 130px;
+  }
+}
+
+.lr-hero-visual-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Lock on the right; crop top/bottom of the tall still freely */
+  object-position: right center;
+  filter: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/*
+ * Desktop: copy overlays the open left; image fills the frame.
+ * Frame height = copy height (image is out of flow).
  */
 @media (min-width: 860px) {
-  .lr-hero-frame {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, auto);
-    width: 100%;
-    aspect-ratio: var(--lr-hero-w) / var(--lr-hero-h);
-  }
-
-  .lr-hero-visual-img {
-    grid-area: 1 / 1;
-    z-index: 0;
-    align-self: stretch;
-    justify-self: stretch;
-    width: 100%;
-    height: 100%;
-    max-width: none;
-    /* Ratio already on the frame; fill the cell without stretch-distortion */
-    aspect-ratio: auto;
-    object-fit: cover;
-    object-position: right center;
-  }
-
   .lr-hero-copy {
-    grid-area: 1 / 1;
-    position: relative;
-    z-index: 1;
-    align-self: center;
-    justify-self: start;
-    /* Stay in the open left third so type clears the lock art */
-    width: min(42%, 24rem);
-    max-width: 24rem;
-    height: auto;
-    min-height: 0;
-    padding: 1.25rem 1.1rem 1.25rem 1.4rem;
+    width: 55%;
+    max-width: none;
+    padding: 2.1rem 1.35rem 2.25rem 1.55rem;
     /* Soft wash so type stays crisp on the pale left of the still */
     background: linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.78) 0%,
-      rgba(255, 255, 255, 0.45) 70%,
+      rgba(255, 255, 255, 0.82) 0%,
+      rgba(255, 255, 255, 0.48) 70%,
       rgba(255, 255, 255, 0) 100%
     );
+  }
+
+  .lr-hero-visual {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: auto;
+    height: auto;
+    max-height: none;
   }
 }
 
