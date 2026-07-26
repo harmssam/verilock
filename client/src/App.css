@@ -553,7 +553,7 @@ html {
   background: linear-gradient(90deg, #f4f7f4 0%, #eef5f3 45%, #e8f2ef 100%);
   box-shadow: var(--shadow-soft);
   /* Keep in sync with HERO_STILL_SIZE in pathMedia.ts (set as --lr-hero-w/h too). */
-  --lr-hero-w: 2280;
+  --lr-hero-w: 1280;
   --lr-hero-h: 720;
 }
 

@@ -33,11 +33,11 @@ export const PATH_STILLS: Record<PathRole, string> = {
   verifier: '/landing/path-verify.jpg',
 }
 
-/** Home hero banner: full-width marketing still (text baked into image). */
+/** Home hero banner: full-width still (lock on right, open left for HTML copy). */
 export const HERO_STILL = '/landing/hero-wide.jpg'
 
-/** Intrinsic size of hero-wide.jpg — keep width/height attrs in sync. */
-export const HERO_STILL_SIZE = { width: 2280, height: 720 } as const
+/** Intrinsic size of hero-wide.jpg — keep width/height attrs + CSS --lr-hero-* in sync. */
+export const HERO_STILL_SIZE = { width: 1280, height: 720 } as const
 
 export function formatObjectPosition(p: Pick<ImagePlacement, 'x' | 'y'>): string {
   return `${p.x}% ${p.y}%`
