@@ -58,7 +58,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Private file. Public proof. Check integrity anytime, and lock on the blockchain new agreements for 50 NIM through the end of July (promo ends August 1).',
+      text: 'Private file. Public proof. Check integrity anytime, and lock on the blockchain new agreements for 500 NIM through the end of July (promo ends August 1).',
     },
   ],
 }

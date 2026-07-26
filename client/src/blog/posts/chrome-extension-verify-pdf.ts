@@ -66,7 +66,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Use the extension when a PDF link appears in the wild, and use Verify on the site when you already have the file. Locking a permanent fingerprint on Nimiq is still free to sign; through the end of July a permanent lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
+      text: 'Use the extension when a PDF link appears in the wild, and use Verify on the site when you already have the file. Locking a permanent fingerprint on Nimiq is still free to sign; through the end of July a permanent lock is 500 NIM (50% off the 1000 NIM list price). Promo ends August 1.',
     },
   ],
 }

@@ -146,7 +146,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'Ready to lock a fingerprint? Through the end of July, a permanent Nimiq on-chain lock is 50 NIM. This is 95% off the 1000 NIM list price. The promo ends August 1.',
+      text: 'Ready to lock a fingerprint? Through the end of July, a permanent Nimiq on-chain lock is 500 NIM. This is 50% off the 1000 NIM list price. The promo ends August 1.',
     },
     {
       type: 'p',
