@@ -497,7 +497,7 @@ export function DocumentJourney({
     registerHubLockComplete(async result => {
       try {
         setBusy(true)
-        setLockMessage('Finishing seal from Nimiq Hub…')
+        setLockMessage('Finishing lock from Nimiq Hub…')
         const me = await api.me(result.token)
         applySession(result.token, me.address)
         const { document: current } = await api.getDocument(result.docId, result.token)
@@ -515,7 +515,7 @@ export function DocumentJourney({
         setLocalError(null)
         window.history.replaceState({}, '', `/d/${sealed.slug}`)
       } catch (err) {
-        setLocalError(err instanceof Error ? err.message : 'Hub seal return failed')
+        setLocalError(err instanceof Error ? err.message : 'Hub lock return failed')
       } finally {
         setBusy(false)
       }
@@ -2478,7 +2478,7 @@ export function DocumentJourney({
             {/* Desktop: keep subtitle on the collapsed row. Mobile: only in expanded detail. */}
             <span className="trust-bar-sub trust-bar-sub--inline">
               {' '}
-              Only a SHA-256 fingerprint is stored / sealed on-chain.
+              Only a SHA-256 fingerprint is stored / locked on-chain.
             </span>
           </span>
           <span className={`trust-chevron${privacyOpen ? ' trust-chevron--open' : ''}`} />
@@ -2486,12 +2486,12 @@ export function DocumentJourney({
         {privacyOpen && (
           <div className="trust-bar-detail">
             <p className="trust-bar-sub trust-bar-sub--detail">
-              Only a SHA-256 fingerprint is stored / sealed on-chain.
+              Only a SHA-256 fingerprint is stored / locked on-chain.
             </p>
             <ul>
               <li>Fingerprinting runs in your browser - bytes stay local.</li>
               <li>Servers keep metadata + hash, not the file.</li>
-              <li>On-chain seal records the hash string only.</li>
+              <li>On-chain lock records the hash string only.</li>
               <li>Verification re-hashes a local copy - no wallet required.</li>
             </ul>
           </div>
@@ -3440,7 +3440,7 @@ export function DocumentJourney({
                                       ? role === 'creator'
                                         ? 'Records your signature, then invite co-signers to complete their fields on the same document.'
                                         : 'Records you as this party on the agreement. You are already signed in - this does not open a new wallet login.'
-                                      : 'Records you as the signer. Next you can seal on Nimiq.'}
+                                      : 'Records you as the signer. Next you can lock on the blockchain.'}
                                   </p>
                                 </>
                               )}
@@ -4150,7 +4150,7 @@ export function DocumentJourney({
                         </p>
                         <p className="muted">
                           {doc.directSeal
-                            ? 'Direct seal - no signatures required.'
+                            ? 'Direct lock - no signatures required.'
                             : allSigned(doc)
                               ? requiredCount(doc) <= 1
                                 ? 'Signature complete.'
@@ -4180,7 +4180,7 @@ export function DocumentJourney({
                           onClick={() => void sealWithCredit()}
                         >
                           <Lock size={18} strokeWidth={2.25} />
-                          Seal on Chain - 1 credit
+                          Lock on blockchain - 1 credit
                         </button>
                       ) : (
                         <>
@@ -4199,7 +4199,7 @@ export function DocumentJourney({
                               <>
                                 <Lock size={18} strokeWidth={2.25} />
                                 {inNimiqPay || nimiq
-                                  ? 'Pay NIM & seal on-chain'
+                                  ? 'Pay NIM & lock on-chain'
                                   : 'Pay NIM via Hub'}
                               </>
                             )}
@@ -4265,7 +4265,7 @@ export function DocumentJourney({
                             ) : (
                               <>
                                 Your fields and wallet signature are recorded. Other parties still
-                                need to finish before the creator can seal.
+                                need to finish before the creator can lock on the blockchain.
                               </>
                             )}{' '}
                             Keep your copy of <em>{doc.fileName}</em>.
@@ -4468,7 +4468,7 @@ export function DocumentJourney({
                         Hash preview: <code className="mono">{verifyOutcome.fingerprint}</code>
                       </p>
                       <p className="muted" style={{ marginBottom: 0, fontSize: '0.82rem' }}>
-                        Could not reach the server to look up sealed agreements
+                        Could not reach the server to look up locked agreements
                         {localError ? ` (${localError})` : ''}. Wait a moment and drop the file
                         again.
                       </p>

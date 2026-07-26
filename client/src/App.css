@@ -1222,7 +1222,7 @@ html {
   gap: 0.45rem;
 }
 
-/* Agreements page: Create & seal / New agreement - match light CTA style */
+/* Agreements page: Create & lock / New agreement - match light CTA style */
 /* Agreements page primary CTAs (header / empty / login) */
 .lr-app .agreements-page .btn-primary {
   display: inline-flex;

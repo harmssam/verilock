@@ -868,11 +868,11 @@ export function AgreementsPage({
         <div className="agreements-page-empty">
           <Files size={28} strokeWidth={1.75} className="agreements-page-empty-icon" aria-hidden />
           <p className="muted" style={{ margin: 0 }}>
-            Ready to fingerprint a document and seal it on Nimiq?
+            Ready to fingerprint a document and lock it on the blockchain?
           </p>
           <button type="button" className="btn btn-primary" onClick={onCreate}>
             <FilePlus size={16} strokeWidth={2.25} aria-hidden />
-            Create &amp; seal
+            Create &amp; lock
           </button>
         </div>
       </section>

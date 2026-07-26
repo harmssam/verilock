@@ -674,7 +674,7 @@ export function PdfAnnotator({
             Annotations ({counts.signatures} sig · {counts.texts} text · {counts.marks} marks)
           </h4>
           <p className="pdf-annotator-hint">
-            Per credit (1 seal): up to {MAX_SIGNATURE_ANNOTATIONS} signatures,{' '}
+            Per credit (1 lock): up to {MAX_SIGNATURE_ANNOTATIONS} signatures,{' '}
             {MAX_TEXT_ANNOTATIONS} text, {MAX_MARK_ANNOTATIONS} check/X marks.
           </p>
           {annotations.length === 0 ? (

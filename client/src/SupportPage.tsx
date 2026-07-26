@@ -241,7 +241,7 @@ export function SupportPage() {
     <div className="card support-page">
       <h2>Support</h2>
       <p className="muted support-lead">
-        Questions about signing, sealing, verification, or billing? Send a message and we&apos;ll get back
+        Questions about signing, locking, verification, or billing? Send a message and we&apos;ll get back
         to you. Your document never needs to leave your device for support - describe the issue in words; don&apos;t
         attach files here.
       </p>
@@ -311,7 +311,7 @@ export function SupportPage() {
               value={subject}
               onChange={e => setSubject(e.target.value.slice(0, MAX_SUPPORT_SUBJECT_LENGTH))}
               disabled={status === 'submitting'}
-              placeholder="e.g. Seal fee, invite link, verification"
+              placeholder="e.g. Lock fee, invite link, verification"
             />
           </div>
 
@@ -328,7 +328,7 @@ export function SupportPage() {
               value={message}
               onChange={e => setMessage(e.target.value.slice(0, MAX_SUPPORT_MESSAGE_LENGTH))}
               disabled={status === 'submitting'}
-              placeholder="What happened, what you expected, and any document title or step (create / sign / seal / verify)."
+              placeholder="What happened, what you expected, and any document title or step (create / sign / lock / verify)."
             />
             <p className="muted support-char-hint">
               {message.length}/{MAX_SUPPORT_MESSAGE_LENGTH}

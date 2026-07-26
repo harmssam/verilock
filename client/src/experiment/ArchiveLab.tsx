@@ -221,7 +221,7 @@ export function ArchiveLab({ wallet }: ArchiveLabProps) {
       <header className="archive-lab-head">
         <div>
           <p className="archive-lab-kicker">
-            Lab · not production seal · <a href="/pdf">/pdf</a> · <strong>/pdf2</strong>
+            Lab · not production lock · <a href="/pdf">/pdf</a> · <strong>/pdf2</strong>
           </p>
           <h1>Hash-only archive demo</h1>
           <p className="muted archive-lab-lead">

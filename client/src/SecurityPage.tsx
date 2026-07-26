@@ -219,7 +219,7 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
               An on-chain lock records the <strong>SHA-256 fingerprint</strong> of the document
               bytes you chose—a fixed-length digest computed locally. Co-signers attach wallet
               signatures to that fingerprint. Locking on Nimiq anchors the hash so a later copy
-              can be compared against what was sealed.
+              can be compared against what was locked.
             </p>
             <div className="security-split" role="list">
               <div className="security-split-card security-split-card--yes" role="listitem">

@@ -42,8 +42,8 @@ export function PrivacyPolicyPage() {
       <section className="privacy-policy-section">
         <h3>Blockchain records</h3>
         <p className="muted">
-          When you seal a document, a Nimiq transaction anchors the document fingerprint on-chain. That
-          record is public on the Nimiq blockchain and cannot be removed by VeriLock.
+          When you lock a document on the blockchain, a Nimiq transaction anchors the document fingerprint
+          on-chain. That record is public on the Nimiq blockchain and cannot be removed by VeriLock.
         </p>
       </section>
 
@@ -51,7 +51,7 @@ export function PrivacyPolicyPage() {
         <h3>Browser storage</h3>
         <p className="muted">
           VeriLock uses your browser&apos;s local and session storage to remember your session, resume
-          in-progress seal flows, and save display preferences (such as fiat currency on the pricing page).
+          in-progress lock flows, and save display preferences (such as fiat currency on the pricing page).
           This data stays on your device.
         </p>
       </section>
@@ -81,7 +81,7 @@ export function PrivacyPolicyPage() {
             <strong>Google Fonts</strong> - web fonts loaded from Google&apos;s CDN when you open the app
           </li>
           <li>
-            <strong>Resend</strong> - transactional email delivery (optional ready-to-seal notifications and
+            <strong>Resend</strong> - transactional email delivery (optional ready-to-lock notifications and
             support form messages)
           </li>
           <li>

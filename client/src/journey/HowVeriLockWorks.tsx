@@ -36,7 +36,7 @@ function roleSubtitle(role: PathRole | null): string {
     return 'Match the shared document, complete your fields, and bind with your wallet'
   if (role === 'verifier')
     return 'Fingerprint locally, match VeriLock and the chain - no wallet needed'
-  return 'Fingerprint locally, sign together, seal permanently on Nimiq'
+  return 'Fingerprint locally, sign together, lock permanently on Nimiq'
 }
 
 function BeatVisual({ stageId, active }: { stageId: JourneyStepId; active: boolean }) {

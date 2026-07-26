@@ -84,7 +84,7 @@ export async function sealJourneyDocumentWithCredit(args: {
       return {
         ok: false,
         redirecting: false,
-        message: result.error ?? 'Credit seal failed',
+        message: result.error ?? 'Credit lock failed',
       }
     }
 
@@ -126,7 +126,7 @@ export async function sealJourneyDocumentWithCredit(args: {
     return {
       ok: false,
       redirecting: false,
-      message: err instanceof Error ? err.message : 'Credit seal failed',
+      message: err instanceof Error ? err.message : 'Credit lock failed',
     }
   }
 }
@@ -176,7 +176,7 @@ export async function sealJourneyDocument(args: {
       const provider = await ensureNimiqProvider(args.nimiq)
       setNimiq(provider)
       const feeSummary = formatSealFeeSummary(getSealPricing())
-      onProgress(`Confirm the ${feeSummary} seal transaction in Nimiq Pay…`)
+      onProgress(`Confirm the ${feeSummary} lock transaction in Nimiq Pay…`)
       txHash = await sendLockAttestation(provider, address, doc.id, finalHash)
     } else {
       const preferRedirect = shouldUseHubRedirect()
@@ -194,7 +194,7 @@ export async function sealJourneyDocument(args: {
       onProgress(
         preferRedirect
           ? HUB_REDIRECT_MESSAGE
-          : `Hub popup - confirm the ${feeSummary} seal transaction.`,
+          : `Hub popup - confirm the ${feeSummary} lock transaction.`,
       )
       const prebuilt = buildLockRequestSync(address, doc.id, finalHash)
       txHash = await sendLockAttestationViaHub(address, doc.id, finalHash, {
@@ -218,7 +218,7 @@ export async function sealJourneyDocument(args: {
       return {
         ok: false,
         redirecting: false,
-        message: 'Cancelled in Hub. Tap Seal to try again.',
+        message: 'Cancelled in Hub. Tap Lock to try again.',
       }
     }
     if (isPopupBlockedError(err)) {
@@ -234,7 +234,7 @@ export async function sealJourneyDocument(args: {
     return {
       ok: false,
       redirecting: false,
-      message: err instanceof Error ? err.message : 'Seal failed',
+      message: err instanceof Error ? err.message : 'Lock failed',
     }
   } finally {
     setSealProgressReporter(null)

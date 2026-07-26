@@ -164,7 +164,7 @@ export function AgreementsPanel({
             <p className="muted agreements-panel-subtitle">
               {activeDocs.length} active
               {actionable > 0 ? ` · ${actionable} need${actionable === 1 ? 's' : ''} your action` : ''}
-              {sealedCount > 0 ? ` · ${sealedCount} sealed` : ''}
+              {sealedCount > 0 ? ` · ${sealedCount} locked` : ''}
             </p>
           )}
         </div>
