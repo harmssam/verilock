@@ -552,6 +552,9 @@ html {
   /* Match the pale left of hero-wide so gaps never flash a hard plate */
   background: linear-gradient(90deg, #f4f7f4 0%, #eef5f3 45%, #e8f2ef 100%);
   box-shadow: var(--shadow-soft);
+  /* Keep in sync with HERO_STILL_SIZE in pathMedia.ts (set as --lr-hero-w/h too). */
+  --lr-hero-w: 2280;
+  --lr-hero-h: 720;
 }
 
 /* Mobile: stack copy above the banner so type stays readable */
@@ -559,10 +562,15 @@ html {
   display: block;
   width: 100%;
   height: auto;
-  /* Natural aspect ratio — never stretch */
-  object-fit: contain;
+  max-width: 100%;
+  /* Explicit ratio: WebKit often mis-sizes height:auto + object-fit inside overflow:hidden */
+  aspect-ratio: var(--lr-hero-w) / var(--lr-hero-h);
+  object-fit: cover;
   object-position: right center;
   filter: none;
+  /* Avoid Safari replaced-element layout thrash */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .lr-hero-copy {
@@ -581,40 +589,45 @@ html {
 }
 
 /*
- * Desktop: show the full wide still (lock is designed on the right).
- * Copy overlays the empty left — do NOT object-fit:cover the still,
- * which re-crops and pulls the lock into the text column.
+ * Desktop: grid stack so Safari and Chromium share one definite height box.
+ * Frame aspect-ratio matches the still — object-fit:cover at the same ratio
+ * does not crop; object-position keeps the lock on the right.
  */
 @media (min-width: 860px) {
   .lr-hero-frame {
-    /* Image in normal flow sets height from intrinsic 2280×720 */
-    line-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, auto);
+    width: 100%;
+    aspect-ratio: var(--lr-hero-w) / var(--lr-hero-h);
   }
 
   .lr-hero-visual-img {
-    position: relative;
+    grid-area: 1 / 1;
     z-index: 0;
-    display: block;
+    align-self: stretch;
+    justify-self: stretch;
     width: 100%;
-    height: auto;
-    /* Full designed frame (2280×720) — no cover crop, no stretch */
-    object-fit: contain;
+    height: 100%;
+    max-width: none;
+    /* Ratio already on the frame; fill the cell without stretch-distortion */
+    aspect-ratio: auto;
+    object-fit: cover;
     object-position: right center;
   }
 
   .lr-hero-copy {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
+    grid-area: 1 / 1;
+    position: relative;
     z-index: 1;
+    align-self: center;
+    justify-self: start;
     /* Stay in the open left third so type clears the lock art */
     width: min(42%, 24rem);
     max-width: 24rem;
-    justify-content: center;
+    height: auto;
     min-height: 0;
     padding: 1.25rem 1.1rem 1.25rem 1.4rem;
-    line-height: normal;
     /* Soft wash so type stays crisp on the pale left of the still */
     background: linear-gradient(
       90deg,

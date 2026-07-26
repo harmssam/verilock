@@ -9,7 +9,7 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { formatBlogDate, getAllPosts } from '../blog'
 import type { PathRole } from '../journey/types'
 import { AppLink } from '../AppLink'
@@ -131,7 +131,15 @@ export function LandingHome({
     <div className="lr-home">
       {/* Wide hero: copy on the open left, lock art on the right */}
       <section className="lr-hero-band" aria-labelledby="lr-hero-headline">
-        <div className="lr-hero-frame">
+        <div
+          className="lr-hero-frame"
+          style={
+            {
+              ['--lr-hero-w']: String(HERO_STILL_SIZE.width),
+              ['--lr-hero-h']: String(HERO_STILL_SIZE.height),
+            } as CSSProperties
+          }
+        >
           <div className="lr-hero-copy">
             <h1 id="lr-hero-headline" className="lr-hero-headline">
               Multi-party document signing.{' '}
