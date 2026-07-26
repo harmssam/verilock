@@ -1,6 +1,6 @@
 import type { BlogPost } from '../types'
 
-const cover = '/blog/esignature-pricing-report.svg'
+const cover = '/blog/esignature-pricing-report-2026.jpg'
 
 export const post: BlogPost = {
   slug: 'esignature-pricing-report-2026',
@@ -10,7 +10,8 @@ export const post: BlogPost = {
   date: '2026-07-25',
   tags: ['pricing'],
   coverImage: cover,
-  coverAlt: 'A printed pricing comparison table on a clean desk with a pen resting beside it, soft daylight',
+  coverAlt:
+    'Top-down light desk: tall stack of subscription invoices, one thin pay-per-use receipt, pocket calculator, mint sticky note, and teal pen on a comparison sheet',
   relatedSlugs: [
     'docusign-vs-hellosign-vs-verilock',
     'prepaid-credits-for-seals',
@@ -40,7 +41,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'VeriLock is the only consumer-facing pay-per-use option with a full signing UI. $0.49 per document, no subscription, no feature tiers. At eight documents a month -- a typical workload -- that is $47 a year. The cheapest subscription alternative costs more than double.',
+      text: 'VeriLock is the only consumer-facing pay-per-use option with a full signing UI. As of July 25, 2026: about $0.41 per document (full list lock fee), no subscription, no feature tiers. At eight documents a month -- a typical workload -- that is about $39 a year. The cheapest subscription alternative still costs more than double.',
     },
     {
       type: 'p',
@@ -48,7 +49,7 @@ export const post: BlogPost = {
     },
     {
       type: 'note',
-      text: 'All pricing data was collected July 25, 2026 from official provider pages. We will refresh the report quarterly so the numbers stay current.',
+      text: 'All pricing data was collected July 25, 2026 from official provider pages (VeriLock from verilock.online/pricing). We will refresh the report quarterly so the numbers stay current.',
     },
   ],
 }
