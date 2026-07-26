@@ -52,11 +52,11 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'VeriLock computes a SHA-256 fingerprint of the PDF in your browser. The file itself is never uploaded. Signers connect through Nimiq wallets and sign against that fingerprint. When everyone agrees, a compact record (the hash, wallet addresses, and a timestamp) is sealed on the Nimiq blockchain.',
+      text: 'VeriLock computes a SHA-256 fingerprint of the PDF in your browser. The file itself is never uploaded. Signers connect through Nimiq wallets and sign against that fingerprint. When everyone agrees, a compact record (the hash, wallet addresses, and a timestamp) is locked on the Nimiq blockchain.',
     },
     {
       type: 'p',
-      text: 'Later verification re-hashes the candidate PDF and checks the chain. It does not need a wallet, an account, or a subscription. Anyone with a copy of the file can confirm whether it matches what was sealed.',
+      text: 'Later verification re-hashes the candidate PDF and checks the chain. It does not need a wallet, an account, or a subscription. Anyone with a copy of the file can confirm whether it matches what was locked.',
     },
     {
       type: 'ul',
@@ -97,7 +97,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'VeriLock charges per seal, not per month. You pay only when you seal a document on-chain. Through the end of July, a permanent Nimiq seal is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
+      text: 'VeriLock charges per lock, not per month. You pay only when you lock a document on-chain. Through the end of July, a permanent Nimiq lock is 50 NIM (95% off the 1000 NIM list price). Promo ends August 1.',
     },
   ],
 }

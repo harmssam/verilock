@@ -82,7 +82,7 @@ export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
   /** Ordered steps for single-path modes; empty for mobile chooser. */
   steps: string[]
 } {
-  const about = 'Connect a Nimiq wallet to sign and seal. VeriLock never holds your keys.'
+  const about = 'Connect a Nimiq wallet to sign and lock on the blockchain. VeriLock never holds your keys.'
 
   switch (mode) {
     case 'pay-native':

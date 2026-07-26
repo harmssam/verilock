@@ -345,7 +345,7 @@ async function waitForTransactionOnNetwork(
   }
   if (options?.required) {
     throw new Error(
-      'Transaction was signed in Hub but did not reach the Nimiq network. Tap Retry seal to sign again.',
+      'Transaction was signed in Hub but did not reach the Nimiq network. Tap Retry lock to sign again.',
     )
   }
   return false

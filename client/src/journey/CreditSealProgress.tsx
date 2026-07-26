@@ -19,7 +19,7 @@ const PHASE_META: Record<
 > = {
   hold: {
     label: 'Reserve credit',
-    detail: '1 credit held for this seal',
+    detail: '1 credit held for this lock',
     Icon: Coins,
   },
   broadcast: {

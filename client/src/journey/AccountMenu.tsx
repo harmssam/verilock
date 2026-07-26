@@ -114,8 +114,8 @@ export function AccountMenu({
           type="button"
           className="exp-credits-chip"
           onClick={onCredits}
-          title="Seal credits - buy more on Pricing"
-          aria-label={`${creditBalance} seal credit${creditBalance === 1 ? '' : 's'}`}
+          title="Lock credits - buy more on Pricing"
+          aria-label={`${creditBalance} lock credit${creditBalance === 1 ? '' : 's'}`}
         >
           <Coins size={14} strokeWidth={2.25} aria-hidden />
           <span className="exp-credits-chip-n">{creditBalance}</span>

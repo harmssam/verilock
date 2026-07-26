@@ -170,8 +170,8 @@ export function shouldResumeHubSeal(): boolean {
 
 export function staleSealMessage(docStatus: string): string {
   return docStatus === 'locking'
-    ? 'Seal was interrupted in Hub. Your signatures are still saved - tap Retry seal to continue.'
-    : 'Previous Hub redirect did not finish. Your signatures are still saved - tap Seal via Hub to try again.'
+    ? 'Lock was interrupted in Hub. Your signatures are still saved - tap Retry lock to continue.'
+    : 'Previous Hub redirect did not finish. Your signatures are still saved - tap Lock via Hub to try again.'
 }
 
 /** Returns false in private mode, storage blocked, or quota issues (common on iOS Safari PWA/WebView). */

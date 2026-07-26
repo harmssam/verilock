@@ -559,7 +559,7 @@ export function ShareInviteCard({
       {!embedded && <h2>Invite signers</h2>}
       <p className="muted share-card-intro">
         {document.signingProgress.required === 0
-          ? 'Direct seal mode - no signers to invite.'
+          ? 'Direct lock mode - no signers to invite.'
           : `${document.signingProgress.signed}/${document.signingProgress.required} signed - share with the other party.`}{' '}
         {canPackEml ? (
           withPdfName(shareIntroForPlan(plan, pdfName), pdfName)

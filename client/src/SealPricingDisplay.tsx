@@ -31,7 +31,7 @@ export function SealPricingDisplay({ className, showNote = true }: SealPricingDi
       <div className="seal-pricing-display-head">
         <Coins className="seal-pricing-display-icon" size={18} strokeWidth={2.25} aria-hidden />
         <div>
-          <span className="seal-pricing-display-label">Seal fee</span>
+          <span className="seal-pricing-display-label">Lock fee</span>
           <div className="seal-pricing-display-amounts">
             <SealFeeAmount
               feeNim={pricing.feeNim}
@@ -52,7 +52,7 @@ export function SealPricingDisplay({ className, showNote = true }: SealPricingDi
       )}
       {showNote && (
         <p className="muted seal-pricing-display-note">
-          Signing and verifying are free. You only pay the seal fee when the agreement is locked
+          Signing and verifying are free. You only pay the lock fee when the agreement is locked
           on-chain.
         </p>
       )}

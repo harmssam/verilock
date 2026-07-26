@@ -47,7 +47,7 @@ export async function buyCreditsWithNim(args: {
     }
     const valueLuna = info.feeLuna * qty
     if (!Number.isFinite(valueLuna) || valueLuna <= 0) {
-      return { ok: false, redirecting: false, message: 'Invalid seal fee for top-up' }
+      return { ok: false, redirecting: false, message: 'Invalid lock fee for top-up' }
     }
 
     const feeLabel = formatSealFeeNim(info.feeNim * qty)

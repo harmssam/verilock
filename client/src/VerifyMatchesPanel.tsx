@@ -88,7 +88,7 @@ export function VerifyMatchesPanel({
                 <div className="verify-match-locked-callout" role="status">
                   <Lock size={18} strokeWidth={2.25} aria-hidden />
                   <div>
-                    <strong>Sealed on the Nimiq blockchain</strong>
+                    <strong>Locked on the Nimiq blockchain</strong>
                     <p>
                       Your local file matches this agreement&apos;s fingerprint. The hash is
                       permanently locked on-chain
