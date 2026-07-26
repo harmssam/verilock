@@ -21,12 +21,21 @@ import {
   type ConstructionPlan,
   type PlacementKind,
   type PlacementSlot,
+  DEFAULT_LABEL_FONT_RATIO,
   MAX_CONSTRUCTION_PEOPLE,
   MIN_CONSTRUCTION_PEOPLE,
+  PLACEMENT_SCALE_DEFAULT_PCT,
+  PLACEMENT_SCALE_MAX_PCT,
+  PLACEMENT_SCALE_MIN_PCT,
+  PLACEMENT_SCALE_STEP_PCT,
+  applyPlacementScale,
   clamp01,
   defaultPeople,
+  defaultSizeForKind,
+  fontSizeRatioAtScale,
   newSlotId,
   personColor,
+  scalePercentFromSlot,
 } from './placements'
 import {
   canvasRectToNormalized,
@@ -239,14 +248,13 @@ export function PlacementEditor({
     [slots, pageNumber],
   )
 
-  const defaultSize = useCallback((kind: PlacementKind) => {
-    if (kind === 'signature') return { width: 0.28, height: 0.08 }
-    // Initials: short box (about 1/3 signature width)
-    if (kind === 'initial') return { width: 0.1, height: 0.055 }
-    if (kind === 'name') return { width: 0.28, height: 0.045 }
-    if (kind === 'text') return { width: 0.28, height: 0.045 }
-    return { width: 0.045, height: 0.045 }
-  }, [])
+  const selectedSlot = useMemo(
+    () => (selectedId ? slots.find(s => s.id === selectedId) ?? null : null),
+    [selectedId, slots],
+  )
+  const selectedScalePercent = selectedSlot
+    ? scalePercentFromSlot(selectedSlot)
+    : PLACEMENT_SCALE_DEFAULT_PCT
 
   const patchPlan = useCallback(
     (patch: Partial<ConstructionPlan> | ((p: ConstructionPlan) => ConstructionPlan)) => {
@@ -419,6 +427,14 @@ export function PlacementEditor({
     [locked, patchPlan],
   )
 
+  const setSelectedScalePercent = useCallback(
+    (pct: number) => {
+      if (!selectedSlot || locked) return
+      updateSlot(selectedSlot.id, applyPlacementScale(selectedSlot, pct))
+    },
+    [selectedSlot, locked, updateSlot],
+  )
+
   const pointerToLocal = (e: React.PointerEvent) => {
     const wrap = wrapRef.current
     if (!wrap) return { x: 0, y: 0 }
@@ -500,7 +516,7 @@ export function PlacementEditor({
     }
 
     setPlaceError(null)
-    const size = defaultSize(kind)
+    const size = defaultSizeForKind(kind)
     const geo = canvasRectToNormalized(
       {
         left: cssX - (size.width * cssSize.width) / 2,
@@ -531,7 +547,14 @@ export function PlacementEditor({
       ...(kind === 'text' && label
         ? {
             // Field label only (e.g. "Date") - fill value comes later at sign time
-            lockedContent: { text: label, fontSizeRatio: 0.018, color: '#64748b' },
+            lockedContent: {
+              text: label,
+              fontSizeRatio: fontSizeRatioAtScale(
+                DEFAULT_LABEL_FONT_RATIO,
+                PLACEMENT_SCALE_DEFAULT_PCT,
+              ),
+              color: '#64748b',
+            },
           }
         : {}),
     }
@@ -692,7 +715,7 @@ export function PlacementEditor({
               : placing.type === 'checkmark'
                 ? 'checkmark'
                 : 'cross'
-    const size = defaultSize(kind)
+    const size = defaultSizeForKind(kind)
     const w = size.width * cssSize.width
     const h = size.height * cssSize.height
     const color = personColor(activePerson)
@@ -1076,9 +1099,33 @@ export function PlacementEditor({
           <Square size={17} strokeWidth={2.1} aria-hidden />
           <X size={11} strokeWidth={2.75} className="placement-tool-check-overlay" aria-hidden />
         </button>
-        {selectedId && !locked && (
+        {selectedId && selectedSlot && !locked && (
           <>
             <span className="placement-toolbar-sep" aria-hidden />
+            <label
+              className="placement-scale-control"
+              title={`Size ${selectedScalePercent}% (40%–140%)`}
+            >
+              <span className="placement-scale-label">Size</span>
+              <input
+                type="range"
+                className="placement-scale-slider"
+                min={PLACEMENT_SCALE_MIN_PCT}
+                max={PLACEMENT_SCALE_MAX_PCT}
+                step={PLACEMENT_SCALE_STEP_PCT}
+                value={selectedScalePercent}
+                onChange={e => setSelectedScalePercent(Number(e.target.value))}
+                disabled={editDisabled}
+                aria-label="Field size"
+                aria-valuemin={PLACEMENT_SCALE_MIN_PCT}
+                aria-valuemax={PLACEMENT_SCALE_MAX_PCT}
+                aria-valuenow={selectedScalePercent}
+                aria-valuetext={`${selectedScalePercent} percent`}
+              />
+              <span className="placement-scale-value" aria-hidden>
+                {selectedScalePercent}%
+              </span>
+            </label>
             <button
               type="button"
               className="placement-tool-btn placement-tool-btn--danger"
@@ -1256,8 +1303,8 @@ export function PlacementEditor({
                       kind={tool}
                       checked={false}
                       color={personColor(activePerson)}
-                      width={defaultSize(tool).width * cssSize.width}
-                      height={defaultSize(tool).height * cssSize.height}
+                      width={defaultSizeForKind(tool).width * cssSize.width}
+                      height={defaultSizeForKind(tool).height * cssSize.height}
                     />
                   ) : (
                     <div className="placement-slot-label">

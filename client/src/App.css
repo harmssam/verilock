@@ -1198,7 +1198,7 @@ a.lr-cta {
   filter: none !important;
 }
 
-/* Logged-in account pill + credits chip (light shell) */
+/* Logged-in account pill (light shell) */
 .lr-header .exp-account-trigger {
   border-color: var(--lr-line-strong);
   background: #ffffff;
@@ -1226,24 +1226,34 @@ a.lr-cta {
   opacity: 1;
 }
 
-.lr-header .exp-credits-chip {
-  border-color: rgba(13, 148, 136, 0.28);
-  background: #ffffff;
-  color: var(--lr-text);
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
-  font-weight: 650;
+/* Credits balance: same nav chrome as Agreements (no pill); active only on Pricing. */
+.lr-header .lr-nav--credits {
+  gap: 0.28rem;
+  cursor: pointer;
+  /* button reset — keep .lr-nav font metrics */
+  font-family: inherit;
+  line-height: inherit;
 }
 
-.lr-header .exp-credits-chip:hover {
-  border-color: rgba(13, 148, 136, 0.45);
-  background: var(--lr-accent-soft);
-  color: var(--lr-text);
-}
-
-.lr-header .exp-credits-chip-n {
-  color: var(--lr-accent);
-  font-weight: 750;
+.lr-header .lr-nav-credits-n {
   font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.lr-header .lr-nav-credits-label {
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.lr-header .lr-nav--credits.lr-nav--active .lr-nav-credits-n {
+  font-weight: 750;
+}
+
+@media (max-width: 520px) {
+  .lr-header .lr-nav-credits-label {
+    display: none;
+  }
 }
 
 .lr-header .exp-account-cluster {
@@ -1599,14 +1609,14 @@ a.lr-cta {
 
 /*
  * Narrow header collapse:
- *  ≤720: when logged in, hide Agreements + Pricing (AccountMenu)
+ *  ≤720: when logged in, hide Agreements + Pricing (AccountMenu; credits nav stays)
  *  ≤560: tighter brand + account chip
  *  ≤400: hide wordmark if still cramped (mark alone is enough to go home)
  * Blog / Security are footer-only (not in header).
  */
 @media (max-width: 720px) {
   /*
-   * Signed-in: Agreements + Pricing already live in AccountMenu (and credits chip).
+   * Signed-in: Agreements + Pricing already live in AccountMenu (and credits nav).
    * Drop the desktop links so address + credits fit.
    */
   .lr-header-actions--connected .lr-nav--agreements,
@@ -1671,9 +1681,9 @@ a.lr-cta {
     max-width: 5.25rem;
   }
 
-  .lr-header .exp-credits-chip {
-    padding: 0.34rem 0.45rem;
-    font-size: 0.68rem;
+  .lr-header .lr-nav--credits {
+    padding: 0.3rem 0.35rem;
+    font-size: 0.7rem;
   }
 
   .lr-header .exp-connect-btn.btn-primary {

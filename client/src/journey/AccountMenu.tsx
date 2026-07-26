@@ -20,6 +20,8 @@ interface AccountMenuProps {
   connectMode?: JourneyConnectMode
   /** Seal credit balance when credits are enabled (header chip). */
   creditBalance?: number | null
+  /** True when the shell is on Pricing — matches Agreements `lr-nav--active`. */
+  creditsActive?: boolean
   onConnect: (options?: JourneyConnectRequest) => void
   onDisconnect: () => void
   onAgreements?: () => void
@@ -33,6 +35,7 @@ export function AccountMenu({
   walletStatus,
   connectMode = 'hub',
   creditBalance = null,
+  creditsActive = false,
   onConnect,
   onDisconnect,
   onAgreements,
@@ -112,14 +115,15 @@ export function AccountMenu({
       {showCredits && (
         <button
           type="button"
-          className="exp-credits-chip"
+          className={`lr-nav lr-nav--credits${creditsActive ? ' lr-nav--active' : ''}`}
           onClick={onCredits}
           title="Lock credits - buy more on Pricing"
           aria-label={`${creditBalance} lock credit${creditBalance === 1 ? '' : 's'}`}
+          aria-current={creditsActive ? 'page' : undefined}
         >
           <Coins size={14} strokeWidth={2.25} aria-hidden />
-          <span className="exp-credits-chip-n">{creditBalance}</span>
-          <span className="exp-credits-chip-label">credits</span>
+          <span className="lr-nav-credits-n">{creditBalance}</span>
+          <span className="lr-nav-credits-label">credits</span>
         </button>
       )}
       <div className={`exp-account${open ? ' exp-account--open' : ''}`} ref={rootRef}>

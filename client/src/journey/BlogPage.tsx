@@ -19,6 +19,11 @@ interface BlogPageProps {
   onOpenPost: (slug: string) => void
   /** Prefer pricing so CTAs advertise lock fee / promo without leaving the site. */
   onPricing: () => void
+  /**
+   * SPA navigate to an in-app path from body links (e.g. `/esignature-pricing`).
+   * External http(s) URLs still use a normal anchor.
+   */
+  onOpenPath?: (path: string) => void
 }
 
 const TAG_LABEL: Record<BlogTag, string> = {
@@ -33,7 +38,47 @@ function primaryTag(tags: BlogTag[]): BlogTag {
   return tags[0] ?? 'guide'
 }
 
-function BlogPostBody({ body }: { body: BlogBlock[] }) {
+function isInternalAppPath(url: string): boolean {
+  return url.startsWith('/') && !url.startsWith('//')
+}
+
+function BlogBodyLink({
+  url,
+  label,
+  onOpenPath,
+}: {
+  url: string
+  label: string
+  onOpenPath?: (path: string) => void
+}) {
+  if (isInternalAppPath(url) && onOpenPath) {
+    return (
+      <AppLink to={url} className="blog-body-link" onClick={() => onOpenPath(url)}>
+        {label}
+      </AppLink>
+    )
+  }
+  const external = /^https?:\/\//i.test(url)
+  return (
+    <a
+      href={url}
+      className="blog-body-link"
+      {...(external
+        ? { target: '_blank', rel: 'noopener noreferrer' }
+        : {})}
+    >
+      {label}
+    </a>
+  )
+}
+
+function BlogPostBody({
+  body,
+  onOpenPath,
+}: {
+  body: BlogBlock[]
+  onOpenPath?: (path: string) => void
+}) {
   return (
     <div className="blog-body">
       {body.map((block, i) => {
@@ -85,11 +130,18 @@ function BlogPostBody({ body }: { body: BlogBlock[] }) {
           )
         }
         return (
-          <p key={i} className="blog-body-p muted">
-            {block.link
-              ? <>{block.text}<br /><a href={block.link.url}>{block.link.label}</a></>
-              : block.text}
-          </p>
+          <div key={i} className="blog-body-block">
+            <p className="blog-body-p muted">{block.text}</p>
+            {block.link ? (
+              <p className="blog-body-p blog-body-p--link">
+                <BlogBodyLink
+                  url={block.link.url}
+                  label={block.link.label}
+                  onOpenPath={onOpenPath}
+                />
+              </p>
+            ) : null}
+          </div>
         )
       })}
     </div>
@@ -245,15 +297,22 @@ function BlogPostView({
   onOpenIndex,
   onOpenPost,
   onPricing,
+  onOpenPath,
 }: {
   post: BlogPost
   onOpenIndex: () => void
   onOpenPost: (slug: string) => void
   onPricing: () => void
+  onOpenPath?: (path: string) => void
 }) {
   const bodyHasCoverFigure = post.body.some(
     b => b.type === 'figure' && b.src === post.coverImage,
   )
+  /** Site pages linked from the body (e.g. full report), not product Pricing. */
+  const reportLink = post.body.find(
+    (b): b is Extract<BlogBlock, { type: 'p' }> =>
+      b.type === 'p' && Boolean(b.link?.url && isInternalAppPath(b.link.url)),
+  )?.link
 
   return (
     <article className="blog-page blog-page--post" aria-labelledby="blog-post-title">
@@ -278,13 +337,24 @@ function BlogPostView({
           />
         </figure>
       ) : null}
-      <BlogPostBody body={post.body} />
+      <BlogPostBody body={post.body} onOpenPath={onOpenPath} />
       <RelatedPosts post={post} onOpenPost={onOpenPost} />
       <div className="blog-cta">
         <PricingCTAMessage />
-        <AppLink to="/pricing" className="btn btn-primary" onClick={onPricing}>
-          See pricing
-        </AppLink>
+        <div className="blog-cta-actions">
+          {reportLink && onOpenPath ? (
+            <AppLink
+              to={reportLink.url}
+              className="btn btn-secondary"
+              onClick={() => onOpenPath(reportLink.url)}
+            >
+              Full pricing report
+            </AppLink>
+          ) : null}
+          <AppLink to="/pricing" className="btn btn-primary" onClick={onPricing}>
+            See pricing
+          </AppLink>
+        </div>
       </div>
     </article>
   )
@@ -328,7 +398,13 @@ function BlogSlugRedirect({
   return null
 }
 
-export function BlogPage({ path, onOpenIndex, onOpenPost, onPricing }: BlogPageProps) {
+export function BlogPage({
+  path,
+  onOpenIndex,
+  onOpenPost,
+  onPricing,
+  onOpenPath,
+}: BlogPageProps) {
   // SPA navigation keeps scroll position; always open blog views at the top.
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -353,6 +429,7 @@ export function BlogPage({ path, onOpenIndex, onOpenPost, onPricing }: BlogPageP
       onOpenIndex={onOpenIndex}
       onOpenPost={onOpenPost}
       onPricing={onPricing}
+      onOpenPath={onOpenPath}
     />
   )
 }
