@@ -26,6 +26,12 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://verilock.online/esignature-pricing</loc>
+    <lastmod>2026-07-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
     <loc>https://verilock.online/blog</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>

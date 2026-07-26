@@ -160,6 +160,10 @@ export function isSupportPath(path: string): boolean {
   return /^\/support\/?$/.test(path)
 }
 
+export function isStatsPricingPath(path: string): boolean {
+  return /^\/esignature-pricing\/?$/.test(path)
+}
+
 /** Blog index (`/blog`) or a post (`/blog/:slug`). */
 export function isBlogPath(path: string): boolean {
   return /^\/blog(?:\/[^/]+)?\/?$/.test(path)
@@ -192,6 +196,7 @@ export function isKnownAppPath(path: string): boolean {
   if (isPrivacyPath(path)) return true
   if (isSecurityPath(path)) return true
   if (isSupportPath(path)) return true
+  if (isStatsPricingPath(path)) return true
   if (isBlogPath(path)) return true
   if (isPdfPath(path)) return true
   if (isSignMobilePath(path)) return true
