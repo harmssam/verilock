@@ -43,6 +43,13 @@ export const PAGE_META = {
       'Contact VeriLock support about signing, locking, verification, or billing. Your file stays on your device - describe the issue without attaching files.',
     path: '/support',
   },
+  redeem: {
+    title: `Redeem code${TITLE_SUFFIX}`,
+    description:
+      'Redeem an AppSumo or promo code for VeriLock seal credits. Connect your wallet, enter your code, and credits are added instantly.',
+    path: '/redeem',
+    noindex: true,
+  },
   blog: {
     title: `Blog${TITLE_SUFFIX}`,
     description:

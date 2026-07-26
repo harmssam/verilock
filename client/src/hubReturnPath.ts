@@ -160,6 +160,11 @@ export function isSupportPath(path: string): boolean {
   return /^\/support\/?$/.test(path)
 }
 
+/** AppSumo / promo code redemption. */
+export function isRedeemPath(path: string): boolean {
+  return /^\/redeem\/?$/.test(path)
+}
+
 export function isStatsPricingPath(path: string): boolean {
   return /^\/esignature-pricing\/?$/.test(path)
 }
@@ -200,6 +205,7 @@ export function isKnownAppPath(path: string): boolean {
   if (isPrivacyPath(path)) return true
   if (isSecurityPath(path)) return true
   if (isSupportPath(path)) return true
+  if (isRedeemPath(path)) return true
   if (isStatsPricingPath(path)) return true
   if (isFaqPath(path)) return true
   if (isBlogPath(path)) return true

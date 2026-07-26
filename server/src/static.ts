@@ -12,6 +12,7 @@ function isKnownAppPath(path: string): boolean {
   if (/^\/privacy\/?$/.test(path)) return true
   if (/^\/security\/?$/.test(path)) return true
   if (/^\/support\/?$/.test(path)) return true
+  if (/^\/redeem\/?$/.test(path)) return true
   if (/^\/esignature-pricing\/?$/.test(path)) return true
   if (/^\/faq\/?$/.test(path)) return true
   // Blog index + post slugs (SPA deep links must get index.html, not 404.html)
