@@ -3231,21 +3231,22 @@ export function DocumentJourney({
                                 </span>
                               </div>
 
-                              <DocumentStage
-                                step={step}
-                                doc={doc}
-                                file={signFile ?? (hasVerifiedLocalPdf ? pdfFile : null)}
-                                onFileChange={setSignFile}
-                                accepting={!hasVerifiedLocalPdf}
-                                localCopyRequired
-                                localCopyMatches={
-                                  hasVerifiedLocalPdf
-                                    ? true
-                                    : !signFile
-                                      ? null
-                                      : signFileMatches
-                                }
-                              />
+                              {/*
+                                Invitees / return visits need the drop zone. Same-session self-sign
+                                already carries the fingerprinted file — do not show a redundant
+                                has-file / fingerprinted card above the pad / page fields.
+                              */}
+                              {!hasVerifiedLocalPdf && (
+                                <DocumentStage
+                                  step={step}
+                                  doc={doc}
+                                  file={signFile ?? null}
+                                  onFileChange={setSignFile}
+                                  accepting
+                                  localCopyRequired
+                                  localCopyMatches={!signFile ? null : signFileMatches}
+                                />
+                              )}
 
                               {signFile && !signFileMatches && !hasVerifiedLocalPdf && (
                                 <div className="result-banner result-banner--bad">
@@ -4063,7 +4064,7 @@ export function DocumentJourney({
                           <strong>Document complete</strong>
                           <p className="muted">
                             All signatures are in. Print a signed copy anytime, or lock on the
-                            blockchain for permanent proof (1 credit).
+                            blockchain for permanent proof.
                           </p>
                         </div>
                       </div>
@@ -4081,32 +4082,43 @@ export function DocumentJourney({
                       )}
                       <section
                         className="journey-pdf-editor"
-                        aria-labelledby="free-complete-print-title"
+                        aria-labelledby={
+                          hasVerifiedLocalPdf
+                            ? undefined
+                            : 'free-complete-print-title'
+                        }
                       >
-                        <header className="signatures-config-head">
-                          <h3 id="free-complete-print-title">Print signed document</h3>
-                        </header>
-                        <DocumentStage
-                          step={step}
-                          doc={doc}
-                          file={signFile ?? (hasVerifiedLocalPdf ? pdfFile : null)}
-                          onFileChange={file => {
-                            setSignFile(file)
-                            setSignHash(null)
-                            if (!file) setLocalError(null)
-                          }}
-                          accepting={!hasVerifiedLocalPdf}
-                          localCopyRequired
-                          localCopyMatches={
-                            hasVerifiedLocalPdf
-                              ? true
-                              : !(signFile || pdfFile)
-                                ? null
-                                : signFileMatches ||
-                                  Boolean(pdfFile && pdfHash === doc.fingerprint)
-                          }
-                          localCopyHint="Drop the same file you fingerprinted so signatures paint on the page, then print. The file stays on this device - nothing is sent to VeriLock."
-                        />
+                        {/*
+                          Drop zone only when the local file is not already matched (e.g. re-open
+                          agreement later). Same-session self-sign already has the file — skip the
+                          fingerprinted card and go straight to the signed preview.
+                        */}
+                        {!hasVerifiedLocalPdf && (
+                          <>
+                            <header className="signatures-config-head">
+                              <h3 id="free-complete-print-title">Print signed document</h3>
+                            </header>
+                            <DocumentStage
+                              step={step}
+                              doc={doc}
+                              file={signFile ?? null}
+                              onFileChange={file => {
+                                setSignFile(file)
+                                setSignHash(null)
+                                if (!file) setLocalError(null)
+                              }}
+                              accepting
+                              localCopyRequired
+                              localCopyMatches={
+                                !(signFile || pdfFile)
+                                  ? null
+                                  : signFileMatches ||
+                                    Boolean(pdfFile && pdfHash === doc.fingerprint)
+                              }
+                              localCopyHint="Drop the same file you fingerprinted so signatures paint on the page, then print. The file stays on this device - nothing is sent to VeriLock."
+                            />
+                          </>
+                        )}
                         {signFile &&
                           !hasVerifiedLocalPdf &&
                           signHash &&
@@ -4132,11 +4144,11 @@ export function DocumentJourney({
                       </section>
                       <button
                         type="button"
-                        className="btn btn-secondary"
+                        className="btn btn-primary btn-lg free-complete-lock-cta"
                         onClick={() => setCreatorChoseLock(true)}
                       >
-                        <Lock size={16} strokeWidth={2.25} />
-                        Lock on the blockchain (1 credit)
+                        <Lock size={18} strokeWidth={2.5} />
+                        Lock on the blockchain
                       </button>
                       <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
                         A lock anchors the fingerprint on Nimiq so anyone can verify this document
@@ -4335,33 +4347,44 @@ export function DocumentJourney({
                       {FEATURES.pdfAnnotationUi && (
                         <section
                           className="journey-pdf-editor"
-                          aria-labelledby="signer-review-layout-title"
+                          aria-labelledby={
+                            hasVerifiedLocalPdf
+                              ? undefined
+                              : 'signer-review-layout-title'
+                          }
                         >
-                          <header className="signatures-config-head">
-                            <h3 id="signer-review-layout-title">Signed document</h3>
-                          </header>
-                          <DocumentStage
-                            step={step}
-                            doc={doc}
-                            file={signFile ?? pdfFile}
-                            onFileChange={file => {
-                              setSignFile(file)
-                              setSignHash(null)
-                              if (!file) setLocalError(null)
-                            }}
-                            accepting
-                            disabled={busy}
-                            localCopyRequired
-                            localCopyMatches={
-                              hasVerifiedLocalPdf
-                                ? true
-                                : !(signFile || pdfFile)
-                                  ? null
-                                  : signFileMatches ||
-                                    Boolean(pdfFile && pdfHash === doc.fingerprint)
-                            }
-                            localCopyHint="Drop the same file you signed to see signatures, initials, and text fields on the page. Read only - the file stays on this device."
-                          />
+                          {/*
+                            Local drop only when returning later without a matched file. After
+                            signing in this session the file is already verified — hide the stage
+                            and the duplicate “Signed document” heading (preview has its own).
+                          */}
+                          {!hasVerifiedLocalPdf && (
+                            <>
+                              <header className="signatures-config-head">
+                                <h3 id="signer-review-layout-title">Signed document</h3>
+                              </header>
+                              <DocumentStage
+                                step={step}
+                                doc={doc}
+                                file={signFile ?? pdfFile}
+                                onFileChange={file => {
+                                  setSignFile(file)
+                                  setSignHash(null)
+                                  if (!file) setLocalError(null)
+                                }}
+                                accepting
+                                disabled={busy}
+                                localCopyRequired
+                                localCopyMatches={
+                                  !(signFile || pdfFile)
+                                    ? null
+                                    : signFileMatches ||
+                                      Boolean(pdfFile && pdfHash === doc.fingerprint)
+                                }
+                                localCopyHint="Drop the same file you signed to see signatures, initials, and text fields on the page. Read only - the file stays on this device."
+                              />
+                            </>
+                          )}
                           {signFile &&
                             !hasVerifiedLocalPdf &&
                             signHash &&
