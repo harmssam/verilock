@@ -14,7 +14,10 @@ import {
   type PlacementBatch,
   type PlacementSlot,
   type SlotFill,
+  DEFAULT_LABEL_FONT_RATIO,
   ZERO_ROOT,
+  fillFontSizeRatioForSlot,
+  fontSizeRatioAtScale,
   kindFromWire,
   kindToWire,
   normalizeHex32,
@@ -22,6 +25,7 @@ import {
   planLockBatch,
   q,
   clamp01,
+  scalePercentFromSlot,
   sha256HexBytes,
   utf8Buffer,
 } from './placements'
@@ -610,7 +614,7 @@ export function expandMergedToAnnotations(state: MergedPlacementState): PdfAnnot
         type: 'text',
         ...geo,
         text: payload.text,
-        fontSizeRatio: payload.fontSizeRatio ?? 0.025,
+        fontSizeRatio: payload.fontSizeRatio ?? fillFontSizeRatioForSlot(slot),
         color: payload.color ?? '#0f172a',
       })
       continue
@@ -632,7 +636,9 @@ export function expandMergedToAnnotations(state: MergedPlacementState): PdfAnnot
         type: 'text',
         ...geo,
         text: slot.lockedContent.text,
-        fontSizeRatio: slot.lockedContent.fontSizeRatio ?? 0.025,
+        fontSizeRatio:
+          slot.lockedContent.fontSizeRatio ??
+          fontSizeRatioAtScale(DEFAULT_LABEL_FONT_RATIO, scalePercentFromSlot(slot)),
         color: slot.lockedContent.color ?? '#0f172a',
       })
     }

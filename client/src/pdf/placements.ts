@@ -149,6 +149,125 @@ export function q(n: number, digits = 4): number {
   return Math.round(n * p) / p
 }
 
+// ---------------------------------------------------------------------------
+// Placement box scale (editor UX only — chain stores absolute width/height)
+// ---------------------------------------------------------------------------
+
+/**
+ * Uniform scale relative to {@link defaultSizeForKind} (100%).
+ * Discrete steps keep the editor slider stable; wire format still uses w/h floats.
+ *
+ * **Do not change defaults casually.** Draft re-open infers slider % as
+ * `slot.size / defaultSize`. Locked plans / chain restore only need w/h.
+ */
+export const PLACEMENT_SCALE_MIN_PCT = 40
+export const PLACEMENT_SCALE_MAX_PCT = 140
+export const PLACEMENT_SCALE_STEP_PCT = 10
+export const PLACEMENT_SCALE_DEFAULT_PCT = 100
+
+/** Page-height font ratios at 100% box scale (paint + fill). */
+export const DEFAULT_LABEL_FONT_RATIO = 0.018
+export const DEFAULT_NAME_FILL_FONT_RATIO = 0.025
+export const DEFAULT_TEXT_FILL_FONT_RATIO = 0.022
+
+/**
+ * Default normalized box size at 100% scale.
+ * Frozen contract for place / ghost / scale reverse-inference.
+ */
+export function defaultSizeForKind(kind: PlacementKind): { width: number; height: number } {
+  if (kind === 'signature') return { width: 0.28, height: 0.08 }
+  // Initials: short box (about 1/3 signature width)
+  if (kind === 'initial') return { width: 0.1, height: 0.055 }
+  if (kind === 'name') return { width: 0.28, height: 0.045 }
+  if (kind === 'text') return { width: 0.28, height: 0.045 }
+  return { width: 0.045, height: 0.045 }
+}
+
+/** Snap to an allowed scale percent (40–140, step 10). Accepts percent or ratio (≤ 2). */
+export function snapPlacementScalePercent(value: number): number {
+  if (!Number.isFinite(value)) return PLACEMENT_SCALE_DEFAULT_PCT
+  // Allow callers to pass either 100 or 1.0
+  const pct = value > 0 && value <= 2 ? value * 100 : value
+  if (pct <= 0) return PLACEMENT_SCALE_DEFAULT_PCT
+  const stepped =
+    Math.round((pct - PLACEMENT_SCALE_MIN_PCT) / PLACEMENT_SCALE_STEP_PCT) *
+      PLACEMENT_SCALE_STEP_PCT +
+    PLACEMENT_SCALE_MIN_PCT
+  return Math.min(
+    PLACEMENT_SCALE_MAX_PCT,
+    Math.max(PLACEMENT_SCALE_MIN_PCT, stepped),
+  )
+}
+
+/** Infer slider percent from stored geometry vs kind defaults. */
+export function scalePercentFromSlot(slot: Pick<PlacementSlot, 'kind' | 'width' | 'height'>): number {
+  const d = defaultSizeForKind(slot.kind)
+  const sx = slot.width / Math.max(EPS, d.width)
+  const sy = slot.height / Math.max(EPS, d.height)
+  return snapPlacementScalePercent((sx + sy) / 2)
+}
+
+/** Base×scale font ratio, quantized for wire stability. */
+export function fontSizeRatioAtScale(baseRatio: number, scalePercent: number): number {
+  const pct = snapPlacementScalePercent(scalePercent)
+  return q(Math.max(0, baseRatio) * (pct / PLACEMENT_SCALE_DEFAULT_PCT), 4)
+}
+
+/**
+ * Font ratio for a text/name fill, proportional to the placement box scale.
+ * Stored on the text blob at sign time so review/chain paint match the field size.
+ */
+export function fillFontSizeRatioForSlot(
+  slot: Pick<PlacementSlot, 'kind' | 'width' | 'height'>,
+): number {
+  const base =
+    slot.kind === 'name' ? DEFAULT_NAME_FILL_FONT_RATIO : DEFAULT_TEXT_FILL_FONT_RATIO
+  return fontSizeRatioAtScale(base, scalePercentFromSlot(slot))
+}
+
+/**
+ * Apply uniform scale from kind defaults; keep box center; clamp on page.
+ * Updates label `lockedContent.fontSizeRatio` when present (text field labels).
+ * Does not write a separate scale field — only geometry (+ optional locked font).
+ */
+export function applyPlacementScale(
+  slot: PlacementSlot,
+  scalePercent: number,
+): Partial<PlacementSlot> {
+  const pct = snapPlacementScalePercent(scalePercent)
+  const scale = pct / PLACEMENT_SCALE_DEFAULT_PCT
+  const d = defaultSizeForKind(slot.kind)
+  const width = clamp01(d.width * scale)
+  const height = clamp01(d.height * scale)
+  const cx = slot.x + slot.width / 2
+  const cy = slot.y + slot.height / 2
+  let x = cx - width / 2
+  let y = cy - height / 2
+  x = Math.min(Math.max(0, x), 1 - width)
+  y = Math.min(Math.max(0, y), 1 - height)
+
+  const patch: Partial<PlacementSlot> = {
+    x: clamp01(x),
+    y: clamp01(y),
+    width,
+    height,
+  }
+
+  // Field labels / static text notes: keep font proportional to box scale.
+  if (slot.lockedContent && (slot.kind === 'text' || slot.kind === 'name')) {
+    const hasTextLabel =
+      slot.lockedContent.text != null || slot.lockedContent.fontSizeRatio != null
+    if (hasTextLabel) {
+      patch.lockedContent = {
+        ...slot.lockedContent,
+        fontSizeRatio: fontSizeRatioAtScale(DEFAULT_LABEL_FONT_RATIO, pct),
+      }
+    }
+  }
+
+  return patch
+}
+
 export function newSlotId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID()

@@ -389,6 +389,67 @@ export function App() {
     scrollShellTop()
   }, [rememberJourneyPath])
 
+  /** In-app path from blog body links (report page, pricing, etc.). */
+  const goShellPath = useCallback(
+    (path: string) => {
+      const pathname = path.split(/[?#]/)[0] || path
+      if (isStatsPricingPath(pathname)) {
+        goStatsPricing()
+        return
+      }
+      if (isPricingPath(pathname)) {
+        goPricing()
+        return
+      }
+      if (isFaqPath(pathname)) {
+        goFaq()
+        return
+      }
+      if (isSecurityPath(pathname)) {
+        goSecurity()
+        return
+      }
+      if (isPrivacyPath(pathname)) {
+        goPrivacy()
+        return
+      }
+      if (isSupportPath(pathname)) {
+        goSupport()
+        return
+      }
+      if (isRedeemPath(pathname)) {
+        goRedeem()
+        return
+      }
+      if (isAgreementsPath(pathname)) {
+        goAgreements()
+        return
+      }
+      if (isBlogPath(pathname)) {
+        const slug = blogSlugFromPath(pathname)
+        goBlog(slug || undefined)
+        return
+      }
+      rememberJourneyPath()
+      setScreen(screenFromPath(pathname, pdfLabEnabled))
+      pushShellUrl(path.startsWith('/') ? path : `/${path}`)
+      scrollShellTop()
+    },
+    [
+      goStatsPricing,
+      goPricing,
+      goFaq,
+      goSecurity,
+      goPrivacy,
+      goSupport,
+      goRedeem,
+      goAgreements,
+      goBlog,
+      rememberJourneyPath,
+      pdfLabEnabled,
+    ],
+  )
+
   const openAgreement = useCallback(
     (doc: SealDocument, preferSeal = false) => {
       setScreen('journey')
@@ -690,8 +751,8 @@ export function App() {
               </AppLink>
             )}
             {/*
-              Credits chip (AccountMenu) already opens Pricing when balance is known.
-              Hide Pricing nav when credits chip already covers it.
+              Credits nav (AccountMenu) already opens Pricing when balance is known.
+              Hide Pricing nav when the credits link already covers it.
             */}
             {!(wallet.account && creditBalance != null && Number.isFinite(creditBalance)) && (
               <AppLink
@@ -710,6 +771,7 @@ export function App() {
               walletStatus={wallet.walletStatus}
               connectMode={connectMode}
               creditBalance={wallet.account ? creditBalance : null}
+              creditsActive={screen === 'pricing'}
               onConnect={connectPreservingPath}
               onDisconnect={wallet.disconnect}
               onAgreements={wallet.account ? goAgreements : undefined}
@@ -759,6 +821,7 @@ export function App() {
           onOpenIndex={() => goBlog()}
           onOpenPost={slug => goBlog(slug)}
           onPricing={goPricing}
+          onOpenPath={goShellPath}
         />
       )}
 

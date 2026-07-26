@@ -428,6 +428,37 @@
   font-size: 0.98rem;
 }
 
+/* Paragraph + optional site-page link (e.g. /esignature-pricing report). */
+.blog-body-block > * + * {
+  margin-top: 0.55rem;
+}
+
+.blog-body-p--link {
+  margin-top: 0.55rem;
+}
+
+/*
+ * Content links must opt into chrome: global `a { text-decoration: none }` and
+ * `.muted` inheritance hide plain anchors. Make report / site-page links obvious.
+ */
+.blog-body-link {
+  display: inline;
+  color: var(--lr-accent, #0d9488);
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-color: rgba(13, 148, 136, 0.4);
+  text-underline-offset: 0.18em;
+  transition:
+    color 0.15s ease,
+    text-decoration-color 0.15s ease;
+}
+
+.blog-body-link:hover,
+.blog-body-link:focus-visible {
+  color: var(--lr-text, #0f172a);
+  text-decoration-color: rgba(15, 23, 42, 0.45);
+}
+
 .blog-body-list {
   margin: 0;
   padding-left: 1.25rem;
@@ -660,6 +691,13 @@
   gap: 0.85rem;
   margin-top: 2rem;
   padding-top: 0.25rem;
+}
+
+.blog-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
 }
 
 .blog-cta-note {

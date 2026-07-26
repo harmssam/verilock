@@ -8,7 +8,12 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import type { DocumentAnnotation, DocumentParty, DocumentSignature } from '../types'
 import type { PdfAnnotation } from './annotations'
-import type { PlacementSlot } from './placements'
+import {
+  type PlacementSlot,
+  DEFAULT_LABEL_FONT_RATIO,
+  fontSizeRatioAtScale,
+  scalePercentFromSlot,
+} from './placements'
 import { reconstructAnnotationsFromPlanAndFills } from './placementStream'
 import {
   PdfReconstructor,
@@ -185,7 +190,9 @@ async function annotationsFromSignatureImages(input: {
           width: slot.width,
           height: slot.height,
           text: slot.lockedContent.text,
-          fontSizeRatio: slot.lockedContent.fontSizeRatio ?? 0.025,
+          fontSizeRatio:
+            slot.lockedContent.fontSizeRatio ??
+            fontSizeRatioAtScale(DEFAULT_LABEL_FONT_RATIO, scalePercentFromSlot(slot)),
           color: slot.lockedContent.color ?? '#0f172a',
         })
       }

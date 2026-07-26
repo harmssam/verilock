@@ -135,6 +135,59 @@
   flex-shrink: 0;
 }
 
+/* Size slider for the selected placement box (40%–140%, step 10%). */
+.placement-scale-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  max-width: 11.5rem;
+  padding: 0 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted, #64748b);
+  user-select: none;
+}
+
+.placement-scale-label {
+  flex-shrink: 0;
+}
+
+.placement-scale-slider {
+  flex: 1 1 4.5rem;
+  min-width: 3.5rem;
+  max-width: 6.5rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--person-color, #0f766e);
+  cursor: pointer;
+}
+
+.placement-scale-slider:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.placement-scale-slider:focus-visible {
+  outline: 2px solid var(--person-color, #0f766e);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.placement-scale-value {
+  flex-shrink: 0;
+  min-width: 2.35rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: right;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.72rem;
+}
+
 .placement-toolbar-pages {
   margin-left: auto;
   display: flex;

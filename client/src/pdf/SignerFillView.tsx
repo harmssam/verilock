@@ -18,6 +18,7 @@ import {
   type BlobPayload,
   type ConstructionPlan,
   type PlacementSlot,
+  fillFontSizeRatioForSlot,
   isInkPlacementKind,
   personColor,
 } from './placements'
@@ -490,7 +491,7 @@ export function SignerFillView({
           payload: {
             kind: 'text',
             text: t,
-            fontSizeRatio: slot.kind === 'name' ? 0.025 : 0.022,
+            fontSizeRatio: fillFontSizeRatioForSlot(slot),
           },
         })
         if (slot.kind === 'name' && !printedName) printedName = t

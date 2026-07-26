@@ -508,6 +508,257 @@ async function main() {
 
   assert(frames0.length <= 128 && frames1.length <= 128, 'under frame cap')
 
+  // --- placement box scale (editor UX; chain stores absolute w/h only) ---
+  const SCALE_MIN = 40
+  const SCALE_MAX = 140
+  const SCALE_STEP = 10
+  const SCALE_DEFAULT = 100
+  const DEFAULT_LABEL_FONT = 0.018
+  const DEFAULT_NAME_FILL_FONT = 0.025
+  const DEFAULT_TEXT_FILL_FONT = 0.022
+  const KIND_DEFAULTS = {
+    signature: { width: 0.28, height: 0.08 },
+    initial: { width: 0.1, height: 0.055 },
+    name: { width: 0.28, height: 0.045 },
+    text: { width: 0.28, height: 0.045 },
+    checkmark: { width: 0.045, height: 0.045 },
+    cross: { width: 0.045, height: 0.045 },
+  }
+
+  function snapScalePct(value) {
+    if (!Number.isFinite(value)) return SCALE_DEFAULT
+    const pct = value > 0 && value <= 2 ? value * 100 : value
+    if (pct <= 0) return SCALE_DEFAULT
+    const stepped =
+      Math.round((pct - SCALE_MIN) / SCALE_STEP) * SCALE_STEP + SCALE_MIN
+    return Math.min(SCALE_MAX, Math.max(SCALE_MIN, stepped))
+  }
+
+  function scalePctFromSlot(slot) {
+    const d = KIND_DEFAULTS[slot.kind]
+    const sx = slot.width / Math.max(1e-9, d.width)
+    const sy = slot.height / Math.max(1e-9, d.height)
+    return snapScalePct((sx + sy) / 2)
+  }
+
+  function fontAtScale(base, scalePercent) {
+    return q(Math.max(0, base) * (snapScalePct(scalePercent) / SCALE_DEFAULT), 4)
+  }
+
+  function applyScale(slot, scalePercent) {
+    const pct = snapScalePct(scalePercent)
+    const scale = pct / SCALE_DEFAULT
+    const d = KIND_DEFAULTS[slot.kind]
+    const width = clamp01(d.width * scale)
+    const height = clamp01(d.height * scale)
+    const cx = slot.x + slot.width / 2
+    const cy = slot.y + slot.height / 2
+    let x = cx - width / 2
+    let y = cy - height / 2
+    x = Math.min(Math.max(0, x), 1 - width)
+    y = Math.min(Math.max(0, y), 1 - height)
+    const out = {
+      ...slot,
+      x: clamp01(x),
+      y: clamp01(y),
+      width,
+      height,
+    }
+    if (slot.lockedContent && (slot.kind === 'text' || slot.kind === 'name')) {
+      if (slot.lockedContent.text != null || slot.lockedContent.fontSizeRatio != null) {
+        out.lockedContent = {
+          ...slot.lockedContent,
+          fontSizeRatio: fontAtScale(DEFAULT_LABEL_FONT, pct),
+        }
+      }
+    }
+    return out
+  }
+
+  const scaleSteps = []
+  for (let p = SCALE_MIN; p <= SCALE_MAX; p += SCALE_STEP) scaleSteps.push(p)
+
+  let scaleRoundTripOk = true
+  for (const kind of Object.keys(KIND_DEFAULTS)) {
+    for (const pct of scaleSteps) {
+      const base = {
+        id: `s-${kind}-${pct}`,
+        personSlotIndex: 1,
+        kind,
+        pageIndex: 0,
+        x: 0.1,
+        y: 0.2,
+        ...KIND_DEFAULTS[kind],
+      }
+      const scaled = applyScale(base, pct)
+      // Simulate plan lock quantize (canonical places)
+      const qw = q(Math.max(1e-9, clamp01(scaled.width)))
+      const qh = q(Math.max(1e-9, clamp01(scaled.height)))
+      const recovered = scalePctFromSlot({ kind, width: qw, height: qh })
+      if (recovered !== pct) {
+        scaleRoundTripOk = false
+        console.error(`scale mismatch ${kind} @${pct}% → ${recovered}% (w=${qw} h=${qh})`)
+      }
+    }
+  }
+  assert(scaleRoundTripOk, 'all kinds × scale steps survive q(4) and re-infer')
+
+  // Edge clamp: scale-up near page corner stays on page
+  const edge = applyScale(
+    {
+      id: 'edge',
+      personSlotIndex: 1,
+      kind: 'signature',
+      pageIndex: 0,
+      x: 0.72,
+      y: 0.9,
+      width: 0.28,
+      height: 0.08,
+    },
+    140,
+  )
+  assert(edge.x >= 0 && edge.y >= 0, 'edge scale x/y ≥ 0')
+  assert(edge.x + edge.width <= 1 + 1e-9, 'edge scale stays within page width')
+  assert(edge.y + edge.height <= 1 + 1e-9, 'edge scale stays within page height')
+
+  // Label font tracks box scale
+  const labeled = applyScale(
+    {
+      id: 'lbl',
+      personSlotIndex: 1,
+      kind: 'text',
+      pageIndex: 0,
+      x: 0.1,
+      y: 0.1,
+      width: 0.28,
+      height: 0.045,
+      lockedContent: { text: 'Date', fontSizeRatio: DEFAULT_LABEL_FONT, color: '#64748b' },
+    },
+    140,
+  )
+  assert(
+    labeled.lockedContent.fontSizeRatio === fontAtScale(DEFAULT_LABEL_FONT, 140),
+    'text label font scales with box (140%)',
+  )
+  const labeled40 = applyScale(labeled, 40)
+  assert(
+    labeled40.lockedContent.fontSizeRatio === fontAtScale(DEFAULT_LABEL_FONT, 40),
+    'text label font scales with box (40%)',
+  )
+
+  // Fill font helpers (name vs text base)
+  const name140 = applyScale(
+    {
+      id: 'n',
+      personSlotIndex: 1,
+      kind: 'name',
+      pageIndex: 0,
+      x: 0,
+      y: 0,
+      width: 0.28,
+      height: 0.045,
+    },
+    140,
+  )
+  const nameFillFont = fontAtScale(DEFAULT_NAME_FILL_FONT, scalePctFromSlot(name140))
+  const textFillFont = fontAtScale(
+    DEFAULT_TEXT_FILL_FONT,
+    scalePctFromSlot({ kind: 'text', width: name140.width, height: name140.height }),
+  )
+  assert(nameFillFont === q(DEFAULT_NAME_FILL_FONT * 1.4, 4), 'name fill font @140%')
+  assert(textFillFont === q(DEFAULT_TEXT_FILL_FONT * 1.4, 4), 'text fill font @140%')
+
+  // Scaled plan pack/unpack preserves geometry
+  const scaledPlan = {
+    pdfSha256: PDF,
+    people: [{ slotIndex: 1, displayName: 'Tom' }],
+    creatorSigningAs: 1,
+    slots: [
+      applyScale(
+        {
+          id: 'slot-sig-scaled',
+          personSlotIndex: 1,
+          kind: 'signature',
+          pageIndex: 0,
+          x: 0.2,
+          y: 0.3,
+          width: 0.28,
+          height: 0.08,
+        },
+        70,
+      ),
+      applyScale(
+        {
+          id: 'slot-text-scaled',
+          personSlotIndex: 1,
+          kind: 'text',
+          pageIndex: 0,
+          x: 0.2,
+          y: 0.5,
+          width: 0.28,
+          height: 0.045,
+          lockedContent: {
+            text: 'City',
+            fontSizeRatio: DEFAULT_LABEL_FONT,
+            color: '#64748b',
+          },
+        },
+        120,
+      ),
+    ],
+  }
+  // re-apply 120 so label font is written
+  scaledPlan.slots[1] = applyScale(
+    {
+      id: 'slot-text-scaled',
+      personSlotIndex: 1,
+      kind: 'text',
+      pageIndex: 0,
+      x: 0.2,
+      y: 0.5,
+      width: 0.28,
+      height: 0.045,
+      lockedContent: {
+        text: 'City',
+        fontSizeRatio: DEFAULT_LABEL_FONT,
+        color: '#64748b',
+      },
+    },
+    120,
+  )
+
+  const scaledCanon = canonicalizePlan(scaledPlan)
+  assert(scaledCanon.places.length === 2, 'scaled plan has 2 places')
+  const sigPlace = scaledCanon.places.find(p => p.id === 'slot-sig-scaled')
+  const textPlace = scaledCanon.places.find(p => p.id === 'slot-text-scaled')
+  assert(scalePctFromSlot({ kind: 'signature', width: sigPlace.w, height: sigPlace.h }) === 70, 'canon sig @70%')
+  assert(scalePctFromSlot({ kind: 'text', width: textPlace.w, height: textPlace.h }) === 120, 'canon text @120%')
+
+  // Wire path: planLock-style batch with places only (people + places)
+  const scaleBatch = {
+    batchIndex: 0,
+    prevRoot: ZERO_ROOT,
+    pdfSha256: PDF,
+    planRoot: await computePlanRoot(scaledPlan),
+    people: scaledPlan.people,
+    places: scaledPlan.slots,
+    blobs: [],
+    fills: [],
+  }
+  scaleBatch.batchRoot = await computeBatchRoot(scaleBatch)
+  const scaleFrames = packPlacementBatch(scaleBatch)
+  const scaleUn = await unpackPlacementBatch(scaleFrames)
+  const wireSig = scaleUn.wire.places.find(p => p.id === 'slot-sig-scaled')
+  const wireText = scaleUn.wire.places.find(p => p.id === 'slot-text-scaled')
+  assert(
+    scalePctFromSlot({ kind: 'signature', width: wireSig.w, height: wireSig.h }) === 70,
+    'unpacked wire sig still 70%',
+  )
+  assert(
+    scalePctFromSlot({ kind: 'text', width: wireText.w, height: wireText.h }) === 120,
+    'unpacked wire text still 120%',
+  )
+
   // sanity: node createHash matches webcrypto for same string
   const sample = 'hello-placement'
   const web = await sha256Hex(new TextEncoder().encode(sample))
