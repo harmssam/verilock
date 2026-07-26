@@ -1,0 +1,38 @@
+/* FAQ page — matches shellPages card layout with SupportPage-like spacing. */
+
+.faq-page {
+  max-width: 720px;
+}
+
+.faq-lead {
+  margin-bottom: 2rem;
+}
+
+.faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.faq-item {
+  /* nothing extra needed */
+}
+
+.faq-question {
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.5;
+  margin-bottom: 0.35rem;
+}
+
+.faq-answer {
+  margin-left: 0;
+  line-height: 1.6;
+  color: var(--lr-muted);
+}
+
+.faq-footer {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--lr-line);
+}
