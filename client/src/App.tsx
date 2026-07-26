@@ -13,6 +13,7 @@ import {
   isPdfPath,
   isPricingPath,
   isPrivacyPath,
+  isRedeemPath,
   isSecurityPath,
   isSignMobilePath,
   isStatsPricingPath,
@@ -35,6 +36,7 @@ import { PrivacyPolicyPage } from './PrivacyPolicyPage'
 import { SecurityPage } from './SecurityPage'
 import { FaqPage } from './FaqPage'
 import { StatsPricingPage } from './StatsPricingPage'
+import { RedeemPage } from './RedeemPage'
 import { SupportPage } from './SupportPage'
 import { AccountMenu } from './journey/AccountMenu'
 import { AgreementsPage } from './journey/AgreementsPage'
@@ -113,6 +115,7 @@ type ShellScreen =
   | 'privacy'
   | 'security'
   | 'support'
+  | 'redeem'
   | 'agreements'
   | 'blog'
   | 'pdf'
@@ -129,6 +132,7 @@ function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotation
   if (isPrivacyPath(pathname)) return 'privacy'
   if (isSecurityPath(pathname)) return 'security'
   if (isSupportPath(pathname)) return 'support'
+  if (isRedeemPath(pathname)) return 'redeem'
   if (isStatsPricingPath(pathname)) return 'stats-pricing'
   if (isFaqPath(pathname)) return 'faq'
   if (isAgreementsPath(pathname)) return 'agreements'
@@ -294,6 +298,7 @@ export function App() {
       !isStatsPricingPath(window.location.pathname) &&
       !isFaqPath(window.location.pathname) &&
       !isSupportPath(window.location.pathname) &&
+      !isRedeemPath(window.location.pathname) &&
       !isAgreementsPath(window.location.pathname) &&
       !isBlogPath(window.location.pathname) &&
       !isPdfPath(window.location.pathname) &&
@@ -341,6 +346,13 @@ export function App() {
     rememberJourneyPath()
     setScreen('support')
     pushShellUrl('/support')
+    scrollShellTop()
+  }, [rememberJourneyPath])
+
+  const goRedeem = useCallback(() => {
+    rememberJourneyPath()
+    setScreen('redeem')
+    pushShellUrl('/redeem')
     scrollShellTop()
   }, [rememberJourneyPath])
 
@@ -541,6 +553,10 @@ export function App() {
       applyPageMeta({ ...PAGE_META.support })
       return
     }
+    if (screen === 'redeem') {
+      applyPageMeta({ ...PAGE_META.redeem })
+      return
+    }
     if (screen === 'stats-pricing') {
       applyPageMeta({ ...PAGE_META.statsPricing })
       return
@@ -611,6 +627,7 @@ export function App() {
     screen === 'security' ||
     screen === 'stats-pricing' ||
     screen === 'support' ||
+    screen === 'redeem' ||
     screen === 'blog' ||
     screen === 'pdf' ||
     screen === 'pdf-lab' ||
@@ -723,6 +740,7 @@ export function App() {
         screen === 'stats-pricing' ||
         screen === 'faq' ||
         screen === 'support' ||
+        screen === 'redeem' ||
         screen === 'agreements' ||
         screen === 'blog' ||
         screen === 'pdf' ||
@@ -769,6 +787,18 @@ export function App() {
         />
       )}
       {screen === 'support' && <SupportPage />}
+      {screen === 'redeem' && (
+        <RedeemPage
+          token={wallet.token}
+          address={wallet.address}
+          connecting={wallet.connecting}
+          onConnect={connectPreservingPath}
+          onCreditsRedeemed={() => {
+            void refreshCredits()
+          }}
+          onGetCredits={goPricing}
+        />
+      )}
       {screen === 'agreements' && (
         <AgreementsPage
           token={wallet.token}
@@ -889,6 +919,13 @@ export function App() {
             onClick={goSupport}
           >
             Support
+          </AppLink>
+          <AppLink
+            to="/redeem"
+            className={`lr-footer-link${screen === 'redeem' ? ' lr-footer-link--active' : ''}`}
+            onClick={goRedeem}
+          >
+            Redeem code
           </AppLink>
           <AppLink
             to="/esignature-pricing"

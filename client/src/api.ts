@@ -945,6 +945,27 @@ export const api = {
       body: JSON.stringify({ sessionId }),
     }),
 
+  /** Public info for the /redeem page. */
+  redeemInfo: () =>
+    request<{
+      enabled: boolean
+      defaultCredits: number
+      creditsPerSeal: number
+    }>('/api/credits/redeem-info'),
+
+  /** Redeem a one-time AppSumo / promo code onto the verified wallet. */
+  redeemCode: (token: string, code: string) =>
+    request<{
+      balance: number
+      creditsMinted: number
+      alreadyClaimed: boolean
+      campaign: string
+    }>('/api/credits/redeem', {
+      method: 'POST',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    }),
+
   payWithCredit: (token: string, docId: string, finalSha256?: string) =>
     request<
       AttestationStatus & {

@@ -1,0 +1,171 @@
+.redeem-page h2 {
+  margin: 0 0 0.5rem;
+}
+
+.redeem-lead {
+  margin: 0 0 1.25rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  max-width: 40rem;
+}
+
+.redeem-lead strong {
+  color: var(--lr-text, #0f172a);
+  font-weight: 700;
+}
+
+.redeem-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.redeem-wallet {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm, 12px);
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
+  background: var(--lr-surface-soft, rgba(15, 23, 42, 0.03));
+}
+
+.redeem-wallet-connected {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--lr-text, #0f172a);
+}
+
+.redeem-wallet-addr {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.redeem-wallet-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.redeem-wallet-prompt .muted {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.redeem-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.redeem-fields label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--lr-text, #0f172a);
+}
+
+.redeem-fields input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-sm, 12px);
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.12));
+  background: #fff;
+  color: var(--lr-text, #0f172a);
+  width: 100%;
+  max-width: 28rem;
+  box-sizing: border-box;
+}
+
+.redeem-fields input:focus {
+  outline: 2px solid rgba(13, 148, 136, 0.35);
+  outline-offset: 1px;
+  border-color: rgba(13, 148, 136, 0.45);
+}
+
+.redeem-fields input:disabled {
+  opacity: 0.65;
+}
+
+.redeem-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.redeem-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.redeem-error {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm, 12px);
+  border: 1px solid rgba(220, 38, 38, 0.28);
+  background: rgba(220, 38, 38, 0.06);
+  color: #b91c1c;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.redeem-success {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.redeem-success-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--lr-accent, #0d9488);
+}
+
+.redeem-success .muted {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.redeem-success-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+}
+
+.redeem-foot {
+  margin: 1.5rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  max-width: 40rem;
+}
+
+.redeem-foot a {
+  color: var(--lr-accent, var(--mint-deep, #0f766e));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.redeem-foot a:hover {
+  color: var(--lr-text, var(--text));
+}
+
+/* Light shell: match support / pricing card density */
+body[data-verilock-surface='journey'] .redeem-page.card {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  box-shadow: 0 10px 36px rgba(15, 23, 42, 0.05);
+  padding: 1.35rem 1.4rem 1.5rem;
+  border-radius: var(--radius, 16px);
+}
+
+body[data-verilock-surface='journey'] .redeem-error {
+  border-color: rgba(185, 28, 28, 0.22);
+}

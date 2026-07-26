@@ -157,6 +157,8 @@ const attestLimit = rateLimit(24, 60_000)
 const walletBalanceLimit = rateLimit(30, 60_000)
 /** Mutations / checkout - keep tight. */
 const creditsLimit = rateLimit(30, 60_000)
+/** Code redemption - tighter (brute-force codes). */
+const redeemLimit = rateLimit(10, 60_000)
 /** Cheap SQLite balance reads - header + panel may both load. */
 const creditsBalanceLimit = rateLimit(120, 60_000)
 const publicReadLimit = rateLimit(60, 60_000)
@@ -459,6 +461,47 @@ app.post(
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Checkout confirm failed'
       res.status(400).json({ error: message })
+    }
+  },
+)
+
+/** Public info for /redeem page (credits per code, feature flag). */
+app.get('/api/credits/redeem-info', creditsLimit, (_req, res) => {
+  void import('./redeemCodes.js').then(({ getRedeemPublicInfo }) => {
+    res.json(getRedeemPublicInfo())
+  })
+})
+
+/**
+ * Redeem a one-time code (AppSumo / promo) onto the verified wallet.
+ * Body: { code: string }. Idempotent per code (second attempt fails as already used).
+ */
+app.post(
+  '/api/credits/redeem',
+  authMiddleware,
+  requireVerifiedWallet,
+  redeemLimit,
+  async (req, res) => {
+    try {
+      const { redeemCodeForWallet } = await import('./redeemCodes.js')
+      const { code } = req.body as { code?: string }
+      if (!code?.trim()) {
+        res.status(400).json({ error: 'code required' })
+        return
+      }
+      const address = res.locals.address as string
+      const result = redeemCodeForWallet(code, address)
+      res.json({
+        balance: result.balance,
+        creditsMinted: result.creditsMinted,
+        alreadyClaimed: result.alreadyClaimed,
+        campaign: result.campaign,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Redemption failed'
+      const status =
+        /already been redeemed|not available|Invalid or unknown/i.test(message) ? 409 : 400
+      res.status(status).json({ error: message })
     }
   },
 )

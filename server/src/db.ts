@@ -1633,15 +1633,47 @@ db.exec(`
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS redemption_codes (
+    code TEXT PRIMARY KEY,
+    campaign TEXT NOT NULL DEFAULT 'appsumo',
+    credits INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'available',
+    batch_id TEXT,
+    redeemed_by TEXT,
+    redeemed_at INTEGER,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_redemption_codes_status
+    ON redemption_codes(status);
+  CREATE INDEX IF NOT EXISTS idx_redemption_codes_campaign
+    ON redemption_codes(campaign, status);
+  CREATE INDEX IF NOT EXISTS idx_redemption_codes_redeemed_by
+    ON redemption_codes(redeemed_by);
 `)
 
 export type CreditLedgerKind =
   | 'topup_nim'
   | 'topup_stripe'
+  | 'topup_code'
   | 'spend'
   | 'refund_release'
   | 'stripe_clawback'
   | 'admin_adjust'
+
+export type RedemptionCodeStatus = 'available' | 'redeemed' | 'disabled'
+
+export interface RedemptionCodeRow {
+  code: string
+  campaign: string
+  credits: number
+  status: RedemptionCodeStatus
+  batchId: string | null
+  redeemedBy: string | null
+  redeemedAt: number | null
+  createdAt: number
+}
 
 export interface CreditLedgerEntry {
   id: string
@@ -2001,6 +2033,117 @@ export function isTxHashUsedForCredits(txHash: string): boolean {
     .get(clean) as unknown
   return Boolean(row)
 }
+
+// ── Redemption codes (AppSumo / promo) ─────────────────────────────────────
+
+function rowToRedemptionCode(row: Record<string, unknown>): RedemptionCodeRow {
+  return {
+    code: row.code as string,
+    campaign: row.campaign as string,
+    credits: row.credits as number,
+    status: row.status as RedemptionCodeStatus,
+    batchId: (row.batch_id as string | null) ?? null,
+    redeemedBy: (row.redeemed_by as string | null) ?? null,
+    redeemedAt: (row.redeemed_at as number | null) ?? null,
+    createdAt: row.created_at as number,
+  }
+}
+
+export function getRedemptionCode(code: string): RedemptionCodeRow | null {
+  const row = db
+    .prepare('SELECT * FROM redemption_codes WHERE code = ?')
+    .get(code) as Record<string, unknown> | undefined
+  return row ? rowToRedemptionCode(row) : null
+}
+
+/**
+ * Insert purchase-ready codes. Skips duplicates (INSERT OR IGNORE).
+ * Returns how many rows were actually inserted.
+ */
+export function insertRedemptionCodes(
+  codes: Array<{
+    code: string
+    campaign?: string
+    credits: number
+    batchId?: string | null
+    createdAt?: number
+  }>,
+): { inserted: number; skipped: number } {
+  if (codes.length === 0) return { inserted: 0, skipped: 0 }
+  const now = Date.now()
+  const stmt = db.prepare(`
+    INSERT OR IGNORE INTO redemption_codes (
+      code, campaign, credits, status, batch_id, redeemed_by, redeemed_at, created_at
+    ) VALUES (
+      @code, @campaign, @credits, 'available', @batchId, NULL, NULL, @createdAt
+    )
+  `)
+  let inserted = 0
+  const run = db.transaction(() => {
+    for (const c of codes) {
+      const result = stmt.run({
+        code: c.code,
+        campaign: c.campaign ?? 'appsumo',
+        credits: c.credits,
+        batchId: c.batchId ?? null,
+        createdAt: c.createdAt ?? now,
+      })
+      if (result.changes > 0) inserted += 1
+    }
+  })
+  run()
+  return { inserted, skipped: codes.length - inserted }
+}
+
+/**
+ * Atomically claim an available code for a wallet.
+ * Returns the row when claimed; null when code missing / not available / race lost.
+ */
+export function claimRedemptionCode(
+  code: string,
+  walletAddress: string,
+  now = Date.now(),
+): RedemptionCodeRow | null {
+  const wallet = normalizeAddress(walletAddress)
+  const result = db
+    .prepare(
+      `UPDATE redemption_codes
+       SET status = 'redeemed', redeemed_by = ?, redeemed_at = ?
+       WHERE code = ? AND status = 'available'`,
+    )
+    .run(wallet, now, code)
+  if (result.changes === 0) return null
+  return getRedemptionCode(code)
+}
+
+export function countRedemptionCodes(campaign?: string): {
+  available: number
+  redeemed: number
+  disabled: number
+  total: number
+} {
+  const rows = (
+    campaign
+      ? (db
+          .prepare(
+            `SELECT status, COUNT(*) AS n FROM redemption_codes WHERE campaign = ? GROUP BY status`,
+          )
+          .all(campaign) as Array<{ status: string; n: number }>)
+      : (db
+          .prepare(`SELECT status, COUNT(*) AS n FROM redemption_codes GROUP BY status`)
+          .all() as Array<{ status: string; n: number }>)
+  )
+  const out = { available: 0, redeemed: 0, disabled: 0, total: 0 }
+  for (const r of rows) {
+    const n = Number(r.n) || 0
+    out.total += n
+    if (r.status === 'available') out.available = n
+    else if (r.status === 'redeemed') out.redeemed = n
+    else if (r.status === 'disabled') out.disabled = n
+  }
+  return out
+}
+
 // ── Signature handoff rooms (cross-device ink capture; ciphertext only) ────
 
 db.exec(`
