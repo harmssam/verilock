@@ -549,7 +549,8 @@ html {
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid var(--lr-line);
-  background: var(--lr-surface-2);
+  /* Match the pale left of hero-wide so gaps never flash a hard plate */
+  background: linear-gradient(90deg, #f4f7f4 0%, #eef5f3 45%, #e8f2ef 100%);
   box-shadow: var(--shadow-soft);
 }
 
@@ -579,36 +580,46 @@ html {
   );
 }
 
-/* Desktop: copy over the empty left of the wide still; lock stays on the right */
+/*
+ * Desktop: show the full wide still (lock is designed on the right).
+ * Copy overlays the empty left — do NOT object-fit:cover the still,
+ * which re-crops and pulls the lock into the text column.
+ */
 @media (min-width: 860px) {
   .lr-hero-frame {
-    /* Copy defines height; image fills and may crop, never stretch */
-    min-height: 18.5rem;
+    /* Image in normal flow sets height from intrinsic 2280×720 */
+    line-height: 0;
   }
 
   .lr-hero-visual-img {
-    position: absolute;
-    inset: 0;
+    position: relative;
     z-index: 0;
+    display: block;
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    height: auto;
+    /* Full designed frame (2280×720) — no cover crop, no stretch */
+    object-fit: contain;
     object-position: right center;
   }
 
   .lr-hero-copy {
-    position: relative;
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
     z-index: 1;
-    width: min(52%, 28rem);
-    max-width: 28rem;
+    /* Stay in the open left third so type clears the lock art */
+    width: min(42%, 24rem);
+    max-width: 24rem;
     justify-content: center;
-    min-height: 18.5rem;
-    padding: 1.5rem 1.35rem 1.5rem 1.5rem;
+    min-height: 0;
+    padding: 1.25rem 1.1rem 1.25rem 1.4rem;
+    line-height: normal;
     /* Soft wash so type stays crisp on the pale left of the still */
     background: linear-gradient(
       90deg,
       rgba(255, 255, 255, 0.78) 0%,
-      rgba(255, 255, 255, 0.48) 62%,
+      rgba(255, 255, 255, 0.45) 70%,
       rgba(255, 255, 255, 0) 100%
     );
   }
