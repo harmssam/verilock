@@ -41,6 +41,7 @@ import { emailFeaturesPublic } from './email/config.js'
 import { sendPartyInviteEmail } from './email/inviteSigner.js'
 import { verifyHubSignedMessage } from './hub-signature.js'
 import { rateLimit } from './rate-limit.js'
+import { attachAdminRoutes } from './admin.js'
 import {
   clientIpFromRequest,
   deliverSupportContact,
@@ -931,6 +932,9 @@ app.get('/api/features', (_req, res) => {
     ...pdfAnnotationFeaturesPublic(),
   })
 })
+
+// Operator admin portal (password + Turnstile cookie session). Stats-only.
+attachAdminRoutes(app)
 
 app.post('/api/support/contact', supportContactLimit, async (req, res) => {
   const body = (req.body ?? {}) as SupportContactBody

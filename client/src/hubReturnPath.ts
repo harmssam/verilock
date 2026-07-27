@@ -198,6 +198,11 @@ export function isFaqPath(path: string): boolean {
   return /^\/faq\/?$/.test(path)
 }
 
+/** Operator admin portal (`/admin` and nested paths). */
+export function isAdminPath(path: string): boolean {
+  return /^\/admin(?:\/.*)?\/?$/.test(path)
+}
+
 export function isKnownAppPath(path: string): boolean {
   if (path === '/' || path === '') return true
   if (isAgreementsPath(path)) return true
@@ -208,6 +213,7 @@ export function isKnownAppPath(path: string): boolean {
   if (isRedeemPath(path)) return true
   if (isStatsPricingPath(path)) return true
   if (isFaqPath(path)) return true
+  if (isAdminPath(path)) return true
   if (isBlogPath(path)) return true
   if (isPdfPath(path)) return true
   if (isSignMobilePath(path)) return true
