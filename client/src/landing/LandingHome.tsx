@@ -115,14 +115,14 @@ const PATHS: {
   {
     role: 'creator',
     title: 'Create & sign',
-    detail: 'Start free: invite co-signers — lock on blockchain if needed',
+    detail: 'Start free: invite co-signers, lock on blockchain if needed',
     icon: Fingerprint,
     imageAlt: '',
   },
   {
     role: 'signer',
     title: 'I was invited',
-    detail: 'Drop the shared file (or open your invite link), then sign',
+    detail: 'Drop the shared file, then sign',
     icon: Users,
     imageAlt: '',
   },
