@@ -57,12 +57,15 @@ export function FaqPage() {
   const headingId = useId()
 
   return (
-    <div className="card faq-page" aria-labelledby={headingId}>
-      <h2 id={headingId}>FAQ</h2>
-      <p className="muted faq-lead">
-        Common questions about how VeriLock works, what it costs, and how it compares to other
-        e-signature tools.
-      </p>
+    <article className="card faq-page" aria-labelledby={headingId}>
+      <header className="faq-header">
+        <p className="faq-eyebrow">Help</p>
+        <h2 id={headingId}>FAQ</h2>
+        <p className="muted faq-lead">
+          Common questions about how VeriLock works, what it costs, and how it compares to other
+          e-signature tools.
+        </p>
+      </header>
 
       <dl className="faq-list">
         {FAQS.map((faq, i) => (
@@ -76,9 +79,9 @@ export function FaqPage() {
       <footer className="faq-footer">
         <p className="muted">
           Something not covered?{' '}
-          <a href="/support">Send us a message</a> and we'll get back to you.
+          <a href="/support">Send us a message</a> and we will get back to you.
         </p>
       </footer>
-    </div>
+    </article>
   )
 }

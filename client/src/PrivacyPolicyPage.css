@@ -1,47 +1,116 @@
+/* Privacy — legal document with shell section rhythm */
+
+.privacy-policy-page {
+  max-width: 40rem;
+  margin: 0 auto 1.5rem;
+}
+
+.privacy-policy-page h2 {
+  margin: 0 0 0.55rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 3vw, 1.65rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--lr-text, #0f172a);
+  text-wrap: balance;
+}
+
+.privacy-policy-eyebrow {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lr-accent, #0d9488);
+}
+
 .privacy-policy-lead {
   margin: 0 0 0.5rem;
-  font-size: 0.9rem;
-  line-height: 1.55;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--lr-muted, #64748b);
+  max-width: 38rem;
+  text-wrap: pretty;
 }
 
 .privacy-policy-updated {
-  margin: 0 0 1.25rem;
+  margin: 0 0 1.5rem;
   font-size: 0.78rem;
+  color: var(--lr-dim, #94a3b8);
 }
 
 .privacy-policy-section {
-  margin-bottom: 1.15rem;
+  margin: 0 0 0.75rem;
+  padding: 1rem 1.1rem 1.05rem;
+  border: 1px solid var(--lr-line, #e2e8f0);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition:
+    border-color 0.25s cubic-bezier(0.32, 0.72, 0, 1),
+    background 0.25s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .privacy-policy-section:last-child {
   margin-bottom: 0;
 }
 
+.privacy-policy-section:hover {
+  border-color: rgba(13, 148, 136, 0.18);
+  background: rgba(13, 148, 136, 0.02);
+}
+
 .privacy-policy-section h3 {
-  margin: 0 0 0.4rem;
+  margin: 0 0 0.45rem;
   font-family: var(--font-display);
-  font-size: 0.92rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--lr-text, #0f172a);
 }
 
 .privacy-policy-section p {
   margin: 0;
-  line-height: 1.55;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--lr-muted, #64748b);
+  max-width: 38rem;
+  text-wrap: pretty;
+}
+
+.privacy-policy-section p + p {
+  margin-top: 0.55rem;
 }
 
 .privacy-policy-list {
-  margin: 0.5rem 0 0;
-  padding-left: 1.15rem;
-  line-height: 1.55;
+  margin: 0.55rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--lr-muted, #64748b);
 }
 
 .privacy-policy-list li + li {
-  margin-top: 0.35rem;
+  margin-top: 0.4rem;
 }
 
 .privacy-policy-list strong {
-  color: var(--text);
+  color: var(--lr-text, #0f172a);
   font-weight: 600;
+}
+
+/* Light shell card chrome */
+body[data-verilock-surface='journey'] .privacy-policy-page.card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0.25rem 0 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .privacy-policy-section {
+    transition: none;
+  }
 }

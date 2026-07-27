@@ -100,6 +100,7 @@ export function RedeemPage({
 
   return (
     <main className="redeem-page card">
+      <p className="redeem-eyebrow">Promo</p>
       <h2>Redeem your code</h2>
       <p className="redeem-lead muted">
         AppSumo buyers get <strong>{defaultCredits} seal credits</strong> per code

@@ -28,11 +28,12 @@
 .stats-hero-title {
   font-family: var(--font-display);
   font-size: clamp(1.5rem, 4vw, 2.2rem);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--lr-text, #0f172a);
   margin: 0 0 1rem;
   line-height: 1.2;
+  text-wrap: balance;
 }
 
 .stats-hero-stat {
@@ -41,11 +42,12 @@
   color: var(--lr-muted, #64748b);
   max-width: 640px;
   margin: 0 auto 0.75rem;
+  text-wrap: pretty;
 }
 
 .stats-hero-stat strong {
   color: var(--lr-text, #0f172a);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .stats-hero-updated {
@@ -69,11 +71,12 @@
   letter-spacing: -0.02em;
   color: var(--lr-text, #0f172a);
   margin: 0 0 0.75rem;
+  text-wrap: balance;
 }
 
 .stats-h3 {
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--lr-text, #0f172a);
   margin: 1.25rem 0 0.5rem;
 }
@@ -84,6 +87,7 @@
   color: var(--lr-muted, #64748b);
   max-width: 640px;
   margin: 0 0 1.25rem;
+  text-wrap: pretty;
 }
 
 /* ── Takeaways ── */
@@ -98,16 +102,27 @@
 
 .stats-takeaways li {
   position: relative;
-  padding-left: 1.2rem;
+  padding: 0.65rem 0.85rem 0.65rem 1.35rem;
   font-size: 0.9rem;
   line-height: 1.55;
   color: var(--lr-text, #0f172a);
+  border-radius: 8px;
+  background: var(--lr-bg, #fbfcfd);
+  border: 1px solid var(--lr-line, #e2e8f0);
+  transition:
+    background 0.25s cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.stats-takeaways li:hover {
+  background: rgba(13, 148, 136, 0.04);
+  border-color: rgba(13, 148, 136, 0.2);
 }
 
 .stats-takeaways li::before {
   content: '▸';
   position: absolute;
-  left: 0;
+  left: 0.55rem;
   color: var(--lr-accent, #0d9488);
   font-weight: 700;
 }
@@ -118,6 +133,10 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   margin: 0 0 1rem;
+  border: 1px solid var(--lr-line, #e2e8f0);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .stats-table {
@@ -128,38 +147,57 @@
 }
 
 .stats-table thead {
-  border-bottom: 2px solid var(--lr-line, #e2e8f0);
+  border-bottom: 1px solid var(--lr-line, #e2e8f0);
+  background: rgba(15, 23, 42, 0.02);
 }
 
 .stats-table th {
   text-align: left;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--lr-muted, #64748b);
-  padding: 0.5rem 0.6rem;
-  font-size: 0.75rem;
-  letter-spacing: 0.03em;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
 .stats-table td {
-  padding: 0.5rem 0.6rem;
+  padding: 0.6rem 0.75rem;
   border-bottom: 1px solid var(--lr-line, #e2e8f0);
   color: var(--lr-text, #0f172a);
+  transition:
+    background 0.25s cubic-bezier(0.32, 0.72, 0, 1),
+    color 0.25s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .stats-table tbody tr:last-child td {
   border-bottom: none;
 }
 
+/* Row hover — all comparison tables */
+.stats-table tbody tr {
+  transition: background 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.stats-table tbody tr:hover td {
+  background: rgba(13, 148, 136, 0.055);
+}
+
+.stats-table tbody tr:hover .stats-table-provider {
+  color: var(--lr-accent, #0d9488);
+}
+
 .stats-table-provider {
   font-weight: 600;
   white-space: nowrap;
+  transition: color 0.25s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .stats-table-price {
   font-family: var(--font-mono, 'SF Mono', ui-monospace, monospace);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -174,18 +212,26 @@
   margin: 0.25rem 0 0;
 }
 
-/* ── VeriLock row highlight ── */
+/* ── VeriLock row / column highlight ── */
 
 .stats-row--verilock {
-  background: rgba(13, 148, 136, 0.06);
+  background: rgba(13, 148, 136, 0.07);
 }
 
 .stats-row--verilock td {
-  border-bottom-color: rgba(13, 148, 136, 0.15);
+  border-bottom-color: rgba(13, 148, 136, 0.18);
+}
+
+.stats-table tbody tr.stats-row--verilock:hover td {
+  background: rgba(13, 148, 136, 0.12);
 }
 
 .stats-col--verilock {
   background: rgba(13, 148, 136, 0.04);
+}
+
+.stats-table tbody tr:hover .stats-col--verilock {
+  background: rgba(13, 148, 136, 0.1);
 }
 
 /* ── Badges ── */
@@ -194,7 +240,7 @@
   display: inline-block;
   font-size: 0.68rem;
   font-weight: 600;
-  padding: 0.1rem 0.45rem;
+  padding: 0.12rem 0.45rem;
   border-radius: 4px;
   background: var(--lr-accent-soft, rgba(13, 148, 136, 0.12));
   color: var(--lr-accent, #0d9488);
@@ -233,10 +279,28 @@
 
 .stats-scenario {
   margin: 1.5rem 0;
-  padding: 1rem;
+  padding: 1.1rem 1.15rem 1.15rem;
   border: 1px solid var(--lr-line, #e2e8f0);
-  border-radius: 8px;
-  background: var(--lr-bg, #fbfcfd);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition:
+    border-color 0.25s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.stats-scenario:hover {
+  border-color: rgba(13, 148, 136, 0.22);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+/* Nested tables inside scenario cards: drop outer chrome so the card is the frame */
+.stats-scenario .stats-table-wrap {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  margin-bottom: 0.5rem;
 }
 
 .stats-scenario-title {
@@ -250,13 +314,15 @@
 .stats-scenario-docs {
   font-weight: 500;
   color: var(--lr-muted, #64748b);
-  font-family: var(--font-sans, inherit);
+  font-family: var(--font-body, inherit);
 }
 
 .stats-scenario-verdict {
   font-size: 0.82rem;
   color: var(--lr-muted, #64748b);
   margin: 0.5rem 0 0;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--lr-line, #e2e8f0);
 }
 
 /* ── Callout ── */
@@ -265,8 +331,8 @@
   margin: 1.5rem 0;
   padding: 1rem 1.25rem;
   background: rgba(13, 148, 136, 0.06);
-  border-left: 3px solid var(--lr-accent, #0d9488);
-  border-radius: 0 6px 6px 0;
+  border: 1px solid rgba(13, 148, 136, 0.18);
+  border-radius: 10px;
 }
 
 .stats-callout p {
@@ -302,27 +368,34 @@
   color: var(--lr-accent, #0d9488);
   text-decoration: underline;
   text-underline-offset: 2px;
+  transition: color 0.25s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .stats-source-list li a:hover {
   color: var(--lr-text, #0f172a);
 }
 
+.stats-source-list li a:focus-visible {
+  outline: 2px solid var(--lr-accent, #0d9488);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 /* ── Footer CTA ── */
 
 .stats-cta {
   text-align: center;
-  padding: 1.5rem 1rem;
+  padding: 1.75rem 1.25rem;
   margin: 2rem 0 0;
-  background: linear-gradient(135deg, rgba(13, 148, 136, 0.08), rgba(251, 191, 36, 0.06));
-  border-radius: 10px;
-  border: 1px solid rgba(13, 148, 136, 0.15);
+  background: rgba(13, 148, 136, 0.06);
+  border-radius: 12px;
+  border: 1px solid rgba(13, 148, 136, 0.16);
 }
 
 .stats-cta-text {
   font-size: 0.95rem;
   color: var(--lr-text, #0f172a);
-  margin: 0 0 0.75rem;
+  margin: 0 0 1rem;
 }
 
 .stats-cta-text strong {
@@ -332,17 +405,31 @@
 .stats-cta-btn {
   display: inline-block;
   padding: 0.55rem 1.4rem;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   font-weight: 600;
   color: #ffffff;
   background: var(--lr-accent, #0d9488);
-  border-radius: 6px;
+  border-radius: 8px;
   text-decoration: none;
-  transition: background 0.15s;
+  transition:
+    background 0.25s cubic-bezier(0.32, 0.72, 0, 1),
+    transform 0.25s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.25s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .stats-cta-btn:hover {
-  background: #0f766e;
+  background: var(--lr-accent-deep, #0f766e);
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.28);
+}
+
+.stats-cta-btn:active {
+  transform: scale(0.98);
+  box-shadow: none;
+}
+
+.stats-cta-btn:focus-visible {
+  outline: 2px solid var(--lr-accent, #0d9488);
+  outline-offset: 3px;
 }
 
 /* ── Responsive ── */
@@ -362,6 +449,31 @@
 
   .stats-table th,
   .stats-table td {
-    padding: 0.4rem 0.4rem;
+    padding: 0.45rem 0.5rem;
+  }
+
+  .stats-takeaways li {
+    padding: 0.55rem 0.7rem 0.55rem 1.25rem;
+  }
+
+  .stats-scenario {
+    padding: 0.9rem;
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .stats-table tbody tr,
+  .stats-table td,
+  .stats-table-provider,
+  .stats-takeaways li,
+  .stats-scenario,
+  .stats-cta-btn,
+  .stats-source-list li a {
+    transition: none;
+  }
+
+  .stats-cta-btn:active {
+    transform: none;
   }
 }

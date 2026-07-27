@@ -2,7 +2,8 @@ import './PrivacyPolicyPage.css'
 
 export function PrivacyPolicyPage() {
   return (
-    <div className="card privacy-policy-page">
+    <article className="card privacy-policy-page">
+      <p className="privacy-policy-eyebrow">Legal</p>
       <h2>Privacy Policy</h2>
       <p className="muted privacy-policy-lead">
         VeriLock is built so your document never leaves your device. This policy explains what we do and do not
@@ -106,6 +107,6 @@ export function PrivacyPolicyPage() {
           was last revised.
         </p>
       </section>
-    </div>
+    </article>
   )
 }
