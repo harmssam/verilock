@@ -67,33 +67,19 @@
   padding: 0.5rem;
 }
 
-.ink-capture-rotate-visual {
-  position: relative;
+/* Free-standing iPhone SVG — no card/box chrome */
+.ink-capture-rotate-phone-wrap {
   display: grid;
   place-items: center;
-  width: 5.5rem;
-  height: 5.5rem;
-  margin-bottom: 0.35rem;
-  border-radius: 1.25rem;
-  background: color-mix(in srgb, var(--mint, #0d9488) 10%, #fff);
-  border: 1px solid color-mix(in srgb, var(--mint, #0d9488) 22%, #e2e8f0);
+  margin: 0.15rem 0 0.5rem;
   color: var(--mint-deep, #0f766e);
 }
 
 .ink-capture-rotate-phone {
+  display: block;
+  transform-origin: 50% 50%;
   transform: rotate(0deg);
   animation: ink-capture-rotate-nudge 1.8s ease-in-out infinite;
-}
-
-.ink-capture-rotate-hint {
-  position: absolute;
-  right: 0.45rem;
-  bottom: 0.4rem;
-  font-size: 1.15rem;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--mint-deep, #0f766e);
-  opacity: 0.85;
 }
 
 @keyframes ink-capture-rotate-nudge {

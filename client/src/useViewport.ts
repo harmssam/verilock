@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react'
 
+/**
+ * Nimiq Pay mini app is portrait-locked and does not support a true landscape
+ * viewport. For ink capture we treat Pay as “already landscape” so we never
+ * show a rotate gate the user cannot satisfy.
+ */
+function isNimiqPayMiniAppHost(): boolean {
+  return typeof window !== 'undefined' && Boolean(window.nimiqPay)
+}
+
 function readLandscape(): boolean {
   if (typeof window === 'undefined') return true
+  // Pay: no landscape mode — skip rotate gate and draw in the available frame.
+  if (isNimiqPayMiniAppHost()) return true
   const mq =
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(orientation: landscape)').matches
@@ -9,12 +20,18 @@ function readLandscape(): boolean {
 }
 
 /**
- * True when the viewport is landscape (width ≥ height). Updates on rotate.
- * Used for mobile signature capture so the pad can match field aspect.
+ * True when ink capture may proceed without a rotate prompt.
+ * Real landscape, or Nimiq Pay mini app (portrait-locked host).
+ * Updates on rotate / resize outside Pay.
  */
 export function useIsLandscape(): boolean {
   const [landscape, setLandscape] = useState(readLandscape)
   useEffect(() => {
+    // Pay never flips to landscape; keep the assumed-true value stable.
+    if (isNimiqPayMiniAppHost()) {
+      setLandscape(true)
+      return
+    }
     const sync = () => setLandscape(readLandscape())
     sync()
     const mq =

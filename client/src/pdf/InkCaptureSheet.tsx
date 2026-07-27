@@ -1,8 +1,9 @@
 /**
  * Full-screen ink capture for phones — shared by QR /m/sign and in-app field signing.
  * Landscape-gated pad + floating primary so both paths feel the same.
+ * Nimiq Pay mini app skips the landscape gate (host is portrait-locked).
  */
-import { Smartphone, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useIsLandscape } from '../useViewport'
 import {
   SignatureStrokePad,
@@ -11,6 +12,47 @@ import {
 import './InkCaptureSheet.css'
 
 export type InkCaptureFieldKind = 'signature' | 'initial'
+
+/** Simple iPhone outline used for the rotate nudge (no bordered card). */
+function IPhoneOutlineIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width={52}
+      height={88}
+      viewBox="0 0 48 80"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      {/* Device body */}
+      <rect
+        x="3.5"
+        y="1.5"
+        width="41"
+        height="77"
+        rx="9"
+        stroke="currentColor"
+        strokeWidth="2.25"
+      />
+      {/* Dynamic Island / notch */}
+      <rect x="16" y="5.5" width="16" height="4" rx="2" fill="currentColor" />
+      {/* Screen area hint */}
+      <rect
+        x="8"
+        y="14"
+        width="32"
+        height="50"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        opacity="0.35"
+      />
+      {/* Home indicator */}
+      <rect x="17" y="69" width="14" height="3" rx="1.5" fill="currentColor" opacity="0.55" />
+    </svg>
+  )
+}
 
 export interface InkCaptureSheetProps {
   fieldKind: InkCaptureFieldKind
@@ -81,9 +123,8 @@ export function InkCaptureSheet({
     >
       {needsLandscape && (
         <div className="ink-capture-rotate" role="status" aria-live="polite">
-          <div className="ink-capture-rotate-visual" aria-hidden>
-            <Smartphone className="ink-capture-rotate-phone" size={40} strokeWidth={1.75} />
-            <span className="ink-capture-rotate-hint">↻</span>
+          <div className="ink-capture-rotate-phone-wrap" aria-hidden>
+            <IPhoneOutlineIcon className="ink-capture-rotate-phone" />
           </div>
           <h1 id={titleId} className="ink-capture-rotate-title">
             Rotate your phone
