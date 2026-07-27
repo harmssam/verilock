@@ -208,44 +208,23 @@ export function StatsPricingPage() {
     <article className="stats-page stats-pricing" aria-labelledby="stats-pricing-title">
       {/* ── Hero ── */}
       <header className="stats-hero">
-        <p className="stats-hero-eyebrow">eSignature Pricing Report · July 2026</p>
+        <p className="stats-hero-eyebrow">Market comparison · July 2026</p>
         <h1 id="stats-pricing-title" className="stats-hero-title">
           eSignature Pricing Report 2026
         </h1>
         <p className="stats-hero-stat">
-          Typical subscriptions run <strong>$8–$60/user/month</strong>. Most people sign under{' '}
-          <strong>10 documents a month</strong>
-          {', so the real cost is often '}
-          <strong>several dollars per signature</strong>
-          {'. VeriLock: multi-party signing is '}
+          Subscriptions run <strong>$8–$60/user/month</strong>, while most people sign under{' '}
+          <strong>10 docs a month</strong>
+          {'. VeriLock multi-party signing is '}
           <strong>free</strong>
-          {'; optional on-chain lock is about '}
+          {'; pay about '}
           <strong>{verilockUsdLabel}</strong>
-          {' when you want permanent proof.'}
+          {' only if you optionally lock a permanent proof.'}
         </p>
         <p className="stats-hero-updated">
-          Last updated: July 25, 2026 · Next review: October 2026
+          Updated July 25, 2026 · Next review October 2026
         </p>
       </header>
-
-      {/* ── Key Takeaways ── */}
-      <section className="stats-section" aria-labelledby={`${pricingId}-takeaways`}>
-        <h2 id={`${pricingId}-takeaways`} className="stats-h2">Key Takeaways</h2>
-        <ul className="stats-takeaways">
-          <li>
-            Subscriptions: <strong>$8–$60/user/month</strong>. Average volume is only{' '}
-            <strong>5–8 docs/month</strong>.
-          </li>
-          <li>
-            VeriLock: <strong>sign free</strong>. Pay ~{verilockUsdLabel} only if you{' '}
-            <strong>optionally lock</strong> a permanent proof.
-          </li>
-          <li>
-            Below ~<strong>{CROSSOVER_DOCS} locks/month</strong>, optional lock beats the cheapest
-            subscription on a per-document basis, and a quiet month costs $0.
-          </li>
-        </ul>
-      </section>
 
       {/* ── Pricing Table ── */}
       <section className="stats-section" aria-labelledby={`${pricingId}-table`}>
