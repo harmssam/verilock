@@ -780,6 +780,7 @@ export function App() {
               connecting={wallet.connecting}
               walletStatus={wallet.walletStatus}
               connectMode={connectMode}
+              showOpenInPay={wallet.showOpenInPay}
               creditBalance={wallet.account ? creditBalance : null}
               creditsActive={screen === 'pricing'}
               onConnect={connectPreservingPath}
