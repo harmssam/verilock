@@ -14,7 +14,11 @@ import {
 } from '../DateField'
 import { FEATURES } from '../features'
 import { SignOnMobileModal } from '../journey/SignOnMobileModal'
-import { isLikelyMobileViewport, useLikelyMobileViewport } from '../useViewport'
+import {
+  isLikelyMobileViewport,
+  isNimiqPayMiniAppHost,
+  useLikelyMobileViewport,
+} from '../useViewport'
 import {
   type BlobPayload,
   type ConstructionPlan,
@@ -595,7 +599,8 @@ export function SignerFillView({
     !isServerFilled(activeSlot.id) &&
     isInkPlacementKind(activeSlot.kind) &&
     sigModalMode === 'draw' &&
-    isMobileViewport
+    // Full-screen sheet on phones; always in Nimiq Pay (viewport heuristics can miss).
+    (isMobileViewport || isNimiqPayMiniAppHost())
 
   const inkApplyLabel =
     activeInkPeerCount > 1
