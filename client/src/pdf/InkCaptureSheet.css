@@ -401,23 +401,21 @@
   font-size: 0.95rem;
 }
 
-/* Fill remaining space and truly center the pad */
+/* Fill remaining space; pad size is exact pixels from JS (--ink-pad-w/h) */
 .ink-capture-sheet.is-portrait-host .ink-capture-pad-stage {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 0.15rem 0.35rem;
+  width: 100%;
+  padding: 0;
 }
 
 .ink-capture-sheet.is-portrait-host .sig-pad {
-  width: 100%;
-  max-width: 100%;
+  width: auto;
   height: auto;
-  max-height: 100%;
-  flex: 0 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -425,33 +423,28 @@
 
 .ink-capture-sheet.is-portrait-host .sig-pad--aspect {
   width: auto;
-  max-width: 100%;
   height: auto;
-  max-height: 100%;
   align-items: center;
   justify-content: center;
 }
 
 /*
- * Short edge = physical phone width (--ink-force-short).
- * Size by height first, then width from field aspect — keeps the band centered.
+ * Exact pad box from useForcedLandscapeFrame: fills the long edge when aspect allows,
+ * keeps field aspect so ink is not re-stretched onto the PDF.
  */
 .ink-capture-sheet.is-portrait-host .sig-pad--aspect .sig-pad-canvas {
   flex: none;
-  width: auto;
-  height: auto;
-  /* Usable draw height in the landscape frame (short edge of phone) */
-  max-height: min(100%, calc(var(--ink-force-short, 100vw) - 5.75rem));
-  min-height: min(6.5rem, calc(var(--ink-force-short, 100vw) - 5.75rem));
-  aspect-ratio: var(--sig-pad-aspect, 2.5);
-  width: min(
-    100%,
-    calc((var(--ink-force-short, 100vw) - 5.75rem) * var(--sig-pad-aspect, 2.5))
-  );
-  max-width: 100%;
+  width: var(--ink-pad-w, 100%) !important;
+  height: var(--ink-pad-h, auto) !important;
+  max-width: none;
+  max-height: none;
+  min-height: 0;
+  min-width: 0;
+  aspect-ratio: auto;
   margin: 0 auto;
 }
 
+/* Clear: top-right inside the signature surface */
 .ink-capture-sheet.is-portrait-host .sig-pad-clear--float {
   top: 0.45rem;
   right: 0.45rem;
