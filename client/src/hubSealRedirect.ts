@@ -1,5 +1,5 @@
 import HubApi from '@nimiq/hub-api'
-import type { ChooseAddressResult, SignedMessage, SignedTransaction } from '@nimiq/hub-api'
+import type { ChooseAddressResult, SignedMessage } from '@nimiq/hub-api'
 
 import {
   clearRpcIdSearchParam,
@@ -7,33 +7,15 @@ import {
   getHubReturnUrl,
   loadStoredRpcRequest,
   readRedirectResponse,
-  type RpcRedirectResponse,
-  type StoredRpcRequest,
 } from './hubRedirectParse'
-import { loadSealInFlight } from './sealRecovery'
-import type { BroadcastFallbackFactory, TransactionBroadcastFallback } from './nimiq'
 import { sealError, sealLog, sealWarn } from './sealDebug'
 
 const { RedirectRequestBehavior, RequestType } = HubApi
-
-export type HubLockRedirectResult = {
-  token: string
-  docId: string
-  txHash: string
-}
 
 export type HubRedirectDeps = {
   appName: string
   getHubApi: () => HubApi
   bytesToHex: (bytes: Uint8Array) => string
-  isLockHubCommand: (command: string, state: Record<string, unknown> | null | undefined) => boolean
-  finalizeHubLockTransaction: (
-    signed: SignedTransaction,
-    options?: {
-      hubBroadcast?: boolean
-      broadcastFallback?: TransactionBroadcastFallback
-    },
-  ) => Promise<string>
 }
 
 function formatHubRedirectError(result: unknown): string {
@@ -45,90 +27,10 @@ function formatHubRedirectError(result: unknown): string {
   return 'Hub redirect failed'
 }
 
-function looksLikeSignedTransaction(value: unknown): value is SignedTransaction {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as SignedTransaction
-  return Boolean(
-    candidate.hash ||
-      candidate.serializedTx ||
-      (candidate.transaction instanceof Uint8Array && candidate.transaction.length > 0),
-  )
-}
-
-function lockContextFromRequest(
-  request: StoredRpcRequest,
-  isLockHubCommand: HubRedirectDeps['isLockHubCommand'],
-): { token: string; docId: string; hubBroadcast: boolean } | null {
-  if (!isLockHubCommand(request.command, request.state)) return null
-  const token = request.state?.token as string | undefined
-  const docId = request.state?.docId as string | undefined
-  if (!token || !docId) return null
-  return {
-    token,
-    docId,
-    hubBroadcast: request.command === RequestType.CHECKOUT,
-  }
-}
-
-function lockContextFromSealInFlight(): { token: string; docId: string; hubBroadcast: boolean } | null {
-  const seal = loadSealInFlight()
-  if (!seal) return null
-  // Lock seals use Hub checkout (broadcasts). Prefer hubBroadcast:true so we wait
-  // for network visibility before falling back to rebroadcast.
-  return { token: seal.token, docId: seal.docId, hubBroadcast: true }
-}
-
-function completeLockRedirect(
-  deps: HubRedirectDeps,
-  redirect: RpcRedirectResponse,
-  lockCtx: { token: string; docId: string; hubBroadcast: boolean },
-  onLockComplete: ((result: HubLockRedirectResult) => void) | undefined,
-  onLockError: ((err: Error) => void) | undefined,
-  createBroadcastFallback: BroadcastFallbackFactory | undefined,
-  registerLockWork?: (work: Promise<void>) => void,
-): boolean {
-  consumeRedirectHash()
-  clearRpcIdSearchParam()
-
-  if (redirect.status === 'error') {
-    const err = new Error(formatHubRedirectError(redirect.result))
-    registerLockWork?.(Promise.resolve(onLockError?.(err)).then(() => undefined))
-    return true
-  }
-
-  try {
-    const signed = redirect.result as SignedTransaction
-    if (!looksLikeSignedTransaction(signed)) {
-      throw new Error('Hub did not return a signed transaction.')
-    }
-    const { token, docId, hubBroadcast } = lockCtx
-    sealLog('hub:lenientLockComplete', { docId, hash: signed.hash, hubBroadcast })
-    const lockWork = deps
-      .finalizeHubLockTransaction(signed, {
-        hubBroadcast,
-        broadcastFallback: createBroadcastFallback?.(token, docId),
-      })
-      .then(async txHash => {
-        sealLog('hub:lenientLockRelayed', { docId, txHash })
-        await onLockComplete?.({ token, docId, txHash })
-      })
-      .catch(err => onLockError?.(err instanceof Error ? err : new Error(String(err))))
-    registerLockWork?.(lockWork)
-    return true
-  } catch (err) {
-    sealError('hub:lenientLockFailed', err)
-    registerLockWork?.(
-      Promise.resolve(onLockError?.(err instanceof Error ? err : new Error(String(err)))).then(
-        () => undefined,
-      ),
-    )
-    return true
-  }
-}
-
 /**
  * Hub's default redirect parser requires document.referrer, which is often empty when
  * Hub sends the user back. Parse the URL hash (and stored rpc responses) ourselves.
+ * Handles login (signMessage / legacy chooseAddress). Credit top-up uses Hub event handlers.
  */
 export function processLenientHubRedirect(
   deps: HubRedirectDeps,
@@ -140,45 +42,27 @@ export function processLenientHubRedirect(
     token: string
   }) => void,
   onError: (err: Error) => void,
-  onLockComplete?: (result: HubLockRedirectResult) => void | Promise<void>,
-  onLockError?: (err: Error) => void | Promise<void>,
-  createBroadcastFallback?: BroadcastFallbackFactory,
-  registerLockWork?: (work: Promise<void>) => void,
 ): boolean {
   const redirect = readRedirectResponse()
   if (!redirect) return false
 
   const request = loadStoredRpcRequest(redirect.id)
-  const lockFromRequest = request ? lockContextFromRequest(request, deps.isLockHubCommand) : null
-  // When rpcRequests is lost after cross-site redirect, sealInFlight identifies lock round-trips
-  // (including Hub error responses - not only successful signed transactions).
-  const lockFromFallback = !request ? lockContextFromSealInFlight() : null
-  const lockCtx = lockFromRequest ?? lockFromFallback
   sealLog('hub:lenientRedirect', {
     redirectId: redirect.id,
     hasRequest: Boolean(request),
-    lockDocId: lockCtx?.docId,
-    usedSealFallback: Boolean(lockFromFallback),
   })
 
-  if (!request && !lockCtx) {
+  if (!request) {
     sealWarn('hub:lenientRedirectMissingRequest', { id: redirect.id })
     return false
   }
 
-  if (lockCtx) {
-    if (!request) {
-      sealWarn('hub:lenientRedirectMissingRequest', { id: redirect.id, fallback: 'sealInFlight' })
-    }
-    return completeLockRedirect(
-      deps,
-      redirect,
-      lockCtx,
-      onLockComplete,
-      onLockError,
-      createBroadcastFallback,
-      registerLockWork,
-    )
+  // Ignore leftover lock-flow redirects from older clients (locks are credit-only now).
+  if (request.state?.flow === 'lock') {
+    consumeRedirectHash()
+    clearRpcIdSearchParam()
+    sealWarn('hub:lenientRedirectIgnoredLegacyLock', { id: redirect.id })
+    return true
   }
 
   consumeRedirectHash()
@@ -189,7 +73,7 @@ export function processLenientHubRedirect(
     return true
   }
 
-  if (request!.command === RequestType.CHOOSE_ADDRESS) {
+  if (request.command === RequestType.CHOOSE_ADDRESS) {
     try {
       const { address } = redirect.result as ChooseAddressResult
       sealLog('hub:lenientChooseAddress', { address })
@@ -213,9 +97,9 @@ export function processLenientHubRedirect(
     }
   }
 
-  if (request!.command === RequestType.SIGN_MESSAGE) {
+  if (request.command === RequestType.SIGN_MESSAGE) {
     try {
-      const token = request!.state?.token as string | undefined
+      const token = request.state?.token as string | undefined
       if (!token) throw new Error('Login session expired - try again.')
       const msg = redirect.result as SignedMessage
       onComplete({
@@ -231,5 +115,14 @@ export function processLenientHubRedirect(
     }
   }
 
+  // Credit top-up CHECKOUT/SIGN_TRANSACTION: let official hub.on handlers run via checkRedirectResponse.
+  if (
+    request.command === RequestType.CHECKOUT ||
+    request.command === RequestType.SIGN_TRANSACTION
+  ) {
+    return false
+  }
+
+  sealError('hub:lenientRedirectUnhandled', { command: request.command })
   return false
 }

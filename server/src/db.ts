@@ -88,6 +88,18 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_documents_creator ON documents(creator_address);
   CREATE INDEX IF NOT EXISTS idx_attestations_tx ON attestations(tx_hash);
+
+  CREATE TABLE IF NOT EXISTS pay_login_qr (
+    id TEXT PRIMARY KEY,
+    status TEXT NOT NULL DEFAULT 'pending',
+    desktop_token TEXT,
+    address TEXT,
+    public_key TEXT,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    consumed_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_pay_login_qr_expires ON pay_login_qr(expires_at);
 `)
 
 const documentColumns = db.prepare('PRAGMA table_info(documents)').all() as Array<{ name: string }>
@@ -312,6 +324,155 @@ export function purgeExpiredSessions(): number {
   const result = db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now())
   return result.changes
 }
+
+
+export type PayLoginQrStatus = 'pending' | 'ready' | 'consumed' | 'expired'
+
+export type PayLoginQrRecord = {
+  id: string
+  status: PayLoginQrStatus
+  desktopToken: string | null
+  address: string | null
+  publicKey: string | null
+  createdAt: number
+  expiresAt: number
+  consumedAt: number | null
+}
+
+export function createPayLoginQr(id: string, ttlMs: number): PayLoginQrRecord {
+  const now = Date.now()
+  const expiresAt = now + ttlMs
+  db.prepare(
+    `INSERT INTO pay_login_qr (id, status, desktop_token, address, public_key, created_at, expires_at, consumed_at)
+     VALUES (?, 'pending', NULL, NULL, NULL, ?, ?, NULL)`,
+  ).run(id, now, expiresAt)
+  return {
+    id,
+    status: 'pending',
+    desktopToken: null,
+    address: null,
+    publicKey: null,
+    createdAt: now,
+    expiresAt,
+    consumedAt: null,
+  }
+}
+
+function mapPayLoginQr(row: {
+  id: string
+  status: string
+  desktop_token: string | null
+  address: string | null
+  public_key: string | null
+  created_at: number
+  expires_at: number
+  consumed_at: number | null
+}): PayLoginQrRecord {
+  const expired = row.expires_at < Date.now()
+  let status = row.status as PayLoginQrStatus
+  if (expired && status === 'pending') status = 'expired'
+  else if (expired && status === 'ready') status = 'expired'
+  return {
+    id: row.id,
+    status,
+    desktopToken: row.desktop_token,
+    address: row.address,
+    publicKey: row.public_key,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    consumedAt: row.consumed_at,
+  }
+}
+
+export function getPayLoginQr(id: string): PayLoginQrRecord | null {
+  const row = db
+    .prepare(
+      `SELECT id, status, desktop_token, address, public_key, created_at, expires_at, consumed_at
+       FROM pay_login_qr WHERE id = ?`,
+    )
+    .get(id) as
+    | {
+        id: string
+        status: string
+        desktop_token: string | null
+        address: string | null
+        public_key: string | null
+        created_at: number
+        expires_at: number
+        consumed_at: number | null
+      }
+    | undefined
+  if (!row) return null
+  return mapPayLoginQr(row)
+}
+
+/** Phone completed Pay login: bind a new desktop session (ready for poll). */
+export function markPayLoginQrReady(
+  id: string,
+  input: { desktopToken: string; address: string; publicKey: string },
+): PayLoginQrRecord {
+  const now = Date.now()
+  const result = db
+    .prepare(
+      `UPDATE pay_login_qr
+       SET status = 'ready', desktop_token = ?, address = ?, public_key = ?
+       WHERE id = ? AND status = 'pending' AND expires_at > ?`,
+    )
+    .run(
+      input.desktopToken,
+      normalizeAddress(input.address),
+      input.publicKey,
+      id,
+      now,
+    )
+  if (result.changes === 0) {
+    throw new Error('QR login session is not available')
+  }
+  const row = getPayLoginQr(id)
+  if (!row) throw new Error('QR login session is not available')
+  return row
+}
+
+/**
+ * Desktop poll success: return credentials once and mark consumed.
+ * Returns null if not ready yet; throws if expired/consumed/missing.
+ */
+export function consumePayLoginQr(id: string): {
+  token: string
+  address: string
+} | null {
+  const row = getPayLoginQr(id)
+  if (!row) throw new Error('QR login session not found')
+  if (row.status === 'expired' || row.expiresAt < Date.now()) {
+    throw new Error('QR login session expired')
+  }
+  if (row.status === 'consumed') {
+    throw new Error('QR login session already used')
+  }
+  if (row.status === 'pending') return null
+  if (row.status !== 'ready' || !row.desktopToken || !row.address) {
+    throw new Error('QR login session is not available')
+  }
+  const now = Date.now()
+  const result = db
+    .prepare(
+      `UPDATE pay_login_qr SET status = 'consumed', consumed_at = ?, desktop_token = NULL
+       WHERE id = ? AND status = 'ready'`,
+    )
+    .run(now, id)
+  if (result.changes === 0) {
+    throw new Error('QR login session already used')
+  }
+  return { token: row.desktopToken, address: row.address }
+}
+
+export function purgeExpiredPayLoginQr(): number {
+  const result = db
+    .prepare(`DELETE FROM pay_login_qr WHERE expires_at < ? OR status = 'consumed'`)
+    .run(Date.now() - 60 * 60 * 1000)
+  return result.changes
+}
+
 
 function parseAnnotationsColumn(raw: unknown): unknown[] | null {
   if (raw == null || raw === '') return null

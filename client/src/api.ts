@@ -118,6 +118,34 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  /** Desktop: start a Pay QR login room (3 min TTL). */
+  authQrStart: () =>
+    request<{ id: string; expiresAt: number }>('/api/auth/qr/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }),
+
+  /**
+   * Desktop: poll QR room. When status is `ready`, response includes token+address
+   * once (room is consumed).
+   */
+  authQrStatus: (id: string) =>
+    request<{
+      status: 'pending' | 'ready' | 'expired' | 'consumed' | 'not_found'
+      expiresAt?: number
+      token?: string
+      address?: string
+    }>(`/api/auth/qr/${encodeURIComponent(id)}`),
+
+  /** Phone: after Pay verify, attach this session to the desktop QR room. */
+  authQrComplete: (id: string, token: string) =>
+    request<{ ok: true; address: string }>(`/api/auth/qr/${encodeURIComponent(id)}/complete`, {
+      method: 'POST',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }),
+
   me: (token: string) =>
     request<{ address: string; documents: SealDocument[] }>('/api/me', {
       headers: withAuth(token),
@@ -477,16 +505,6 @@ export const api = {
       promoEndsLabel: string | null
     }>('/api/seal-pricing'),
 
-  walletBalance: (token: string) =>
-    request<{
-      address: string
-      balanceLuna: number
-      requiredLuna: number
-      sufficient: boolean
-    }>('/api/wallet-balance', {
-      headers: withAuth(token),
-    }),
-
   nimPrices: () =>
     request<{
       usd: number
@@ -495,47 +513,6 @@ export const api = {
       lastUpdatedAt: number | null
       source: 'fastspot' | 'coingecko'
     }>('/api/nim-prices'),
-
-  prepareLock: (token: string, docId: string, finalSha256: string) =>
-    request<{
-      document: SealDocument
-      attestationPayload: string
-      pricing: {
-        feeNim: number
-        feeLuna: number
-        baseFeeNim: number
-        promoActive: boolean
-        promoLabel: string | null
-        promoEndsLabel: string | null
-      }
-    }>(
-      `/api/documents/${docId}/prepare-lock`,
-      {
-        method: 'POST',
-        headers: { ...withAuth(token), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ finalSha256 }),
-      },
-    ),
-
-  beginLock: (token: string, docId: string) =>
-    request<{ document: SealDocument }>(`/api/documents/${docId}/begin-lock`, {
-      method: 'POST',
-      headers: { ...withAuth(token) },
-    }),
-
-  broadcastTransaction: (token: string, documentId: string, serializedTx: string) =>
-    request<{ hash: string }>('/api/transactions/broadcast', {
-      method: 'POST',
-      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ documentId, serializedTx }),
-    }),
-
-  submitAttestation: (token: string, docId: string, txHash: string) =>
-    request<AttestationStatus>(`/api/documents/${docId}/attestations`, {
-      method: 'POST',
-      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ txHash }),
-    }),
 
   attestationStatus: (token: string, txHash: string) =>
     request<AttestationStatus>(`/api/attestations/status/${txHash}`, {

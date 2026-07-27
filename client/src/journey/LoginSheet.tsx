@@ -1,10 +1,18 @@
-import { ExternalLink, LoaderCircle, Smartphone, X } from 'lucide-react'
-import { useEffect, useId, useRef, useState } from 'react'
+import { Copy, ExternalLink, LoaderCircle, Smartphone, X } from 'lucide-react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { NIMIQ_PAY_ANDROID_URL, NIMIQ_PAY_IOS_URL } from '../nimiq'
+import { api } from '../api'
+import {
+  isLoopbackAppOrigin,
+  NIMIQ_PAY_ANDROID_URL,
+  NIMIQ_PAY_IOS_URL,
+  payLoginQrPayload,
+} from '../nimiq'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
+import { qrDataUrl } from '../signatureHandoff/qr'
 import {
   journeyConnectLabels,
+  journeyDesktopChoiceLabels,
   journeyLoginSheetCopy,
   journeyMobileChoiceLabels,
   type JourneyConnectMode,
@@ -19,21 +27,29 @@ interface LoginSheetProps {
   walletStatus?: string | null
   onClose?: () => void
   /**
-   * Start connect. Pass `{ useRedirect: true }` for Hub in browser,
-   * `{ useRedirect: false }` (or `{}`) for Nimiq Pay deeplink on mobile.
+   * Start connect. Pass `{ useRedirect: true }` for Hub,
+   * `{ useRedirect: false }` for Nimiq Pay deeplink on mobile.
    */
   onProceed: (options?: JourneyConnectRequest) => void
+  /**
+   * Desktop Pay QR success - parent applies session (same as Hub/Pay verify).
+   */
+  onSession?: (token: string, address: string) => void
   /** Anchor under a header Login button vs full-width in a page card */
   placement?: 'popover' | 'inline'
   /** Hide the X control (e.g. forced open on the connect step). */
   showClose?: boolean
 }
 
+const QR_POLL_MS = 1600
+
+type QrPhase = 'idle' | 'loading' | 'waiting' | 'error'
+
 /**
  * Explains Nimiq + how to connect, then runs the real wallet connect on proceed.
  *
  * Mobile (`pay-open` / `hub-fallback`): dual choice - Nimiq Pay app or Hub in browser.
- * Desktop Hub path usually skips this sheet entirely (see AccountMenu / login gates).
+ * Desktop (`desktop-choice`): dual choice - Pay QR or Hub.
  */
 export function LoginSheet({
   open,
@@ -42,6 +58,7 @@ export function LoginSheet({
   walletStatus,
   onClose,
   onProceed,
+  onSession,
   placement = 'popover',
   showClose,
 }: LoginSheetProps) {
@@ -50,37 +67,162 @@ export function LoginSheet({
   const copy = journeyLoginSheetCopy(connectMode)
   const labels = journeyConnectLabels(connectMode)
   const mobileChoice = journeyMobileChoiceLabels()
+  const desktopChoice = journeyDesktopChoiceLabels()
   const canClose = showClose ?? placement === 'popover'
   const isMobileChoice = connectMode === 'pay-open' || connectMode === 'hub-fallback'
-  /** After Pay deeplink fails, prefer Hub as the primary action. */
-  const hubPreferred = connectMode === 'hub-fallback'
+  const isDesktopChoice = connectMode === 'desktop-choice'
+  const isChoice = isMobileChoice || isDesktopChoice
+  /** Localhost / 127.0.0.1 - phone cannot reach this machine; Pay QR is prod-only. */
+  const payQrUnavailableLocal = isLoopbackAppOrigin()
+  /**
+   * Prefer Hub when Pay deeplink failed (mobile) or Pay QR cannot work (localhost).
+   */
+  const hubPreferred = connectMode === 'hub-fallback' || payQrUnavailableLocal
   const [pendingChoice, setPendingChoice] = useState<'pay' | 'hub' | null>(null)
 
+  const [qrPhase, setQrPhase] = useState<QrPhase>('idle')
+  const [qrImage, setQrImage] = useState<string | null>(null)
+  const [qrUrl, setQrUrl] = useState<string | null>(null)
+  const [qrError, setQrError] = useState<string | null>(null)
+  const [qrCopied, setQrCopied] = useState(false)
+  const [qrExpiresAt, setQrExpiresAt] = useState<number | null>(null)
+  const pollTimerRef = useRef<number | null>(null)
+  const qrIdRef = useRef<string | null>(null)
+
+  const clearPoll = useCallback(() => {
+    if (pollTimerRef.current != null) {
+      window.clearInterval(pollTimerRef.current)
+      pollTimerRef.current = null
+    }
+  }, [])
+
+  const resetQr = useCallback(() => {
+    clearPoll()
+    qrIdRef.current = null
+    setQrPhase('idle')
+    setQrImage(null)
+    setQrUrl(null)
+    setQrError(null)
+    setQrCopied(false)
+    setQrExpiresAt(null)
+    setPendingChoice(null)
+  }, [clearPoll])
+
   useEffect(() => {
-    if (!connecting) setPendingChoice(null)
+    if (!connecting) setPendingChoice(prev => (prev === 'hub' ? null : prev))
   }, [connecting])
+
+  useEffect(() => {
+    if (!open) {
+      resetQr()
+    }
+  }, [open, resetQr])
+
+  useEffect(() => {
+    return () => clearPoll()
+  }, [clearPoll])
+
+  const startPayQr = useCallback(async () => {
+    if (payQrUnavailableLocal) {
+      setQrError(
+        'Nimiq Pay QR login does not work on localhost - your phone cannot open this machine. Use Nimiq Hub below (or test on production).',
+      )
+      setQrPhase('error')
+      return
+    }
+    if (!onSession) {
+      setQrError('Pay QR login is not available here.')
+      setQrPhase('error')
+      return
+    }
+    clearPoll()
+    setPendingChoice('pay')
+    setQrPhase('loading')
+    setQrError(null)
+    setQrImage(null)
+
+    try {
+      const { id, expiresAt } = await api.authQrStart()
+      qrIdRef.current = id
+      const payload = payLoginQrPayload(id)
+      if (payload.loopback) {
+        setQrPhase('error')
+        setQrError(
+          'Nimiq Pay QR login does not work on localhost - your phone cannot open this machine. Use Nimiq Hub below (or test on production).',
+        )
+        setPendingChoice(null)
+        return
+      }
+      setQrUrl(payload.webUrl)
+      setQrExpiresAt(expiresAt)
+      // nimiqpay:// so the camera can open Pay; embedded URL must be public (prod).
+      const dataUrl = await qrDataUrl(payload.qrText, 200)
+      setQrImage(dataUrl)
+      setQrPhase('waiting')
+
+      pollTimerRef.current = window.setInterval(() => {
+        const sid = qrIdRef.current
+        if (!sid) return
+        void (async () => {
+          try {
+            const status = await api.authQrStatus(sid)
+            if (status.status === 'ready' && status.token && status.address) {
+              clearPoll()
+              onSession(status.token, status.address)
+              resetQr()
+              onClose?.()
+              return
+            }
+            if (status.status === 'expired' || status.status === 'consumed') {
+              clearPoll()
+              setQrPhase('error')
+              setQrError(
+                status.status === 'expired'
+                  ? 'QR expired. Generate a new one to try again.'
+                  : 'This QR was already used. Generate a new one.',
+              )
+              setPendingChoice(null)
+            }
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : ''
+            if (/expired|not found|already used/i.test(msg)) {
+              clearPoll()
+              setQrPhase('error')
+              setQrError(msg || 'QR login failed')
+              setPendingChoice(null)
+            }
+          }
+        })()
+      }, QR_POLL_MS)
+    } catch (err) {
+      setQrPhase('error')
+      setQrError(err instanceof Error ? err.message : 'Could not start QR login')
+      setPendingChoice(null)
+    }
+  }, [clearPoll, onClose, onSession, payQrUnavailableLocal, resetQr])
 
   useEffect(() => {
     if (!open || !canClose || !onClose) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !connecting) onClose()
+      if (e.key === 'Escape' && !connecting && qrPhase !== 'waiting' && qrPhase !== 'loading') {
+        onClose()
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [open, connecting, onClose, canClose])
+  }, [open, connecting, onClose, canClose, qrPhase])
 
   useEffect(() => {
     if (!open || placement !== 'popover' || !onClose) return
     const onDoc = (e: MouseEvent) => {
       if (panelRef.current?.contains(e.target as Node)) return
-      // Ignore clicks on the Login trigger (parent handles toggle)
       const t = e.target as HTMLElement | null
       if (t?.closest?.('[data-login-trigger]')) return
-      if (!connecting) onClose()
+      if (!connecting && qrPhase !== 'waiting' && qrPhase !== 'loading') onClose()
     }
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
-  }, [open, placement, connecting, onClose])
+  }, [open, placement, connecting, onClose, qrPhase])
 
   useEffect(() => {
     if (!open || placement !== 'popover') return
@@ -96,10 +238,15 @@ export function LoginSheet({
   const payBtnClass = hubPreferred ? 'btn btn-secondary' : 'btn btn-primary'
   const hubBtnClass = hubPreferred ? 'btn btn-primary' : 'btn btn-secondary'
 
+  const expiresLabel =
+    qrExpiresAt != null
+      ? `Expires ${new Date(qrExpiresAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+      : null
+
   const panel = (
     <div
       ref={panelRef}
-      className={`login-sheet login-sheet--${placement}${isMobileChoice ? ' login-sheet--choice' : ''}`}
+      className={`login-sheet login-sheet--${placement}${isChoice ? ' login-sheet--choice' : ''}`}
       role="dialog"
       aria-modal={placement === 'popover' ? true : undefined}
       aria-labelledby={titleId}
@@ -115,8 +262,11 @@ export function LoginSheet({
           <button
             type="button"
             className="login-sheet-close"
-            onClick={onClose}
-            disabled={connecting}
+            onClick={() => {
+              resetQr()
+              onClose()
+            }}
+            disabled={connecting && pendingChoice === 'hub'}
             aria-label="Close login"
           >
             <X size={18} strokeWidth={2.25} aria-hidden />
@@ -134,7 +284,104 @@ export function LoginSheet({
         </ol>
       )}
 
-      {isMobileChoice ? (
+      {isDesktopChoice ? (
+        <div className="login-sheet-choices">
+          <div className="login-sheet-choice">
+            {qrPhase === 'loading' || qrPhase === 'waiting' ? (
+              <div className="login-sheet-qr" role="status" aria-live="polite">
+                {qrImage ? (
+                  <img src={qrImage} alt="Scan with Nimiq Pay on your phone" width={200} height={200} />
+                ) : (
+                  <div className="login-sheet-qr-placeholder">
+                    <LoaderCircle className="btn-spinner" size={24} strokeWidth={2.5} aria-hidden />
+                  </div>
+                )}
+                <p className="login-sheet-qr-wait">
+                  {qrPhase === 'loading' ? 'Generating QR…' : desktopChoice.payBusy}
+                </p>
+                {expiresLabel && <p className="muted login-sheet-qr-expires">{expiresLabel}</p>}
+                <ol className="login-sheet-qr-steps muted">
+                  <li>Scan with your phone camera (opens Nimiq Pay when installed).</li>
+                  <li>Approve login prompts in Nimiq Pay.</li>
+                  <li>This page finishes automatically.</li>
+                </ol>
+                <div className="login-sheet-qr-actions">
+                  {qrUrl && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(qrUrl).then(() => {
+                          setQrCopied(true)
+                          window.setTimeout(() => setQrCopied(false), 2000)
+                        })
+                      }}
+                    >
+                      <Copy size={14} strokeWidth={2.25} aria-hidden />
+                      {qrCopied ? 'Link copied' : 'Copy link'}
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-ghost" onClick={() => void startPayQr()}>
+                    New QR
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={`${payBtnClass} login-sheet-proceed`}
+                  onClick={() => void startPayQr()}
+                  disabled={connecting}
+                >
+                  <Smartphone size={16} strokeWidth={2.25} aria-hidden />
+                  {desktopChoice.payIdle}
+                </button>
+                <p className="muted login-sheet-choice-hint">
+                  {payQrUnavailableLocal
+                    ? 'Not available on localhost - use Nimiq Hub below (or production).'
+                    : desktopChoice.payHint}
+                </p>
+                {qrError && (
+                  <p className="login-sheet-qr-error" role="alert">
+                    {qrError}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="login-sheet-choice-divider" role="presentation">
+            <span>or</span>
+          </div>
+
+          <div className="login-sheet-choice">
+            <button
+              type="button"
+              className={`${hubBtnClass} login-sheet-proceed${pendingChoice === 'hub' ? ' btn--busy' : ''}`}
+              onClick={() => {
+                resetQr()
+                setPendingChoice('hub')
+                onProceed({ useRedirect: true })
+              }}
+              disabled={connecting || qrPhase === 'loading'}
+            >
+              {pendingChoice === 'hub' && connecting ? (
+                <>
+                  <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+                  {desktopChoice.hubBusy}
+                </>
+              ) : (
+                <>
+                  <NimiqHexagonIcon size={16} />
+                  {desktopChoice.hubIdle}
+                </>
+              )}
+            </button>
+            <p className="muted login-sheet-choice-hint">{desktopChoice.hubHint}</p>
+          </div>
+        </div>
+      ) : isMobileChoice ? (
         <div className="login-sheet-choices">
           <div className="login-sheet-choice">
             <button
@@ -239,8 +486,6 @@ export function LoginSheet({
     </div>
   )
 
-  // Portal popovers to body so header `backdrop-filter` / sticky stacking
-  // does not trap `position: fixed` and push the dialog off-screen on mobile.
   if (placement === 'popover') {
     return createPortal(
       <div className="login-sheet-layer">
@@ -248,9 +493,12 @@ export function LoginSheet({
           type="button"
           className="login-sheet-backdrop"
           aria-label="Dismiss login"
-          disabled={connecting}
+          disabled={connecting || qrPhase === 'waiting' || qrPhase === 'loading'}
           onClick={() => {
-            if (!connecting) onClose?.()
+            if (!connecting && qrPhase !== 'waiting' && qrPhase !== 'loading') {
+              resetQr()
+              onClose?.()
+            }
           }}
         />
         {panel}

@@ -111,6 +111,7 @@ interface AgreementsPageProps {
   connecting: boolean
   connectMode: JourneyConnectMode
   onConnect: (options?: JourneyConnectRequest) => void
+  onSession?: (token: string, address: string) => void
   onOpen: (doc: SealDocument, preferSeal?: boolean) => void
   onCreate: () => void
   /** Optional: send user to pricing when they need credits for data archive. */
@@ -121,11 +122,13 @@ function AgreementsLoginGate({
   connectMode,
   connecting,
   onConnect,
+  onSession,
   entry,
 }: {
   connectMode: JourneyConnectMode
   connecting: boolean
   onConnect: (options?: JourneyConnectRequest) => void
+  onSession?: (token: string, address: string) => void
   entry: { idle: string; busy: string }
 }) {
   const [loginOpen, setLoginOpen] = useState(false)
@@ -174,6 +177,7 @@ function AgreementsLoginGate({
           connecting={connecting}
           onClose={() => setLoginOpen(false)}
           onProceed={onConnect}
+          onSession={onSession}
           placement="inline"
         />
       )}
@@ -187,6 +191,7 @@ export function AgreementsPage({
   connecting,
   connectMode,
   onConnect,
+  onSession,
   onOpen,
   onCreate,
   onGetCredits,
@@ -823,6 +828,7 @@ export function AgreementsPage({
         connectMode={connectMode}
         connecting={connecting}
         onConnect={onConnect}
+        onSession={onSession}
         entry={entry}
       />
     )

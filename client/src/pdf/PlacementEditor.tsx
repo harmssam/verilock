@@ -6,11 +6,15 @@
 import {
   Calendar,
   Check,
+  Maximize2,
+  Minimize2,
   Minus,
   Plus,
   Square,
   UserRound,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react'
 import {
   useCallback,
@@ -62,6 +66,11 @@ type Tool =
   | 'date'
   | 'checkmark'
   | 'cross'
+
+/** View-only zoom for placement (not stored on the plan). */
+const ZOOM_MIN_PCT = 50
+const ZOOM_MAX_PCT = 200
+const ZOOM_STEP_PCT = 25
 
 /**
  * Signature tool mark (from signature-svgrepo-com.svg).
@@ -152,6 +161,8 @@ export function PlacementEditor({
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  /** Scrollable PDF stage (used for edge auto-scroll while dragging). */
+  const stageRef = useRef<HTMLDivElement>(null)
   const surfaceRef = useRef<DocumentSurface | null>(null)
   const [surface, setSurface] = useState<DocumentSurface | null>(null)
   const [pageCount, setPageCount] = useState(1)
@@ -184,6 +195,11 @@ export function PlacementEditor({
     origX: number
     origY: number
     moved: boolean
+    /** Stage scroll at drag start — needed so auto-scroll maps pointer → page coords. */
+    startScrollLeft: number
+    startScrollTop: number
+    slotWidth: number
+    slotHeight: number
   } | null>(null)
   /**
    * Place tools wait for pointerup. On mobile, pointerdown alone would drop a box
@@ -198,17 +214,29 @@ export function PlacementEditor({
   /** Finger/mouse movement above this = pan/scroll, not a place tap. */
   const PLACE_TAP_SLOP_PX = 12
   const [dragTick, setDragTick] = useState(0)
+  /** Last pointer position during a slot drag (for continuous edge auto-scroll). */
+  const lastDragPointerRef = useRef<{ x: number; y: number } | null>(null)
+  const autoScrollRafRef = useRef<number | null>(null)
+  /** Full-viewport stage workspace (toolbar + PDF) for dense placement work. */
+  const [stageFullscreen, setStageFullscreen] = useState(false)
+  /** Inner width of the stage frame — used to render a wider page in fullscreen. */
+  const [stageInnerWidth, setStageInnerWidth] = useState(0)
+  /** View zoom % applied on top of fit/base page width (placement only; not stored). */
+  const [zoomPct, setZoomPct] = useState(100)
+  const cssSizeRef = useRef(cssSize)
+  cssSizeRef.current = cssSize
+  const updateSlotRef = useRef<(id: string, patch: Partial<PlacementSlot>) => void>(() => {})
 
   /**
-   * Mobile: undock placement tools to a fixed bar under the shell header while
-   * the user works on the PDF. Scroll back up to the natural slot → auto-dock.
-   * Portaled to body because .lr-view-blend transform + .action-dock overflow
-   * break position:sticky/fixed in-tree.
+   * Undock placement tools to a fixed bar under the shell header while the user
+   * scrolls the PDF (mobile + desktop). Scroll back up to the natural slot →
+   * auto-dock. Portaled to body because .lr-view-blend transform + .action-dock
+   * overflow break position:sticky/fixed in-tree. Disabled in stage fullscreen
+   * (tools live in the fullscreen chrome).
    */
   const toolbarSlotRef = useRef<HTMLDivElement>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const toolbarUndockedRef = useRef(false)
-  const [toolbarNarrow, setToolbarNarrow] = useState(false)
   const [toolbarUndocked, setToolbarUndocked] = useState(false)
   const [toolbarHeight, setToolbarHeight] = useState(0)
   const [toolbarUndockTop, setToolbarUndockTop] = useState(0)
@@ -217,16 +245,6 @@ export function PlacementEditor({
   const slots = plan.slots
   /** Placement tools stay off until a person chip is selected. */
   const toolsDisabled = editDisabled || activePerson == null
-
-  // Narrow viewports only - desktop keeps the in-flow toolbar.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const mq = window.matchMedia('(max-width: 768px)')
-    const sync = () => setToolbarNarrow(mq.matches)
-    sync()
-    mq.addEventListener('change', sync)
-    return () => mq.removeEventListener('change', sync)
-  }, [])
 
   // Dismiss wallet address help when clicking outside or pressing Escape.
   useEffect(() => {
@@ -260,11 +278,12 @@ export function PlacementEditor({
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [toolbarNarrow, toolbarUndocked, selectedId, tool, pageCount, activePerson])
+  }, [toolbarUndocked, selectedId, tool, pageCount, activePerson, stageFullscreen])
 
   // Undock when the dock slot scrolls under the sticky shell header; re-dock on scroll up.
+  // Works on desktop and mobile (not only narrow viewports).
   useEffect(() => {
-    if (!toolbarNarrow || typeof window === 'undefined') {
+    if (typeof window === 'undefined' || stageFullscreen) {
       toolbarUndockedRef.current = false
       setToolbarUndocked(false)
       return
@@ -311,7 +330,7 @@ export function PlacementEditor({
       vv?.removeEventListener('resize', update)
       vv?.removeEventListener('scroll', update)
     }
-  }, [toolbarNarrow])
+  }, [stageFullscreen])
 
   // Drop selection if that person slot was removed (never auto-pick another).
   useEffect(() => {
@@ -358,12 +377,34 @@ export function PlacementEditor({
     }
   }, [])
 
+  /**
+   * Base page width: docked prop size, or (in fullscreen) fit to stage.
+   * Zoom multiplies this so placement boxes stay in normalized coords.
+   */
+  const basePageWidth = useMemo(() => {
+    if (!stageFullscreen) return pageWidth
+    const available = stageInnerWidth > 0 ? stageInnerWidth - 32 : 0
+    if (available <= 0) return Math.max(pageWidth, 720)
+    return Math.max(pageWidth, Math.min(available, 1100))
+  }, [stageFullscreen, stageInnerWidth, pageWidth])
+
+  const effectivePageWidth = useMemo(
+    () => Math.max(160, Math.round(basePageWidth * (zoomPct / 100))),
+    [basePageWidth, zoomPct],
+  )
+
+  const nudgeZoom = useCallback((delta: number) => {
+    setZoomPct(prev =>
+      Math.max(ZOOM_MIN_PCT, Math.min(ZOOM_MAX_PCT, prev + delta)),
+    )
+  }, [])
+
   useEffect(() => {
     if (!surface || !canvasRef.current) return
     let cancelled = false
     const canvas = canvasRef.current
     surface
-      .renderPage(pageNumber, pageWidth, canvas)
+      .renderPage(pageNumber, effectivePageWidth, canvas)
       .then(rendered => {
         if (cancelled) return
         setCssSize({ width: rendered.cssWidth, height: rendered.cssHeight })
@@ -377,7 +418,41 @@ export function PlacementEditor({
     return () => {
       cancelled = true
     }
-  }, [surface, pageNumber, pageWidth])
+    // stageFullscreen: portal remounts the canvas; re-paint after enter/exit.
+  }, [surface, pageNumber, effectivePageWidth, stageFullscreen])
+
+  // Measure stage content width for fullscreen page scaling.
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage || typeof ResizeObserver === 'undefined') return
+    const measure = () => {
+      const w = stage.clientWidth
+      if (w > 0) setStageInnerWidth(w)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(stage)
+    return () => ro.disconnect()
+  }, [stageFullscreen])
+
+  // Fullscreen: lock body scroll; Escape exits (after place-tool cancel is handled elsewhere).
+  useEffect(() => {
+    if (!stageFullscreen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      // Let the place-tool handler cancel an active tool first.
+      if (tool !== 'select') return
+      e.preventDefault()
+      setStageFullscreen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [stageFullscreen, tool])
 
   const pageSlots = useMemo(
     () => slots.filter(s => s.pageIndex === pageNumber - 1),
@@ -562,6 +637,88 @@ export function PlacementEditor({
     },
     [locked, patchPlan],
   )
+  updateSlotRef.current = updateSlot
+
+  const stopDragAutoScroll = useCallback(() => {
+    if (autoScrollRafRef.current != null) {
+      cancelAnimationFrame(autoScrollRafRef.current)
+      autoScrollRafRef.current = null
+    }
+    lastDragPointerRef.current = null
+  }, [])
+
+  /**
+   * Map pointer + stage scroll delta to normalized slot origin and write it.
+   * Scroll is included so edge auto-scroll keeps the box under the cursor.
+   */
+  const applyDragPosition = useCallback((clientX: number, clientY: number) => {
+    const drag = dragRef.current
+    const stage = stageRef.current
+    if (!drag || !stage) return
+    const { width: pageW, height: pageH } = cssSizeRef.current
+    if (pageW <= 0 || pageH <= 0) return
+    const scrollDx = stage.scrollLeft - drag.startScrollLeft
+    const scrollDy = stage.scrollTop - drag.startScrollTop
+    let nx = drag.origX + (clientX - drag.startX + scrollDx) / pageW
+    let ny = drag.origY + (clientY - drag.startY + scrollDy) / pageH
+    nx = Math.min(Math.max(0, nx), 1 - drag.slotWidth)
+    ny = Math.min(Math.max(0, ny), 1 - drag.slotHeight)
+    updateSlotRef.current(drag.id, { x: nx, y: ny })
+    setDragTick(t => t + 1)
+  }, [])
+
+  /**
+   * While dragging near the stage edge, keep scrolling so long pages stay reachable.
+   * Speed ramps with how deep the pointer sits in the edge band.
+   */
+  const tickDragAutoScroll = useCallback(() => {
+    autoScrollRafRef.current = null
+    const drag = dragRef.current
+    const stage = stageRef.current
+    const ptr = lastDragPointerRef.current
+    if (!drag?.moved || !stage || !ptr) return
+
+    const rect = stage.getBoundingClientRect()
+    const EDGE = 52
+    const MAX_SPEED = 18
+
+    let vx = 0
+    let vy = 0
+    const distLeft = ptr.x - rect.left
+    const distRight = rect.right - ptr.x
+    const distTop = ptr.y - rect.top
+    const distBottom = rect.bottom - ptr.y
+
+    if (distLeft < EDGE) {
+      vx = -MAX_SPEED * (1 - Math.max(0, distLeft) / EDGE)
+    } else if (distRight < EDGE) {
+      vx = MAX_SPEED * (1 - Math.max(0, distRight) / EDGE)
+    }
+    if (distTop < EDGE) {
+      vy = -MAX_SPEED * (1 - Math.max(0, distTop) / EDGE)
+    } else if (distBottom < EDGE) {
+      vy = MAX_SPEED * (1 - Math.max(0, distBottom) / EDGE)
+    }
+
+    const maxScrollLeft = Math.max(0, stage.scrollWidth - stage.clientWidth)
+    const maxScrollTop = Math.max(0, stage.scrollHeight - stage.clientHeight)
+    if (vx < 0 && stage.scrollLeft <= 0) vx = 0
+    if (vx > 0 && stage.scrollLeft >= maxScrollLeft - 0.5) vx = 0
+    if (vy < 0 && stage.scrollTop <= 0) vy = 0
+    if (vy > 0 && stage.scrollTop >= maxScrollTop - 0.5) vy = 0
+
+    if (vx === 0 && vy === 0) return
+
+    stage.scrollLeft = Math.min(maxScrollLeft, Math.max(0, stage.scrollLeft + vx))
+    stage.scrollTop = Math.min(maxScrollTop, Math.max(0, stage.scrollTop + vy))
+    applyDragPosition(ptr.x, ptr.y)
+    autoScrollRafRef.current = requestAnimationFrame(tickDragAutoScroll)
+  }, [applyDragPosition])
+
+  const ensureDragAutoScroll = useCallback(() => {
+    if (autoScrollRafRef.current != null) return
+    autoScrollRafRef.current = requestAnimationFrame(tickDragAutoScroll)
+  }, [tickDragAutoScroll])
 
   const setSelectedScalePercent = useCallback(
     (pct: number) => {
@@ -778,19 +935,15 @@ export function PlacementEditor({
     const dist = Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY)
     if (dist > 4) drag.moved = true
     if (!drag.moved) return
-    const slot = slots.find(s => s.id === drag.id)
-    if (!slot) return
-    let nx = drag.origX + (e.clientX - drag.startX) / cssSize.width
-    let ny = drag.origY + (e.clientY - drag.startY) / cssSize.height
-    nx = Math.min(Math.max(0, nx), 1 - slot.width)
-    ny = Math.min(Math.max(0, ny), 1 - slot.height)
-    updateSlot(drag.id, { x: nx, y: ny })
-    setDragTick(t => t + 1)
+    lastDragPointerRef.current = { x: e.clientX, y: e.clientY }
+    applyDragPosition(e.clientX, e.clientY)
+    ensureDragAutoScroll()
   }
 
   const endDrag = () => {
     const drag = dragRef.current
     dragRef.current = null
+    stopDragAutoScroll()
     if (!drag || drag.moved || editDisabled) return
     const slot = slots.find(s => s.id === drag.id)
     if (slot && (slot.kind === 'checkmark' || slot.kind === 'cross')) {
@@ -831,6 +984,7 @@ export function PlacementEditor({
     const slot = slots.find(s => s.id === id)
     if (!slot) return
     setSelectedId(id)
+    const stage = stageRef.current
     dragRef.current = {
       id,
       startX: e.clientX,
@@ -838,7 +992,12 @@ export function PlacementEditor({
       origX: slot.x,
       origY: slot.y,
       moved: false,
+      startScrollLeft: stage?.scrollLeft ?? 0,
+      startScrollTop: stage?.scrollTop ?? 0,
+      slotWidth: slot.width,
+      slotHeight: slot.height,
     }
+    lastDragPointerRef.current = { x: e.clientX, y: e.clientY }
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }
 
@@ -886,7 +1045,8 @@ export function PlacementEditor({
     patchPlan(p => ({ ...p, creatorSigningAs: value }))
   }
 
-  const toolbarUndockedActive = toolbarNarrow && toolbarUndocked
+  // Fullscreen keeps tools in the panel chrome; undock only for page scroll dock.
+  const toolbarUndockedActive = toolbarUndocked && !stageFullscreen
   const toolbarStyle: CSSProperties | undefined = (() => {
     const style: CSSProperties = {}
     if (activePersonColor) {
@@ -898,6 +1058,47 @@ export function PlacementEditor({
     }
     return Object.keys(style).length > 0 ? style : undefined
   })()
+
+  /** Compact person switcher for fullscreen (full chips stay on the main layout). */
+  const fullscreenPeopleNode = (
+    <div
+      className="placement-fullscreen-people"
+      role="tablist"
+      aria-label="Select person for placements"
+    >
+      <span className="placement-fullscreen-people-label">
+        <UserRound size={14} strokeWidth={2.25} aria-hidden />
+        Placing for
+      </span>
+      <div className="placement-fullscreen-people-chips">
+        {people.map(p => {
+          const color = personColor(p.slotIndex)
+          const active = p.slotIndex === activePerson
+          const label = p.displayName?.trim() || `Person ${p.slotIndex}`
+          return (
+            <button
+              key={p.slotIndex}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className={`placement-fullscreen-person${active ? ' is-active' : ''}`}
+              style={{ ['--person-color' as string]: color }}
+              onClick={() => selectPerson(p.slotIndex)}
+              disabled={editDisabled}
+              title={label}
+            >
+              <span className="placement-fullscreen-person-swatch" aria-hidden />
+              <span className="placement-fullscreen-person-name">{label}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+
+  useEffect(() => {
+    return () => stopDragAutoScroll()
+  }, [stopDragAutoScroll])
 
   const toolbarNode = (
     <div
@@ -1066,6 +1267,39 @@ export function PlacementEditor({
           />
         </label>
       )}
+      <span className="placement-toolbar-sep" aria-hidden />
+      <div className="placement-toolbar-zoom" role="group" aria-label="Zoom">
+        <button
+          type="button"
+          className="placement-tool-btn placement-tool-btn--sm"
+          disabled={disabled || zoomPct <= ZOOM_MIN_PCT}
+          onClick={() => nudgeZoom(-ZOOM_STEP_PCT)}
+          title="Zoom out"
+          aria-label="Zoom out"
+        >
+          <ZoomOut size={14} strokeWidth={2.25} aria-hidden />
+        </button>
+        <button
+          type="button"
+          className="placement-zoom-value"
+          disabled={disabled || zoomPct === 100}
+          onClick={() => setZoomPct(100)}
+          title={zoomPct === 100 ? 'Zoom 100%' : 'Reset zoom to 100%'}
+          aria-label={zoomPct === 100 ? `Zoom ${zoomPct} percent` : 'Reset zoom to 100 percent'}
+        >
+          {zoomPct}%
+        </button>
+        <button
+          type="button"
+          className="placement-tool-btn placement-tool-btn--sm"
+          disabled={disabled || zoomPct >= ZOOM_MAX_PCT}
+          onClick={() => nudgeZoom(ZOOM_STEP_PCT)}
+          title="Zoom in"
+          aria-label="Zoom in"
+        >
+          <ZoomIn size={14} strokeWidth={2.25} aria-hidden />
+        </button>
+      </div>
       {pageCount > 1 && (
         <div className="pdf-annotator-pages placement-toolbar-pages">
           <button
@@ -1388,32 +1622,19 @@ export function PlacementEditor({
         </ul>
       </div>
 
-      <div ref={toolbarSlotRef} className="placement-editor-toolbar-slot">
-        {toolbarUndockedActive && (
-          <div
-            className="placement-editor-toolbar-spacer"
-            style={{ height: toolbarHeight > 0 ? toolbarHeight : undefined }}
-            aria-hidden
-          />
-        )}
-        {toolbarUndockedActive && typeof document !== 'undefined'
-          ? createPortal(toolbarNode, document.body)
-          : toolbarNode}
-      </div>
-
-      {!locked && !reviewMode && activePerson == null && (
+      {!locked && !reviewMode && activePerson == null && !stageFullscreen && (
         <p className="placement-editor-hint placement-editor-hint--pick" role="status">
           <strong>Select a person</strong> above to unlock the toolbar and place fields for them.
         </p>
       )}
-      {!locked && !reviewMode && activePerson != null && (
+      {!locked && !reviewMode && activePerson != null && !stageFullscreen && (
         <p className="placement-editor-hint placement-editor-hint--design" role="status">
           <strong>Designing, not signing.</strong> These boxes mark where people will sign later.
           No ink or wallet signature is collected on this step. Tap to place a field; drag to pan the
           page. Check and X boxes start empty - click a placed box to toggle the mark.
         </p>
       )}
-      {reviewMode && (
+      {reviewMode && !stageFullscreen && (
         <p className="placement-editor-hint placement-editor-hint--locked" role="status">
           Field layout the organizer designed
           {filledSlotIds && filledSlotIds.size > 0
@@ -1422,138 +1643,217 @@ export function PlacementEditor({
           . Signature images appear under Recorded signatures - not redrawn on this preview.
         </p>
       )}
-      {locked && !reviewMode && (
+      {locked && !reviewMode && !stageFullscreen && (
         <p className="placement-editor-hint placement-editor-hint--locked">
           Layout is set for signing. Use Back to edit placements to change it before anyone signs.
         </p>
       )}
-      {placeError && (
+      {placeError && !stageFullscreen && (
         <p className="placement-editor-error" role="alert">
           {placeError}
         </p>
       )}
 
-      <div className="pdf-annotator-layout">
-        <div className="pdf-annotator-stage">
-          {loading && <p className="pdf-annotator-hint">Loading document…</p>}
-          {loadError && <p className="pdf-annotator-hint">{loadError}</p>}
+      {(() => {
+        /*
+         * Fullscreen is portaled to document.body so journey transforms
+         * (.lr-view-blend) and .action-dock overflow cannot trap position:fixed.
+         * Canvas re-paints via the render effect (deps include stageFullscreen).
+         */
+        const stagePanel = (
           <div
-            ref={wrapRef}
-            className={`pdf-annotator-page-wrap${tool !== 'select' ? ' is-tool-active' : ''}`}
-            style={{ width: cssSize.width }}
-            onPointerDown={onStagePointerDown}
-            onPointerMove={onStagePointerMove}
-            onPointerUp={onStagePointerUp}
-            onPointerCancel={onStagePointerCancel}
-            onPointerLeave={() => {
-              // Clear hover ghost only; keep an in-flight place gesture until up/cancel
-              // so a finger that briefly leaves the page wrap mid-tap still places.
-              if (tool !== 'select' && !placeGestureRef.current) setPlacing(null)
-            }}
+            className={`placement-stage-panel${stageFullscreen ? ' is-fullscreen' : ''}`}
+            role={stageFullscreen ? 'dialog' : undefined}
+            aria-modal={stageFullscreen || undefined}
+            aria-label={stageFullscreen ? 'Document placement full screen' : undefined}
           >
-            <canvas ref={canvasRef} />
-            <div className="pdf-annotator-layer">
-              {pageSlots.map(slot => {
-                const r = normalizedToCanvasRect(slot, cssSize.width, cssSize.height)
-                const selected = selectedId === slot.id
-                const color = personColor(slot.personSlotIndex)
-                const person =
-                  people.find(p => p.slotIndex === slot.personSlotIndex)?.displayName ||
-                  `Person ${slot.personSlotIndex}`
-                return (
-                  <div
-                    key={slot.id}
-                    className={`placement-slot pdf-annotator-item${selected ? ' is-selected' : ''}${
-                      dragRef.current?.id === slot.id ? ' is-dragging' : ''
-                    }${locked ? ' is-locked' : ''}`}
-                    style={{
-                      left: r.left,
-                      top: r.top,
-                      width: r.width,
-                      height: r.height,
-                      ['--person-color' as string]: color,
-                    }}
-                    onPointerDown={e => startItemDrag(e, slot.id)}
-                    onPointerUp={endDrag}
-                    onPointerCancel={endDrag}
-                  >
-                    {!locked && (
-                      <button
-                        type="button"
-                        className="placement-slot-remove"
-                        aria-label={`Remove ${kindLabel(slot.kind)} for ${person}`}
-                        title="Remove"
-                        onPointerDown={e => {
-                          e.stopPropagation()
-                          e.preventDefault()
-                        }}
-                        onClick={e => {
-                          e.stopPropagation()
-                          removeSlot(slot.id)
-                        }}
-                      >
-                        <X size={10} strokeWidth={3} aria-hidden />
-                      </button>
-                    )}
-                    {slot.kind === 'checkmark' || slot.kind === 'cross' ? (
-                      <MarkPreview
-                        kind={slot.kind}
-                        checked={slot.lockedContent?.mark === slot.kind}
-                        color={slot.lockedContent?.color ?? color}
-                        width={r.width}
-                        height={r.height}
-                      />
-                    ) : (
-                      <div className="placement-slot-label">
-                        <span className="placement-slot-person">{person}</span>
-                        <span className="placement-slot-kind">
-                          ·{' '}
-                          {slot.kind === 'text' && slot.lockedContent?.text
-                            ? slot.lockedContent.text
-                            : kindLabel(slot.kind)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-              {placing && tool !== 'select' && activePerson != null && (
-                <div className="pdf-annotator-ghost placement-ghost" style={ghostStyle()}>
-                  {tool === 'checkmark' || tool === 'cross' ? (
-                    <MarkPreview
-                      kind={tool}
-                      checked={false}
-                      color={personColor(activePerson)}
-                      width={defaultSizeForKind(tool).width * cssSize.width}
-                      height={defaultSizeForKind(tool).height * cssSize.height}
-                    />
-                  ) : (
-                    <div className="placement-slot-label">
-                      <span className="placement-slot-person">{activeName}</span>
-                      <span className="placement-slot-kind">
-                        ·{' '}
-                        {tool === 'date'
-                          ? 'Date'
-                          : tool === 'text' && textFieldLabel.trim()
-                            ? textFieldLabel.trim()
-                            : kindLabel(
-                                tool === 'signature'
-                                  ? 'signature'
-                                  : tool === 'initial'
-                                    ? 'initial'
-                                    : tool === 'name'
-                                      ? 'name'
-                                      : 'text',
-                              )}
-                      </span>
-                    </div>
-                  )}
-                </div>
+            {stageFullscreen && (
+              <div className="placement-fullscreen-bar">
+                <span className="placement-fullscreen-bar-title">Design the document</span>
+                <button
+                  type="button"
+                  className="placement-tool-btn placement-stage-fullscreen-btn placement-stage-fullscreen-btn--bar"
+                  onClick={() => setStageFullscreen(false)}
+                  title="Exit full screen (Esc)"
+                  aria-label="Exit full screen"
+                >
+                  <Minimize2 size={16} strokeWidth={2.25} aria-hidden />
+                </button>
+              </div>
+            )}
+
+            {stageFullscreen && fullscreenPeopleNode}
+
+            <div ref={toolbarSlotRef} className="placement-editor-toolbar-slot">
+              {toolbarUndockedActive && (
+                <div
+                  className="placement-editor-toolbar-spacer"
+                  style={{ height: toolbarHeight > 0 ? toolbarHeight : undefined }}
+                  aria-hidden
+                />
               )}
+              {toolbarUndockedActive && typeof document !== 'undefined'
+                ? createPortal(toolbarNode, document.body)
+                : toolbarNode}
+            </div>
+
+            {stageFullscreen && !locked && !reviewMode && activePerson == null && (
+              <p className="placement-editor-hint placement-editor-hint--pick" role="status">
+                <strong>Select a person</strong> above to unlock tools and place their fields.
+              </p>
+            )}
+
+            {stageFullscreen && placeError && (
+              <p className="placement-editor-error" role="alert">
+                {placeError}
+              </p>
+            )}
+
+            <div className="pdf-annotator-layout placement-stage-layout">
+              <div className="placement-stage-frame">
+                {!stageFullscreen && (
+                  <button
+                    type="button"
+                    className="placement-tool-btn placement-stage-fullscreen-btn"
+                    onClick={() => setStageFullscreen(true)}
+                    title="Full screen"
+                    aria-label="Open document full screen"
+                  >
+                    <Maximize2 size={16} strokeWidth={2.25} aria-hidden />
+                  </button>
+                )}
+                <div
+                  ref={stageRef}
+                  className={`pdf-annotator-stage${stageFullscreen ? ' is-fullscreen' : ''}`}
+                >
+                  {loading && <p className="pdf-annotator-hint">Loading document…</p>}
+                  {loadError && <p className="pdf-annotator-hint">{loadError}</p>}
+                  <div
+                    ref={wrapRef}
+                    className={`pdf-annotator-page-wrap${tool !== 'select' ? ' is-tool-active' : ''}`}
+                    style={{ width: cssSize.width }}
+                    onPointerDown={onStagePointerDown}
+                    onPointerMove={onStagePointerMove}
+                    onPointerUp={onStagePointerUp}
+                    onPointerCancel={onStagePointerCancel}
+                    onPointerLeave={() => {
+                      // Clear hover ghost only; keep an in-flight place gesture until up/cancel
+                      // so a finger that briefly leaves the page wrap mid-tap still places.
+                      if (tool !== 'select' && !placeGestureRef.current) setPlacing(null)
+                    }}
+                  >
+                    <canvas ref={canvasRef} />
+                    <div className="pdf-annotator-layer">
+                      {pageSlots.map(slot => {
+                        const r = normalizedToCanvasRect(slot, cssSize.width, cssSize.height)
+                        const selected = selectedId === slot.id
+                        const color = personColor(slot.personSlotIndex)
+                        const person =
+                          people.find(p => p.slotIndex === slot.personSlotIndex)?.displayName ||
+                          `Person ${slot.personSlotIndex}`
+                        return (
+                          <div
+                            key={slot.id}
+                            className={`placement-slot pdf-annotator-item${selected ? ' is-selected' : ''}${
+                              dragRef.current?.id === slot.id ? ' is-dragging' : ''
+                            }${locked ? ' is-locked' : ''}`}
+                            style={{
+                              left: r.left,
+                              top: r.top,
+                              width: r.width,
+                              height: r.height,
+                              ['--person-color' as string]: color,
+                            }}
+                            onPointerDown={e => startItemDrag(e, slot.id)}
+                            onPointerUp={endDrag}
+                            onPointerCancel={endDrag}
+                          >
+                            {!locked && (
+                              <button
+                                type="button"
+                                className="placement-slot-remove"
+                                aria-label={`Remove ${kindLabel(slot.kind)} for ${person}`}
+                                title="Remove"
+                                onPointerDown={e => {
+                                  e.stopPropagation()
+                                  e.preventDefault()
+                                }}
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  removeSlot(slot.id)
+                                }}
+                              >
+                                <X size={10} strokeWidth={3} aria-hidden />
+                              </button>
+                            )}
+                            {slot.kind === 'checkmark' || slot.kind === 'cross' ? (
+                              <MarkPreview
+                                kind={slot.kind}
+                                checked={slot.lockedContent?.mark === slot.kind}
+                                color={slot.lockedContent?.color ?? color}
+                                width={r.width}
+                                height={r.height}
+                              />
+                            ) : (
+                              <div className="placement-slot-label">
+                                <span className="placement-slot-person">{person}</span>
+                                <span className="placement-slot-kind">
+                                  ·{' '}
+                                  {slot.kind === 'text' && slot.lockedContent?.text
+                                    ? slot.lockedContent.text
+                                    : kindLabel(slot.kind)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                      {placing && tool !== 'select' && activePerson != null && (
+                        <div className="pdf-annotator-ghost placement-ghost" style={ghostStyle()}>
+                          {tool === 'checkmark' || tool === 'cross' ? (
+                            <MarkPreview
+                              kind={tool}
+                              checked={false}
+                              color={personColor(activePerson)}
+                              width={defaultSizeForKind(tool).width * cssSize.width}
+                              height={defaultSizeForKind(tool).height * cssSize.height}
+                            />
+                          ) : (
+                            <div className="placement-slot-label">
+                              <span className="placement-slot-person">{activeName}</span>
+                              <span className="placement-slot-kind">
+                                ·{' '}
+                                {tool === 'date'
+                                  ? 'Date'
+                                  : tool === 'text' && textFieldLabel.trim()
+                                    ? textFieldLabel.trim()
+                                    : kindLabel(
+                                        tool === 'signature'
+                                          ? 'signature'
+                                          : tool === 'initial'
+                                            ? 'initial'
+                                            : tool === 'name'
+                                              ? 'name'
+                                              : 'text',
+                                      )}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        )
+
+        if (stageFullscreen && typeof document !== 'undefined') {
+          return createPortal(stagePanel, document.body)
+        }
+        return stagePanel
+      })()}
 
     </div>
   )

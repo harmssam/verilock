@@ -20,7 +20,6 @@ import {
 } from '../nimiq'
 import { clearStaleHubRpcStateIfIdle, hasPendingHubRedirect } from '../hubRedirectParse'
 import { clearSession, loadSession, saveSession } from '../session'
-import { createServerBroadcastFallback } from './journeySeal'
 import { toJourneyAccount, type JourneyAccount } from './types'
 
 export interface UseJourneyWalletResult {
@@ -37,12 +36,6 @@ export interface UseJourneyWalletResult {
   setNimiq: (provider: NimiqProvider | null) => void
   applySession: (token: string, address: string) => void
   bootReady: boolean
-  /** Completes after Hub seal return handlers finish (if any). */
-  hubLockCompletion: Promise<void> | null
-  registerHubLockComplete: (
-    handler: (result: { txHash: string; token: string; docId: string }) => Promise<void>,
-  ) => void
-  registerHubLockError: (handler: (err: Error) => Promise<void> | void) => void
   /** User is inside Nimiq Pay WebView (host probe or window.nimiq). */
   inNimiqPay: boolean
   /**
@@ -86,7 +79,6 @@ export function useJourneyWallet(): UseJourneyWalletResult {
   const [walletStatus, setWalletStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [bootReady, setBootReady] = useState(false)
-  const [hubLockCompletion, setHubLockCompletion] = useState<Promise<void> | null>(null)
   const [inNimiqPay, setInNimiqPay] = useState(() =>
     typeof window !== 'undefined' ? isNimiqPayHost() : false,
   )
@@ -96,10 +88,6 @@ export function useJourneyWallet(): UseJourneyWalletResult {
   /** Any connect() path in flight (Pay dialogs or Hub) - blocks concurrent Login taps. */
   const connectInFlightRef = useRef(false)
   const walletStatusRef = useRef<string | null>(null)
-  const lockCompleteRef = useRef<
-    ((result: { txHash: string; token: string; docId: string }) => Promise<void>) | null
-  >(null)
-  const lockErrorRef = useRef<((err: Error) => Promise<void> | void) | null>(null)
   const deeplinkFallbackTimerRef = useRef<number | null>(null)
   const loginCanceledTimerRef = useRef<number | null>(null)
   /** After explicit disconnect in Pay, do not immediately auto-login again. */
@@ -165,20 +153,6 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     clearPayDeeplinkPending()
   }, [clearPayDeeplinkPending])
 
-  const registerHubLockComplete = useCallback(
-    (handler: (result: { txHash: string; token: string; docId: string }) => Promise<void>) => {
-      lockCompleteRef.current = handler
-    },
-    [],
-  )
-
-  const registerHubLockError = useCallback(
-    (handler: (err: Error) => Promise<void> | void) => {
-      lockErrorRef.current = handler
-    },
-    [],
-  )
-
   /**
    * Hub login uses a full-page redirect. If the user hits Back (or the tab is
    * restored from bfcache) without Hub return params, React state can still
@@ -237,7 +211,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
         }
       })
 
-      const hubSetup = await setupHubRedirectHandlers(
+      await setupHubRedirectHandlers(
         // Hub single-trip: no address. Legacy chooseAddress path may still pass one.
         async addr => api.challenge(addr ?? undefined),
         async result => {
@@ -274,20 +248,9 @@ export function useJourneyWallet(): UseJourneyWalletResult {
             setWalletStatus(null)
           }
         },
-        async lockResult => {
-          const handler = lockCompleteRef.current
-          if (handler) await handler(lockResult)
-        },
-        async err => {
-          const handler = lockErrorRef.current
-          if (handler) await handler(err)
-          else setError(err.message)
-        },
-        createServerBroadcastFallback,
       )
 
       if (!cancelled) {
-        setHubLockCompletion(hubSetup.lockCompletion)
         setBootReady(true)
         // History Back can restore after boot without a full remount.
         resetAbandonedHubRedirect()
@@ -612,9 +575,6 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     setNimiq,
     applySession,
     bootReady,
-    hubLockCompletion,
-    registerHubLockComplete,
-    registerHubLockError,
     inNimiqPay,
     mobilePayConnect,
     showOpenInPay,

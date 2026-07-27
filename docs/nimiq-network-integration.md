@@ -63,9 +63,9 @@ Individual RPC method pages (e.g. `getTransactionByHash`) are listed on the meth
 **Data flow summary**
 
 1. **Sign-in:** Wallet signs a server-issued nonce; server verifies via RPC (`verifySignature`) or local Ed25519 (Hub prefix).
-2. **Lock:** Wallet signs a basic transaction with 37-byte attestation payload in `extraData` / `data`.
-3. **Broadcast:** Hub `checkout` may broadcast; otherwise client RPC and/or server `sendRawTransaction`.
-4. **Confirm:** Server fetches tx via RPC, checks payload, confirmations, `executionResult`, then marks document locked.
+2. **Lock (credits):** Creator burns **1 credit**; the **service wallet** broadcasts a minimal attestation proof with the 37-byte payload (no user lock tx).
+3. **Confirm:** Server resolves the service-wallet tx on-chain, then marks the document locked.
+4. **Credit top-up (optional):** User may still pay NIM via Pay/Hub to mint credits (separate from lock).
 
 ---
 
@@ -75,8 +75,8 @@ VeriLock picks a mode at runtime (`getWalletMode()` in `client/src/nimiq.ts`):
 
 | Mode | Detection | Wallet API | Typical context |
 |------|-----------|------------|-----------------|
-| **Nimiq Pay** (`nimiq-pay`) | `window.nimiqPay` and/or `window.nimiq` after `init()` | [@nimiq/mini-app-sdk](https://www.nimiq.dev/mini-apps/api-reference/nimiq-provider) | Mini app inside Nimiq Pay; mobile deeplink |
-| **Hub** (`hub`) | Default when not in Pay host | [@nimiq/hub-api](https://www.nimiq.dev/hub) → `https://hub.nimiq.com` | Desktop browser, popup or full-page redirect |
+| **Nimiq Pay** (`nimiq-pay`) | `window.nimiqPay` and/or `window.nimiq` after `init()` | [@nimiq/mini-app-sdk](https://www.nimiq.dev/mini-apps/api-reference/nimiq-provider) | Mini app inside Nimiq Pay; mobile deeplink; desktop QR login |
+| **Hub** (`hub`) | Desktop/browser when not in Pay host | [@nimiq/hub-api](https://www.nimiq.dev/hub) → `https://hub.nimiq.com` | Browser login + NIM credit top-up |
 
 ```ts
 // client/src/nimiq.ts - getWalletMode()

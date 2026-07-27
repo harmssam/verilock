@@ -427,6 +427,82 @@
   border-top: 1px solid var(--border);
 }
 
+/* Desktop Pay QR panel */
+.login-sheet-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  text-align: center;
+}
+
+.login-sheet-qr img {
+  display: block;
+  width: 200px;
+  height: 200px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.login-sheet-qr-placeholder {
+  width: 200px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  background: var(--surface-2, #f8fafc);
+}
+
+.login-sheet-qr-wait {
+  margin: 0.25rem 0 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.login-sheet-qr-expires {
+  margin: 0;
+  font-size: 0.76rem;
+}
+
+.login-sheet-qr-steps {
+  margin: 0.15rem 0 0.25rem;
+  padding-left: 1.1rem;
+  text-align: left;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  width: 100%;
+  max-width: 16rem;
+}
+
+.login-sheet-qr-steps li + li {
+  margin-top: 0.2rem;
+}
+
+.login-sheet-qr-error {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--danger, #b91c1c);
+  line-height: 1.4;
+  text-align: left;
+  max-width: 18rem;
+}
+
+.login-sheet-qr-error code {
+  font-size: 0.72rem;
+}
+
+.login-sheet-qr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: center;
+  width: 100%;
+}
+
 .login-sheet-stores-label {
   margin: 0;
   font-size: 0.78rem;
