@@ -55,7 +55,19 @@
   padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
 }
 
-/* ── Rotate gate (real portrait browsers that can tip) ── */
+/* Unrotated fill under forced-landscape sheet (Pay). */
+.ink-capture-force-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 229;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #0f172a;
+  pointer-events: none;
+}
+
+/* ── Rotate gate (browsers that can tip) ── */
 
 .ink-capture-rotate {
   display: flex;
@@ -78,7 +90,6 @@
 .ink-capture-rotate-phone {
   display: block;
   transform-origin: 50% 50%;
-  transform: rotate(0deg);
   animation: ink-capture-rotate-nudge 1.8s ease-in-out infinite;
 }
 
@@ -126,9 +137,7 @@
   margin-top: 0.5rem;
 }
 
-/*
- * Portrait-host guide (Nimiq Pay): iPhone SVG once, centered, non-blocking.
- */
+/* One-shot guide inside forced landscape frame */
 .ink-capture-portrait-guide {
   position: absolute;
   inset: 0;
@@ -322,51 +331,84 @@
 }
 
 /*
- * Portrait host (Nimiq Pay): NO CSS rotate — WebView blanks or clips.
- * Full-screen upright sheet + large full-width pad (height-first for finger room).
+ * Portrait host (Nimiq Pay): geometry comes from inline JS style
+ * (width=innerHeight, height=innerWidth, rotate 90deg, centered).
+ * Layout inside the box is normal landscape flex — not a tall portrait stack.
  */
 .ink-capture-sheet.is-portrait-host.is-draw {
-  /* Keep standard overlay fill — do not swap vh/vw or transform */
+  /* Do not set inset/width/height here — useForcedLandscapeFrame owns geometry */
+  inset: unset;
+  max-width: none;
+  max-height: none;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
   justify-content: stretch;
+  gap: 0.3rem;
+  padding: 0.4rem 0.65rem 3.85rem;
+  background: var(--bg, #f8fafc);
+}
+
+/* Dock is absolute inside the rotated sheet (transform → containing block). */
+.ink-capture-sheet.is-portrait-host .ink-capture-float-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  padding: 0.5rem 0.75rem 0.55rem;
+}
+
+.ink-capture-sheet.is-portrait-host .ink-capture-kicker {
+  display: none;
+}
+
+.ink-capture-sheet.is-portrait-host .ink-capture-title {
+  font-size: 0.95rem;
 }
 
 .ink-capture-sheet.is-portrait-host .ink-capture-pad-stage {
   flex: 1 1 auto;
   min-height: 0;
   justify-content: center;
-  align-items: stretch;
-  padding-block: 0.5rem;
+  align-items: center;
 }
 
 .ink-capture-sheet.is-portrait-host .sig-pad {
   width: 100%;
+  height: 100%;
   flex: 1 1 auto;
   min-height: 0;
-  max-height: 100%;
-  display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
 }
 
 .ink-capture-sheet.is-portrait-host .sig-pad--aspect {
   width: 100%;
-  align-items: stretch;
+  height: 100%;
+  align-items: center;
   justify-content: center;
 }
 
-/* Drop field aspect lock — width/2.5 was a tiny strip. Big drawable band. */
+/* Short edge of forced frame = physical phone width (--ink-force-short from JS) */
 .ink-capture-sheet.is-portrait-host .sig-pad--aspect .sig-pad-canvas {
   flex: none;
-  width: 100%;
+  width: auto;
+  height: auto;
+  min-height: 5.5rem;
   max-width: 100%;
-  height: clamp(16rem, 52dvh, 28rem);
-  min-height: 16rem;
-  max-height: min(60dvh, 30rem);
-  aspect-ratio: auto;
+  max-height: min(100%, calc(var(--ink-force-short, 100vw) - 4.5rem));
+  aspect-ratio: var(--sig-pad-aspect, 2.5);
+  width: min(
+    100%,
+    calc((var(--ink-force-short, 100vw) - 4.5rem) * var(--sig-pad-aspect, 2.5))
+  );
   margin: 0 auto;
 }
 
-/* True landscape devices (Safari/Chrome tipped) */
+/* True landscape devices (OS orientation landscape) */
 @media (orientation: landscape) {
   .ink-capture-kicker {
     display: none;
@@ -394,15 +436,6 @@
     height: auto;
     min-height: 7rem;
     max-width: 100%;
-    max-height: min(100%, calc(100dvh - 5.25rem));
-    aspect-ratio: var(--sig-pad-aspect, 2.5);
-    width: min(100%, calc((100dvh - 5.25rem) * var(--sig-pad-aspect, 2.5)));
-  }
-
-  /* Don't fight real landscape with portrait-host height rules */
-  .ink-capture-sheet.is-portrait-host .sig-pad--aspect .sig-pad-canvas {
-    height: auto;
-    min-height: 7rem;
     max-height: min(100%, calc(100dvh - 5.25rem));
     aspect-ratio: var(--sig-pad-aspect, 2.5);
     width: min(100%, calc((100dvh - 5.25rem) * var(--sig-pad-aspect, 2.5)));
