@@ -774,7 +774,16 @@ export function App() {
                 Pricing
               </AppLink>
             )}
-            {/* Blog + Security live in the footer (and homepage blog teaser) - keep header product-only. */}
+            {/* Blog: desktop header only; footer + homepage teaser cover narrow viewports. */}
+            <AppLink
+              to="/blog"
+              onClick={() => goBlog()}
+              className={`lr-nav lr-nav--blog${screen === 'blog' ? ' lr-nav--active' : ''}`}
+              aria-current={screen === 'blog' ? 'page' : undefined}
+            >
+              Blog
+            </AppLink>
+            {/* Security + legal stay footer-only so the header stays product + one content link. */}
             <AccountMenu
               account={wallet.account}
               connecting={wallet.connecting}

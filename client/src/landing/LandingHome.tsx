@@ -166,7 +166,15 @@ export function LandingHome({
 }: LandingHomeProps) {
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [howOpen, setHowOpen] = useState(false)
-  const latestPost = useMemo(() => getAllPosts()[0] ?? null, [])
+  /** Featured + up to two more for a stronger home teaser. */
+  const blogTeaser = useMemo(() => {
+    const all = getAllPosts()
+    return {
+      latest: all[0] ?? null,
+      more: all.slice(1, 3),
+    }
+  }, [])
+  const latestPost = blogTeaser.latest
   const { claim, visible: claimVisible } = useHeroClaims()
   const ClaimIcon = claim.icon
   const heroCopyRef = useRef<HTMLDivElement>(null)
@@ -370,21 +378,26 @@ export function LandingHome({
           aria-labelledby="lr-blog-latest-title"
         >
           <div className="lr-blog-latest-head">
-            <div>
+            <div className="lr-blog-latest-intro">
+              <p className="lr-blog-latest-kicker">Learn</p>
               <h2 id="lr-blog-latest-title" className="lr-blog-latest-heading">
                 From the blog
               </h2>
+              <p className="lr-blog-latest-lead">
+                Practical guides on multi-party signing, wallet identity, and permanent proof - without
+                the subscription tax.
+              </p>
             </div>
             {onOpenBlogIndex && (
               <AppLink to="/blog" className="lr-blog-latest-all" onClick={onOpenBlogIndex}>
                 All posts
-                <ArrowRight size={14} strokeWidth={2.25} aria-hidden />
+                <ArrowRight size={15} strokeWidth={2.25} aria-hidden />
               </AppLink>
             )}
           </div>
           <AppLink
             to={`/blog/${latestPost.slug}`}
-            className="lr-blog-latest-card"
+            className="lr-blog-latest-card lr-blog-latest-card--featured"
             onClick={() => onOpenBlogPost(latestPost.slug)}
           >
             <span className="lr-blog-latest-thumb" aria-hidden>
@@ -399,6 +412,7 @@ export function LandingHome({
             </span>
             <span className="lr-blog-latest-body">
               <span className="lr-blog-latest-meta">
+                <span className="lr-blog-latest-badge">Latest</span>
                 <time dateTime={latestPost.date}>{formatBlogDate(latestPost.date)}</time>
                 {latestPost.tags[0] && (
                   <span className="lr-blog-latest-tag">{latestPost.tags[0]}</span>
@@ -412,6 +426,42 @@ export function LandingHome({
               </span>
             </span>
           </AppLink>
+          {blogTeaser.more.length > 0 && (
+            <div className="lr-blog-latest-more">
+              {blogTeaser.more.map(post => (
+                <AppLink
+                  key={post.slug}
+                  to={`/blog/${post.slug}`}
+                  className="lr-blog-latest-mini"
+                  onClick={() => onOpenBlogPost(post.slug)}
+                >
+                  <span className="lr-blog-latest-mini-thumb" aria-hidden>
+                    <img
+                      src={post.coverImage}
+                      alt=""
+                      width={320}
+                      height={180}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </span>
+                  <span className="lr-blog-latest-mini-body">
+                    <span className="lr-blog-latest-meta">
+                      <time dateTime={post.date}>{formatBlogDate(post.date)}</time>
+                      {post.tags[0] && (
+                        <span className="lr-blog-latest-tag">{post.tags[0]}</span>
+                      )}
+                    </span>
+                    <strong className="lr-blog-latest-mini-title">{post.title}</strong>
+                    <span className="lr-blog-latest-cta">
+                      Read
+                      <ArrowRight size={14} strokeWidth={2.25} aria-hidden />
+                    </span>
+                  </span>
+                </AppLink>
+              ))}
+            </div>
+          )}
         </section>
       )}
     </div>
