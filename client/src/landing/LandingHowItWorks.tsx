@@ -52,6 +52,61 @@ function prefersReducedMotion(): boolean {
   )
 }
 
+/**
+ * Step 4 lock visual: large silver padlock snaps shut, shrinks, then
+ * official Nimiq hex badge settles behind it.
+ * V mark: light narrow stroke (chosen).
+ */
+function SealBeatVisual({ active }: { active: boolean }) {
+  const play = active ? ' lr-how-visual--play' : ''
+
+  return (
+    <div className={`lr-how-visual lr-how-visual--seal lr-how-visual--seal-snap${play}`} aria-hidden>
+      <span className="lr-how-lock-wrap">
+        {/*
+          Official Nimiq hex (design kit: logos/nimiq/hexagon.svg) —
+          same asset as header / connect; flat-top gold gradient.
+        */}
+        <NimiqHexagonIcon size={42} className="lr-how-seal-hex-img" />
+        <svg className="lr-how-seal-svg" viewBox="0 0 48 48" fill="none" aria-hidden>
+          <g className="lr-how-padlock">
+            {/*
+              Shackle under opaque body.
+              Left leg short → clears body when raised (open).
+              Right leg long → stays seated in body as the hinge while animating.
+            */}
+            <g className="lr-how-pad-shackle-g">
+              <path
+                className="lr-how-pad-shackle"
+                d="M18.8 23 V15.5 A5.3 5.3 0 0 1 29.2 15.5 V34.8"
+                strokeWidth="2.75"
+                strokeLinecap="butt"
+                strokeLinejoin="round"
+              />
+            </g>
+            <rect
+              className="lr-how-pad-body"
+              x="15.6"
+              y="22.2"
+              width="16.8"
+              height="14.2"
+              rx="2.6"
+            />
+            <path
+              className="lr-how-pad-v"
+              d="M21.6 26.5 L24 32.7 L26.4 26.5"
+              fill="none"
+              strokeWidth="1.1"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </g>
+        </svg>
+      </span>
+    </div>
+  )
+}
+
 function BeatVisual({ stageId, active }: { stageId: JourneyStepId; active: boolean }) {
   const play = active ? ' lr-how-visual--play' : ''
   switch (stageId) {
@@ -177,69 +232,7 @@ function BeatVisual({ stageId, active }: { stageId: JourneyStepId; active: boole
         </div>
       )
     case 'seal':
-      /*
-       * Regular flat-top hex + padlock. Shackle behind opaque body.
-       * Left leg is shorter so raised = open padlock; drop = locked.
-       * Plays once on scroll-in.
-       */
-      return (
-        <div className={`lr-how-visual lr-how-visual--seal${play}`} aria-hidden>
-          <span className="lr-how-chain">
-            <span />
-            <span />
-            <span />
-          </span>
-          <span className="lr-how-lock-wrap">
-            <svg
-              className="lr-how-seal-svg"
-              viewBox="0 0 48 48"
-              fill="none"
-              aria-hidden
-            >
-              {/*
-                Regular flat-top hexagon (center 24,24, R=18).
-                Vertices at 0°/60°/… so top & bottom edges are horizontal,
-                width:height = 2 : √3.
-              */}
-              <path
-                className="lr-how-seal-hex"
-                d="M42 24 L33 39.59 L15 39.59 L6 24 L15 8.41 L33 8.41 Z"
-              />
-              <g className="lr-how-padlock">
-                {/*
-                  Shackle first (under body). Right leg long (hinge in body);
-                  left leg short so when raised it clears the body = unlocked.
-                */}
-                <g className="lr-how-pad-shackle-g">
-                  <path
-                    className="lr-how-pad-shackle"
-                    d="M19.25 23.4 V16.4 A4.75 4.75 0 0 1 28.75 16.4 V28.2"
-                    strokeWidth="2.5"
-                    strokeLinecap="butt"
-                    strokeLinejoin="round"
-                  />
-                </g>
-                {/* Opaque body covers shackle feet when locked */}
-                <rect
-                  className="lr-how-pad-body"
-                  x="16.5"
-                  y="22"
-                  width="15"
-                  height="13"
-                  rx="2.4"
-                />
-                <circle className="lr-how-pad-keyhole" cx="24" cy="27.2" r="1.4" />
-                <path
-                  className="lr-how-pad-keyslot"
-                  d="M24 28.3 V31.4"
-                  strokeWidth="1.55"
-                  strokeLinecap="round"
-                />
-              </g>
-            </svg>
-          </span>
-        </div>
-      )
+      return <SealBeatVisual active={active} />
     case 'verify':
     case 'done':
       /* Real magnifying-glass shape (lens + handle) drifts over the document */
