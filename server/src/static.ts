@@ -73,6 +73,11 @@ export function attachClientStatic(app: Express): boolean {
           /[\\/]assets[\\/]/.test(filePath)
         ) {
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+          return
+        }
+        // OG / marketing stills: short cache so link-preview swaps aren't stuck for hours.
+        if (/[\\/]og-(?:hero|card)(?:-[\w.-]+)?\.(?:png|jpe?g|webp)$/i.test(filePath)) {
+          res.setHeader('Cache-Control', 'public, max-age=300, must-revalidate')
         }
       },
     }),
