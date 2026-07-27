@@ -655,7 +655,25 @@
   font-style: italic;
 }
 
+.placement-person-wallet-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.placement-person-wallet-row {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  width: 100%;
+  min-width: 0;
+}
+
 .placement-person-wallet {
+  flex: 1;
+  min-width: 0;
   width: 100%;
   border: 1px solid var(--border, #e2e8f0);
   border-radius: 4px;
@@ -673,6 +691,45 @@
 
 .placement-person-wallet[aria-invalid='true'] {
   border-color: #b91c1c;
+}
+
+.placement-person-wallet-help {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 999px;
+  background: #fff;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  font-family: inherit;
+}
+
+.placement-person-wallet-help:hover,
+.placement-person-wallet-help:focus-visible,
+.placement-person-wallet-help.is-open {
+  border-color: var(--person-color, #0f766e);
+  color: var(--person-color, #0f766e);
+  outline: none;
+}
+
+.placement-person-wallet-tip {
+  margin: 0.15rem 0 0;
+  padding: 0.35rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--person-color, #0f766e) 22%, #e2e8f0);
+  background: color-mix(in srgb, var(--person-color, #0f766e) 6%, #fff);
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: #475569;
+  font-weight: 500;
 }
 
 .placement-person-wallet-err {

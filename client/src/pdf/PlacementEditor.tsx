@@ -168,6 +168,9 @@ export function PlacementEditor({
   const [placeError, setPlaceError] = useState<string | null>(null)
   /** Optional label on fillable text fields (e.g. "Date", "Printed name"). */
   const [textFieldLabel, setTextFieldLabel] = useState('')
+  /** Which person chip is showing the Nimiq address help tip (slotIndex). */
+  const [walletHelpPerson, setWalletHelpPerson] = useState<number | null>(null)
+  const walletHelpRootRef = useRef<HTMLDivElement | null>(null)
   /**
    * Draft digits while typing the people count (null = show committed people.length).
    * Allows clearing the field mid-edit without snapping back to 1 immediately.
@@ -225,6 +228,25 @@ export function PlacementEditor({
     mq.addEventListener('change', sync)
     return () => mq.removeEventListener('change', sync)
   }, [])
+
+  // Dismiss wallet address help when clicking outside or pressing Escape.
+  useEffect(() => {
+    if (walletHelpPerson == null) return
+    const onPointerDown = (e: PointerEvent) => {
+      const root = walletHelpRootRef.current
+      if (root && e.target instanceof Node && root.contains(e.target)) return
+      setWalletHelpPerson(null)
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setWalletHelpPerson(null)
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [walletHelpPerson])
 
   // Preserve layout height when the bar is portaled out (avoids jump).
   useLayoutEffect(() => {
@@ -1274,26 +1296,73 @@ export function PlacementEditor({
                             aria-label={`Rename person ${p.slotIndex}`}
                           />
                         </label>
-                        <input
-                          className="placement-person-wallet"
-                          value={walletRaw}
-                          disabled={editDisabled}
-                          maxLength={48}
-                          placeholder="Nimiq address (optional)"
-                          spellCheck={false}
-                          autoComplete="off"
-                          onFocus={() => selectPerson(p.slotIndex)}
-                          onClick={e => {
-                            e.stopPropagation()
-                            selectPerson(p.slotIndex)
-                          }}
-                          onChange={e => {
-                            selectPerson(p.slotIndex)
-                            setPersonWallet(p.slotIndex, e.target.value)
-                          }}
-                          aria-label={`Nimiq address for person ${p.slotIndex}`}
-                          aria-invalid={walletOk ? undefined : true}
-                        />
+                        <div
+                          className="placement-person-wallet-block"
+                          ref={
+                            walletHelpPerson === p.slotIndex
+                              ? walletHelpRootRef
+                              : undefined
+                          }
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <div className="placement-person-wallet-row">
+                            <input
+                              className="placement-person-wallet"
+                              value={walletRaw}
+                              disabled={editDisabled}
+                              maxLength={48}
+                              placeholder="Nimiq address (optional)"
+                              spellCheck={false}
+                              autoComplete="off"
+                              onFocus={() => selectPerson(p.slotIndex)}
+                              onClick={e => {
+                                e.stopPropagation()
+                                selectPerson(p.slotIndex)
+                              }}
+                              onChange={e => {
+                                selectPerson(p.slotIndex)
+                                setPersonWallet(p.slotIndex, e.target.value)
+                              }}
+                              aria-label={`Nimiq address for person ${p.slotIndex}`}
+                              aria-invalid={walletOk ? undefined : true}
+                              aria-describedby={
+                                walletHelpPerson === p.slotIndex
+                                  ? `placement-wallet-help-${p.slotIndex}`
+                                  : undefined
+                              }
+                            />
+                            <button
+                              type="button"
+                              className={`placement-person-wallet-help${
+                                walletHelpPerson === p.slotIndex ? ' is-open' : ''
+                              }`}
+                              title="If set, only this Nimiq wallet can sign as this person"
+                              aria-label="Explain Nimiq address lock"
+                              aria-expanded={walletHelpPerson === p.slotIndex}
+                              aria-controls={`placement-wallet-help-${p.slotIndex}`}
+                              onClick={e => {
+                                e.stopPropagation()
+                                selectPerson(p.slotIndex)
+                                setWalletHelpPerson(cur =>
+                                  cur === p.slotIndex ? null : p.slotIndex,
+                                )
+                              }}
+                            >
+                              ?
+                            </button>
+                          </div>
+                          {walletHelpPerson === p.slotIndex && (
+                            <p
+                              id={`placement-wallet-help-${p.slotIndex}`}
+                              className="placement-person-wallet-tip"
+                              role="note"
+                            >
+                              Optional. If you enter an address, only that Nimiq wallet
+                              can sign as this person. Leave blank so any invited signer
+                              can claim the role.
+                            </p>
+                          )}
+                        </div>
                         {!walletOk && (
                           <span className="placement-person-wallet-err">
                             Invalid Nimiq address
