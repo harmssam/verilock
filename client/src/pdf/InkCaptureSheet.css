@@ -326,7 +326,8 @@
 
 /*
  * Portrait host (Nimiq Pay mini app, or any tall viewport where we still draw):
- * center a wide horizontal signature band — do not pin a short strip to the top.
+ * height-first pad — full width, large finger area. Do not use field aspect-ratio
+ * here (width/2.5 pins a short strip ~150px tall). Unit ink still maps to the PDF box.
  */
 .ink-capture-sheet.is-portrait-host.is-draw {
   justify-content: stretch;
@@ -334,42 +335,39 @@
 
 .ink-capture-sheet.is-portrait-host .ink-capture-pad-stage {
   flex: 1 1 auto;
-  min-height: 12rem;
+  min-height: 0;
   justify-content: center;
-  align-items: center;
+  align-items: stretch;
   padding-block: 0.35rem;
+  padding-inline: 0.1rem;
 }
 
 .ink-capture-sheet.is-portrait-host .sig-pad {
   width: 100%;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
+  min-height: 0;
   max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .ink-capture-sheet.is-portrait-host .sig-pad--aspect {
   width: 100%;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
 }
 
 .ink-capture-sheet.is-portrait-host .sig-pad--aspect .sig-pad-canvas {
   flex: none;
-  /* Full width horizontal pad; height from field aspect, clamped for thumb reach */
   width: 100%;
   max-width: 100%;
-  height: auto;
-  min-height: 10.5rem;
-  max-height: min(42dvh, 16rem);
-  aspect-ratio: var(--sig-pad-aspect, 2.5);
+  /* Big horizontal band in Pay’s tall frame (not width÷aspect) */
+  height: clamp(14rem, 48dvh, 22rem);
+  min-height: 14rem;
+  max-height: min(56dvh, 24rem);
+  aspect-ratio: auto;
   margin: 0 auto;
-}
-
-/* When aspect-ratio would make the pad shorter than min-height, keep min-height
-   (wide fields stay finger-friendly in Pay’s tall frame). */
-@supports (aspect-ratio: 1) {
-  .ink-capture-sheet.is-portrait-host .sig-pad--aspect .sig-pad-canvas {
-    height: auto;
-  }
 }
 
 @media (orientation: landscape) {
