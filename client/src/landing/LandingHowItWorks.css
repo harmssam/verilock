@@ -2,14 +2,19 @@
    Easing: ease-out-expo. No bounce. Content stays readable while revealing. */
 
 .lr-how {
-  border-radius: 12px;
-  border: 1px solid var(--lr-line, rgba(255, 255, 255, 0.1));
-  background: var(--lr-surface, rgba(255,255,255,0.055));
+  border-radius: 14px;
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.08));
+  background: var(--lr-surface, #ffffff);
   overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  transition:
+    border-color 0.45s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.45s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .lr-how--open {
   border-color: rgba(13, 148, 136, 0.28);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
 }
 
 .lr-how-toggle {
@@ -199,7 +204,7 @@
   display: block;
   font-family: var(--font-display);
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.2;
   color: var(--lr-text, #0f172a);

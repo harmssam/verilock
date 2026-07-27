@@ -4,12 +4,18 @@ import {
   Fingerprint,
   Lock,
   ScanSearch,
-  Shield,
   ShieldCheck,
   Users,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 import { formatBlogDate, getAllPosts } from '../blog'
 import type { PathRole } from '../journey/types'
 import { AppLink } from '../AppLink'
@@ -21,6 +27,43 @@ import {
   PATH_STILLS,
   placementImageStyle,
 } from './pathMedia'
+
+/** Fade-up once the block enters the viewport (IntersectionObserver, no scroll listener). */
+function useRevealInView<T extends HTMLElement = HTMLElement>() {
+  const ref = useRef<T | null>(null)
+  const [inView, setInView] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const reduce =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduce) {
+      setInView(true)
+      return
+    }
+    const io = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          setInView(true)
+          io.disconnect()
+          return
+        }
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -6% 0px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+
+  return { ref, inView }
+}
+
+function revealClass(inView: boolean, className = '') {
+  return `lr-reveal${inView ? ' lr-reveal--in' : ''}${className ? ` ${className}` : ''}`
+}
 
 interface LandingHomeProps {
   onPickRole: (role: PathRole) => void
@@ -128,6 +171,10 @@ export function LandingHome({
   const ClaimIcon = claim.icon
   const heroCopyRef = useRef<HTMLDivElement>(null)
   const [heroCopyH, setHeroCopyH] = useState(0)
+  const trustReveal = useRevealInView<HTMLElement>()
+  const pathsReveal = useRevealInView<HTMLElement>()
+  const howReveal = useRevealInView<HTMLDivElement>()
+  const blogReveal = useRevealInView<HTMLElement>()
 
   /* Mobile image band height tracks copy; desktop image is absolute-fill of the same box. */
   useLayoutEffect(() => {
@@ -143,7 +190,7 @@ export function LandingHome({
   return (
     <div className="lr-home">
       {/* Hero: copy sizes the frame; still covers and may crop top/bottom */}
-      <section className="lr-hero-band" aria-labelledby="lr-hero-headline">
+      <section className="lr-hero-band lr-reveal lr-reveal--in" aria-labelledby="lr-hero-headline">
         <div
           className="lr-hero-frame"
           style={
@@ -154,13 +201,13 @@ export function LandingHome({
         >
           <div className="lr-hero-copy" ref={heroCopyRef}>
             <h1 id="lr-hero-headline" className="lr-hero-headline">
-              Multi-party document signing.{' '}
+              <span className="lr-hero-headline-line">Multi-party document signing.</span>{' '}
               <span className="lr-hero-headline-em">Free.</span>
             </h1>
             <p className="lr-hero-sub">
-              Co-sign documents with your Nimiq wallet - completely free. Your document stays on your
-              device. Print when everyone has signed. Upgrade anytime: lock a permanent proof on the
-              blockchain for 1 credit.
+              Co-sign with your Nimiq wallet at no cost. Your document stays on this device. Print when
+              everyone has signed. When you need permanence, lock a proof on the blockchain for 1
+              credit.
             </p>
             {/*
               One primary CTA only. Paths below cover Create / Invited / Verify.
@@ -180,11 +227,11 @@ export function LandingHome({
               </a>
             </div>
             <p className="lr-promo" role="note">
-              <span className="lr-promo-free">100% free to sign</span>
+              <span className="lr-promo-free">Free to sign</span>
               <span className="lr-promo-sep" aria-hidden>
                 ·
               </span>
-              <span>Lock on blockchain for 1 credit</span>
+              <span>Lock on chain for 1 credit</span>
             </p>
             <p
               className={`lr-status${claimVisible ? ' lr-status--in' : ''}`}
@@ -208,7 +255,12 @@ export function LandingHome({
       </section>
 
       <section
-        className={`lr-trust${privacyOpen ? ' lr-trust--open' : ''}`}
+        ref={trustReveal.ref}
+        className={revealClass(
+          trustReveal.inView,
+          `lr-trust${privacyOpen ? ' lr-trust--open' : ''}`,
+        )}
+        style={{ ['--lr-reveal-delay' as string]: '40ms' }}
         aria-label="Privacy"
       >
         <button
@@ -217,7 +269,7 @@ export function LandingHome({
           onClick={() => setPrivacyOpen(v => !v)}
           aria-expanded={privacyOpen}
         >
-          <Shield className="lr-trust-icon" size={18} strokeWidth={2.25} aria-hidden />
+          <Fingerprint className="lr-trust-icon" size={18} strokeWidth={2.25} aria-hidden />
           <span className="lr-trust-copy">
             <strong>Your file never leaves this device.</strong>
             <span className="lr-trust-sub">
@@ -230,7 +282,9 @@ export function LandingHome({
           <div className="lr-trust-detail">
             <ul>
               <li>The math that identifies your file runs in the browser. The file stays local.</li>
-              <li>Servers keep agreement metadata and that short proof string, never the file bytes.</li>
+              <li>
+                Servers keep agreement metadata and that short proof string, never the file bytes.
+              </li>
               <li>A permanent on-chain lock records only the proof on the Nimiq blockchain.</li>
               <li>Verification re-checks a local copy. No wallet required to verify.</li>
             </ul>
@@ -239,8 +293,10 @@ export function LandingHome({
       </section>
 
       <section
+        ref={pathsReveal.ref}
         id="lr-paths"
-        className="lr-paths-section"
+        className={revealClass(pathsReveal.inView, 'lr-paths-section')}
+        style={{ ['--lr-reveal-delay' as string]: '60ms' }}
         aria-labelledby="lr-paths-title"
       >
         <div className="lr-paths-head">
@@ -253,11 +309,16 @@ export function LandingHome({
         </div>
 
         <div className="lr-paths" role="list">
-          {PATHS.map(path => {
+          {PATHS.map((path, i) => {
             const Icon = path.icon
             const place = PATH_PLACEMENTS.card[path.role]
             return (
-              <div key={path.role} className="lr-path-wrap" role="listitem">
+              <div
+                key={path.role}
+                className={`lr-path-wrap${path.role === 'creator' ? ' lr-path-wrap--primary' : ''}`}
+                role="listitem"
+                style={{ ['--lr-path-i' as string]: i }}
+              >
                 <AppLink
                   to={`/?intent=${path.role}`}
                   className={`lr-path lr-path--${path.role}`}
@@ -293,12 +354,21 @@ export function LandingHome({
         </div>
       </section>
 
-      <div className="lr-how-wrap">
+      <div
+        ref={howReveal.ref}
+        className={revealClass(howReveal.inView, 'lr-how-wrap')}
+        style={{ ['--lr-reveal-delay' as string]: '80ms' }}
+      >
         <LandingHowItWorks role={null} open={howOpen} onToggle={() => setHowOpen(v => !v)} />
       </div>
 
       {latestPost && onOpenBlogPost && (
-        <section className="lr-blog-latest" aria-labelledby="lr-blog-latest-title">
+        <section
+          ref={blogReveal.ref}
+          className={revealClass(blogReveal.inView, 'lr-blog-latest')}
+          style={{ ['--lr-reveal-delay' as string]: '100ms' }}
+          aria-labelledby="lr-blog-latest-title"
+        >
           <div className="lr-blog-latest-head">
             <div>
               <h2 id="lr-blog-latest-title" className="lr-blog-latest-heading">
