@@ -1,7 +1,8 @@
 export const SITE_NAME = 'VeriLock'
 export const SITE_TAGLINE = 'Sign free. Lock when it matters.'
 export const DEFAULT_ORIGIN = 'https://verilock.online'
-export const DEFAULT_OG_IMAGE = '/og-hero.png'
+/** Versioned path so social scrapers + CDN pick up OG art updates. */
+export const DEFAULT_OG_IMAGE = '/og-card.png'
 
 export interface PageMeta {
   title: string
