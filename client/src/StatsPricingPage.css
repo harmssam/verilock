@@ -90,41 +90,35 @@
   text-wrap: pretty;
 }
 
-/* ── Takeaways ── */
+/* ── Takeaways (light list, not card stack) ── */
 
 .stats-takeaways {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 0.5rem;
+  gap: 0.35rem;
+  max-width: 40rem;
 }
 
 .stats-takeaways li {
   position: relative;
-  padding: 0.65rem 0.85rem 0.65rem 1.35rem;
+  padding: 0.2rem 0 0.2rem 1.1rem;
   font-size: 0.9rem;
-  line-height: 1.55;
+  line-height: 1.5;
   color: var(--lr-text, #0f172a);
-  border-radius: 8px;
-  background: var(--lr-bg, #fbfcfd);
-  border: 1px solid var(--lr-line, #e2e8f0);
-  transition:
-    background 0.25s cubic-bezier(0.32, 0.72, 0, 1),
-    border-color 0.25s cubic-bezier(0.32, 0.72, 0, 1);
-}
-
-.stats-takeaways li:hover {
-  background: rgba(13, 148, 136, 0.04);
-  border-color: rgba(13, 148, 136, 0.2);
 }
 
 .stats-takeaways li::before {
-  content: '▸';
+  content: '';
   position: absolute;
-  left: 0.55rem;
-  color: var(--lr-accent, #0d9488);
-  font-weight: 700;
+  left: 0;
+  top: 0.7em;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: var(--lr-accent, #0d9488);
+  opacity: 0.85;
 }
 
 /* ── Tables ── */
@@ -452,10 +446,6 @@
     padding: 0.45rem 0.5rem;
   }
 
-  .stats-takeaways li {
-    padding: 0.55rem 0.7rem 0.55rem 1.25rem;
-  }
-
   .stats-scenario {
     padding: 0.9rem;
   }
@@ -466,7 +456,6 @@
   .stats-table tbody tr,
   .stats-table td,
   .stats-table-provider,
-  .stats-takeaways li,
   .stats-scenario,
   .stats-cta-btn,
   .stats-source-list li a {

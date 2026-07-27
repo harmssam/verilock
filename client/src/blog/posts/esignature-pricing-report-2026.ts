@@ -6,7 +6,7 @@ export const post: BlogPost = {
   slug: 'esignature-pricing-report-2026',
   title: 'eSignature Pricing Report 2026: What You Actually Pay Per Signature',
   description:
-    'Side-by-side pricing across DocuSign, Adobe Sign, PandaDoc, Dropbox Sign, SignNow, and VeriLock. Subscription plans hide the real cost -- here is the math.',
+    'Side-by-side pricing across DocuSign, Adobe Sign, PandaDoc, Dropbox Sign, SignNow, and VeriLock. Sign free on VeriLock; optional lock is pay-per-use. Subscription math vs real cost per document.',
   date: '2026-07-25',
   tags: ['pricing'],
   coverImage: cover,
@@ -41,7 +41,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'VeriLock is the only consumer-facing pay-per-use option with a full signing UI. As of July 25, 2026: about $0.41 per document (full list lock fee), no subscription, no feature tiers. At eight documents a month -- a typical workload -- that is about $39 a year. The cheapest subscription alternative still costs more than double.',
+      text: 'VeriLock is free for multi-party signing. The paid piece is optional: a permanent on-chain lock for about $0.41 (full list fee as of July 25, 2026), no subscription, no feature tiers. If you lock eight documents a month -- a typical workload -- that is about $39 a year. Sign-only stays $0. The cheapest subscription alternative still costs more than double the lock path.',
     },
     {
       type: 'p',
