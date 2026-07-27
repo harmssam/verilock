@@ -104,7 +104,8 @@ export function InkCaptureSheet({
   const isLandscape = useIsLandscape()
   const isRealPortrait = useIsRealPortrait()
   const isInitial = fieldKind === 'initial'
-  // Pay is portrait-locked: gate is open, but layout still uses portrait pad rules.
+  // Pay is portrait-locked: skip rotate *gate*, but force a real landscape layout
+  // (rotated 90°) so the pad is not a tall portrait stack.
   const needsLandscape = !isLandscape
   const isPortraitHost = !needsLandscape && isRealPortrait
   const canDraw = isLandscape && !disabled
@@ -117,8 +118,8 @@ export function InkCaptureSheet({
         : 2.8
 
   /**
-   * One-shot guide: same iPhone SVG turns upright → landscape (2s), holds, fades.
-   * Shown only on portrait hosts (e.g. Nimiq Pay) where the pad is already horizontal.
+   * One-shot guide: iPhone SVG turns upright → landscape (2s), holds, fades.
+   * Shown on forced-landscape portrait hosts (Nimiq Pay) so users tip the phone.
    */
   const [portraitGuide, setPortraitGuide] = useState<'off' | 'play' | 'fade'>('off')
   useEffect(() => {
@@ -138,13 +139,23 @@ export function InkCaptureSheet({
     }
   }, [isPortraitHost, padKey])
 
+  // Lock body scroll while the forced-landscape sheet covers the viewport.
+  useEffect(() => {
+    if (!isPortraitHost) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [isPortraitHost])
+
   return (
     <div
       className={[
         'ink-capture-sheet',
         `ink-capture-sheet--${variant}`,
         needsLandscape ? 'is-rotate' : 'is-draw',
-        // Wide horizontal pad centered in a tall frame (Pay / portrait browsers).
+        // Forced landscape UI inside portrait-locked host (Nimiq Pay).
         isPortraitHost ? 'is-portrait-host' : '',
         className,
       ]
