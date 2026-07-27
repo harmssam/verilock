@@ -483,8 +483,15 @@
   background: var(--surface-2, #f8fafc);
 }
 
+.login-sheet-qr-hint {
+  margin: 0.15rem 0 0;
+  max-width: 16rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .login-sheet-qr-wait {
-  margin: 0.25rem 0 0;
+  margin: 0.15rem 0 0;
   font-size: 0.84rem;
   font-weight: 600;
   color: var(--text);

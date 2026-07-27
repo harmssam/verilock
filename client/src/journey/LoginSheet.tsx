@@ -5,6 +5,8 @@ import { api } from '../api'
 import { IPhoneIcon } from '../IPhoneIcon'
 import {
   isLoopbackAppOrigin,
+  isMobileDevice,
+  isNimiqPayHost,
   NIMIQ_PAY_ANDROID_URL,
   NIMIQ_PAY_IOS_URL,
   payLoginQrPayload,
@@ -70,19 +72,26 @@ export function LoginSheet({
   const mobileChoice = journeyMobileChoiceLabels()
   const desktopChoice = journeyDesktopChoiceLabels()
   const canClose = showClose ?? placement === 'popover'
-  const isMobileChoice = connectMode === 'pay-open' || connectMode === 'hub-fallback'
-  const isDesktopChoice = connectMode === 'desktop-choice'
+  /**
+   * Hard gate: real phones never use the desktop QR path (that broke mobile Pay
+   * when a device was mis-classified as desktop-choice). Mobile browser = deeplink
+   * chooser; desktop only = Hub + Pay QR.
+   */
+  const forceMobileChooser =
+    typeof window !== 'undefined' && isMobileDevice() && !isNimiqPayHost()
+  const isMobileChoice =
+    forceMobileChooser ||
+    connectMode === 'pay-open' ||
+    connectMode === 'hub-fallback'
+  const isDesktopChoice = !forceMobileChooser && connectMode === 'desktop-choice'
   const isChoice = isMobileChoice || isDesktopChoice
   /** Localhost / 127.0.0.1 - phone cannot reach this machine; Pay QR is prod-only. */
   const payQrUnavailableLocal = isLoopbackAppOrigin()
   /**
-   * Hub is the default primary action on desktop.
-   * Also prefer Hub when Pay deeplink failed on mobile.
+   * Hub primary: desktop default, or mobile after Pay deeplink failed.
+   * Never demote mobile “Open in Nimiq Pay” just because origin is loopback.
    */
-  const hubPreferred =
-    connectMode === 'desktop-choice' ||
-    connectMode === 'hub-fallback' ||
-    payQrUnavailableLocal
+  const hubPreferred = isDesktopChoice || connectMode === 'hub-fallback'
   const [pendingChoice, setPendingChoice] = useState<'pay' | 'hub' | null>(null)
 
   const [qrPhase, setQrPhase] = useState<QrPhase>('idle')
@@ -91,6 +100,7 @@ export function LoginSheet({
   const [qrExpiresAt, setQrExpiresAt] = useState<number | null>(null)
   const pollTimerRef = useRef<number | null>(null)
   const qrIdRef = useRef<string | null>(null)
+  const pollSecretRef = useRef<string | null>(null)
 
   const clearPoll = useCallback(() => {
     if (pollTimerRef.current != null) {
@@ -102,6 +112,7 @@ export function LoginSheet({
   const resetQr = useCallback(() => {
     clearPoll()
     qrIdRef.current = null
+    pollSecretRef.current = null
     setQrPhase('idle')
     setQrImage(null)
     setQrError(null)
@@ -143,8 +154,9 @@ export function LoginSheet({
     setQrImage(null)
 
     try {
-      const { id, expiresAt } = await api.authQrStart()
+      const { id, pollSecret, expiresAt } = await api.authQrStart()
       qrIdRef.current = id
+      pollSecretRef.current = pollSecret
       const payload = payLoginQrPayload(id)
       if (payload.loopback) {
         setQrPhase('error')
@@ -156,16 +168,18 @@ export function LoginSheet({
       }
       setQrExpiresAt(expiresAt)
       // nimiqpay:// so the camera can open Pay; embedded URL must be public (prod).
+      // pollSecret is never encoded in the QR — only held in this tab for polling.
       const dataUrl = await qrDataUrl(payload.qrText, 200)
       setQrImage(dataUrl)
       setQrPhase('waiting')
 
       pollTimerRef.current = window.setInterval(() => {
         const sid = qrIdRef.current
-        if (!sid) return
+        const secret = pollSecretRef.current
+        if (!sid || !secret) return
         void (async () => {
           try {
-            const status = await api.authQrStatus(sid)
+            const status = await api.authQrStatus(sid, secret)
             if (status.status === 'ready' && status.token && status.address) {
               clearPoll()
               onSession(status.token, status.address)
@@ -185,10 +199,14 @@ export function LoginSheet({
             }
           } catch (err) {
             const msg = err instanceof Error ? err.message : ''
-            if (/expired|not found|already used/i.test(msg)) {
+            if (/expired|not found|already used|poll secret|401|429/i.test(msg)) {
               clearPoll()
               setQrPhase('error')
-              setQrError(msg || 'QR login failed')
+              setQrError(
+                /429|too many/i.test(msg)
+                  ? 'Too many poll attempts - wait a moment and try a new QR.'
+                  : msg || 'QR login failed',
+              )
               setPendingChoice(null)
             }
           }
@@ -286,6 +304,7 @@ export function LoginSheet({
               <LoaderCircle className="btn-spinner" size={24} strokeWidth={2.5} aria-hidden />
             </div>
           )}
+          <p className="muted login-sheet-qr-hint">{desktopChoice.payHint}</p>
           <p className="login-sheet-qr-wait">
             {qrPhase === 'loading' ? 'Generating QR…' : desktopChoice.payBusy}
           </p>
@@ -368,11 +387,12 @@ export function LoginSheet({
                   <IPhoneIcon size={16} strokeWidth={2.25} />
                   {desktopChoice.payIdle}
                 </button>
-                <p className="muted login-sheet-choice-hint">
-                  {payQrUnavailableLocal
-                    ? 'Nimiq Pay QR is not available on localhost - use Hub above, or try this on production.'
-                    : desktopChoice.payHint}
-                </p>
+                {payQrUnavailableLocal && (
+                  <p className="muted login-sheet-choice-hint">
+                    Nimiq Pay QR is not available on localhost - use Hub above, or try this on
+                    production.
+                  </p>
+                )}
                 {qrError && (
                   <p className="login-sheet-qr-error" role="alert">
                     {qrError}

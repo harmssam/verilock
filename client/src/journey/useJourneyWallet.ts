@@ -211,44 +211,50 @@ export function useJourneyWallet(): UseJourneyWalletResult {
         }
       })
 
-      await setupHubRedirectHandlers(
-        // Hub single-trip: no address. Legacy chooseAddress path may still pass one.
-        async addr => api.challenge(addr ?? undefined),
-        async result => {
-          try {
-            const verified = await api.verify(result.token, {
-              publicKey: result.publicKey,
-              signature: result.signature,
-              authScheme: 'hub',
-            })
-            applySession(result.token, verified.address)
-            setError(null)
-            setWalletStatus(null)
-          } catch (err) {
-            clearSession()
-            setToken(null)
-            setAddress(null)
+      // Always mark boot ready even if Hub redirect plumbing fails — otherwise
+      // in-Pay auto-login never runs (Pay mobile sign-in depends on bootReady).
+      try {
+        await setupHubRedirectHandlers(
+          // Hub single-trip: no address. Legacy chooseAddress path may still pass one.
+          async addr => api.challenge(addr ?? undefined),
+          async result => {
+            try {
+              const verified = await api.verify(result.token, {
+                publicKey: result.publicKey,
+                signature: result.signature,
+                authScheme: 'hub',
+              })
+              applySession(result.token, verified.address)
+              setError(null)
+              setWalletStatus(null)
+            } catch (err) {
+              clearSession()
+              setToken(null)
+              setAddress(null)
+              if (isHubCancelError(err)) {
+                showLoginCanceled()
+              } else {
+                setError(err instanceof Error ? err.message : 'Hub login failed')
+              }
+            } finally {
+              hubConnectInFlightRef.current = false
+              setConnecting(false)
+            }
+          },
+          err => {
+            hubConnectInFlightRef.current = false
+            setConnecting(false)
             if (isHubCancelError(err)) {
               showLoginCanceled()
             } else {
-              setError(err instanceof Error ? err.message : 'Hub login failed')
+              setError(err.message)
+              setWalletStatus(null)
             }
-          } finally {
-            hubConnectInFlightRef.current = false
-            setConnecting(false)
-          }
-        },
-        err => {
-          hubConnectInFlightRef.current = false
-          setConnecting(false)
-          if (isHubCancelError(err)) {
-            showLoginCanceled()
-          } else {
-            setError(err.message)
-            setWalletStatus(null)
-          }
-        },
-      )
+          },
+        )
+      } catch (err) {
+        console.warn('[wallet] Hub redirect setup failed (Pay login still available)', err)
+      }
 
       if (!cancelled) {
         setBootReady(true)

@@ -92,6 +92,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS pay_login_qr (
     id TEXT PRIMARY KEY,
     status TEXT NOT NULL DEFAULT 'pending',
+    poll_secret TEXT,
     desktop_token TEXT,
     address TEXT,
     public_key TEXT,
@@ -101,6 +102,11 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_pay_login_qr_expires ON pay_login_qr(expires_at);
 `)
+
+const payLoginQrColumns = db.prepare('PRAGMA table_info(pay_login_qr)').all() as Array<{ name: string }>
+if (!payLoginQrColumns.some(col => col.name === 'poll_secret')) {
+  db.exec('ALTER TABLE pay_login_qr ADD COLUMN poll_secret TEXT')
+}
 
 const documentColumns = db.prepare('PRAGMA table_info(documents)').all() as Array<{ name: string }>
 if (!documentColumns.some(col => col.name === 'required_signatures')) {
@@ -331,6 +337,8 @@ export type PayLoginQrStatus = 'pending' | 'ready' | 'consumed' | 'expired'
 export type PayLoginQrRecord = {
   id: string
   status: PayLoginQrStatus
+  /** Desktop-only secret; never put in the QR / phone URL. */
+  pollSecret: string | null
   desktopToken: string | null
   address: string | null
   publicKey: string | null
@@ -339,16 +347,21 @@ export type PayLoginQrRecord = {
   consumedAt: number | null
 }
 
-export function createPayLoginQr(id: string, ttlMs: number): PayLoginQrRecord {
+export function createPayLoginQr(
+  id: string,
+  pollSecret: string,
+  ttlMs: number,
+): PayLoginQrRecord {
   const now = Date.now()
   const expiresAt = now + ttlMs
   db.prepare(
-    `INSERT INTO pay_login_qr (id, status, desktop_token, address, public_key, created_at, expires_at, consumed_at)
-     VALUES (?, 'pending', NULL, NULL, NULL, ?, ?, NULL)`,
-  ).run(id, now, expiresAt)
+    `INSERT INTO pay_login_qr (id, status, poll_secret, desktop_token, address, public_key, created_at, expires_at, consumed_at)
+     VALUES (?, 'pending', ?, NULL, NULL, NULL, ?, ?, NULL)`,
+  ).run(id, pollSecret, now, expiresAt)
   return {
     id,
     status: 'pending',
+    pollSecret,
     desktopToken: null,
     address: null,
     publicKey: null,
@@ -361,6 +374,7 @@ export function createPayLoginQr(id: string, ttlMs: number): PayLoginQrRecord {
 function mapPayLoginQr(row: {
   id: string
   status: string
+  poll_secret: string | null
   desktop_token: string | null
   address: string | null
   public_key: string | null
@@ -375,6 +389,7 @@ function mapPayLoginQr(row: {
   return {
     id: row.id,
     status,
+    pollSecret: row.poll_secret,
     desktopToken: row.desktop_token,
     address: row.address,
     publicKey: row.public_key,
@@ -387,13 +402,14 @@ function mapPayLoginQr(row: {
 export function getPayLoginQr(id: string): PayLoginQrRecord | null {
   const row = db
     .prepare(
-      `SELECT id, status, desktop_token, address, public_key, created_at, expires_at, consumed_at
+      `SELECT id, status, poll_secret, desktop_token, address, public_key, created_at, expires_at, consumed_at
        FROM pay_login_qr WHERE id = ?`,
     )
     .get(id) as
     | {
         id: string
         status: string
+        poll_secret: string | null
         desktop_token: string | null
         address: string | null
         public_key: string | null
@@ -435,14 +451,21 @@ export function markPayLoginQrReady(
 
 /**
  * Desktop poll success: return credentials once and mark consumed.
- * Returns null if not ready yet; throws if expired/consumed/missing.
+ * Requires the desktop-only pollSecret (never embedded in the QR).
+ * Returns null if not ready yet; throws if expired/consumed/missing/unauthorized.
  */
-export function consumePayLoginQr(id: string): {
+export function consumePayLoginQr(
+  id: string,
+  pollSecret: string,
+): {
   token: string
   address: string
 } | null {
   const row = getPayLoginQr(id)
   if (!row) throw new Error('QR login session not found')
+  if (!pollSecret || !row.pollSecret || pollSecret !== row.pollSecret) {
+    throw new Error('Invalid QR login poll secret')
+  }
   if (row.status === 'expired' || row.expiresAt < Date.now()) {
     throw new Error('QR login session expired')
   }
@@ -457,13 +480,23 @@ export function consumePayLoginQr(id: string): {
   const result = db
     .prepare(
       `UPDATE pay_login_qr SET status = 'consumed', consumed_at = ?, desktop_token = NULL
-       WHERE id = ? AND status = 'ready'`,
+       WHERE id = ? AND status = 'ready' AND poll_secret = ?`,
     )
-    .run(now, id)
+    .run(now, id, pollSecret)
   if (result.changes === 0) {
     throw new Error('QR login session already used')
   }
   return { token: row.desktopToken, address: row.address }
+}
+
+/** Public status for desktop poll without consuming (still requires poll secret). */
+export function assertPayLoginQrPollSecret(id: string, pollSecret: string): PayLoginQrRecord {
+  const row = getPayLoginQr(id)
+  if (!row) throw new Error('QR login session not found')
+  if (!pollSecret || !row.pollSecret || pollSecret !== row.pollSecret) {
+    throw new Error('Invalid QR login poll secret')
+  }
+  return row
 }
 
 export function purgeExpiredPayLoginQr(): number {

@@ -71,7 +71,7 @@ import { LandingHome } from './landing/LandingHome'
 import { PATH_PLACEMENTS, PATH_STILLS, placementImageStyle } from './landing/pathMedia'
 import { api } from './api'
 import { FEATURES } from './features'
-import { LOGIN_CANCELED_MESSAGE } from './nimiq'
+import { isMobileDevice, LOGIN_CANCELED_MESSAGE } from './nimiq'
 import { SignMobilePage } from './SignMobilePage'
 import { PayLoginMobilePage } from './PayLoginMobilePage'
 
@@ -239,6 +239,7 @@ export function App() {
     inNimiqPay: wallet.inNimiqPay,
     mobilePayConnect: wallet.mobilePayConnect,
     showOpenInPay: wallet.showOpenInPay,
+    isMobile: isMobileDevice(),
   })
 
   const clearBlendTimers = useCallback(() => {
