@@ -4,13 +4,12 @@
  * to the next step (and can re-open until someone signs). No ink payloads here.
  */
 import {
-  AlignLeft,
+  Calendar,
   Check,
   Minus,
   Plus,
   Square,
   Trash2,
-  Type,
   UserRound,
   X,
 } from 'lucide-react'
@@ -55,7 +54,15 @@ import { loadDocumentSurface, type DocumentSurface } from './documentSurface'
 import './PdfAnnotator.css'
 import './PlacementEditor.css'
 
-type Tool = 'select' | 'signature' | 'initial' | 'name' | 'text' | 'checkmark' | 'cross'
+type Tool =
+  | 'select'
+  | 'signature'
+  | 'initial'
+  | 'name'
+  | 'text'
+  | 'date'
+  | 'checkmark'
+  | 'cross'
 
 /**
  * Signature tool mark (from signature-svgrepo-com.svg).
@@ -77,11 +84,20 @@ function SignatureToolIcon({ size = 18 }: { size?: number }) {
   )
 }
 
-/** Cursive monogram for the initials placement tool. */
+/** Clean monogram for the initials placement tool (sans, not script). */
 function InitialsToolIcon() {
   return (
     <span className="placement-tool-initials" aria-hidden>
       S.H.
+    </span>
+  )
+}
+
+/** Bracket label icons for name / text tools (reads as the field type). */
+function BracketToolLabel({ children }: { children: string }) {
+  return (
+    <span className="placement-tool-bracket" aria-hidden>
+      [{children}]
     </span>
   )
 }
@@ -562,7 +578,7 @@ export function PlacementEditor({
           ? 'initial'
           : tool === 'name'
             ? 'name'
-            : tool === 'text'
+            : tool === 'text' || tool === 'date'
               ? 'text'
               : tool === 'checkmark'
                 ? 'checkmark'
@@ -632,7 +648,9 @@ export function PlacementEditor({
     geo.x = Math.min(Math.max(0, geo.x), 1 - geo.width)
     geo.y = Math.min(Math.max(0, geo.y), 1 - geo.height)
 
-    const label = textFieldLabel.trim().slice(0, 80)
+    // Date tool always labels the field "Date" (opens calendar picker at sign time).
+    const label =
+      tool === 'date' ? 'Date' : textFieldLabel.trim().slice(0, 80)
     // Check / X start as empty squares; click the slot to toggle the mark on or off.
     const slot: PlacementSlot = {
       id: newSlotId(),
@@ -660,7 +678,12 @@ export function PlacementEditor({
 
     patchPlan(p => ({ ...p, slots: [...p.slots, slot] }))
     setSelectedId(slot.id)
-    if (kind === 'signature' || kind === 'initial' || kind === 'name' || kind === 'text') {
+    if (
+      kind === 'signature' ||
+      kind === 'initial' ||
+      kind === 'name' ||
+      kind === 'text'
+    ) {
       setTool('select')
     }
     setPlacing(null)
@@ -809,7 +832,7 @@ export function PlacementEditor({
           ? 'initial'
           : placing.type === 'name'
             ? 'name'
-            : placing.type === 'text'
+            : placing.type === 'text' || placing.type === 'date'
               ? 'text'
               : placing.type === 'checkmark'
                 ? 'checkmark'
@@ -904,7 +927,7 @@ export function PlacementEditor({
       </button>
       <button
         type="button"
-        className={`placement-tool-btn${tool === 'name' ? ' is-active' : ''}`}
+        className={`placement-tool-btn placement-tool-btn--label${tool === 'name' ? ' is-active' : ''}`}
         onClick={() => setTool('name')}
         disabled={toolsDisabled}
         title={
@@ -915,11 +938,11 @@ export function PlacementEditor({
         aria-label="Printed name"
         aria-pressed={tool === 'name'}
       >
-        <Type size={18} strokeWidth={2.1} aria-hidden />
+        <BracketToolLabel>name</BracketToolLabel>
       </button>
       <button
         type="button"
-        className={`placement-tool-btn${tool === 'text' ? ' is-active' : ''}`}
+        className={`placement-tool-btn placement-tool-btn--label${tool === 'text' ? ' is-active' : ''}`}
         onClick={() => setTool('text')}
         disabled={toolsDisabled}
         title={
@@ -930,7 +953,22 @@ export function PlacementEditor({
         aria-label="Text field"
         aria-pressed={tool === 'text'}
       >
-        <AlignLeft size={18} strokeWidth={2.1} aria-hidden />
+        <BracketToolLabel>text</BracketToolLabel>
+      </button>
+      <button
+        type="button"
+        className={`placement-tool-btn${tool === 'date' ? ' is-active' : ''}`}
+        onClick={() => setTool('date')}
+        disabled={toolsDisabled}
+        title={
+          activePerson == null
+            ? 'Select a person first'
+            : `Place date field for ${activeName}`
+        }
+        aria-label="Date"
+        aria-pressed={tool === 'date'}
+      >
+        <Calendar size={17} strokeWidth={2.1} aria-hidden />
       </button>
       <span className="placement-toolbar-sep" aria-hidden />
       <button
@@ -1011,7 +1049,7 @@ export function PlacementEditor({
             type="text"
             value={textFieldLabel}
             onChange={e => setTextFieldLabel(e.target.value.slice(0, 80))}
-            placeholder="Label (optional): Date, City…"
+            placeholder="Label (optional): City, Title…"
             maxLength={80}
             disabled={toolsDisabled}
           />
@@ -1436,17 +1474,19 @@ export function PlacementEditor({
                       <span className="placement-slot-person">{activeName}</span>
                       <span className="placement-slot-kind">
                         ·{' '}
-                        {tool === 'text' && textFieldLabel.trim()
-                          ? textFieldLabel.trim()
-                          : kindLabel(
-                              tool === 'signature'
-                                ? 'signature'
-                                : tool === 'initial'
-                                  ? 'initial'
-                                  : tool === 'name'
-                                    ? 'name'
-                                    : 'text',
-                            )}
+                        {tool === 'date'
+                          ? 'Date'
+                          : tool === 'text' && textFieldLabel.trim()
+                            ? textFieldLabel.trim()
+                            : kindLabel(
+                                tool === 'signature'
+                                  ? 'signature'
+                                  : tool === 'initial'
+                                    ? 'initial'
+                                    : tool === 'name'
+                                      ? 'name'
+                                      : 'text',
+                              )}
                       </span>
                     </div>
                   )}
