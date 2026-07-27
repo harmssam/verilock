@@ -13,7 +13,8 @@ import {
   todayIsoDate,
 } from '../DateField'
 import { FEATURES } from '../features'
-import { SignOnMobileModal, isLikelyMobileViewport } from '../journey/SignOnMobileModal'
+import { SignOnMobileModal } from '../journey/SignOnMobileModal'
+import { isLikelyMobileViewport, useLikelyMobileViewport } from '../useViewport'
 import {
   type BlobPayload,
   type ConstructionPlan,
@@ -29,6 +30,7 @@ import {
   type SignaturePathData,
 } from './annotations'
 import { loadDocumentSurface, type DocumentSurface } from './documentSurface'
+import { InkCaptureSheet } from './InkCaptureSheet'
 import {
   SignatureStrokePad,
   type SignatureStrokeResult,
@@ -121,6 +123,7 @@ export function SignerFillView({
   const [localError, setLocalError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [signOnMobileOpen, setSignOnMobileOpen] = useState(false)
+  const isMobileViewport = useLikelyMobileViewport()
 
   const person =
     plan.people.find(p => p.slotIndex === personSlotIndex) ?? {
@@ -581,6 +584,25 @@ export function SignerFillView({
   const initCount = myInitialSlots.filter(s => !isServerFilled(s.id)).length
   const activeIsInitial = activeSlot?.kind === 'initial'
   const activeInkPeerCount = activeIsInitial ? initCount : sigCount
+  /**
+   * Phone already on VeriLock: open shared full-screen ink sheet (QR path uses the same).
+   * Desktop keeps the card modal for ink draw.
+   */
+  const useInkCaptureSheet =
+    Boolean(activeSlot) &&
+    activeSlot != null &&
+    activeSlot.personSlotIndex === personSlotIndex &&
+    !isServerFilled(activeSlot.id) &&
+    isInkPlacementKind(activeSlot.kind) &&
+    sigModalMode === 'draw' &&
+    isMobileViewport
+
+  const inkApplyLabel =
+    activeInkPeerCount > 1
+      ? 'Apply to all'
+      : activeIsInitial
+        ? 'Apply initials'
+        : 'Apply signature'
 
   return (
     <div className={`signer-fill-view${disabled ? ' is-disabled' : ''}`}>
@@ -746,13 +768,34 @@ export function SignerFillView({
         </div>
       </div>
 
+      {useInkCaptureSheet &&
+        activeSlot &&
+        createPortal(
+          <InkCaptureSheet
+            variant="overlay"
+            fieldKind={activeSlot.kind === 'initial' ? 'initial' : 'signature'}
+            padAspect={activeSlot.width / Math.max(1e-6, activeSlot.height)}
+            padKey={sigPadKey}
+            onChange={setModalDraftInk}
+            hasInk={Boolean(modalDraftInk?.path?.strokes?.length)}
+            primaryLabel={inkApplyLabel}
+            onPrimary={confirmModal}
+            primaryDisabled={disabled || busy || submitting}
+            disabled={disabled || busy || submitting}
+            onClose={closeModal}
+            titleId="signer-fill-modal-title"
+          />,
+          document.body,
+        )}
+
       {/*
-        Portal to document.body so journey overflow/transform ancestors cannot trap
-        position:fixed and park the dialog above the visible viewport.
+        Card dialog for desktop ink, reuse, name, date, text.
+        Mobile ink draw uses InkCaptureSheet above (same shell as QR /m/sign).
       */}
       {activeSlot &&
         activeSlot.personSlotIndex === personSlotIndex &&
         !isServerFilled(activeSlot.id) &&
+        !useInkCaptureSheet &&
         createPortal(
           <div
             className="signer-fill-modal"
@@ -840,7 +883,9 @@ export function SignerFillView({
                           setSigPadKey(k => k + 1)
                         }}
                       >
-                        {activeIsInitial ? 'Draw different initials' : 'Draw a different signature'}
+                        {activeIsInitial
+                          ? 'Draw different initials'
+                          : 'Draw a different signature'}
                       </button>
                     </div>
                   ) : (
@@ -861,17 +906,19 @@ export function SignerFillView({
                         onChange={result => setModalDraftInk(result)}
                         disabled={disabled || busy || submitting}
                       />
-                      {FEATURES.signOnMobile && authToken && !isLikelyMobileViewport() && (
-                        <button
-                          type="button"
-                          className="btn btn-secondary signer-fill-mobile-btn"
-                          disabled={disabled || busy || submitting}
-                          onClick={() => setSignOnMobileOpen(true)}
-                        >
-                          <Smartphone size={16} strokeWidth={2.25} aria-hidden />
-                          {activeIsInitial ? 'Initials on mobile' : 'Sign on mobile'}
-                        </button>
-                      )}
+                      {FEATURES.signOnMobile &&
+                        authToken &&
+                        !isLikelyMobileViewport() && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary signer-fill-mobile-btn"
+                            disabled={disabled || busy || submitting}
+                            onClick={() => setSignOnMobileOpen(true)}
+                          >
+                            <Smartphone size={16} strokeWidth={2.25} aria-hidden />
+                            {activeIsInitial ? 'Initials on mobile' : 'Sign on mobile'}
+                          </button>
+                        )}
                     </>
                   )
                 ) : activeIsDateField ? (
