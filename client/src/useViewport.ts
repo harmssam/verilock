@@ -2,17 +2,15 @@ import { useEffect, useState } from 'react'
 
 /**
  * Nimiq Pay mini app is portrait-locked and does not support a true landscape
- * viewport. For ink capture we treat Pay as “already landscape” so we never
- * show a rotate gate the user cannot satisfy.
+ * viewport. Detect via injected `window.nimiqPay` (same as `isNimiqPayHost`).
  */
-function isNimiqPayMiniAppHost(): boolean {
+export function isNimiqPayMiniAppHost(): boolean {
   return typeof window !== 'undefined' && Boolean(window.nimiqPay)
 }
 
-function readLandscape(): boolean {
+/** Physical / CSS landscape (ignores Nimiq Pay). */
+function readRealLandscape(): boolean {
   if (typeof window === 'undefined') return true
-  // Pay: no landscape mode — skip rotate gate and draw in the available frame.
-  if (isNimiqPayMiniAppHost()) return true
   const mq =
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(orientation: landscape)').matches
@@ -22,17 +20,18 @@ function readLandscape(): boolean {
 /**
  * True when ink capture may proceed without a rotate prompt.
  * Real landscape, or Nimiq Pay mini app (portrait-locked host).
- * Updates on rotate / resize outside Pay.
  */
 export function useIsLandscape(): boolean {
-  const [landscape, setLandscape] = useState(readLandscape)
+  const [ok, setOk] = useState(
+    () => isNimiqPayMiniAppHost() || readRealLandscape(),
+  )
   useEffect(() => {
-    // Pay never flips to landscape; keep the assumed-true value stable.
+    // Pay never flips to landscape; keep gate open forever.
     if (isNimiqPayMiniAppHost()) {
-      setLandscape(true)
+      setOk(true)
       return
     }
-    const sync = () => setLandscape(readLandscape())
+    const sync = () => setOk(readRealLandscape())
     sync()
     const mq =
       typeof window.matchMedia === 'function'
@@ -47,7 +46,33 @@ export function useIsLandscape(): boolean {
       window.removeEventListener('resize', sync)
     }
   }, [])
-  return landscape
+  return ok
+}
+
+/**
+ * True when the device is actually portrait (CSS orientation).
+ * Used so Nimiq Pay can skip the rotate gate but still get a portrait pad layout
+ * (wide horizontal band centered in a tall frame).
+ */
+export function useIsRealPortrait(): boolean {
+  const [portrait, setPortrait] = useState(() => !readRealLandscape())
+  useEffect(() => {
+    const sync = () => setPortrait(!readRealLandscape())
+    sync()
+    const mq =
+      typeof window.matchMedia === 'function'
+        ? window.matchMedia('(orientation: landscape)')
+        : null
+    mq?.addEventListener('change', sync)
+    window.addEventListener('orientationchange', sync)
+    window.addEventListener('resize', sync)
+    return () => {
+      mq?.removeEventListener('change', sync)
+      window.removeEventListener('orientationchange', sync)
+      window.removeEventListener('resize', sync)
+    }
+  }, [])
+  return portrait
 }
 
 /** One-shot: phone-sized touch surface (narrow + coarse pointer). */

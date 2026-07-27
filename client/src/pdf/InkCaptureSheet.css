@@ -1,6 +1,7 @@
 /* Shared full-screen ink capture (QR /m/sign + in-app mobile field sign). */
 
 .ink-capture-sheet {
+  position: relative;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -124,6 +125,61 @@
 
 .ink-capture-rotate-cancel {
   margin-top: 0.5rem;
+}
+
+/*
+ * Portrait-host guide (Nimiq Pay): same iPhone SVG, plays once centered —
+ * 2s turn portrait → landscape, short hold, then fade. Non-blocking.
+ */
+.ink-capture-portrait-guide {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.45s ease;
+}
+
+.ink-capture-portrait-guide.is-fade {
+  opacity: 0;
+}
+
+.ink-capture-portrait-guide-phone {
+  display: grid;
+  place-items: center;
+  color: var(--mint-deep, #0f766e);
+  filter: drop-shadow(0 8px 24px rgba(15, 23, 42, 0.12));
+}
+
+.ink-capture-portrait-guide-svg {
+  display: block;
+  width: 64px;
+  height: 108px;
+  transform-origin: 50% 50%;
+  /* 2s turn once; hold at landscape for the remaining visible window */
+  animation: ink-capture-portrait-guide-turn 2s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+@keyframes ink-capture-portrait-guide-turn {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(90deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ink-capture-portrait-guide-svg {
+    animation: none;
+    transform: rotate(90deg);
+  }
+
+  .ink-capture-portrait-guide {
+    transition-duration: 0.2s;
+  }
 }
 
 /* ── Draw chrome ── */
@@ -266,6 +322,54 @@
 .ink-capture-primary.is-disabled,
 .ink-capture-primary:disabled {
   opacity: 0.45;
+}
+
+/*
+ * Portrait host (Nimiq Pay mini app, or any tall viewport where we still draw):
+ * center a wide horizontal signature band — do not pin a short strip to the top.
+ */
+.ink-capture-sheet.is-portrait-host.is-draw {
+  justify-content: stretch;
+}
+
+.ink-capture-sheet.is-portrait-host .ink-capture-pad-stage {
+  flex: 1 1 auto;
+  min-height: 12rem;
+  justify-content: center;
+  align-items: center;
+  padding-block: 0.35rem;
+}
+
+.ink-capture-sheet.is-portrait-host .sig-pad {
+  width: 100%;
+  flex: 0 1 auto;
+  max-height: 100%;
+}
+
+.ink-capture-sheet.is-portrait-host .sig-pad--aspect {
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.ink-capture-sheet.is-portrait-host .sig-pad--aspect .sig-pad-canvas {
+  flex: none;
+  /* Full width horizontal pad; height from field aspect, clamped for thumb reach */
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  min-height: 10.5rem;
+  max-height: min(42dvh, 16rem);
+  aspect-ratio: var(--sig-pad-aspect, 2.5);
+  margin: 0 auto;
+}
+
+/* When aspect-ratio would make the pad shorter than min-height, keep min-height
+   (wide fields stay finger-friendly in Pay’s tall frame). */
+@supports (aspect-ratio: 1) {
+  .ink-capture-sheet.is-portrait-host .sig-pad--aspect .sig-pad-canvas {
+    height: auto;
+  }
 }
 
 @media (orientation: landscape) {
