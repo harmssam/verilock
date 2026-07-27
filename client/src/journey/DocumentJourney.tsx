@@ -1081,9 +1081,17 @@ export function DocumentJourney({
     flush: flushCreatePdfDraft,
     clear: clearCreatePdfDraftState,
   } = useCreatePdfDraft({
-    enabled: !doc && (role === 'creator' || role == null),
+    // Keep saving after agreement create so refresh can restore the local PDF.
+    enabled:
+      (role === 'creator' || role == null) &&
+      Boolean(pdfFile) &&
+      (!doc || Boolean(pdfHash && doc.fingerprint === pdfHash)),
     bootReady,
-    canRestore: !doc && (role === 'creator' || role == null),
+    // Restore create draft when still pre-doc, or when we reopened /d/ without a file in memory.
+    canRestore:
+      (role === 'creator' || role == null || role === 'signer') &&
+      !pdfFile &&
+      !signFile,
     pdfFile,
     setPdfFile,
     meta: {
@@ -1226,6 +1234,34 @@ export function DocumentJourney({
       setSignHash(pdfHash)
     }
   }, [doc, pdfFile, pdfHash, signFile, signHash])
+
+  // After hard-refresh on /d/:slug, rehydrate local PDF from IndexedDB when fingerprint matches.
+  useEffect(() => {
+    if (!bootReady || !doc?.fingerprint) return
+    if (pdfFile || signFile) return
+    let cancelled = false
+    void (async () => {
+      const draft = await loadCreatePdfDraft()
+      if (cancelled || !draft?.pdfHash || draft.pdfHash !== doc.fingerprint) return
+      try {
+        const file = fileFromCreatePdfDraft(draft)
+        await readFileBytes(file)
+        if (cancelled) return
+        setPdfFile(file)
+        setSignFile(file)
+        setPdfHash(draft.pdfHash)
+        setSignHash(draft.pdfHash)
+        if (typeof draft.pageCount === 'number' && draft.pageCount > 0) {
+          setPageCount(draft.pageCount)
+        }
+      } catch {
+        /* stale handle — drop UI will ask for the file again */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [bootReady, doc?.id, doc?.fingerprint, pdfFile, signFile])
 
   // Verify path: hash once per selected file, then look up matches.
   // Important: do NOT depend on `doc` - loading a match used to setActiveFromSeal,
@@ -1503,7 +1539,9 @@ export function DocumentJourney({
       setConstructionPlan(emptyPlan(pdfHash, 2))
       setPageFieldsConfirmed(false)
       window.history.pushState({}, '', `/d/${document.slug}`)
-      void clearCreatePdfDraftState()
+      // Keep IndexedDB local PDF so hard-refresh / Pay remount can rehydrate the file.
+      // (Clearing here forced “drop document again” after every deploy refresh.)
+      void flushCreatePdfDraft()
       // Step advances to Setup - bring the next actions into view.
       scrollToJourneyAction('auto')
     } catch (err) {
