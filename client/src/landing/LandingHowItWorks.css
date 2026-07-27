@@ -771,17 +771,23 @@
   animation: lr-share-doc-once 4.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Single diagram: paths + person dots share viewBox (no flex-dot misalignment) */
+/*
+ * Single diagram: paths + person dots share viewBox (no flex-dot misalignment).
+ * Definite width+height so the SVG fills the slot instead of sizing from viewBox
+ * aspect ratio. On mobile the tile is wider than tall; without this, the diagram
+ * grows ~viewBox-tall (taller than the tile) and overflow:hidden clips the fan-out.
+ */
 .lr-share-diagram {
   position: absolute;
   left: 1.55rem;
-  right: 0.2rem;
-  top: 0.35rem;
-  bottom: 0.35rem;
-  width: auto;
-  height: auto;
-  overflow: visible;
+  top: 50%;
   z-index: 1;
+  width: calc(100% - 1.75rem);
+  height: calc(100% - 0.6rem);
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  transform: translateY(-50%);
 }
 
 .lr-share-path {
@@ -1488,5 +1494,15 @@
   .lr-how-visual--connect {
     max-width: 9.5rem;
     height: 5rem;
+  }
+
+  /* Share fans out vertically — give the tile room so paths/people aren't clipped */
+  .lr-how-visual--share {
+    max-width: 9.25rem;
+    height: 5.75rem;
+  }
+
+  .lr-share {
+    min-height: 0;
   }
 }
