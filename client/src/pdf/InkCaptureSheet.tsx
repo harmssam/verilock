@@ -1,15 +1,21 @@
 /**
  * Full-screen ink capture for phones — shared by QR /m/sign and in-app field signing.
  * Landscape-gated pad + floating primary so both paths feel the same.
- * Nimiq Pay mini app skips the landscape gate (host is portrait-locked).
+ * Nimiq Pay mini app skips the landscape gate (host is portrait-locked) and shows
+ * a one-shot iPhone rotate guide over the horizontal pad.
  */
 import { X } from 'lucide-react'
-import { useIsLandscape } from '../useViewport'
+import { useEffect, useState } from 'react'
+import { useIsLandscape, useIsRealPortrait } from '../useViewport'
 import {
   SignatureStrokePad,
   type SignatureStrokeResult,
 } from './SignatureStrokePad'
 import './InkCaptureSheet.css'
+
+/** Rotate animation (2s) + brief hold before fade (~0.55s) + fade duration (~0.45s). */
+const PORTRAIT_GUIDE_VISIBLE_MS = 2550
+const PORTRAIT_GUIDE_FADE_MS = 450
 
 export type InkCaptureFieldKind = 'signature' | 'initial'
 
@@ -96,8 +102,11 @@ export function InkCaptureSheet({
   titleId = 'ink-capture-title',
 }: InkCaptureSheetProps) {
   const isLandscape = useIsLandscape()
+  const isRealPortrait = useIsRealPortrait()
   const isInitial = fieldKind === 'initial'
+  // Pay is portrait-locked: gate is open, but layout still uses portrait pad rules.
   const needsLandscape = !isLandscape
+  const isPortraitHost = !needsLandscape && isRealPortrait
   const canDraw = isLandscape && !disabled
   const title = isInitial ? 'Draw your initials' : 'Draw your signature'
   const aspect =
@@ -107,12 +116,36 @@ export function InkCaptureSheet({
         ? 1.4
         : 2.8
 
+  /**
+   * One-shot guide: same iPhone SVG turns upright → landscape (2s), holds, fades.
+   * Shown only on portrait hosts (e.g. Nimiq Pay) where the pad is already horizontal.
+   */
+  const [portraitGuide, setPortraitGuide] = useState<'off' | 'play' | 'fade'>('off')
+  useEffect(() => {
+    if (!isPortraitHost) {
+      setPortraitGuide('off')
+      return
+    }
+    setPortraitGuide('play')
+    const fadeTimer = window.setTimeout(() => setPortraitGuide('fade'), PORTRAIT_GUIDE_VISIBLE_MS)
+    const offTimer = window.setTimeout(
+      () => setPortraitGuide('off'),
+      PORTRAIT_GUIDE_VISIBLE_MS + PORTRAIT_GUIDE_FADE_MS,
+    )
+    return () => {
+      window.clearTimeout(fadeTimer)
+      window.clearTimeout(offTimer)
+    }
+  }, [isPortraitHost, padKey])
+
   return (
     <div
       className={[
         'ink-capture-sheet',
         `ink-capture-sheet--${variant}`,
         needsLandscape ? 'is-rotate' : 'is-draw',
+        // Wide horizontal pad centered in a tall frame (Pay / portrait browsers).
+        isPortraitHost ? 'is-portrait-host' : '',
         className,
       ]
         .filter(Boolean)
@@ -147,6 +180,21 @@ export function InkCaptureSheet({
               Cancel
             </button>
           )}
+        </div>
+      )}
+
+      {portraitGuide !== 'off' && (
+        <div
+          className={`ink-capture-portrait-guide${
+            portraitGuide === 'fade' ? ' is-fade' : ''
+          }`}
+          role="status"
+          aria-live="polite"
+          aria-label="Sign sideways on this pad — the layout matches landscape"
+        >
+          <div className="ink-capture-portrait-guide-phone" aria-hidden>
+            <IPhoneOutlineIcon className="ink-capture-portrait-guide-svg" />
+          </div>
         </div>
       )}
 
