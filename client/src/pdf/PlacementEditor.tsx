@@ -14,7 +14,16 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
+import { createPortal } from 'react-dom'
 import { isValidNimiqAddress, normalizeAddress, shortAddress } from '../addresses'
 import {
   type ConstructionPerson,
@@ -172,10 +181,100 @@ export function PlacementEditor({
   const PLACE_TAP_SLOP_PX = 12
   const [dragTick, setDragTick] = useState(0)
 
+  /**
+   * Mobile: undock placement tools to a fixed bar under the shell header while
+   * the user works on the PDF. Scroll back up to the natural slot → auto-dock.
+   * Portaled to body because .lr-view-blend transform + .action-dock overflow
+   * break position:sticky/fixed in-tree.
+   */
+  const toolbarSlotRef = useRef<HTMLDivElement>(null)
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const toolbarUndockedRef = useRef(false)
+  const [toolbarNarrow, setToolbarNarrow] = useState(false)
+  const [toolbarUndocked, setToolbarUndocked] = useState(false)
+  const [toolbarHeight, setToolbarHeight] = useState(0)
+  const [toolbarUndockTop, setToolbarUndockTop] = useState(0)
+
   const people = plan.people.length > 0 ? plan.people : defaultPeople(1)
   const slots = plan.slots
   /** Placement tools stay off until a person chip is selected. */
   const toolsDisabled = editDisabled || activePerson == null
+
+  // Narrow viewports only - desktop keeps the in-flow toolbar.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(max-width: 768px)')
+    const sync = () => setToolbarNarrow(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+
+  // Preserve layout height when the bar is portaled out (avoids jump).
+  useLayoutEffect(() => {
+    const el = toolbarRef.current
+    if (!el) return
+    const measure = () => {
+      const h = el.getBoundingClientRect().height
+      if (h > 0) setToolbarHeight(h)
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [toolbarNarrow, toolbarUndocked, selectedId, tool, pageCount, activePerson])
+
+  // Undock when the dock slot scrolls under the sticky shell header; re-dock on scroll up.
+  useEffect(() => {
+    if (!toolbarNarrow || typeof window === 'undefined') {
+      toolbarUndockedRef.current = false
+      setToolbarUndocked(false)
+      return
+    }
+
+    const DOCK_SLACK_PX = 4
+    let lastUndockTop = -1
+
+    const update = () => {
+      const slot = toolbarSlotRef.current
+      if (!slot) return
+      const header = document.querySelector('.lr-header')
+      const headerBottom = header?.getBoundingClientRect().bottom ?? 0
+      const undockTop = Math.max(0, Math.round(headerBottom + 6))
+      // Only re-render when the sticky header height actually changes.
+      if (undockTop !== lastUndockTop) {
+        lastUndockTop = undockTop
+        setToolbarUndockTop(undockTop)
+      }
+
+      const slotTop = slot.getBoundingClientRect().top
+      if (toolbarUndockedRef.current) {
+        // Scroll up far enough that the natural dock is back under the header line.
+        if (slotTop >= headerBottom + DOCK_SLACK_PX) {
+          toolbarUndockedRef.current = false
+          setToolbarUndocked(false)
+        }
+      } else if (slotTop < headerBottom - DOCK_SLACK_PX) {
+        toolbarUndockedRef.current = true
+        setToolbarUndocked(true)
+      }
+    }
+
+    update()
+    window.addEventListener('scroll', update, { passive: true, capture: true })
+    window.addEventListener('resize', update)
+    // Visual viewport changes (mobile URL bar) move the sticky header.
+    const vv = window.visualViewport
+    vv?.addEventListener('resize', update)
+    vv?.addEventListener('scroll', update)
+    return () => {
+      window.removeEventListener('scroll', update, true)
+      window.removeEventListener('resize', update)
+      vv?.removeEventListener('resize', update)
+      vv?.removeEventListener('scroll', update)
+    }
+  }, [toolbarNarrow])
 
   // Drop selection if that person slot was removed (never auto-pick another).
   useEffect(() => {
@@ -743,6 +842,211 @@ export function PlacementEditor({
     patchPlan(p => ({ ...p, creatorSigningAs: value }))
   }
 
+  const toolbarUndockedActive = toolbarNarrow && toolbarUndocked
+  const toolbarStyle: CSSProperties | undefined = (() => {
+    const style: CSSProperties = {}
+    if (activePersonColor) {
+      ;(style as Record<string, string>)['--person-color'] = activePersonColor
+    }
+    if (toolbarUndockedActive) {
+      ;(style as Record<string, string>)['--placement-toolbar-undock-top'] =
+        `${toolbarUndockTop}px`
+    }
+    return Object.keys(style).length > 0 ? style : undefined
+  })()
+
+  const toolbarNode = (
+    <div
+      ref={toolbarRef}
+      className={[
+        'pdf-annotator-toolbar',
+        'placement-editor-toolbar',
+        activePersonColor ? 'has-person' : '',
+        toolsDisabled && !locked ? 'is-tools-disabled' : '',
+        toolbarUndockedActive ? 'is-undocked' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      style={toolbarStyle}
+      role="toolbar"
+      aria-label="Placement tools"
+      aria-disabled={toolsDisabled || undefined}
+    >
+      <button
+        type="button"
+        className={`placement-tool-btn${tool === 'signature' ? ' is-active' : ''}`}
+        onClick={() => setTool('signature')}
+        disabled={toolsDisabled}
+        title={
+          activePerson == null
+            ? 'Select a person first'
+            : `Place signature line for ${activeName}`
+        }
+        aria-label="Signature"
+        aria-pressed={tool === 'signature'}
+      >
+        <SignatureToolIcon size={18} />
+      </button>
+      <button
+        type="button"
+        className={`placement-tool-btn${tool === 'initial' ? ' is-active' : ''}`}
+        onClick={() => setTool('initial')}
+        disabled={toolsDisabled}
+        title={
+          activePerson == null
+            ? 'Select a person first'
+            : `Place initials box for ${activeName}`
+        }
+        aria-label="Initials"
+        aria-pressed={tool === 'initial'}
+      >
+        <InitialsToolIcon />
+      </button>
+      <button
+        type="button"
+        className={`placement-tool-btn${tool === 'name' ? ' is-active' : ''}`}
+        onClick={() => setTool('name')}
+        disabled={toolsDisabled}
+        title={
+          activePerson == null
+            ? 'Select a person first'
+            : `Place printed-name line for ${activeName}`
+        }
+        aria-label="Printed name"
+        aria-pressed={tool === 'name'}
+      >
+        <Type size={18} strokeWidth={2.1} aria-hidden />
+      </button>
+      <button
+        type="button"
+        className={`placement-tool-btn${tool === 'text' ? ' is-active' : ''}`}
+        onClick={() => setTool('text')}
+        disabled={toolsDisabled}
+        title={
+          activePerson == null
+            ? 'Select a person first'
+            : `Place text field (date, etc.) for ${activeName}`
+        }
+        aria-label="Text field"
+        aria-pressed={tool === 'text'}
+      >
+        <AlignLeft size={18} strokeWidth={2.1} aria-hidden />
+      </button>
+      <span className="placement-toolbar-sep" aria-hidden />
+      <button
+        type="button"
+        className={`placement-tool-btn${tool === 'checkmark' ? ' is-active' : ''}`}
+        onClick={() => setTool('checkmark')}
+        disabled={toolsDisabled}
+        title={
+          activePerson == null
+            ? 'Select a person first'
+            : 'Place empty checkbox - click the box to toggle check on or off'
+        }
+        aria-label="Checkbox"
+        aria-pressed={tool === 'checkmark'}
+      >
+        <Square size={17} strokeWidth={2.1} aria-hidden />
+        <Check size={11} strokeWidth={2.75} className="placement-tool-check-overlay" aria-hidden />
+      </button>
+      <button
+        type="button"
+        className={`placement-tool-btn${tool === 'cross' ? ' is-active' : ''}`}
+        onClick={() => setTool('cross')}
+        disabled={toolsDisabled}
+        title={
+          activePerson == null
+            ? 'Select a person first'
+            : 'Place empty X box - click the box to toggle X on or off'
+        }
+        aria-label="X mark"
+        aria-pressed={tool === 'cross'}
+      >
+        <Square size={17} strokeWidth={2.1} aria-hidden />
+        <X size={11} strokeWidth={2.75} className="placement-tool-check-overlay" aria-hidden />
+      </button>
+      {selectedId && selectedSlot && !locked && (
+        <>
+          <span className="placement-toolbar-sep" aria-hidden />
+          <label
+            className="placement-scale-control"
+            title={`Size ${selectedScalePercent}% (40%–140%)`}
+          >
+            <span className="placement-scale-label">Size</span>
+            <input
+              type="range"
+              className="placement-scale-slider"
+              min={PLACEMENT_SCALE_MIN_PCT}
+              max={PLACEMENT_SCALE_MAX_PCT}
+              step={PLACEMENT_SCALE_STEP_PCT}
+              value={selectedScalePercent}
+              onChange={e => setSelectedScalePercent(Number(e.target.value))}
+              disabled={editDisabled}
+              aria-label="Field size"
+              aria-valuemin={PLACEMENT_SCALE_MIN_PCT}
+              aria-valuemax={PLACEMENT_SCALE_MAX_PCT}
+              aria-valuenow={selectedScalePercent}
+              aria-valuetext={`${selectedScalePercent} percent`}
+            />
+            <span className="placement-scale-value" aria-hidden>
+              {selectedScalePercent}%
+            </span>
+          </label>
+          <button
+            type="button"
+            className="placement-tool-btn placement-tool-btn--danger"
+            onClick={() => removeSlot(selectedId)}
+            disabled={editDisabled}
+            title="Delete selected box"
+            aria-label="Delete selected box"
+          >
+            <Trash2 size={17} strokeWidth={2.1} aria-hidden />
+          </button>
+        </>
+      )}
+      {tool === 'text' && !locked && (
+        <label className="placement-text-label-field">
+          <span className="visually-hidden">Text field label</span>
+          <input
+            type="text"
+            value={textFieldLabel}
+            onChange={e => setTextFieldLabel(e.target.value.slice(0, 80))}
+            placeholder="Label (optional): Date, City…"
+            maxLength={80}
+            disabled={toolsDisabled}
+          />
+        </label>
+      )}
+      {pageCount > 1 && (
+        <div className="pdf-annotator-pages placement-toolbar-pages">
+          <button
+            type="button"
+            className="placement-tool-btn placement-tool-btn--sm"
+            disabled={disabled || pageNumber <= 1}
+            onClick={() => setPageNumber(p => Math.max(1, p - 1))}
+            title="Previous page"
+            aria-label="Previous page"
+          >
+            ‹
+          </button>
+          <span>
+            {pageNumber} / {pageCount}
+          </span>
+          <button
+            type="button"
+            className="placement-tool-btn placement-tool-btn--sm"
+            disabled={disabled || pageNumber >= pageCount}
+            onClick={() => setPageNumber(p => Math.min(pageCount, p + 1))}
+            title="Next page"
+            aria-label="Next page"
+          >
+            ›
+          </button>
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <div className={`placement-editor pdf-annotator${editDisabled && !locked ? ' is-disabled' : ''}${locked ? ' is-locked' : ''}`}>
       <div className="placement-editor-people" role="tablist" aria-label="People">
@@ -988,196 +1292,17 @@ export function PlacementEditor({
         </ul>
       </div>
 
-      <div
-        className={[
-          'pdf-annotator-toolbar',
-          'placement-editor-toolbar',
-          activePersonColor ? 'has-person' : '',
-          toolsDisabled && !locked ? 'is-tools-disabled' : '',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-        style={
-          activePersonColor
-            ? ({ ['--person-color' as string]: activePersonColor } as React.CSSProperties)
-            : undefined
-        }
-        role="toolbar"
-        aria-label="Placement tools"
-        aria-disabled={toolsDisabled || undefined}
-      >
-        <button
-          type="button"
-          className={`placement-tool-btn${tool === 'signature' ? ' is-active' : ''}`}
-          onClick={() => setTool('signature')}
-          disabled={toolsDisabled}
-          title={
-            activePerson == null
-              ? 'Select a person first'
-              : `Place signature line for ${activeName}`
-          }
-          aria-label="Signature"
-          aria-pressed={tool === 'signature'}
-        >
-          <SignatureToolIcon size={18} />
-        </button>
-        <button
-          type="button"
-          className={`placement-tool-btn${tool === 'initial' ? ' is-active' : ''}`}
-          onClick={() => setTool('initial')}
-          disabled={toolsDisabled}
-          title={
-            activePerson == null
-              ? 'Select a person first'
-              : `Place initials box for ${activeName}`
-          }
-          aria-label="Initials"
-          aria-pressed={tool === 'initial'}
-        >
-          <InitialsToolIcon />
-        </button>
-        <button
-          type="button"
-          className={`placement-tool-btn${tool === 'name' ? ' is-active' : ''}`}
-          onClick={() => setTool('name')}
-          disabled={toolsDisabled}
-          title={
-            activePerson == null
-              ? 'Select a person first'
-              : `Place printed-name line for ${activeName}`
-          }
-          aria-label="Printed name"
-          aria-pressed={tool === 'name'}
-        >
-          <Type size={18} strokeWidth={2.1} aria-hidden />
-        </button>
-        <button
-          type="button"
-          className={`placement-tool-btn${tool === 'text' ? ' is-active' : ''}`}
-          onClick={() => setTool('text')}
-          disabled={toolsDisabled}
-          title={
-            activePerson == null
-              ? 'Select a person first'
-              : `Place text field (date, etc.) for ${activeName}`
-          }
-          aria-label="Text field"
-          aria-pressed={tool === 'text'}
-        >
-          <AlignLeft size={18} strokeWidth={2.1} aria-hidden />
-        </button>
-        <span className="placement-toolbar-sep" aria-hidden />
-        <button
-          type="button"
-          className={`placement-tool-btn${tool === 'checkmark' ? ' is-active' : ''}`}
-          onClick={() => setTool('checkmark')}
-          disabled={toolsDisabled}
-          title={
-            activePerson == null
-              ? 'Select a person first'
-              : 'Place empty checkbox - click the box to toggle check on or off'
-          }
-          aria-label="Checkbox"
-          aria-pressed={tool === 'checkmark'}
-        >
-          <Square size={17} strokeWidth={2.1} aria-hidden />
-          <Check size={11} strokeWidth={2.75} className="placement-tool-check-overlay" aria-hidden />
-        </button>
-        <button
-          type="button"
-          className={`placement-tool-btn${tool === 'cross' ? ' is-active' : ''}`}
-          onClick={() => setTool('cross')}
-          disabled={toolsDisabled}
-          title={
-            activePerson == null
-              ? 'Select a person first'
-              : 'Place empty X box - click the box to toggle X on or off'
-          }
-          aria-label="X mark"
-          aria-pressed={tool === 'cross'}
-        >
-          <Square size={17} strokeWidth={2.1} aria-hidden />
-          <X size={11} strokeWidth={2.75} className="placement-tool-check-overlay" aria-hidden />
-        </button>
-        {selectedId && selectedSlot && !locked && (
-          <>
-            <span className="placement-toolbar-sep" aria-hidden />
-            <label
-              className="placement-scale-control"
-              title={`Size ${selectedScalePercent}% (40%–140%)`}
-            >
-              <span className="placement-scale-label">Size</span>
-              <input
-                type="range"
-                className="placement-scale-slider"
-                min={PLACEMENT_SCALE_MIN_PCT}
-                max={PLACEMENT_SCALE_MAX_PCT}
-                step={PLACEMENT_SCALE_STEP_PCT}
-                value={selectedScalePercent}
-                onChange={e => setSelectedScalePercent(Number(e.target.value))}
-                disabled={editDisabled}
-                aria-label="Field size"
-                aria-valuemin={PLACEMENT_SCALE_MIN_PCT}
-                aria-valuemax={PLACEMENT_SCALE_MAX_PCT}
-                aria-valuenow={selectedScalePercent}
-                aria-valuetext={`${selectedScalePercent} percent`}
-              />
-              <span className="placement-scale-value" aria-hidden>
-                {selectedScalePercent}%
-              </span>
-            </label>
-            <button
-              type="button"
-              className="placement-tool-btn placement-tool-btn--danger"
-              onClick={() => removeSlot(selectedId)}
-              disabled={editDisabled}
-              title="Delete selected box"
-              aria-label="Delete selected box"
-            >
-              <Trash2 size={17} strokeWidth={2.1} aria-hidden />
-            </button>
-          </>
+      <div ref={toolbarSlotRef} className="placement-editor-toolbar-slot">
+        {toolbarUndockedActive && (
+          <div
+            className="placement-editor-toolbar-spacer"
+            style={{ height: toolbarHeight > 0 ? toolbarHeight : undefined }}
+            aria-hidden
+          />
         )}
-        {tool === 'text' && !locked && (
-          <label className="placement-text-label-field">
-            <span className="visually-hidden">Text field label</span>
-            <input
-              type="text"
-              value={textFieldLabel}
-              onChange={e => setTextFieldLabel(e.target.value.slice(0, 80))}
-              placeholder="Label (optional): Date, City…"
-              maxLength={80}
-              disabled={toolsDisabled}
-            />
-          </label>
-        )}
-        {pageCount > 1 && (
-          <div className="pdf-annotator-pages placement-toolbar-pages">
-            <button
-              type="button"
-              className="placement-tool-btn placement-tool-btn--sm"
-              disabled={disabled || pageNumber <= 1}
-              onClick={() => setPageNumber(p => Math.max(1, p - 1))}
-              title="Previous page"
-              aria-label="Previous page"
-            >
-              ‹
-            </button>
-            <span>
-              {pageNumber} / {pageCount}
-            </span>
-            <button
-              type="button"
-              className="placement-tool-btn placement-tool-btn--sm"
-              disabled={disabled || pageNumber >= pageCount}
-              onClick={() => setPageNumber(p => Math.min(pageCount, p + 1))}
-              title="Next page"
-              aria-label="Next page"
-            >
-              ›
-            </button>
-          </div>
-        )}
+        {toolbarUndockedActive && typeof document !== 'undefined'
+          ? createPortal(toolbarNode, document.body)
+          : toolbarNode}
       </div>
 
       {!locked && !reviewMode && activePerson == null && (

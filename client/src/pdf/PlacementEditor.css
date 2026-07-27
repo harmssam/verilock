@@ -6,6 +6,17 @@
   cursor: default;
 }
 
+/* Slot holds the in-flow toolbar (or a spacer while the bar is undocked). */
+.placement-editor-toolbar-slot {
+  min-width: 0;
+}
+
+.placement-editor-toolbar-spacer {
+  /* Height set inline from measured toolbar; keep a min so layout never collapses. */
+  min-height: 2.95rem;
+  pointer-events: none;
+}
+
 /* PDF-style tool strip: square icon buttons + person-colored frame */
 .placement-editor-toolbar {
   display: flex;
@@ -33,6 +44,53 @@
 
 .placement-editor-toolbar.is-tools-disabled:not(.has-person) {
   opacity: 0.72;
+}
+
+/*
+ * Mobile undock: fixed under the sticky shell header while the user works the PDF.
+ * Portaled to document.body (transforms / overflow on journey ancestors trap fixed).
+ * Scroll back up past the dock slot → JS removes .is-undocked.
+ */
+.placement-editor-toolbar.is-undocked {
+  position: fixed;
+  top: var(--placement-toolbar-undock-top, calc(4.75rem + env(safe-area-inset-top, 0px)));
+  left: max(0.5rem, env(safe-area-inset-left, 0px));
+  right: max(0.5rem, env(safe-area-inset-right, 0px));
+  z-index: 35; /* below .lr-header (40) */
+  max-height: min(42vh, 16rem);
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: rgb(255 255 255 / 96%);
+  box-shadow:
+    0 8px 28px rgb(15 23 42 / 14%),
+    0 1px 0 rgb(15 23 42 / 6%),
+    inset 0 1px 0 rgb(255 255 255 / 70%);
+}
+
+.placement-editor-toolbar.is-undocked.has-person {
+  background: color-mix(in srgb, var(--person-color, #0f766e) 8%, rgb(255 255 255 / 96%));
+  box-shadow:
+    0 8px 28px rgb(15 23 42 / 14%),
+    0 0 0 1px color-mix(in srgb, var(--person-color, #0f766e) 32%, transparent),
+    inset 0 1px 0 rgb(255 255 255 / 70%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .placement-editor-toolbar.is-undocked {
+    animation: placement-toolbar-undock-in 0.18s ease-out;
+  }
+}
+
+@keyframes placement-toolbar-undock-in {
+  from {
+    opacity: 0.55;
+    transform: translateY(-0.35rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .placement-tool-btn {
