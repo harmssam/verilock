@@ -4037,6 +4037,21 @@ a.hash-chip.text-link:focus-visible {
   line-height: 1.4;
 }
 
+/* Solo sign dock: doc title only (no 0/1 progress or single-person roster). */
+.solo-sign-doc-title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text, #0f172a);
+  /* Override .muted when both classes apply — keep readable. */
+}
+
+.solo-sign-doc-title.muted {
+  color: var(--text-muted, #475569);
+  font-weight: 550;
+}
+
 .doc-stage--needs-local {
   border-color: rgba(251, 191, 36, 0.45);
   box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.12);

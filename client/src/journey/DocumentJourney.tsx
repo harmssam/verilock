@@ -3109,11 +3109,13 @@ export function DocumentJourney({
 
                   {doc && (
                     <>
-                      {/*
-                        Quiet waiting view already has a slim progress line - skip the Sign
-                        roster / progress chrome so co-signer wait isn’t a wall of people.
-                      */}
-                      {!inviteWaitingView && (
+                      {/**
+                       * Solo (1 of 1): skip roster + signature progress — they already know
+                       * they’re the only signer; the PDF + field count carry the work.
+                       * Multi still shows Signatures n/m and the party list.
+                       * Quiet waiting view also skips this chrome.
+                       */}
+                      {!inviteWaitingView && requiredCount(doc) > 1 && (
                         <>
                           <div className="progress-bar-wrap">
                             <div className="progress-bar-meta">
@@ -3140,6 +3142,10 @@ export function DocumentJourney({
                             }
                           />
                         </>
+                      )}
+
+                      {!inviteWaitingView && requiredCount(doc) <= 1 && !allSigned(doc) && (
+                        <p className="solo-sign-doc-title muted">{doc.title}</p>
                       )}
 
                       {/* Creator invites on the share step (after they sign). Never on invited path. */}
@@ -3262,23 +3268,26 @@ export function DocumentJourney({
 
                           {account && signingResolution?.ok && pendingParty && (
                             <>
-                              <div className="sign-as-banner">
-                                Signing as{' '}
-                                <strong>
-                                  {pendingParty.roleLabel}
-                                  {pendingParty.displayName
-                                    ? ` · ${pendingParty.displayName}`
-                                    : ''}
-                                </strong>
-                                <span className="muted">
-                                  {' '}
-                                  ({signedCount(doc) + 1} of {requiredCount(doc)}) with{' '}
-                                  {account.shortAddress}
-                                  {pendingParty.walletAddress
-                                    ? ' · wallet required for this person'
-                                    : ''}
-                                </span>
-                              </div>
+                              {/* Multi only: solo already has identity from the wallet pill + PDF. */}
+                              {requiredCount(doc) > 1 && (
+                                <div className="sign-as-banner">
+                                  Signing as{' '}
+                                  <strong>
+                                    {pendingParty.roleLabel}
+                                    {pendingParty.displayName
+                                      ? ` · ${pendingParty.displayName}`
+                                      : ''}
+                                  </strong>
+                                  <span className="muted">
+                                    {' '}
+                                    ({signedCount(doc) + 1} of {requiredCount(doc)}) with{' '}
+                                    {account.shortAddress}
+                                    {pendingParty.walletAddress
+                                      ? ' · wallet required for this person'
+                                      : ''}
+                                  </span>
+                                </div>
+                              )}
 
                               {/*
                                 Invitees / return visits need the drop zone. Same-session self-sign
@@ -3378,6 +3387,7 @@ export function DocumentJourney({
                                     onSubmit={submitPageFields}
                                     authToken={token}
                                     documentId={doc.id}
+                                    solo={requiredCount(doc) <= 1}
                                   />
                                 )}
 
