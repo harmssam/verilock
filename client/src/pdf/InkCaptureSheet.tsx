@@ -65,12 +65,17 @@ function IPhoneOutlineIcon({ className }: { className?: string }) {
 
 /**
  * Pixel-perfect forced landscape frame for portrait-locked hosts (Nimiq Pay).
- * CSS-only 100vh/100vw + transform is unreliable in iOS mini-app WebViews.
  *
  * Layout box is landscape-sized (long = physical height, short = physical width),
  * centered, then rotated 90° so it fills the portrait viewport. Hold phone on its side.
+ *
+ * Also computes pad pixel size to fill the long edge while keeping field aspect
+ * (so the draw band is full-width when viewed landscape, not a narrow strip).
  */
-function useForcedLandscapeFrame(enabled: boolean): CSSProperties | undefined {
+function useForcedLandscapeFrame(
+  enabled: boolean,
+  fieldAspect: number,
+): CSSProperties | undefined {
   const [style, setStyle] = useState<CSSProperties | undefined>(undefined)
 
   useLayoutEffect(() => {
@@ -83,26 +88,46 @@ function useForcedLandscapeFrame(enabled: boolean): CSSProperties | undefined {
       const vw = window.innerWidth
       const vh = window.innerHeight
       if (vw < 1 || vh < 1) return
-      // Landscape logical size: wide edge along physical vertical after rotate
-      const width = vh
-      const height = vw
+      // Landscape logical size: width = long edge, height = short edge
+      const frameW = vh
+      const frameH = vw
+      const aspect =
+        Number.isFinite(fieldAspect) && fieldAspect > 0.05 && fieldAspect < 20
+          ? fieldAspect
+          : 2.5
+
+      // Room for head + Apply dock + gaps (logical landscape coords)
+      const padX = 20
+      const padTop = 52
+      const padBottom = 58
+      const availW = Math.max(120, frameW - padX * 2)
+      const availH = Math.max(80, frameH - padTop - padBottom)
+
+      // Fit field aspect inside avail box — prefer using full long edge (width)
+      let padW = availW
+      let padH = padW / aspect
+      if (padH > availH) {
+        padH = availH
+        padW = padH * aspect
+      }
+
       setStyle({
         position: 'fixed',
         zIndex: 230,
-        width,
-        height,
-        // Center the landscape box in the portrait viewport before rotate
-        top: (vh - height) / 2,
-        left: (vw - width) / 2,
+        width: frameW,
+        height: frameH,
+        top: (vh - frameH) / 2,
+        left: (vw - frameW) / 2,
         right: 'auto',
         bottom: 'auto',
         margin: 0,
         transform: 'rotate(90deg)',
         transformOrigin: 'center center',
         boxSizing: 'border-box',
-        // Expose short edge for pad max-height (physical phone width)
-        ['--ink-force-short' as string]: `${height}px`,
-        ['--ink-force-long' as string]: `${width}px`,
+        ['--ink-force-short' as string]: `${frameH}px`,
+        ['--ink-force-long' as string]: `${frameW}px`,
+        ['--ink-pad-w' as string]: `${Math.round(padW)}px`,
+        ['--ink-pad-h' as string]: `${Math.round(padH)}px`,
       })
     }
 
@@ -118,7 +143,7 @@ function useForcedLandscapeFrame(enabled: boolean): CSSProperties | undefined {
       vv?.removeEventListener('resize', apply)
       vv?.removeEventListener('scroll', apply)
     }
-  }, [enabled])
+  }, [enabled, fieldAspect])
 
   return style
 }
@@ -171,7 +196,6 @@ export function InkCaptureSheet({
   const needsLandscape = !isLandscape
   const isPortraitHost = !needsLandscape && isRealPortrait
   const canDraw = isLandscape && !disabled
-  const forceFrame = useForcedLandscapeFrame(isPortraitHost)
   const title = isInitial ? 'Draw your initials' : 'Draw your signature'
   const aspect =
     padAspect != null && Number.isFinite(padAspect) && padAspect > 0.05
@@ -179,6 +203,7 @@ export function InkCaptureSheet({
       : isInitial
         ? 1.4
         : 2.8
+  const forceFrame = useForcedLandscapeFrame(isPortraitHost, aspect)
 
   /**
    * One-shot guide: iPhone SVG turns 2s, holds, fades — tip the phone to match the frame.
