@@ -155,8 +155,10 @@ export function applyPageMeta(meta: PageMeta): void {
   setMeta('property', 'og:description', meta.description)
   setMeta('property', 'og:url', url)
   setMeta('property', 'og:image', image)
+  setMeta('property', 'og:image:type', 'image/png')
   setMeta('property', 'og:image:width', '1200')
   setMeta('property', 'og:image:height', '630')
+  setMeta('property', 'og:image:alt', 'VeriLock — Multi-party document signing. Free.')
   setMeta('property', 'og:locale', 'en_US')
 
   setMeta('name', 'twitter:card', 'summary_large_image')
