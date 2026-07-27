@@ -88,9 +88,9 @@ export const PAGE_META = {
     path: '/',
   },
   statsPricing: {
-    title: `eSignature Pricing Report 2026 — Compare Costs Per Document${TITLE_SUFFIX}`,
+    title: `eSignature Pricing Report 2026 - Compare Costs Per Document${TITLE_SUFFIX}`,
     description:
-      'Side-by-side pricing comparison of DocuSign, Adobe Sign, PandaDoc, Dropbox Sign, SignNow, and VeriLock. See actual cost per signature at every usage level — subscription vs pay-per-use.',
+      'DocuSign, Adobe Sign, PandaDoc, Dropbox Sign, SignNow, and VeriLock side by side. VeriLock multi-party signing is free; optional on-chain lock is pay-per-use. Cost per document at every usage level.',
     path: '/esignature-pricing',
   },
   faq: {

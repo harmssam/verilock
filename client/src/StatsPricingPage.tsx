@@ -1,5 +1,5 @@
 /**
- * eSignature Pricing Report — journalist-keyword resource page.
+ * eSignature Pricing Report - journalist-keyword resource page.
  * Data-driven comparison for journalists citing e-signature pricing.
  * Last updated: July 25, 2026. Next review: October 2026.
  *
@@ -14,7 +14,7 @@ import './StatsPricingPage.css'
 // Rate: Fastspot via /api/nim-prices (same source as Pricing).
 
 const VERILOCK_FEE_NIM = 1000
-/** USD per NIM — as of July 25, 2026. */
+/** USD per NIM - as of July 25, 2026. */
 const NIM_USD = 0.000408962
 /** Lock estimate (1000 NIM × NIM/USD), rounded for tables. */
 const VERILOCK_USD_PER_DOC = +(VERILOCK_FEE_NIM * NIM_USD).toFixed(2) // $0.41
@@ -128,12 +128,12 @@ const PROVIDERS: Provider[] = [
     slug: 'verilock',
     tiers: [
       {
-        name: 'Pay-per-lock',
-        price: `$${VERILOCK_USD_PER_DOC.toFixed(2)}/document`,
-        notes: 'No subscription. Pay only when you lock on-chain.',
+        name: 'Optional lock',
+        price: `$${VERILOCK_USD_PER_DOC.toFixed(2)}/lock`,
+        notes: 'Signing is free. Pay only if you lock on-chain.',
       },
     ],
-    freeTier: 'Free multi-party signing. Pay only for optional on-chain lock.',
+    freeTier: 'Yes: unlimited signing; lock optional',
     payPerUse: true,
     uploadsDocument: false,
     url: '/pricing',
@@ -158,7 +158,7 @@ interface ScenarioRow {
 function calcScenarios(docs: number): ScenarioRow[] {
   const verilockRow: ScenarioRow = {
     provider: 'VeriLock',
-    tier: `Pay-per-lock $${VERILOCK_USD_PER_DOC.toFixed(2)}`,
+    tier: `Optional lock $${VERILOCK_USD_PER_DOC.toFixed(2)}`,
     monthlyCost: +(docs * VERILOCK_USD_PER_DOC).toFixed(2),
     costPerDoc: VERILOCK_USD_PER_DOC,
     isVerilock: true,
@@ -189,7 +189,7 @@ const ANNUAL_EIGHT: { provider: string; annual: number; details: string }[] = [
   {
     provider: 'VeriLock',
     annual: VERILOCK_ANNUAL_AT_EIGHT,
-    details: `$${VERILOCK_USD_PER_DOC.toFixed(2)}/doc · ${DOCS_PER_YEAR_AT_EIGHT} docs/year · no subscription`,
+    details: `If every doc is locked: $${VERILOCK_USD_PER_DOC.toFixed(2)} × ${DOCS_PER_YEAR_AT_EIGHT}/year · sign-only is $0`,
   },
   { provider: 'SignNow', annual: 96, details: 'Business $8/mo · $96/year' },
   { provider: 'Adobe Sign', annual: 155.88, details: 'Standard $12.99/mo · $155.88/year' },
@@ -213,13 +213,15 @@ export function StatsPricingPage() {
           eSignature Pricing Report 2026
         </h1>
         <p className="stats-hero-stat">
-          The average e-signature subscription costs <strong>$22/user/month</strong>
-          {' — but most users sign fewer than '}
-          <strong>10 documents monthly</strong>
-          {'. At 5 documents/month, that\'s '}
-          <strong>$4.40 per signature</strong>
-          {'. VeriLock costs '}
-          <strong>{verilockUsdLabel} per document</strong>, period.
+          Typical subscriptions run <strong>$8–$60/user/month</strong>. Most people sign under{' '}
+          <strong>10 documents a month</strong>
+          {', so the real cost is often '}
+          <strong>several dollars per signature</strong>
+          {'. VeriLock: multi-party signing is '}
+          <strong>free</strong>
+          {'; optional on-chain lock is about '}
+          <strong>{verilockUsdLabel}</strong>
+          {' when you want permanent proof.'}
         </p>
         <p className="stats-hero-updated">
           Last updated: July 25, 2026 · Next review: October 2026
@@ -230,17 +232,18 @@ export function StatsPricingPage() {
       <section className="stats-section" aria-labelledby={`${pricingId}-takeaways`}>
         <h2 id={`${pricingId}-takeaways`} className="stats-h2">Key Takeaways</h2>
         <ul className="stats-takeaways">
-          <li>e-signature pricing ranges from <strong>$8 to $60 per user/month</strong> for subscription plans.</li>
-          <li>Most providers <strong>lock basic features</strong> (templates, reminders, branding) behind higher tiers — the entry price is a teaser.</li>
           <li>
-            Pay-per-use alternatives like VeriLock cost <strong>{verilockUsdLabel}/document</strong>
-            {' '}— no monthly minimum, no feature tiers.
+            Subscriptions: <strong>$8–$60/user/month</strong>. Average volume is only{' '}
+            <strong>5–8 docs/month</strong>.
           </li>
           <li>
-            For users signing fewer than <strong>{CROSSOVER_DOCS} documents/month</strong>, subscription plans
-            cost more per signature than pay-per-use.
+            VeriLock: <strong>sign free</strong>. Pay ~{verilockUsdLabel} only if you{' '}
+            <strong>optionally lock</strong> a permanent proof.
           </li>
-          <li>The average business user signs <strong>5–8 documents per month</strong> — well below most plan break-even points.</li>
+          <li>
+            Below ~<strong>{CROSSOVER_DOCS} locks/month</strong>, optional lock beats the cheapest
+            subscription on a per-document basis, and a quiet month costs $0.
+          </li>
         </ul>
       </section>
 
@@ -268,12 +271,12 @@ export function StatsPricingPage() {
                   <tr key={p.slug} className={isVerilock ? 'stats-row--verilock' : ''}>
                     <td className="stats-table-provider">
                       {p.name}
-                      {isVerilock && <span className="stats-badge">Pay-per-use</span>}
+                      {isVerilock && <span className="stats-badge">Sign free</span>}
                     </td>
-                    <td>{lowest?.name ?? '—'}</td>
-                    <td className="stats-table-price">{lowest?.price ?? '—'}</td>
-                    <td>{mid?.name ?? '—'}</td>
-                    <td className="stats-table-price">{mid?.price ?? '—'}</td>
+                    <td>{lowest?.name ?? '-'}</td>
+                    <td className="stats-table-price">{lowest?.price ?? '-'}</td>
+                    <td>{mid?.name ?? '-'}</td>
+                    <td className="stats-table-price">{mid?.price ?? '-'}</td>
                     <td>{p.freeTier}</td>
                   </tr>
                 )
@@ -291,7 +294,7 @@ export function StatsPricingPage() {
       <section className="stats-section" aria-labelledby={`${pricingId}-features`}>
         <h2 id={`${pricingId}-features`} className="stats-h2">What You Get at the Lowest Paid Tier</h2>
         <p className="stats-lead">
-          The base price looks cheap — but most providers strip core features at the entry level,
+          The base price looks cheap, but most providers strip core features at the entry level,
           forcing an upgrade for anything beyond basic signatures.
         </p>
         <div className="stats-table-wrap">
@@ -309,7 +312,7 @@ export function StatsPricingPage() {
             <tbody>
               {[
                 { feature: 'E-signatures', map: () => true },
-                { feature: 'Unlimited documents', map: (p: Provider) => p.payPerUse || p.slug === 'pandadoc' || p.slug === 'dropbox', notes: (p: Provider) => p.slug === 'docusign' ? '5 sends' : p.slug === 'adobe' ? '150/yr' : p.payPerUse ? 'Pay per doc' : null },
+                { feature: 'Unlimited documents', map: (p: Provider) => p.payPerUse || p.slug === 'pandadoc' || p.slug === 'dropbox', notes: (p: Provider) => p.slug === 'docusign' ? '5 sends' : p.slug === 'adobe' ? '150/yr' : p.payPerUse ? 'Sign free' : null },
                 { feature: 'Reminders', map: (p: Provider) => p.slug === 'dropbox' || p.slug === 'signnow', notes: (p: Provider) => p.payPerUse ? 'N/A' : null },
                 { feature: 'Multi-party signing', map: (p: Provider) => p.slug !== 'adobe' && p.slug !== 'docusign', notes: (p: Provider) => p.slug === 'adobe' ? 'Limited' : null },
                 { feature: 'Audit trail', map: () => true, notes: (p: Provider) => p.payPerUse ? 'Blockchain' : 'Basic' },
@@ -322,7 +325,7 @@ export function StatsPricingPage() {
                     const note = notes ? notes(p) : null
                     return (
                       <td key={p.slug} className={p.slug === 'verilock' ? 'stats-col--verilock' : ''}>
-                        {has ? <span className="stats-check">✓</span> : <span className="stats-cross">—</span>}
+                        {has ? <span className="stats-check">✓</span> : <span className="stats-cross">-</span>}
                         {note && <span className="stats-feature-note"> {note}</span>}
                       </td>
                     )
@@ -338,8 +341,9 @@ export function StatsPricingPage() {
       <section className="stats-section" aria-labelledby={`${pricingId}-cost`}>
         <h2 id={`${pricingId}-cost`} className="stats-h2">Cost Per Document: The Hidden Math</h2>
         <p className="stats-lead">
-          The monthly price tells one story. The actual cost per signature tells another.
-          Here's what you really pay at three usage levels.
+          Monthly sticker price vs cost per document at three usage levels.
+          VeriLock rows assume every document is <strong>locked</strong>
+          {'; signed-only agreements stay $0.'}
         </p>
 
         {SCENARIOS.map(s => {
@@ -376,8 +380,11 @@ export function StatsPricingPage() {
                 </table>
               </div>
               <p className="stats-scenario-verdict">
-                Cheapest: <strong>{cheapest.provider}</strong> at <strong>{fmtMoney(cheapest.costPerDoc)}/document</strong>
-                {cheapest.isVerilock ? ' — pay-per-use with no monthly commitment.' : ` — ${cheapest.tier}.`}
+                Cheapest: <strong>{cheapest.provider}</strong> at{' '}
+                <strong>{fmtMoney(cheapest.costPerDoc)}/document</strong>
+                {cheapest.isVerilock
+                  ? ' if locked (signing alone is free, no monthly commitment).'
+                  : ` (${cheapest.tier}).`}
               </p>
             </div>
           )
@@ -385,10 +392,10 @@ export function StatsPricingPage() {
 
         <div className="stats-callout">
           <p>
-            <strong>The crossover point:</strong> VeriLock is cheapest for users signing fewer than ~
-            {CROSSOVER_DOCS} documents/month. Above that, SignNow Business ($8/mo) becomes cheaper per
-            document — but locks you into a recurring subscription. With VeriLock,{' '}
-            <strong>zero documents in a month costs zero dollars</strong>.
+            <strong>Crossover:</strong> if you lock every document, VeriLock stays cheapest below ~
+            {CROSSOVER_DOCS} locks/month. Above that, SignNow Business ($8/mo) can win on per-doc
+            math, with a subscription. Sign free without locking anytime; a quiet month is still{' '}
+            <strong>$0</strong>.
           </p>
         </div>
       </section>
@@ -472,8 +479,8 @@ export function StatsPricingPage() {
             <a href="/pricing">verilock.online/pricing</a>).
           </li>
           <li>
-            <strong>Cost-per-document scenarios:</strong> Assumes one lock per document. Multi-party signing is
-            free on VeriLock; only the optional on-chain lock is paid.
+            <strong>Cost-per-document scenarios:</strong> One lock per document for apples-to-apples
+            comparison. Multi-party signing on VeriLock is free; the on-chain lock is optional and paid.
           </li>
           <li><strong>Enterprise pricing excluded:</strong> Custom quotes vary by organization size, volume commitments, and contract length.</li>
           <li><strong>Annual billing discounts not applied:</strong> Monthly pricing shown throughout for fair comparison. Annual plans are typically 15–30% cheaper.</li>
@@ -495,7 +502,8 @@ export function StatsPricingPage() {
       {/* ── Footer CTA ── */}
       <footer className="stats-cta">
         <p className="stats-cta-text">
-          Lock your next document for <strong>{verilockUsdLabel}</strong>. No subscription. No upload. Just proof.
+          Sign free. Lock for about <strong>{verilockUsdLabel}</strong> when it matters. No
+          subscription. No upload.
         </p>
         <a href="/pricing" className="stats-cta-btn">See VeriLock pricing</a>
       </footer>
