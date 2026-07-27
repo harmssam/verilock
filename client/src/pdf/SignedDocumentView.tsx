@@ -429,19 +429,35 @@ export function SignedDocumentView({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sigKey/partyKey/legacyKey stabilize array props
   }, [file, fingerprint, documentId, authToken, revealPrivate, sigKey, partyKey, legacyKey])
 
-  const handlePrint = async () => {
+  const handlePrint = () => {
     setPrintError(null)
     setPrintBusy(true)
+    // Open the sheet in the same user-gesture turn as the tap so mobile browsers
+    // allow it; the document body is then filled with page images only (no SPA).
+    let sheet: Window | null = null
     try {
-      await printRenderedPages(
-        reconRef.current?.getPagesRoot() ?? null,
-        file.name ? `Signed - ${file.name}` : 'Signed document',
-      )
-    } catch (err) {
-      setPrintError(err instanceof Error ? err.message : 'Could not print')
-    } finally {
-      setPrintBusy(false)
+      sheet = window.open('about:blank', 'verilock-print')
+    } catch {
+      sheet = null
     }
+    void (async () => {
+      try {
+        await printRenderedPages(
+          reconRef.current?.getPagesRoot() ?? null,
+          file.name ? `Signed - ${file.name}` : 'Signed document',
+          sheet,
+        )
+      } catch (err) {
+        try {
+          sheet?.close()
+        } catch {
+          /* ignore */
+        }
+        setPrintError(err instanceof Error ? err.message : 'Could not print')
+      } finally {
+        setPrintBusy(false)
+      }
+    })()
   }
 
   return (
@@ -463,7 +479,7 @@ export function SignedDocumentView({
               type="button"
               className={`btn btn-secondary signed-document-print${printBusy ? ' btn--busy' : ''}`}
               disabled={!pagesReady || printBusy}
-              onClick={() => void handlePrint()}
+              onClick={handlePrint}
             >
               <Printer size={16} strokeWidth={2.25} aria-hidden />
               {printBusy ? 'Preparing…' : 'Print'}
