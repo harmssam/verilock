@@ -1,5 +1,6 @@
 import { Eraser } from 'lucide-react'
 import { useEffect, useRef, type CSSProperties } from 'react'
+import { usePrimarilyTouch } from '../useViewport'
 import { simplifyStroke, type StrokePoint } from './signatureCodec'
 import { SIGNATURE_RDP_EPSILON_PX } from './annotationLimits'
 import type { SignaturePathData } from './annotations'
@@ -65,6 +66,7 @@ export function SignatureStrokePad({
   const captureAspectRef = useRef<number | null>(null)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  const primarilyTouch = usePrimarilyTouch()
 
   const aspect =
     padAspect != null && Number.isFinite(padAspect) && padAspect > 0.05 && padAspect < 20
@@ -332,7 +334,11 @@ export function SignatureStrokePad({
       />
       {!compact &&
         (productMode ? (
-          <p className="sig-pad-hint muted">Draw with your finger or mouse. Clear to start over.</p>
+          <p className="sig-pad-hint muted">
+            {primarilyTouch
+              ? 'Draw with your finger. Clear to start over.'
+              : 'Draw with your mouse or trackpad. Clear to start over.'}
+          </p>
         ) : (
           <p className="sig-pad-hint muted">
             Vector ink with RDP ε={epsilon}px (lab default). PNG is preview only - path is what we

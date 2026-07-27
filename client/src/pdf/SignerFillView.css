@@ -365,7 +365,7 @@
   }
 }
 
-/* Shorter pad for initials (matches smaller page boxes) */
+/* Shorter pad for initials (matches smaller page boxes) — desktop card only */
 .signer-fill-modal-body.is-initial .sig-pad-canvas {
   min-height: 5.25rem;
   max-width: 14rem;
@@ -432,6 +432,9 @@
 .signer-fill-modal-actions .btn-primary {
   min-width: 9rem;
 }
+
+/*
+ * In-app mobile ink capture — full
 
 @keyframes signer-modal-fade {
   from {

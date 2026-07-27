@@ -1,5 +1,6 @@
 import { Eraser, Undo2 } from 'lucide-react'
 import { useEffect, useRef } from 'react'
+import { usePrimarilyTouch } from '../useViewport'
 
 interface SignaturePadProps {
   /** Called with PNG blob when ink changes; null when cleared. */
@@ -28,6 +29,7 @@ export function SignaturePad({
   const drawing = useRef(false)
   const strokes = useRef<Stroke[]>([])
   const current = useRef<Stroke>([])
+  const primarilyTouch = usePrimarilyTouch()
 
   const redraw = () => {
     const canvas = canvasRef.current
@@ -175,7 +177,9 @@ export function SignaturePad({
       />
       {!hideHint && (
         <p className="sig-pad-hint muted">
-          Draw with mouse or finger. Image stays on this device until you sign.
+          {primarilyTouch
+            ? 'Draw with your finger. Image stays on this device until you sign.'
+            : 'Draw with your mouse or trackpad. Image stays on this device until you sign.'}
         </p>
       )}
     </div>

@@ -441,10 +441,5 @@ export function SignOnMobileModal({
   return createPortal(node, document.body)
 }
 
-/** True when the primary surface is already a phone-sized touch device. */
-export function isLikelyMobileViewport(): boolean {
-  if (typeof window === 'undefined') return false
-  const narrow = window.matchMedia('(max-width: 640px)').matches
-  const coarse = window.matchMedia('(pointer: coarse)').matches
-  return narrow && coarse
-}
+/** @deprecated Prefer `isLikelyMobileViewport` / `useLikelyMobileViewport` from `useViewport`. */
+export { isLikelyMobileViewport } from '../useViewport'

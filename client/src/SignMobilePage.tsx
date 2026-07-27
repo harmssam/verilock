@@ -1,9 +1,7 @@
-import { Check, LoaderCircle, Smartphone } from 'lucide-react'
+import { Check, LoaderCircle } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  SignatureStrokePad,
-  type SignatureStrokeResult,
-} from './pdf/SignatureStrokePad'
+import { InkCaptureSheet } from './pdf/InkCaptureSheet'
+import type { SignatureStrokeResult } from './pdf/SignatureStrokePad'
 import {
   encryptPayload,
   importKeyB64url,
@@ -50,40 +48,10 @@ function kindFromHash(): 'signature' | 'initial' {
   return hashParams().get('kind') === 'initial' ? 'initial' : 'signature'
 }
 
-/** True when the viewport is landscape (width ≥ height). Updates on rotate. */
-function useIsLandscape(): boolean {
-  const read = () => {
-    if (typeof window === 'undefined') return true
-    // matchMedia is the usual signal; width/height covers quirky mobile UAs.
-    const mq =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(orientation: landscape)').matches
-    return mq || window.innerWidth >= window.innerHeight
-  }
-  const [landscape, setLandscape] = useState(read)
-  useEffect(() => {
-    const sync = () => setLandscape(read())
-    sync()
-    const mq =
-      typeof window.matchMedia === 'function'
-        ? window.matchMedia('(orientation: landscape)')
-        : null
-    mq?.addEventListener('change', sync)
-    window.addEventListener('orientationchange', sync)
-    window.addEventListener('resize', sync)
-    return () => {
-      mq?.removeEventListener('change', sync)
-      window.removeEventListener('orientationchange', sync)
-      window.removeEventListener('resize', sync)
-    }
-  }, [])
-  return landscape
-}
-
 /**
  * Full-screen mobile signature capture - no wallet, no PDF, no preview step.
  * Draw → Done sends vectors (E2E encrypted) to the desktop host.
- * Drawing requires landscape so the pad has room to match the PDF field.
+ * Capture UI is shared with in-app mobile field signing (`InkCaptureSheet`).
  */
 export function SignMobilePage() {
   const sessionId = parseSessionId(window.location.pathname)
@@ -91,10 +59,8 @@ export function SignMobilePage() {
   const [error, setError] = useState<string | null>(null)
   const [stroke, setStroke] = useState<SignatureStrokeResult | null>(null)
   const [padKey, setPadKey] = useState(0)
-  const isLandscape = useIsLandscape()
   const padAspect = aspectFromHash()
   const fieldKind = kindFromHash()
-  const isInitial = fieldKind === 'initial'
 
   const keyRef = useRef<CryptoKey | null>(null)
   const channelRef = useRef<RTCDataChannel | null>(null)
@@ -146,7 +112,9 @@ export function SignMobilePage() {
           onStatus: s => {
             if (cancelled) return
             if (s === 'connected') {
-              setPhase(p => (p === 'ready' || p === 'connecting' || p === 'loading' ? 'connected' : p))
+              setPhase(p =>
+                p === 'ready' || p === 'connecting' || p === 'loading' ? 'connected' : p,
+              )
             }
           },
           onError: () => {
@@ -208,93 +176,25 @@ export function SignMobilePage() {
 
   const drawing =
     phase === 'ready' || phase === 'connecting' || phase === 'connected'
-  const needsLandscape = drawing && !isLandscape
-  const canDraw = drawing && isLandscape
+
+  if (drawing) {
+    return (
+      <InkCaptureSheet
+        variant="page"
+        fieldKind={fieldKind}
+        padAspect={padAspect ?? undefined}
+        padKey={padKey}
+        kicker="VeriLock"
+        onChange={setStroke}
+        hasInk={Boolean(stroke?.path?.strokes?.length)}
+        primaryLabel="Done"
+        onPrimary={() => void send()}
+      />
+    )
+  }
 
   return (
-    <div
-      className={[
-        'sign-mobile-page',
-        drawing ? 'sign-mobile-page--draw' : '',
-        needsLandscape ? 'sign-mobile-page--rotate' : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
-    >
-      {needsLandscape && (
-        <div className="sign-mobile-rotate" role="status" aria-live="polite">
-          <div className="sign-mobile-rotate-visual" aria-hidden>
-            <Smartphone className="sign-mobile-rotate-phone" size={40} strokeWidth={1.75} />
-            <span className="sign-mobile-rotate-hint">↻</span>
-          </div>
-          <h1 className="sign-mobile-rotate-title">Rotate your phone</h1>
-          <p className="sign-mobile-rotate-copy">
-            Turn the phone sideways to{' '}
-            {isInitial ? 'draw your initials' : 'draw your signature'}. This
-            message leaves when you do.
-          </p>
-          <p className="sign-mobile-rotate-note muted">
-            If nothing changes, unlock portrait lock in Control Center or Quick
-            Settings, then rotate.
-          </p>
-        </div>
-      )}
-
-      {drawing && (
-        <>
-          <header
-            className="sign-mobile-header sign-mobile-header--compact"
-            hidden={needsLandscape}
-          >
-            <p className="sign-mobile-kicker">VeriLock</p>
-            <h1 className="sign-mobile-title">
-              {isInitial ? 'Draw your initials' : 'Draw your signature'}
-            </h1>
-          </header>
-
-          {/*
-            Keep the pad mounted under the rotate overlay so session + strokes
-            survive orientation changes (pad resizes on landscape).
-          */}
-          <div
-            className="sign-mobile-pad-stage"
-            hidden={needsLandscape}
-            aria-hidden={needsLandscape || undefined}
-          >
-            <SignatureStrokePad
-              key={padKey}
-              productMode
-              compact
-              disabled={!canDraw}
-              label={isInitial ? 'Initials' : 'Signature'}
-              padAspect={padAspect ?? (isInitial ? 1.4 : 2.8)}
-              onChange={result => setStroke(result)}
-            />
-          </div>
-
-          {/*
-            Floating dock: canvas stays full-size underneath. Pointer capture on the
-            pad keeps drawing continuous when the finger passes over the buttons.
-          */}
-          <div
-            className="sign-mobile-float-dock"
-            hidden={needsLandscape}
-            aria-hidden={needsLandscape || undefined}
-          >
-            <button
-              type="button"
-              className={`btn btn-primary btn-lg sign-mobile-done-btn${
-                !stroke?.path?.strokes?.length ? ' is-disabled' : ''
-              }`}
-              disabled={!canDraw || !stroke?.path?.strokes?.length}
-              onClick={() => void send()}
-            >
-              Done
-            </button>
-          </div>
-        </>
-      )}
-
+    <div className="sign-mobile-page">
       {phase === 'loading' && (
         <p className="sign-mobile-status" role="status">
           <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.25} />
@@ -333,7 +233,8 @@ export function SignMobilePage() {
           <Check size={28} strokeWidth={2.5} aria-hidden />
           <h2>Sent to your computer</h2>
           <p className="muted">
-            Keep the computer window open until the signature appears. You can close this tab.
+            Keep the computer window open until the signature appears. You can close this
+            tab.
           </p>
         </div>
       )}
