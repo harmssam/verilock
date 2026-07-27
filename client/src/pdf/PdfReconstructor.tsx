@@ -128,6 +128,8 @@ export const PdfReconstructor = forwardRef<PdfReconstructorHandle, PdfReconstruc
 
 const PRINT_ROOT_ID = 'verilock-print-root'
 const PRINT_STYLE_ID = 'verilock-print-style'
+/** Applied to <html> so mobile browsers that snapshot the live page (not only @media print) still drop app chrome. */
+const PRINTING_CLASS = 'verilock-printing'
 
 function waitForImage(img: HTMLImageElement): Promise<void> {
   return new Promise(resolve => {
@@ -140,10 +142,23 @@ function waitForImage(img: HTMLImageElement): Promise<void> {
   })
 }
 
+function waitForNextPaint(): Promise<void> {
+  return new Promise(resolve => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve())
+    })
+  })
+}
+
 /**
  * Open a print dialog with the rendered page canvases (signatures already painted).
- * Prints from the current window (no pop-up) so mobile Safari/Chrome work -
+ * Prints from the current window (no pop-up) so mobile Safari/Chrome work —
  * window.open print sheets are blocked or unusable on many phones.
+ *
+ * Isolation strategy: add `verilock-printing` on <html> *before* calling print so
+ * only the signed page images are in the layout (screen + print). Relying on
+ * @media print alone often fails on mobile, which then prints the full SPA chrome
+ * (logo, path titles, docks, etc.).
  */
 export async function printRenderedPages(
   pagesRoot: HTMLElement | null,
@@ -162,13 +177,14 @@ export async function printRenderedPages(
   })
 
   // Drop leftovers if a prior print was interrupted.
+  document.documentElement.classList.remove(PRINTING_CLASS)
   document.getElementById(PRINT_ROOT_ID)?.remove()
   document.getElementById(PRINT_STYLE_ID)?.remove()
 
   const style = document.createElement('style')
   style.id = PRINT_STYLE_ID
   style.textContent = `
-    /* Keep the print root out of the interactive UI until the print sheet opens. */
+    /* Park print sheets until we enter print mode. */
     #${PRINT_ROOT_ID} {
       position: fixed !important;
       left: 0 !important;
@@ -182,18 +198,71 @@ export async function printRenderedPages(
       pointer-events: none !important;
       z-index: -1 !important;
     }
+
+    /*
+     * Live isolation (screen + print): hide every body child except the signed pages.
+     * Mobile Safari/Chrome often capture the on-screen DOM instead of re-layout from
+     * @media print alone — so this class must be active before window.print().
+     */
+    html.${PRINTING_CLASS},
+    html.${PRINTING_CLASS} body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+      height: auto !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+    }
+    html.${PRINTING_CLASS} body > *:not(#${PRINT_ROOT_ID}) {
+      display: none !important;
+      visibility: hidden !important;
+    }
+    html.${PRINTING_CLASS} #${PRINT_ROOT_ID} {
+      display: block !important;
+      position: static !important;
+      left: auto !important;
+      top: auto !important;
+      width: 100% !important;
+      height: auto !important;
+      min-height: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: visible !important;
+      opacity: 1 !important;
+      pointer-events: none !important;
+      z-index: auto !important;
+      background: #fff !important;
+      color: #0f172a !important;
+    }
+    html.${PRINTING_CLASS} #${PRINT_ROOT_ID} .print-page {
+      display: block !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      height: auto !important;
+      margin: 0 auto 0 !important;
+      page-break-after: always;
+      break-after: page;
+    }
+    html.${PRINTING_CLASS} #${PRINT_ROOT_ID} .print-page:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+
     @media print {
-      @page { margin: 10mm; }
+      @page { margin: 10mm; size: auto; }
       html, body {
         margin: 0 !important;
         padding: 0 !important;
         background: #fff !important;
         height: auto !important;
         overflow: visible !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
-      /* Hide app chrome; only the signed pages go to the printer. */
+      /* Belt-and-suspenders if the class was stripped mid-dialog. */
       body > *:not(#${PRINT_ROOT_ID}) {
         display: none !important;
+        visibility: hidden !important;
       }
       #${PRINT_ROOT_ID} {
         display: block !important;
@@ -202,8 +271,6 @@ export async function printRenderedPages(
         height: auto !important;
         overflow: visible !important;
         opacity: 1 !important;
-        pointer-events: auto !important;
-        z-index: auto !important;
         background: #fff !important;
         color: #0f172a !important;
       }
@@ -239,26 +306,46 @@ export async function printRenderedPages(
 
   await Promise.all(Array.from(root.querySelectorAll('img')).map(waitForImage))
 
-  // Let layout settle before the system print UI.
-  await new Promise<void>(r => {
-    window.setTimeout(r, 50)
-  })
-
   const previousTitle = document.title
+  const previousScrollX = window.scrollX
+  const previousScrollY = window.scrollY
   const safeTitle = title.replace(/[<>&"]/g, '').trim()
   if (safeTitle) document.title = safeTitle
 
+  // Swap the live layout to document-only *before* the system print UI opens.
+  document.documentElement.classList.add(PRINTING_CLASS)
+  window.scrollTo(0, 0)
+  await waitForNextPaint()
+  // Extra beat for mobile WebKit layout + image decode before the print sheet.
+  await new Promise<void>(r => {
+    window.setTimeout(r, 120)
+  })
+
   let cleaned = false
+  const mql = typeof window.matchMedia === 'function' ? window.matchMedia('print') : null
   const cleanup = () => {
     if (cleaned) return
     cleaned = true
+    document.documentElement.classList.remove(PRINTING_CLASS)
     document.title = previousTitle
     root.remove()
     style.remove()
     window.removeEventListener('afterprint', onAfterPrint)
+    window.removeEventListener('focus', onFocusCleanup)
+    mql?.removeEventListener?.('change', onPrintMediaChange)
+    window.scrollTo(previousScrollX, previousScrollY)
   }
   const onAfterPrint = () => cleanup()
+  const onPrintMediaChange = (event: MediaQueryListEvent) => {
+    if (!event.matches) cleanup()
+  }
+  // iOS often skips afterprint; focus returns when the share/print sheet closes.
+  // Delay attaching so we never tear down while the sheet is still opening.
+  const onFocusCleanup = () => {
+    window.setTimeout(cleanup, 250)
+  }
   window.addEventListener('afterprint', onAfterPrint)
+  mql?.addEventListener?.('change', onPrintMediaChange)
 
   try {
     window.print()
@@ -267,6 +354,10 @@ export async function printRenderedPages(
     throw err instanceof Error ? err : new Error('Could not open print')
   }
 
-  // iOS Safari often never fires afterprint; always tear down eventually.
+  window.setTimeout(() => {
+    if (!cleaned) window.addEventListener('focus', onFocusCleanup)
+  }, 1500)
+
+  // Last-resort teardown if neither afterprint nor focus fire.
   window.setTimeout(cleanup, 60_000)
 }
