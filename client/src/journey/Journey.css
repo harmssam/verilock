@@ -6,7 +6,9 @@
 .exp-app {
   position: relative;
   z-index: 1;
-  max-width: 760px;
+  box-sizing: border-box;
+  /* Cap at layout width (100%), not 100vw — avoids mobile side-pan. */
+  max-width: min(760px, 100%);
   margin: 0 auto;
   padding:
     max(1.35rem, env(safe-area-inset-top))
@@ -20,13 +22,13 @@
    Journey create/sign/verify stays compact for focused mobile-first flows. */
 @media (min-width: 900px) {
   .exp-app--wide {
-    max-width: min(1120px, calc(100vw - 3rem));
+    max-width: min(1120px, calc(100% - 3rem));
   }
 }
 
 @media (min-width: 1280px) {
   .exp-app--wide {
-    max-width: min(1200px, calc(100vw - 4rem));
+    max-width: min(1200px, calc(100% - 4rem));
   }
 }
 
@@ -5449,6 +5451,12 @@ a.hash-chip.text-link:focus-visible {
     padding-right: max(0.75rem, env(safe-area-inset-right));
     padding-bottom: max(2.5rem, env(safe-area-inset-bottom));
     padding-left: max(0.75rem, env(safe-area-inset-left));
+  }
+
+  /* Keep full-bleed header pull-out matched to the tighter mobile shell pad. */
+  .lr-app {
+    --lr-shell-pad-x: max(0.75rem, env(safe-area-inset-left));
+    --lr-shell-pad-r: max(0.75rem, env(safe-area-inset-right));
   }
 
   .exp-header {

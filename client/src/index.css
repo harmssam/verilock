@@ -72,9 +72,21 @@
   box-sizing: border-box;
 }
 
+/*
+ * Clip horizontal overflow at the document root.
+ * Full-bleed / sticky children must not create a side-pan scrollport.
+ * Prefer `clip` over `hidden` so we do not create a nested scroll container
+ * that would break `position: sticky` on the shell header.
+ */
+html {
+  overflow-x: clip;
+}
+
 body {
   margin: 0;
   min-height: 100dvh;
+  max-width: 100%;
+  overflow-x: clip;
   background:
     radial-gradient(ellipse 70% 45% at 10% -5%, rgba(13, 148, 136, 0.07), transparent 55%),
     radial-gradient(ellipse 50% 40% at 100% 0%, rgba(15, 118, 110, 0.05), transparent 50%),
