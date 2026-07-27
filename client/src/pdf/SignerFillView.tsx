@@ -72,6 +72,11 @@ export interface SignerFillViewProps {
   /** Session token for cross-device Sign on mobile (vector handoff). */
   authToken?: string | null
   documentId?: string | null
+  /**
+   * Solo agreement (1 of 1). Shorter chrome — no “Person 1” / other-people copy.
+   * Defaults from plan people count when omitted.
+   */
+  solo?: boolean
 }
 
 type LocalFill =
@@ -89,7 +94,9 @@ export function SignerFillView({
   pageWidth = 640,
   authToken = null,
   documentId = null,
+  solo: soloProp,
 }: SignerFillViewProps) {
+  const solo = soloProp ?? plan.people.length <= 1
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const modalPanelRef = useRef<HTMLDivElement>(null)
   const surfaceRef = useRef<DocumentSurface | null>(null)
@@ -580,7 +587,13 @@ export function SignerFillView({
       <header className="signer-fill-head" style={{ ['--person-color' as string]: color }}>
         <div className="signer-fill-head-row">
           <h3>
-            Sign as <strong>{person.displayName || `Person ${personSlotIndex}`}</strong>
+            {solo ? (
+              'Complete your fields'
+            ) : (
+              <>
+                Sign as <strong>{person.displayName || `Person ${personSlotIndex}`}</strong>
+              </>
+            )}
           </h3>
           {remaining > 0 ? (
             <span className="signer-fill-remaining">
@@ -593,12 +606,23 @@ export function SignerFillView({
           )}
         </div>
         <p className="muted signer-fill-help">
-          Tap each <strong>highlighted</strong> box on the document. Signing opens in a panel so you stay
-          with the document
-          {sigCount > 1 || initCount > 1
-            ? ' - each signature and each initial is reused on every matching box after the first.'
-            : '.'}{' '}
-          Other people&apos;s fields stay locked.
+          {solo ? (
+            <>
+              Tap each <strong>highlighted</strong> box on the document
+              {sigCount > 1 || initCount > 1
+                ? ' — your signature and initials reuse across matching boxes.'
+                : '.'}
+            </>
+          ) : (
+            <>
+              Tap each <strong>highlighted</strong> box on the document. Signing opens in a
+              panel so you stay with the document
+              {sigCount > 1 || initCount > 1
+                ? ' - each signature and each initial is reused on every matching box after the first.'
+                : '.'}{' '}
+              Other people&apos;s fields stay locked.
+            </>
+          )}
         </p>
       </header>
 
