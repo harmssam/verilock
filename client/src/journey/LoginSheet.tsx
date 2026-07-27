@@ -75,9 +75,13 @@ export function LoginSheet({
   /** Localhost / 127.0.0.1 - phone cannot reach this machine; Pay QR is prod-only. */
   const payQrUnavailableLocal = isLoopbackAppOrigin()
   /**
-   * Prefer Hub when Pay deeplink failed (mobile) or Pay QR cannot work (localhost).
+   * Hub is the default primary action on desktop.
+   * Also prefer Hub when Pay deeplink failed on mobile.
    */
-  const hubPreferred = connectMode === 'hub-fallback' || payQrUnavailableLocal
+  const hubPreferred =
+    connectMode === 'desktop-choice' ||
+    connectMode === 'hub-fallback' ||
+    payQrUnavailableLocal
   const [pendingChoice, setPendingChoice] = useState<'pay' | 'hub' | null>(null)
 
   const [qrPhase, setQrPhase] = useState<QrPhase>('idle')
@@ -286,6 +290,38 @@ export function LoginSheet({
 
       {isDesktopChoice ? (
         <div className="login-sheet-choices">
+          {/* Default: Hub on this computer */}
+          <div className="login-sheet-choice">
+            <button
+              type="button"
+              className={`${hubBtnClass} login-sheet-proceed${pendingChoice === 'hub' ? ' btn--busy' : ''}`}
+              onClick={() => {
+                resetQr()
+                setPendingChoice('hub')
+                onProceed({ useRedirect: true })
+              }}
+              disabled={connecting || qrPhase === 'loading' || qrPhase === 'waiting'}
+            >
+              {pendingChoice === 'hub' && connecting ? (
+                <>
+                  <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+                  {desktopChoice.hubBusy}
+                </>
+              ) : (
+                <>
+                  <NimiqHexagonIcon size={16} />
+                  {desktopChoice.hubIdle}
+                </>
+              )}
+            </button>
+            <p className="muted login-sheet-choice-hint">{desktopChoice.hubHint}</p>
+          </div>
+
+          <div className="login-sheet-choice-divider" role="presentation">
+            <span>or</span>
+          </div>
+
+          {/* Optional: Nimiq Pay wallet on phone via QR */}
           <div className="login-sheet-choice">
             {qrPhase === 'loading' || qrPhase === 'waiting' ? (
               <div className="login-sheet-qr" role="status" aria-live="polite">
@@ -301,9 +337,9 @@ export function LoginSheet({
                 </p>
                 {expiresLabel && <p className="muted login-sheet-qr-expires">{expiresLabel}</p>}
                 <ol className="login-sheet-qr-steps muted">
-                  <li>Scan with your phone camera (opens Nimiq Pay when installed).</li>
-                  <li>Approve login prompts in Nimiq Pay.</li>
-                  <li>This page finishes automatically.</li>
+                  <li>On your phone, open the camera or Nimiq Pay and scan this code.</li>
+                  <li>Approve the login prompts in Nimiq Pay.</li>
+                  <li>This computer finishes automatically - keep this window open.</li>
                 </ol>
                 <div className="login-sheet-qr-actions">
                   {qrUrl && (
@@ -339,7 +375,7 @@ export function LoginSheet({
                 </button>
                 <p className="muted login-sheet-choice-hint">
                   {payQrUnavailableLocal
-                    ? 'Not available on localhost - use Nimiq Hub below (or production).'
+                    ? 'Nimiq Pay QR is not available on localhost - use Hub above, or try this on production.'
                     : desktopChoice.payHint}
                 </p>
                 {qrError && (
@@ -349,36 +385,6 @@ export function LoginSheet({
                 )}
               </>
             )}
-          </div>
-
-          <div className="login-sheet-choice-divider" role="presentation">
-            <span>or</span>
-          </div>
-
-          <div className="login-sheet-choice">
-            <button
-              type="button"
-              className={`${hubBtnClass} login-sheet-proceed${pendingChoice === 'hub' ? ' btn--busy' : ''}`}
-              onClick={() => {
-                resetQr()
-                setPendingChoice('hub')
-                onProceed({ useRedirect: true })
-              }}
-              disabled={connecting || qrPhase === 'loading'}
-            >
-              {pendingChoice === 'hub' && connecting ? (
-                <>
-                  <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
-                  {desktopChoice.hubBusy}
-                </>
-              ) : (
-                <>
-                  <NimiqHexagonIcon size={16} />
-                  {desktopChoice.hubIdle}
-                </>
-              )}
-            </button>
-            <p className="muted login-sheet-choice-hint">{desktopChoice.hubHint}</p>
           </div>
         </div>
       ) : isMobileChoice ? (

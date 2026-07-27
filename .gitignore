@@ -27,6 +27,11 @@ tmp-*.jpg
 14.jpg
 client/tmp-home.png
 
+# Local leftover art (already shipped elsewhere / not for repo)
+client/public/blog/subscription-vs-pay-per-use-calculator.png
+client/public/og-hero-new.png
+verilock-lock-1920x1080.jpg
+
 # Pixelmator source files (export PNGs only)
 *.pxm
 
