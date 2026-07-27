@@ -325,44 +325,60 @@
 }
 
 /*
- * Forced landscape inside a portrait-locked host (Nimiq Pay):
- * Build a real landscape layout (wide × short), then rotate 90° so it fills the
- * portrait webview. Hold the phone on its side — UI reads upright like true landscape.
- * (A tall portrait stack with a wide pad is NOT the same thing.)
+ * Forced landscape inside a portrait-locked host (Nimiq Pay).
+ *
+ * Classic webview pattern (not translate-center — that often parks the box
+ * off-screen in iOS mini-apps):
+ *   • Layout box is landscape-sized: width = 100vh, height = 100vw
+ *   • Rotate 90° around top-left and shift so it covers the portrait viewport
+ * Hold the phone on its side so the UI reads upright.
  */
+.ink-capture-force-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 229;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--bg, #f8fafc);
+  pointer-events: none;
+}
+
 .ink-capture-sheet.is-portrait-host.is-draw {
   position: fixed;
   z-index: 230;
-  /* Logical landscape: long edge = physical phone height, short = physical width */
+  /* Logical landscape size (fallbacks for older WebViews) */
+  width: 100vh;
   width: 100dvh;
-  width: 100svh;
+  height: 100vw;
   height: 100dvw;
-  height: 100svw;
   max-width: none;
   max-height: none;
+  min-width: 0;
   min-height: 0;
-  top: 50%;
-  left: 50%;
+  /* Pin to top-left of viewport, then rotate into place */
+  top: 0;
+  left: 0;
   right: auto;
   bottom: auto;
   inset: auto;
   margin: 0;
-  transform: translate(-50%, -50%) rotate(90deg);
-  transform-origin: center center;
+  transform: rotate(90deg) translateY(-100%);
+  transform-origin: top left;
   overflow: hidden;
   overscroll-behavior: contain;
+  display: flex;
   flex-direction: column;
   justify-content: stretch;
   gap: 0.3rem;
-  padding:
-    0.45rem
-    0.65rem
-    4.25rem
-    0.65rem;
+  padding: 0.45rem 0.65rem 4.25rem;
   box-sizing: border-box;
+  background: var(--bg, #f8fafc);
+  /* Override overlay inset/width/height from .ink-capture-sheet--overlay */
+  inset: unset;
 }
 
-/* Dock is fixed to this transformed box (not the unrotated OS viewport). */
+/* Dock belongs to the rotated sheet (ancestor transform → containing block). */
 .ink-capture-sheet.is-portrait-host .ink-capture-float-dock {
   position: absolute;
   left: 0;
@@ -402,16 +418,17 @@
   justify-content: center;
 }
 
-/* Same sizing model as true landscape: height-limited, width follows field aspect */
+/* Height-limited landscape pad; short edge ≈ physical phone width (100vw) */
 .ink-capture-sheet.is-portrait-host .sig-pad--aspect .sig-pad-canvas {
   flex: none;
   width: auto;
   height: auto;
   min-height: 7.5rem;
   max-width: 100%;
-  /* Short edge of forced landscape ≈ physical phone width */
+  max-height: min(100%, calc(100vw - 5.25rem));
   max-height: min(100%, calc(100dvw - 5.25rem));
   aspect-ratio: var(--sig-pad-aspect, 2.5);
+  width: min(100%, calc((100vw - 5.25rem) * var(--sig-pad-aspect, 2.5)));
   width: min(100%, calc((100dvw - 5.25rem) * var(--sig-pad-aspect, 2.5)));
   margin: 0 auto;
 }

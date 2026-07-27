@@ -150,6 +150,11 @@ export function InkCaptureSheet({
   }, [isPortraitHost])
 
   return (
+    <>
+      {/* Unrotated fill so the portrait webview never flashes empty under the sheet. */}
+      {isPortraitHost && (
+        <div className="ink-capture-force-backdrop" aria-hidden />
+      )}
     <div
       className={[
         'ink-capture-sheet',
@@ -270,5 +275,6 @@ export function InkCaptureSheet({
         </button>
       </div>
     </div>
+    </>
   )
 }
