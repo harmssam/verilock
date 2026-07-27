@@ -1,7 +1,8 @@
-import { Copy, ExternalLink, LoaderCircle, Smartphone, X } from 'lucide-react'
+import { ChevronLeft, ExternalLink, LoaderCircle, X } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../api'
+import { IPhoneIcon } from '../IPhoneIcon'
 import {
   isLoopbackAppOrigin,
   NIMIQ_PAY_ANDROID_URL,
@@ -86,9 +87,7 @@ export function LoginSheet({
 
   const [qrPhase, setQrPhase] = useState<QrPhase>('idle')
   const [qrImage, setQrImage] = useState<string | null>(null)
-  const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [qrError, setQrError] = useState<string | null>(null)
-  const [qrCopied, setQrCopied] = useState(false)
   const [qrExpiresAt, setQrExpiresAt] = useState<number | null>(null)
   const pollTimerRef = useRef<number | null>(null)
   const qrIdRef = useRef<string | null>(null)
@@ -105,9 +104,7 @@ export function LoginSheet({
     qrIdRef.current = null
     setQrPhase('idle')
     setQrImage(null)
-    setQrUrl(null)
     setQrError(null)
-    setQrCopied(false)
     setQrExpiresAt(null)
     setPendingChoice(null)
   }, [clearPoll])
@@ -157,7 +154,6 @@ export function LoginSheet({
         setPendingChoice(null)
         return
       }
-      setQrUrl(payload.webUrl)
       setQrExpiresAt(expiresAt)
       // nimiqpay:// so the camera can open Pay; embedded URL must be public (prod).
       const dataUrl = await qrDataUrl(payload.qrText, 200)
@@ -241,6 +237,8 @@ export function LoginSheet({
 
   const payBtnClass = hubPreferred ? 'btn btn-secondary' : 'btn btn-primary'
   const hubBtnClass = hubPreferred ? 'btn btn-primary' : 'btn btn-secondary'
+  const showingPayQr =
+    isDesktopChoice && (qrPhase === 'loading' || qrPhase === 'waiting')
 
   const expiresLabel =
     qrExpiresAt != null
@@ -250,127 +248,124 @@ export function LoginSheet({
   const panel = (
     <div
       ref={panelRef}
-      className={`login-sheet login-sheet--${placement}${isChoice ? ' login-sheet--choice' : ''}`}
+      className={[
+        'login-sheet',
+        `login-sheet--${placement}`,
+        isChoice && !showingPayQr ? 'login-sheet--choice' : '',
+        showingPayQr ? 'login-sheet--qr-only' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       role="dialog"
       aria-modal={placement === 'popover' ? true : undefined}
       aria-labelledby={titleId}
     >
-      <header className="login-sheet-head">
-        <div className="login-sheet-title-row">
-          <NimiqHexagonIcon size={22} className="login-sheet-mark" />
-          <div>
-            <h3 id={titleId}>{copy.title}</h3>
-          </div>
-        </div>
-        {canClose && onClose && (
+      {showingPayQr ? (
+        <div className="login-sheet-qr" role="status" aria-live="polite">
           <button
             type="button"
-            className="login-sheet-close"
-            onClick={() => {
-              resetQr()
-              onClose()
-            }}
-            disabled={connecting && pendingChoice === 'hub'}
-            aria-label="Close login"
+            className="btn btn-ghost login-sheet-qr-back"
+            onClick={() => resetQr()}
           >
-            <X size={18} strokeWidth={2.25} aria-hidden />
+            <ChevronLeft size={16} strokeWidth={2.25} aria-hidden />
+            Back
           </button>
-        )}
-      </header>
-
-      <p className="login-sheet-about">{copy.about}</p>
-
-      {copy.steps.length > 0 && (
-        <ol className="login-sheet-steps">
-          {copy.steps.map(step => (
-            <li key={step}>{step}</li>
-          ))}
-        </ol>
-      )}
-
-      {isDesktopChoice ? (
-        <div className="login-sheet-choices">
-          {/* Default: Hub on this computer */}
-          <div className="login-sheet-choice">
-            <button
-              type="button"
-              className={`${hubBtnClass} login-sheet-proceed${pendingChoice === 'hub' ? ' btn--busy' : ''}`}
-              onClick={() => {
-                resetQr()
-                setPendingChoice('hub')
-                onProceed({ useRedirect: true })
-              }}
-              disabled={connecting || qrPhase === 'loading' || qrPhase === 'waiting'}
-            >
-              {pendingChoice === 'hub' && connecting ? (
-                <>
-                  <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
-                  {desktopChoice.hubBusy}
-                </>
-              ) : (
-                <>
-                  <NimiqHexagonIcon size={16} />
-                  {desktopChoice.hubIdle}
-                </>
-              )}
-            </button>
-            <p className="muted login-sheet-choice-hint">{desktopChoice.hubHint}</p>
-          </div>
-
-          <div className="login-sheet-choice-divider" role="presentation">
-            <span>or</span>
-          </div>
-
-          {/* Optional: Nimiq Pay wallet on phone via QR */}
-          <div className="login-sheet-choice">
-            {qrPhase === 'loading' || qrPhase === 'waiting' ? (
-              <div className="login-sheet-qr" role="status" aria-live="polite">
-                {qrImage ? (
-                  <img src={qrImage} alt="Scan with Nimiq Pay on your phone" width={200} height={200} />
-                ) : (
-                  <div className="login-sheet-qr-placeholder">
-                    <LoaderCircle className="btn-spinner" size={24} strokeWidth={2.5} aria-hidden />
-                  </div>
-                )}
-                <p className="login-sheet-qr-wait">
-                  {qrPhase === 'loading' ? 'Generating QR…' : desktopChoice.payBusy}
-                </p>
-                {expiresLabel && <p className="muted login-sheet-qr-expires">{expiresLabel}</p>}
-                <ol className="login-sheet-qr-steps muted">
-                  <li>On your phone, open the camera or Nimiq Pay and scan this code.</li>
-                  <li>Approve the login prompts in Nimiq Pay.</li>
-                  <li>This computer finishes automatically - keep this window open.</li>
-                </ol>
-                <div className="login-sheet-qr-actions">
-                  {qrUrl && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => {
-                        void navigator.clipboard?.writeText(qrUrl).then(() => {
-                          setQrCopied(true)
-                          window.setTimeout(() => setQrCopied(false), 2000)
-                        })
-                      }}
-                    >
-                      <Copy size={14} strokeWidth={2.25} aria-hidden />
-                      {qrCopied ? 'Link copied' : 'Copy link'}
-                    </button>
-                  )}
-                  <button type="button" className="btn btn-ghost" onClick={() => void startPayQr()}>
-                    New QR
-                  </button>
-                </div>
+          <h3 id={titleId} className="login-sheet-sr-only">
+            Scan with Nimiq Pay
+          </h3>
+          {qrImage ? (
+            <img
+              className="login-sheet-qr-img"
+              src={qrImage}
+              alt="Scan with Nimiq Pay on your phone"
+              width={200}
+              height={200}
+            />
+          ) : (
+            <div className="login-sheet-qr-placeholder">
+              <LoaderCircle className="btn-spinner" size={24} strokeWidth={2.5} aria-hidden />
+            </div>
+          )}
+          <p className="login-sheet-qr-wait">
+            {qrPhase === 'loading' ? 'Generating QR…' : desktopChoice.payBusy}
+          </p>
+          {expiresLabel && <p className="muted login-sheet-qr-expires">{expiresLabel}</p>}
+        </div>
+      ) : (
+        <>
+          <header className="login-sheet-head">
+            <div className="login-sheet-title-row">
+              <NimiqHexagonIcon size={22} className="login-sheet-mark" />
+              <div>
+                <h3 id={titleId}>{copy.title}</h3>
               </div>
-            ) : (
-              <>
+            </div>
+            {canClose && onClose && (
+              <button
+                type="button"
+                className="login-sheet-close"
+                onClick={() => {
+                  resetQr()
+                  onClose()
+                }}
+                disabled={connecting && pendingChoice === 'hub'}
+                aria-label="Close login"
+              >
+                <X size={18} strokeWidth={2.25} aria-hidden />
+              </button>
+            )}
+          </header>
+
+          <p className="login-sheet-about">{copy.about}</p>
+
+          {copy.steps.length > 0 && (
+            <ol className="login-sheet-steps">
+              {copy.steps.map(step => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          )}
+
+          {isDesktopChoice ? (
+            <div className="login-sheet-choices">
+              <div className="login-sheet-choice">
+                <button
+                  type="button"
+                  className={`${hubBtnClass} login-sheet-proceed${pendingChoice === 'hub' ? ' btn--busy' : ''}`}
+                  onClick={() => {
+                    resetQr()
+                    setPendingChoice('hub')
+                    onProceed({ useRedirect: true })
+                  }}
+                  disabled={connecting}
+                >
+                  {pendingChoice === 'hub' && connecting ? (
+                    <>
+                      <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+                      {desktopChoice.hubBusy}
+                    </>
+                  ) : (
+                    <>
+                      <NimiqHexagonIcon size={16} />
+                      {desktopChoice.hubIdle}
+                    </>
+                  )}
+                </button>
+                <p className="muted login-sheet-choice-hint">{desktopChoice.hubHint}</p>
+              </div>
+
+              <div className="login-sheet-choice-divider" role="presentation">
+                <span>or</span>
+              </div>
+
+              <div className="login-sheet-choice">
                 <button
                   type="button"
                   className={`${payBtnClass} login-sheet-proceed`}
                   onClick={() => void startPayQr()}
                   disabled={connecting}
                 >
-                  <Smartphone size={16} strokeWidth={2.25} aria-hidden />
+                  <IPhoneIcon size={16} strokeWidth={2.25} />
                   {desktopChoice.payIdle}
                 </button>
                 <p className="muted login-sheet-choice-hint">
@@ -383,111 +378,111 @@ export function LoginSheet({
                     {qrError}
                   </p>
                 )}
-              </>
-            )}
-          </div>
-        </div>
-      ) : isMobileChoice ? (
-        <div className="login-sheet-choices">
-          <div className="login-sheet-choice">
-            <button
-              type="button"
-              className={`${payBtnClass} login-sheet-proceed${pendingChoice === 'pay' ? ' btn--busy' : ''}`}
-              onClick={() => {
-                setPendingChoice('pay')
-                onProceed({ useRedirect: false })
-              }}
-              disabled={connecting}
-            >
-              {pendingChoice === 'pay' ? (
-                <>
-                  <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
-                  {mobileChoice.payBusy}
-                </>
-              ) : (
-                <>
-                  <Smartphone size={16} strokeWidth={2.25} aria-hidden />
-                  {mobileChoice.payIdle}
-                </>
-              )}
-            </button>
-            <p className="muted login-sheet-choice-hint">{mobileChoice.payHint}</p>
-            <div className="login-sheet-store-row">
-              <a
-                className="btn btn-ghost login-sheet-store-link"
-                href={NIMIQ_PAY_IOS_URL}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <ExternalLink size={13} strokeWidth={2.25} aria-hidden />
-                App Store
-              </a>
-              <a
-                className="btn btn-ghost login-sheet-store-link"
-                href={NIMIQ_PAY_ANDROID_URL}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <ExternalLink size={13} strokeWidth={2.25} aria-hidden />
-                Google Play
-              </a>
+              </div>
             </div>
-          </div>
+          ) : isMobileChoice ? (
+            <div className="login-sheet-choices">
+              <div className="login-sheet-choice">
+                <button
+                  type="button"
+                  className={`${payBtnClass} login-sheet-proceed${pendingChoice === 'pay' ? ' btn--busy' : ''}`}
+                  onClick={() => {
+                    setPendingChoice('pay')
+                    onProceed({ useRedirect: false })
+                  }}
+                  disabled={connecting}
+                >
+                  {pendingChoice === 'pay' ? (
+                    <>
+                      <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+                      {mobileChoice.payBusy}
+                    </>
+                  ) : (
+                    <>
+                      <IPhoneIcon size={16} strokeWidth={2.25} />
+                      {mobileChoice.payIdle}
+                    </>
+                  )}
+                </button>
+                <p className="muted login-sheet-choice-hint">{mobileChoice.payHint}</p>
+                <div className="login-sheet-store-row">
+                  <a
+                    className="btn btn-ghost login-sheet-store-link"
+                    href={NIMIQ_PAY_IOS_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <ExternalLink size={13} strokeWidth={2.25} aria-hidden />
+                    App Store
+                  </a>
+                  <a
+                    className="btn btn-ghost login-sheet-store-link"
+                    href={NIMIQ_PAY_ANDROID_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <ExternalLink size={13} strokeWidth={2.25} aria-hidden />
+                    Google Play
+                  </a>
+                </div>
+              </div>
 
-          <div className="login-sheet-choice-divider" role="presentation">
-            <span>or</span>
-          </div>
+              <div className="login-sheet-choice-divider" role="presentation">
+                <span>or</span>
+              </div>
 
-          <div className="login-sheet-choice">
+              <div className="login-sheet-choice">
+                <button
+                  type="button"
+                  className={`${hubBtnClass} login-sheet-proceed${pendingChoice === 'hub' ? ' btn--busy' : ''}`}
+                  onClick={() => {
+                    setPendingChoice('hub')
+                    onProceed({ useRedirect: true })
+                  }}
+                  disabled={connecting}
+                >
+                  {pendingChoice === 'hub' ? (
+                    <>
+                      <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+                      {mobileChoice.hubBusy}
+                    </>
+                  ) : (
+                    <>
+                      <NimiqHexagonIcon size={16} />
+                      {mobileChoice.hubIdle}
+                    </>
+                  )}
+                </button>
+                <p className="muted login-sheet-choice-hint">{mobileChoice.hubHint}</p>
+              </div>
+            </div>
+          ) : (
             <button
               type="button"
-              className={`${hubBtnClass} login-sheet-proceed${pendingChoice === 'hub' ? ' btn--busy' : ''}`}
-              onClick={() => {
-                setPendingChoice('hub')
-                onProceed({ useRedirect: true })
-              }}
+              className={`btn btn-primary login-sheet-proceed${connecting ? ' btn--busy' : ''}`}
+              onClick={() => onProceed()}
               disabled={connecting}
             >
-              {pendingChoice === 'hub' ? (
+              {connecting ? (
                 <>
                   <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
-                  {mobileChoice.hubBusy}
+                  {labels.busy}
                 </>
               ) : (
                 <>
                   <NimiqHexagonIcon size={16} />
-                  {mobileChoice.hubIdle}
+                  {labels.idle}
                 </>
               )}
             </button>
-            <p className="muted login-sheet-choice-hint">{mobileChoice.hubHint}</p>
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          className={`btn btn-primary login-sheet-proceed${connecting ? ' btn--busy' : ''}`}
-          onClick={() => onProceed()}
-          disabled={connecting}
-        >
-          {connecting ? (
-            <>
-              <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
-              {labels.busy}
-            </>
-          ) : (
-            <>
-              <NimiqHexagonIcon size={16} />
-              {labels.idle}
-            </>
           )}
-        </button>
-      )}
 
-      {walletStatus && (
-        <p className="login-sheet-status" role="status">
-          {walletStatus}
-        </p>
+          {walletStatus && (
+            <p className="login-sheet-status" role="status">
+              {walletStatus}
+            </p>
+          )}
+        </>
       )}
     </div>
   )

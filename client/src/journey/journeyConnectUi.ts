@@ -132,8 +132,7 @@ export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
     case 'desktop-choice':
       return {
         title: 'Login with Nimiq',
-        about:
-          'Connect a Nimiq wallet to sign and lock on the blockchain. VeriLock never holds your keys. Prefer Hub on this computer; use Nimiq Pay only if you want to authenticate with the wallet on your phone.',
+        about: 'Connect via browser Hub or the Nimiq Pay app.',
         steps: [],
       }
     case 'hub':
