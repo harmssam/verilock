@@ -1,8 +1,10 @@
 /**
  * Full-screen ink capture for phones — shared by QR /m/sign and in-app field signing.
- * Landscape-gated pad + floating primary so both paths feel the same.
- * Nimiq Pay mini app skips the landscape gate (host is portrait-locked) and shows
- * a one-shot iPhone rotate guide over the horizontal pad.
+ *
+ * - Real landscape devices: normal landscape pad sizing.
+ * - Portrait browsers: rotate gate until they tip the phone.
+ * - Nimiq Pay (portrait-locked): skip the gate, full-screen portrait UI with a large
+ *   horizontal pad + one-shot iPhone guide. No CSS 90° transform (breaks Pay WebView).
  */
 import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -19,7 +21,7 @@ const PORTRAIT_GUIDE_FADE_MS = 450
 
 export type InkCaptureFieldKind = 'signature' | 'initial'
 
-/** Simple iPhone outline used for the rotate nudge (no bordered card). */
+/** Simple iPhone outline used for the rotate nudge / one-shot guide. */
 function IPhoneOutlineIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -31,7 +33,6 @@ function IPhoneOutlineIcon({ className }: { className?: string }) {
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden
     >
-      {/* Device body */}
       <rect
         x="3.5"
         y="1.5"
@@ -41,9 +42,7 @@ function IPhoneOutlineIcon({ className }: { className?: string }) {
         stroke="currentColor"
         strokeWidth="2.25"
       />
-      {/* Dynamic Island / notch */}
       <rect x="16" y="5.5" width="16" height="4" rx="2" fill="currentColor" />
-      {/* Screen area hint */}
       <rect
         x="8"
         y="14"
@@ -54,7 +53,6 @@ function IPhoneOutlineIcon({ className }: { className?: string }) {
         strokeWidth="1.25"
         opacity="0.35"
       />
-      {/* Home indicator */}
       <rect x="17" y="69" width="14" height="3" rx="1.5" fill="currentColor" opacity="0.55" />
     </svg>
   )
@@ -62,7 +60,7 @@ function IPhoneOutlineIcon({ className }: { className?: string }) {
 
 export interface InkCaptureSheetProps {
   fieldKind: InkCaptureFieldKind
-  /** Field width÷height so the pad matches the PDF box. */
+  /** Field width÷height so the pad matches the PDF box (when layout allows). */
   padAspect?: number
   padKey?: number | string
   onChange: (result: SignatureStrokeResult | null) => void
@@ -104,8 +102,7 @@ export function InkCaptureSheet({
   const isLandscape = useIsLandscape()
   const isRealPortrait = useIsRealPortrait()
   const isInitial = fieldKind === 'initial'
-  // Pay is portrait-locked: skip rotate *gate*, but force a real landscape layout
-  // (rotated 90°) so the pad is not a tall portrait stack.
+  // Pay: isLandscape is forced true (skip gate). Real portrait → tall-frame pad layout.
   const needsLandscape = !isLandscape
   const isPortraitHost = !needsLandscape && isRealPortrait
   const canDraw = isLandscape && !disabled
@@ -118,8 +115,8 @@ export function InkCaptureSheet({
         : 2.8
 
   /**
-   * One-shot guide: iPhone SVG turns upright → landscape (2s), holds, fades.
-   * Shown on forced-landscape portrait hosts (Nimiq Pay) so users tip the phone.
+   * One-shot guide on portrait hosts (Nimiq Pay): iPhone SVG turns 2s, holds, fades.
+   * Educational only — pad stays usable underneath.
    */
   const [portraitGuide, setPortraitGuide] = useState<'off' | 'play' | 'fade'>('off')
   useEffect(() => {
@@ -139,28 +136,22 @@ export function InkCaptureSheet({
     }
   }, [isPortraitHost, padKey])
 
-  // Lock body scroll while the forced-landscape sheet covers the viewport.
   useEffect(() => {
-    if (!isPortraitHost) return
+    if (!isPortraitHost && variant !== 'overlay') return
+    if (needsLandscape) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = prev
     }
-  }, [isPortraitHost])
+  }, [isPortraitHost, variant, needsLandscape])
 
   return (
-    <>
-      {/* Unrotated fill so the portrait webview never flashes empty under the sheet. */}
-      {isPortraitHost && (
-        <div className="ink-capture-force-backdrop" aria-hidden />
-      )}
     <div
       className={[
         'ink-capture-sheet',
         `ink-capture-sheet--${variant}`,
         needsLandscape ? 'is-rotate' : 'is-draw',
-        // Forced landscape UI inside portrait-locked host (Nimiq Pay).
         isPortraitHost ? 'is-portrait-host' : '',
         className,
       ]
@@ -206,7 +197,7 @@ export function InkCaptureSheet({
           }`}
           role="status"
           aria-live="polite"
-          aria-label="Sign sideways on this pad — the layout matches landscape"
+          aria-label="Draw across the wide pad — tip the phone if that helps"
         >
           <div className="ink-capture-portrait-guide-phone" aria-hidden>
             <IPhoneOutlineIcon className="ink-capture-portrait-guide-svg" />
@@ -214,14 +205,7 @@ export function InkCaptureSheet({
         </div>
       )}
 
-      {/*
-        Keep pad mounted under the rotate gate so strokes + session survive
-        orientation changes (pad resizes on landscape).
-      */}
-      <header
-        className="ink-capture-head"
-        hidden={needsLandscape}
-      >
+      <header className="ink-capture-head" hidden={needsLandscape}>
         <div className="ink-capture-head-text">
           {kicker ? <p className="ink-capture-kicker">{kicker}</p> : null}
           <h1 id={needsLandscape ? undefined : titleId} className="ink-capture-title">
@@ -275,6 +259,5 @@ export function InkCaptureSheet({
         </button>
       </div>
     </div>
-    </>
   )
 }
