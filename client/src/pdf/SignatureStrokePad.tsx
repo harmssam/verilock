@@ -42,6 +42,84 @@ const LINE_WIDTH_REF_MIN = 160
 type UnitStroke = { points: Array<{ x: number; y: number }> }
 
 /**
+ * Map viewport client coordinates into canvas local CSS pixels (pre-transform
+ * border box). Under CSS rotate on ancestors, clientX − getBoundingClientRect
+ * is wrong (that rect is the axis-aligned bbox of the rotated element).
+ */
+function clientPointToCanvasLocal(
+  el: HTMLElement,
+  clientX: number,
+  clientY: number,
+): { x: number; y: number } {
+  const forceRoot = el.closest('[data-ink-force-landscape]') as HTMLElement | null
+  if (forceRoot) {
+    return clientPointUnderRotate90Ancestor(el, forceRoot, clientX, clientY)
+  }
+
+  // Untransformed (or scale-only): map through layout size vs CSS box
+  const w = Math.max(1, el.offsetWidth)
+  const h = Math.max(1, el.offsetHeight)
+  const rect = el.getBoundingClientRect()
+  return {
+    x: ((clientX - rect.left) / Math.max(1e-6, rect.width)) * w,
+    y: ((clientY - rect.top) / Math.max(1e-6, rect.height)) * h,
+  }
+}
+
+/**
+ * Map client → canvas local when an ancestor is rotate(90deg) about its center
+ * (Nimiq Pay forced landscape). Uses layout geometry, not AABB subtraction.
+ *
+ * rotate(90deg) CW: local offset (lx, ly) from center → client (ly, −lx).
+ * Inverse: client (dx, dy) from center → local (lx, ly) = (−dy, dx).
+ */
+function clientPointUnderRotate90Ancestor(
+  canvas: HTMLElement,
+  forceRoot: HTMLElement,
+  clientX: number,
+  clientY: number,
+): { x: number; y: number } {
+  const W = forceRoot.offsetWidth
+  const H = forceRoot.offsetHeight
+  // Rotation center in client space = center of the root’s post-transform AABB
+  const rootRect = forceRoot.getBoundingClientRect()
+  const cx = rootRect.left + rootRect.width / 2
+  const cy = rootRect.top + rootRect.height / 2
+
+  const dx = clientX - cx
+  const dy = clientY - cy
+  // Inverse of rotate(90deg) CW about center
+  const preX = -dy
+  const preY = dx
+  const sheetX = W / 2 + preX
+  const sheetY = H / 2 + preY
+
+  const canvasOffset = offsetRelativeToAncestor(canvas, forceRoot)
+  const x = sheetX - canvasOffset.x
+  const y = sheetY - canvasOffset.y
+  const w = Math.max(1, canvas.offsetWidth)
+  const h = Math.max(1, canvas.offsetHeight)
+  return {
+    x: Math.min(w, Math.max(0, x)),
+    y: Math.min(h, Math.max(0, y)),
+  }
+}
+
+function offsetRelativeToAncestor(el: HTMLElement, ancestor: HTMLElement): { x: number; y: number } {
+  let x = 0
+  let y = 0
+  let n: HTMLElement | null = el
+  while (n && n !== ancestor) {
+    x += n.offsetLeft
+    y += n.offsetTop
+    const op = n.offsetParent as HTMLElement | null
+    if (!op || op === ancestor) break
+    n = op
+  }
+  return { x, y }
+}
+
+/**
  * Draw pad that records strokes in unit coords (0–1), so rotate/resize never
  * changes relative thickness or warps earlier strokes.
  */
@@ -73,11 +151,17 @@ export function SignatureStrokePad({
       ? padAspect
       : null
 
+  /**
+   * Layout (pre-transform) CSS size. getBoundingClientRect() is the axis-aligned
+   * bounding box after CSS rotate — wrong under forced-landscape ancestors.
+   */
   const padCssSize = () => {
     const canvas = canvasRef.current
     if (!canvas) return { w: 1, h: 1 }
-    const rect = canvas.getBoundingClientRect()
-    return { w: Math.max(1, rect.width), h: Math.max(1, rect.height) }
+    return {
+      w: Math.max(1, canvas.offsetWidth),
+      h: Math.max(1, canvas.offsetHeight),
+    }
   }
 
   const lockMetricsIfNeeded = () => {
@@ -87,7 +171,9 @@ export function SignatureStrokePad({
       lineWidthRatioRef.current = LINE_WIDTH_CSS / LINE_WIDTH_REF_MIN
     }
     if (captureAspectRef.current == null) {
-      captureAspectRef.current = w / h
+      // Prefer declared field aspect so PDF placement never re-stretches ink.
+      captureAspectRef.current =
+        aspect != null && aspect > 0 ? aspect : w / Math.max(1e-6, h)
     }
   }
 
@@ -198,10 +284,22 @@ export function SignatureStrokePad({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- paint/emit use refs
   }, [])
 
+  /**
+   * Map pointer → canvas local CSS pixels (pre-transform border box).
+   * Under CSS rotate(90deg) on ancestors, never use clientX − getBoundingClientRect
+   * alone (that rect is the rotated AABB and scrambles axes).
+   */
   const pointCss = (e: React.PointerEvent<HTMLCanvasElement>): StrokePoint => {
     const canvas = canvasRef.current!
-    const rect = canvas.getBoundingClientRect()
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    // Always use transform-aware mapping when under forced landscape.
+    if (canvas.closest('[data-ink-force-landscape]')) {
+      return clientPointToCanvasLocal(canvas, e.clientX, e.clientY)
+    }
+    const ne = e.nativeEvent
+    if (e.target === canvas && typeof ne.offsetX === 'number' && typeof ne.offsetY === 'number') {
+      return { x: ne.offsetX, y: ne.offsetY }
+    }
+    return clientPointToCanvasLocal(canvas, e.clientX, e.clientY)
   }
 
   const toUnit = (p: StrokePoint) => {
