@@ -146,7 +146,7 @@
   place-items: center;
   pointer-events: none;
   opacity: 1;
-  transition: opacity 0.45s ease;
+  transition: opacity 0.3s ease;
 }
 
 .ink-capture-portrait-guide.is-fade {
@@ -165,7 +165,8 @@
   width: 64px;
   height: 108px;
   transform-origin: 50% 50%;
-  animation: ink-capture-portrait-guide-turn 2s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  /* Match PORTRAIT_GUIDE turn duration (1.4s) */
+  animation: ink-capture-portrait-guide-turn 1.4s cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }
 
 @keyframes ink-capture-portrait-guide-turn {

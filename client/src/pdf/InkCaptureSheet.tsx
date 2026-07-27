@@ -20,9 +20,9 @@ import {
 } from './SignatureStrokePad'
 import './InkCaptureSheet.css'
 
-/** Rotate animation (2s) + brief hold before fade (~0.55s) + fade duration (~0.45s). */
-const PORTRAIT_GUIDE_VISIBLE_MS = 2550
-const PORTRAIT_GUIDE_FADE_MS = 450
+/** Turn (1.4s) + short hold (~0.25s), then fade (~0.3s). */
+const PORTRAIT_GUIDE_VISIBLE_MS = 1650
+const PORTRAIT_GUIDE_FADE_MS = 300
 
 export type InkCaptureFieldKind = 'signature' | 'initial'
 
@@ -227,6 +227,8 @@ export function InkCaptureSheet({
           .filter(Boolean)
           .join(' ')}
         style={forceFrame}
+        // Marks the rotate(90deg) root for correct pointer → canvas mapping.
+        {...(isPortraitHost ? { 'data-ink-force-landscape': '' } : {})}
         role={variant === 'overlay' ? 'dialog' : undefined}
         aria-modal={variant === 'overlay' ? true : undefined}
         aria-labelledby={titleId}
