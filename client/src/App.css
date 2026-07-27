@@ -190,8 +190,13 @@
   padding: 1.2rem 1.25rem;
 }
 
-/* Title + detail stack; glow is only on the subtext (see .lr-track-detail). */
+/*
+ * Title + detail stack. Soft white bloom behind the whole plate (title and
+ * subtext) so both stay readable on the path stills.
+ */
 .lr-header-track-copy {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -201,6 +206,30 @@
   border-radius: 10px;
   background: transparent;
   box-shadow: none;
+}
+
+/* Outer feather — solid fill + blur so L→R strength matches the text box */
+.lr-header-track-copy::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -0.35rem -0.55rem -0.45rem -0.55rem;
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.72);
+  filter: blur(16px);
+  pointer-events: none;
+}
+
+/* Inner soft core — same even coverage, slightly tighter */
+.lr-header-track-copy::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0.05rem 0.1rem 0.05rem 0.1rem;
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.28);
+  filter: blur(10px);
+  pointer-events: none;
 }
 
 .lr-header-track .lr-track-title-row {
@@ -222,6 +251,8 @@
 }
 
 .lr-header-track .lr-track-title {
+  position: relative;
+  z-index: 1;
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(1.08rem, 2.5vw, 1.28rem);
@@ -231,13 +262,9 @@
   color: var(--lr-text);
 }
 
-/*
- * Soft white bloom only behind the path subtext (detail), not the title.
- * Even full-width wash (not a left-biased radial) so long lines stay uniform.
- */
 .lr-header-track .lr-track-detail {
   position: relative;
-  isolation: isolate;
+  z-index: 1;
   margin: 0;
   font-size: 0.84rem;
   font-weight: 400;
@@ -245,30 +272,6 @@
   color: var(--lr-muted);
   max-width: 34rem;
   text-shadow: none;
-}
-
-/* Outer feather — solid fill + blur so L→R strength matches the text box */
-.lr-header-track .lr-track-detail::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: -0.55rem -0.75rem -0.6rem -0.75rem;
-  border-radius: 1.25rem;
-  background: rgba(255, 255, 255, 0.72);
-  filter: blur(16px);
-  pointer-events: none;
-}
-
-/* Inner soft core — same even coverage, slightly tighter */
-.lr-header-track .lr-track-detail::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: -0.15rem -0.3rem -0.2rem -0.3rem;
-  border-radius: 0.65rem;
-  background: rgba(255, 255, 255, 0.28);
-  filter: blur(10px);
-  pointer-events: none;
 }
 
 @media (max-width: 560px) {
@@ -296,13 +299,13 @@
     background: transparent;
   }
 
-  .lr-header-track .lr-track-detail::before {
-    inset: -0.5rem -0.65rem -0.55rem -0.65rem;
+  .lr-header-track-copy::before {
+    inset: -0.3rem -0.45rem -0.4rem -0.45rem;
     filter: blur(14px);
   }
 
-  .lr-header-track .lr-track-detail::after {
-    inset: -0.12rem -0.25rem -0.16rem -0.25rem;
+  .lr-header-track-copy::after {
+    inset: 0.05rem 0.08rem;
     filter: blur(9px);
   }
 }
