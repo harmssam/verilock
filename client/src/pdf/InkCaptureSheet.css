@@ -325,48 +325,94 @@
 }
 
 /*
- * Portrait host (Nimiq Pay mini app, or any tall viewport where we still draw):
- * height-first pad — full width, large finger area. Do not use field aspect-ratio
- * here (width/2.5 pins a short strip ~150px tall). Unit ink still maps to the PDF box.
+ * Forced landscape inside a portrait-locked host (Nimiq Pay):
+ * Build a real landscape layout (wide × short), then rotate 90° so it fills the
+ * portrait webview. Hold the phone on its side — UI reads upright like true landscape.
+ * (A tall portrait stack with a wide pad is NOT the same thing.)
  */
 .ink-capture-sheet.is-portrait-host.is-draw {
+  position: fixed;
+  z-index: 230;
+  /* Logical landscape: long edge = physical phone height, short = physical width */
+  width: 100dvh;
+  width: 100svh;
+  height: 100dvw;
+  height: 100svw;
+  max-width: none;
+  max-height: none;
+  min-height: 0;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  inset: auto;
+  margin: 0;
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center center;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  flex-direction: column;
   justify-content: stretch;
+  gap: 0.3rem;
+  padding:
+    0.45rem
+    0.65rem
+    4.25rem
+    0.65rem;
+  box-sizing: border-box;
+}
+
+/* Dock is fixed to this transformed box (not the unrotated OS viewport). */
+.ink-capture-sheet.is-portrait-host .ink-capture-float-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+}
+
+.ink-capture-sheet.is-portrait-host .ink-capture-kicker {
+  display: none;
+}
+
+.ink-capture-sheet.is-portrait-host .ink-capture-title {
+  font-size: 0.95rem;
 }
 
 .ink-capture-sheet.is-portrait-host .ink-capture-pad-stage {
   flex: 1 1 auto;
   min-height: 0;
   justify-content: center;
-  align-items: stretch;
-  padding-block: 0.35rem;
-  padding-inline: 0.1rem;
+  align-items: center;
 }
 
 .ink-capture-sheet.is-portrait-host .sig-pad {
   width: 100%;
+  height: 100%;
   flex: 1 1 auto;
   min-height: 0;
-  max-height: 100%;
-  display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
 }
 
 .ink-capture-sheet.is-portrait-host .sig-pad--aspect {
   width: 100%;
-  align-items: stretch;
+  height: 100%;
+  align-items: center;
   justify-content: center;
 }
 
+/* Same sizing model as true landscape: height-limited, width follows field aspect */
 .ink-capture-sheet.is-portrait-host .sig-pad--aspect .sig-pad-canvas {
   flex: none;
-  width: 100%;
+  width: auto;
+  height: auto;
+  min-height: 7.5rem;
   max-width: 100%;
-  /* Big horizontal band in Pay’s tall frame (not width÷aspect) */
-  height: clamp(14rem, 48dvh, 22rem);
-  min-height: 14rem;
-  max-height: min(56dvh, 24rem);
-  aspect-ratio: auto;
+  /* Short edge of forced landscape ≈ physical phone width */
+  max-height: min(100%, calc(100dvw - 5.25rem));
+  aspect-ratio: var(--sig-pad-aspect, 2.5);
+  width: min(100%, calc((100dvw - 5.25rem) * var(--sig-pad-aspect, 2.5)));
   margin: 0 auto;
 }
 
