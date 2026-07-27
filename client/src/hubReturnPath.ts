@@ -109,7 +109,8 @@ export function restorePayReturnPathIfNeeded(): string | null {
     !verifySlugFromPath(pathOnly) &&
     !isAgreementsPath(pathOnly) &&
     !isPricingPath(pathOnly) &&
-    !isSignMobilePath(pathOnly)
+    !isSignMobilePath(pathOnly) &&
+    !isPayLoginPath(pathOnly)
   ) {
     clearPayReturnPath()
     return null
@@ -194,6 +195,11 @@ export function isSignMobilePath(path: string): boolean {
   return /^\/m\/sign\/[^/]+\/?$/.test(path)
 }
 
+/** Desktop→phone Nimiq Pay QR login (`/m/login/:id`). */
+export function isPayLoginPath(path: string): boolean {
+  return /^\/m\/login\/[^/]+\/?$/.test(path)
+}
+
 export function isFaqPath(path: string): boolean {
   return /^\/faq\/?$/.test(path)
 }
@@ -217,6 +223,7 @@ export function isKnownAppPath(path: string): boolean {
   if (isBlogPath(path)) return true
   if (isPdfPath(path)) return true
   if (isSignMobilePath(path)) return true
+  if (isPayLoginPath(path)) return true
   if (documentSlugFromPath(path)) return true
   if (verifySlugFromPath(path)) return true
   return false

@@ -30,8 +30,10 @@ client/tmp-home.png
 # Pixelmator source files (export PNGs only)
 *.pxm
 
-# Grok agent local artifacts (reviews, session notes)
+# Grok agent local artifacts (reviews, session notes, local skills)
 .grok/reviews/
+.grok/skills/redesign-existing-projects.md
+.grok/skills/redesign-existing-projects/
 
 # Historical UI snapshots - keep locally, not in GitHub
 client/src/archive/

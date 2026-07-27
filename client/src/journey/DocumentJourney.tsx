@@ -42,7 +42,6 @@ import {
 import { getDocumentPageCount } from '../pdf/documentSurface'
 import { sha256Hex, shortHash } from '../pdf/hashPdf'
 import { prepareSignatureImageUpload } from '../signatureImage'
-import { isMobileDevice } from '../nimiq'
 import { SealPricingDisplay } from '../SealPricingDisplay'
 import { canShareFiles, isValidEmailAddress, shareInviteWithPdf } from '../shareInvite'
 import {
@@ -84,11 +83,7 @@ import {
 import { LoginSheet } from './LoginSheet'
 import { CreditsPanel } from './CreditsPanel'
 import { CreditSealProgress } from './CreditSealProgress'
-import {
-  finishJourneyLock,
-  sealJourneyDocument,
-  sealJourneyDocumentWithCredit,
-} from './journeySeal'
+import { sealJourneyDocumentWithCredit } from './journeySeal'
 import { formatFileSize } from './PdfDropZone'
 import { SignaturePad } from './SignaturePad'
 import { SignOnMobileModal } from './SignOnMobileModal'
@@ -216,8 +211,6 @@ export function DocumentJourney({
     nimiq,
     setNimiq,
     applySession,
-    registerHubLockComplete,
-    registerHubLockError,
     bootReady,
     inNimiqPay,
     mobilePayConnect,
@@ -504,41 +497,6 @@ export function DocumentJourney({
       cancelled = true
     }
   }, [bootReady, address, token, setActiveFromSeal, navEpoch])
-
-  // Hub seal return
-  useEffect(() => {
-    registerHubLockComplete(async result => {
-      try {
-        setBusy(true)
-        setLockMessage('Finishing lock from Nimiq Hub…')
-        const me = await api.me(result.token)
-        applySession(result.token, me.address)
-        const { document: current } = await api.getDocument(result.docId, result.token)
-        const finalHash = current.finalSha256 ?? current.originalSha256
-        await api.prepareLock(result.token, result.docId, finalHash).catch(() => {})
-        await api.beginLock(result.token, result.docId)
-        const sealed = await finishJourneyLock(
-          result.docId,
-          result.txHash,
-          result.token,
-          setLockMessage,
-        )
-        setActiveFromSeal(sealed)
-        setRole('creator')
-        setLocalError(null)
-        window.history.replaceState({}, '', `/d/${sealed.slug}`)
-      } catch (err) {
-        setLocalError(err instanceof Error ? err.message : 'Hub lock return failed')
-      } finally {
-        setBusy(false)
-      }
-    })
-    registerHubLockError(err => {
-      setLocalError(err.message)
-      setLockMessage(null)
-      setBusy(false)
-    })
-  }, [registerHubLockComplete, registerHubLockError, applySession, setActiveFromSeal])
 
   /** Derived step from agreement progress (source of truth for “how far” we are). */
   const naturalStep = useMemo<JourneyStepId>(() => {
@@ -2371,42 +2329,6 @@ export function DocumentJourney({
     }
   }
 
-  const seal = async () => {
-    if (!token || !address || !doc) return
-    if (!doc.directSeal && !allSigned(doc)) {
-      setLocalError(
-        `${signedCount(doc)} of ${requiredCount(doc)} signatures collected - remaining signers must sign before locking on the blockchain.`,
-      )
-      return
-    }
-    setBusy(true)
-    setLocalError(null)
-    setLockMessage('Preparing lock…')
-    const result = await sealJourneyDocument({
-      token,
-      address,
-      doc: doc.source,
-      nimiq,
-      setNimiq,
-      onProgress: setLockMessage,
-    })
-    if (result.ok) {
-      setActiveFromSeal(result.document, doc.fileSize)
-      setLockMessage('Agreement locked on the Nimiq blockchain.')
-      setCreditsRefresh(k => k + 1)
-    } else if (result.redirecting) {
-      setLockMessage(result.message)
-    } else {
-      setLocalError(result.message)
-      setLockMessage(null)
-    }
-    if (!result.ok && result.redirecting) {
-      // leave busy - page navigates
-      return
-    }
-    setBusy(false)
-  }
-
   const sealWithCredit = async () => {
     if (!token || !doc) return
     if (!doc.directSeal && !allSigned(doc)) {
@@ -2924,6 +2846,7 @@ export function DocumentJourney({
                       walletStatus={walletStatus}
                       onClose={() => setLoginSheetOpen(false)}
                       onProceed={connectFromPath}
+                      onSession={applySession}
                       placement="inline"
                     />
                   )}
@@ -3239,6 +3162,7 @@ export function DocumentJourney({
                                   walletStatus={walletStatus}
                                   onClose={() => setLoginSheetOpen(false)}
                                   onProceed={connectFromPath}
+                                  onSession={applySession}
                                   placement="inline"
                                 />
                               )}
@@ -4333,35 +4257,10 @@ export function DocumentJourney({
                           Lock on blockchain - 1 credit
                         </button>
                       ) : (
-                        <>
-                          <button
-                            type="button"
-                            className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
-                            disabled={busy || !account || !allSigned(doc)}
-                            onClick={() => void seal()}
-                          >
-                            {busy ? (
-                              <>
-                                <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                                Locking on Nimiq…
-                              </>
-                            ) : (
-                              <>
-                                <Lock size={18} strokeWidth={2.25} />
-                                {inNimiqPay || nimiq
-                                  ? 'Pay NIM & lock on-chain'
-                                  : 'Pay NIM via Hub'}
-                              </>
-                            )}
-                          </button>
-                          {!inNimiqPay && !nimiq && (
-                            <p className="muted journey-seal-hint" style={{ margin: 0 }}>
-                              {isMobileDevice()
-                                ? 'Locking works best inside Nimiq Pay. In the browser, this lock uses Nimiq Hub - keep VeriLock open until you return and the on-chain proof is confirmed.'
-                                : 'Locking redirects to Nimiq Hub in this tab. Keep VeriLock open until you return and the on-chain proof is confirmed. Or buy credits with card (or NIM at half the card rate) above to lock without another wallet payment.'}
-                            </p>
-                          )}
-                        </>
+                        <p className="muted journey-seal-hint" style={{ margin: 0 }}>
+                          Buy or redeem 1 credit above to lock a permanent proof on Nimiq. Signing
+                          stays free - only the on-chain lock spends a credit.
+                        </p>
                       )}
                     </>
                   )}

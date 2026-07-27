@@ -15,6 +15,7 @@ import {
   isPrivacyPath,
   isRedeemPath,
   isSecurityPath,
+  isPayLoginPath,
   isSignMobilePath,
   isStatsPricingPath,
   isSupportPath,
@@ -72,6 +73,7 @@ import { api } from './api'
 import { FEATURES } from './features'
 import { LOGIN_CANCELED_MESSAGE } from './nimiq'
 import { SignMobilePage } from './SignMobilePage'
+import { PayLoginMobilePage } from './PayLoginMobilePage'
 
 /** Path card labels - stills + placement from pathMedia. */
 const TRACK_META: Record<
@@ -122,11 +124,13 @@ type ShellScreen =
   | 'pdf-lab'
   | 'pdf2'
   | 'sign-mobile'
+  | 'pay-login'
   | 'stats-pricing'
   | 'faq'
   | 'not-found'
 
 function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotationUi): ShellScreen {
+  if (isPayLoginPath(pathname)) return 'pay-login'
   if (isSignMobilePath(pathname)) return 'sign-mobile'
   if (isPricingPath(pathname)) return 'pricing'
   if (isPrivacyPath(pathname)) return 'privacy'
@@ -700,6 +704,11 @@ export function App() {
     return <SignMobilePage />
   }
 
+  // Desktop→phone Pay QR login - no shell chrome.
+  if (screen === 'pay-login') {
+    return <PayLoginMobilePage />
+  }
+
   return (
     <div
       className={[
@@ -773,6 +782,7 @@ export function App() {
               creditBalance={wallet.account ? creditBalance : null}
               creditsActive={screen === 'pricing'}
               onConnect={connectPreservingPath}
+              onSession={wallet.applySession}
               onDisconnect={wallet.disconnect}
               onAgreements={wallet.account ? goAgreements : undefined}
               onCredits={goPricing}
@@ -834,6 +844,7 @@ export function App() {
           connecting={wallet.connecting}
           connectMode={connectMode}
           onConnect={connectPreservingPath}
+          onSession={wallet.applySession}
           onCreditsPurchased={() => {
             void refreshCredits()
           }}
@@ -869,6 +880,7 @@ export function App() {
           connecting={wallet.connecting}
           connectMode={connectMode}
           onConnect={connectPreservingPath}
+          onSession={wallet.applySession}
           onOpen={openAgreement}
           onCreate={startCreate}
           onGetCredits={goPricing}

@@ -55,6 +55,7 @@ export interface PricePageProps {
   connecting?: boolean
   connectMode?: JourneyConnectMode
   onConnect?: (options?: JourneyConnectRequest) => void
+  onSession?: (token: string, address: string) => void
   onCreditsPurchased?: () => void
 }
 
@@ -66,6 +67,7 @@ export function PricePage({
   connecting = false,
   connectMode = 'hub',
   onConnect,
+  onSession,
   onCreditsPurchased,
 }: PricePageProps = {}) {
   const pricing = getSealPricing()
@@ -435,6 +437,7 @@ export function PricePage({
                 connecting={connecting}
                 onClose={() => setBuyLoginOpen(false)}
                 onProceed={onConnect}
+                onSession={onSession}
                 placement="inline"
               />
             </div>

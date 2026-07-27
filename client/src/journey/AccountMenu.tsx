@@ -23,6 +23,8 @@ interface AccountMenuProps {
   /** True when the shell is on Pricing — matches Agreements `lr-nav--active`. */
   creditsActive?: boolean
   onConnect: (options?: JourneyConnectRequest) => void
+  /** Desktop Pay QR success. */
+  onSession?: (token: string, address: string) => void
   onDisconnect: () => void
   onAgreements?: () => void
   /** Open pricing / buy credits. */
@@ -37,6 +39,7 @@ export function AccountMenu({
   creditBalance = null,
   creditsActive = false,
   onConnect,
+  onSession,
   onDisconnect,
   onAgreements,
   onCredits,
@@ -101,6 +104,7 @@ export function AccountMenu({
             walletStatus={walletStatus}
             onClose={() => setLoginOpen(false)}
             onProceed={onConnect}
+            onSession={onSession}
             placement="popover"
           />
         )}

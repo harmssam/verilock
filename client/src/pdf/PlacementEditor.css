@@ -22,6 +22,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 0.3rem;
   padding: 0.35rem 0.4rem;
   border-radius: 8px;
@@ -277,7 +278,6 @@
 }
 
 .placement-toolbar-pages {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -285,6 +285,47 @@
   font-weight: 600;
   color: var(--muted, #64748b);
   font-variant-numeric: tabular-nums;
+}
+
+.placement-toolbar-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  font-variant-numeric: tabular-nums;
+}
+
+.placement-zoom-value {
+  min-width: 2.6rem;
+  margin: 0;
+  padding: 0.2rem 0.25rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+
+.placement-zoom-value:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--person-color, #0f766e) 10%, #f1f5f9);
+  color: var(--person-color, #0f766e);
+}
+
+.placement-zoom-value:focus-visible {
+  outline: 2px solid var(--person-color, #0f766e);
+  outline-offset: 1px;
+}
+
+.placement-zoom-value:disabled {
+  cursor: default;
+  opacity: 0.85;
 }
 
 .placement-mark-preview.is-empty {
@@ -777,9 +818,225 @@
   font-size: 0.8125rem;
 }
 
-/* Full-width page stage (no side list) */
-.placement-editor .pdf-annotator-layout {
+/* Full-width page stage (no side list). Also apply on .placement-stage-layout
+   so the fullscreen portal (outside .placement-editor) stays single-column. */
+.placement-editor .pdf-annotator-layout,
+.placement-stage-layout.pdf-annotator-layout {
   grid-template-columns: 1fr;
+}
+
+/* Stage + toolbar workspace (docked or full-viewport) */
+.placement-stage-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.placement-stage-panel.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 80; /* above .lr-header (40) and undocked toolbar (35) */
+  gap: 0.55rem;
+  padding:
+    max(0.65rem, env(safe-area-inset-top, 0px))
+    max(0.75rem, env(safe-area-inset-right, 0px))
+    max(0.75rem, env(safe-area-inset-bottom, 0px))
+    max(0.75rem, env(safe-area-inset-left, 0px));
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.placement-fullscreen-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  min-height: 2.25rem;
+  /* Room for the absolute exit control so the title stays visually centered */
+  padding-inline: 2.5rem;
+}
+
+.placement-fullscreen-bar-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+  text-align: center;
+}
+
+/* Compact person picker in fullscreen (select who you're placing for). */
+.placement-fullscreen-people {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 0.35rem 0.45rem;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(15, 23, 42, 0.09));
+  background: #fff;
+  box-shadow: var(--shadow-soft, 0 10px 36px rgba(15, 23, 42, 0.04));
+}
+
+.placement-fullscreen-people-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted, #64748b);
+  white-space: nowrap;
+}
+
+.placement-fullscreen-people-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-bottom: 1px;
+}
+
+.placement-fullscreen-person {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+  max-width: 11rem;
+  margin: 0;
+  padding: 0.32rem 0.55rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 999px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease,
+    background 0.12s ease;
+}
+
+.placement-fullscreen-person:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--person-color, #0f766e) 45%, #e2e8f0);
+}
+
+.placement-fullscreen-person:focus-visible {
+  outline: 2px solid var(--person-color, #0f766e);
+  outline-offset: 1px;
+}
+
+.placement-fullscreen-person.is-active {
+  border-color: var(--person-color, #0f766e);
+  background: color-mix(in srgb, var(--person-color, #0f766e) 10%, #fff);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--person-color, #0f766e) 30%, transparent);
+}
+
+.placement-fullscreen-person:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.placement-fullscreen-person-swatch {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: var(--person-color, #0f766e);
+}
+
+.placement-fullscreen-person-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.placement-stage-panel.is-fullscreen .placement-editor-toolbar-slot {
+  flex-shrink: 0;
+}
+
+.placement-stage-panel.is-fullscreen .placement-stage-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.placement-stage-panel.is-fullscreen .placement-stage-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.placement-stage-panel.is-fullscreen .pdf-annotator-stage.is-fullscreen {
+  flex: 1 1 auto;
+  max-height: none;
+  height: 100%;
+  min-height: 0;
+}
+
+.placement-stage-frame {
+  position: relative;
+  min-width: 0;
+}
+
+/* Top-right control on the PDF stage (docked view) */
+.placement-stage-fullscreen-btn {
+  position: absolute;
+  top: 0.55rem;
+  /* Clear permanent scrollbar gutter on the stage */
+  right: 1.35rem;
+  z-index: 6;
+  width: 2.1rem;
+  height: 2.1rem;
+  background: rgb(255 255 255 / 94%);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 10%),
+    0 4px 12px rgb(15 23 42 / 8%);
+}
+
+.placement-stage-fullscreen-btn:hover:not(:disabled) {
+  background: #fff;
+  border-color: #94a3b8;
+}
+
+.placement-stage-fullscreen-btn--bar {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+  box-shadow: 0 1px 0 rgb(15 23 42 / 4%);
+}
+
+/* Center helper / error copy above the stage */
+.placement-stage-panel .placement-editor-hint,
+.placement-stage-panel .placement-editor-error {
+  text-align: center;
+}
+
+.placement-editor > .placement-editor-hint,
+.placement-editor > .placement-editor-error {
+  text-align: center;
 }
 
 .placement-slot {

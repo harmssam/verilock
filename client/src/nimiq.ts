@@ -3,18 +3,13 @@ import type { ChooseAddressResult, SignedMessage, SignedTransaction } from '@nim
 
 const { RedirectRequestBehavior, RequestType } = HubApi
 import { getHostLanguage, init } from '@nimiq/mini-app-sdk'
-import {
-  processLenientHubRedirect,
-  type HubLockRedirectResult,
-} from './hubSealRedirect'
+import { processLenientHubRedirect } from './hubSealRedirect'
 import { saveHubReturnPath, savePayReturnPath } from './hubReturnPath'
 import { clearStaleHubRpcStateIfIdle, getHubReturnUrl } from './hubRedirectParse'
 import { peekHubRedirectInUrl, RPC_ID_SEARCH_PARAM } from './sealRecovery'
 import { sealError, sealLog, sealWarn } from './sealDebug'
-import { getSealFeeLuna } from './sealPricing'
 
 export { peekHubRedirectInUrl }
-export type { HubLockRedirectResult }
 
 const HUB_ENDPOINT = import.meta.env.VITE_NIMIQ_HUB_URL ?? 'https://hub.nimiq.com'
 const NIMIQ_RPC_URL = import.meta.env.VITE_NIMIQ_RPC_URL ?? 'https://rpc.nimiqwatch.com'
@@ -25,8 +20,6 @@ export type WalletMode = 'nimiq-pay' | 'hub'
 
 let hubApi: HubApi | null = null
 let hubRedirectHandlersReady = false
-const hubLockCompletionInFlight = new Set<string>()
-
 export function getProviderErrorMessage(value: unknown): string | null {
   if (typeof value !== 'object' || value === null || !('error' in value)) return null
   const maybeError = (value as { error?: { message?: unknown } }).error
@@ -281,44 +274,6 @@ function getRecentBlockHeightSync(): number | null {
   return lastKnownBlock
 }
 
-/** Hub checkout payload for seal - checkout() signs and broadcasts. */
-export type HubLockCheckoutRequest = {
-  appName: string
-  sender: string
-  forceSender: true
-  recipient: string
-  value: number
-  flags: number
-  extraData: Uint8Array
-  /** Hub sets validityStartHeight; 120 is the documented max/default duration. */
-  validityDuration: number
-}
-
-/**
- * Hub checkout request for seal (sync - safe on user-gesture path).
- *
- * Per Nimiq Hub docs, checkout() signs **and broadcasts**. Prefer this over
- * signTransaction(), which only returns a signed payload and often fails to
- * land when we rebroadcast ourselves (see docs/nimiq-network-integration.md).
- */
-export function buildLockRequestSync(
-  address: string,
-  docId: string,
-  finalSha256: string,
-): HubLockCheckoutRequest {
-  const recipient = getHubAttestationRecipient()
-  return {
-    appName: APP_NAME,
-    sender: address,
-    forceSender: true,
-    recipient,
-    value: getSealFeeLuna(),
-    flags: 0,
-    extraData: buildAttestationPayloadBytes(docId, finalSha256.toLowerCase()),
-    validityDuration: 120,
-  }
-}
-
 let sealProgressReporter: ((message: string) => void) | null = null
 
 export function setSealProgressReporter(reporter: ((message: string) => void) | null): void {
@@ -449,25 +404,6 @@ export function getHubAttestationRecipient(): string {
   return DEFAULT_ATTESTATION_RECIPIENT
 }
 
-async function buildHubLockCheckoutRequest(
-  address: string,
-  docId: string,
-  finalSha256: string,
-): Promise<HubLockCheckoutRequest> {
-  // Checkout does not require validityStartHeight (Hub sets it). Keep this async
-  // so call sites can warm block height for other Hub paths without blocking.
-  void getRecentBlockHeightSync()
-  void refreshBlockHeight().catch(() => {})
-  return buildLockRequestSync(address, docId, finalSha256)
-}
-
-export function isLockHubCommand(command: string, state: Record<string, unknown> | null | undefined): boolean {
-  return (
-    state?.flow === 'lock' &&
-    (command === RequestType.CHECKOUT || command === RequestType.SIGN_TRANSACTION)
-  )
-}
-
 export async function relaySignedTransaction(
   signed: SignedTransaction,
   broadcastFallback?: TransactionBroadcastFallback,
@@ -543,8 +479,6 @@ const hubRedirectDeps = () => ({
   appName: APP_NAME,
   getHubApi,
   bytesToHex,
-  isLockHubCommand,
-  finalizeHubLockTransaction,
 })
 
 function registerHubEventHandlers(
@@ -557,10 +491,7 @@ function registerHubEventHandlers(
     token: string
   }) => void,
   onError: (err: Error) => void,
-  handleLockComplete: (result: HubLockRedirectResult) => Promise<void>,
-  handleLockError: (err: Error) => Promise<void>,
-  createBroadcastFallback?: BroadcastFallbackFactory,
-  registerLockWork?: (work: Promise<void>) => void,
+  registerTxWork?: (work: Promise<void>) => void,
 ): void {
   /**
    * Legacy two-trip login (chooseAddress → signMessage). Still handled so an
@@ -595,30 +526,6 @@ function registerHubEventHandlers(
       onError(err instanceof Error ? err : new Error(String(err)))
     }
   })
-  const handleLockSigned = (
-    signed: SignedTransaction,
-    state: Record<string, unknown> | null | undefined,
-    hubBroadcast: boolean,
-    registerLockWork?: (work: Promise<void>) => void,
-  ) => {
-    try {
-      const token = state?.token as string | undefined
-      const docId = state?.docId as string | undefined
-      if (!token || !docId) throw new Error('Lock session expired - try again.')
-      sealLog('hub:lockTxSigned', { docId, hash: signed.hash, hubBroadcast })
-      const lockWork = finalizeHubLockTransaction(signed, {
-        hubBroadcast,
-        broadcastFallback: token ? createBroadcastFallback?.(token, docId) : undefined,
-      })
-        .then(txHash => handleLockComplete({ token, docId, txHash }))
-        .catch(err => handleLockError(err instanceof Error ? err : new Error(String(err))))
-      registerLockWork?.(lockWork)
-    } catch (err) {
-      sealError('hub:lockTxHandlerFailed', err)
-      registerLockWork?.(handleLockError(err instanceof Error ? err : new Error(String(err))))
-    }
-  }
-
   const handleCreditTopupSigned = (
     signed: SignedTransaction,
     state: Record<string, unknown> | null | undefined,
@@ -669,37 +576,30 @@ function registerHubEventHandlers(
   }
 
   hub.on(RequestType.CHECKOUT, (signed, state) => {
-    sealLog('hub:CHECKOUT', { flow: state?.flow, hasToken: Boolean(state?.token), docId: state?.docId })
+    sealLog('hub:CHECKOUT', { flow: state?.flow, hasToken: Boolean(state?.token) })
     if (state?.flow === 'credit_topup') {
-      handleCreditTopupSigned(signed as SignedTransaction, state, true, registerLockWork)
+      handleCreditTopupSigned(signed as SignedTransaction, state, true, registerTxWork)
       return
     }
-    if (state?.flow !== 'lock') return
-    handleLockSigned(signed as SignedTransaction, state, true, registerLockWork)
+    sealWarn('hub:CHECKOUT ignored (not credit_topup)', { flow: state?.flow })
   })
 
   hub.on(RequestType.SIGN_TRANSACTION, (signed, state) => {
-    sealLog('hub:SIGN_TRANSACTION', { flow: state?.flow, hasToken: Boolean(state?.token), docId: state?.docId })
+    sealLog('hub:SIGN_TRANSACTION', { flow: state?.flow, hasToken: Boolean(state?.token) })
     if (state?.flow === 'credit_topup') {
-      handleCreditTopupSigned(signed as SignedTransaction, state, false, registerLockWork)
+      handleCreditTopupSigned(signed as SignedTransaction, state, false, registerTxWork)
       return
     }
-    if (state?.flow !== 'lock') {
-      sealWarn('hub:SIGN_TRANSACTION ignored (not a lock flow)', { flow: state?.flow })
-      return
-    }
-    handleLockSigned(signed as SignedTransaction, state, false, registerLockWork)
+    sealWarn('hub:SIGN_TRANSACTION ignored (not credit_topup)', { flow: state?.flow })
   })
 }
 
 export type HubRedirectSetupResult = {
   redirectHandled: boolean
   loginHandled: boolean
-  lockHandled: boolean
-  lockCompletion: Promise<void> | null
 }
 
-/** Call on app load to finish Hub redirect login and lock round-trips. */
+/** Call on app load to finish Hub redirect login (and credit top-up) round-trips. */
 export async function setupHubRedirectHandlers(
   getChallenge: (address?: string | null) => Promise<{ token: string; nonce: string }>,
   onComplete: (result: {
@@ -709,18 +609,9 @@ export async function setupHubRedirectHandlers(
     token: string
   }) => void,
   onError: (err: Error) => void,
-  onLockComplete?: (result: HubLockRedirectResult) => void,
-  onLockError?: (err: Error) => void,
-  createBroadcastFallback?: BroadcastFallbackFactory,
 ): Promise<HubRedirectSetupResult> {
   const hub = getHubApi()
-  let lockRedirectHandled = false
   let loginRedirectHandled = false
-  let lockCompletion: Promise<void> | null = null
-
-  const registerLockWork = (work: Promise<void>) => {
-    lockCompletion = lockCompletion ? lockCompletion.then(() => work) : work
-  }
 
   const handleLoginComplete = (result: {
     address: string
@@ -732,60 +623,25 @@ export async function setupHubRedirectHandlers(
     onComplete(result)
   }
 
-  const handleLockComplete = (result: HubLockRedirectResult): Promise<void> => {
-    const key = `${result.docId}:${normalizeTxHash(result.txHash)}`
-    if (hubLockCompletionInFlight.has(key)) {
-      sealWarn('hub:lockCompleteDuplicate', { key })
-      return Promise.resolve()
-    }
-    hubLockCompletionInFlight.add(key)
-    lockRedirectHandled = true
-    return Promise.resolve(onLockComplete?.(result)).finally(() => {
-      hubLockCompletionInFlight.delete(key)
-    })
-  }
-
-  const handleLockError = (err: Error): Promise<void> => {
-    lockRedirectHandled = true
-    return Promise.resolve(onLockError?.(err)).then(() => undefined)
-  }
-
   const lenientHandled = processLenientHubRedirect(
     hubRedirectDeps(),
     getChallenge,
     handleLoginComplete,
     onError,
-    handleLockComplete,
-    handleLockError,
-    createBroadcastFallback,
-    registerLockWork,
   )
 
   if (!hubRedirectHandlersReady) {
     hubRedirectHandlersReady = true
-    registerHubEventHandlers(
-      hub,
-      getChallenge,
-      handleLoginComplete,
-      onError,
-      handleLockComplete,
-      handleLockError,
-      createBroadcastFallback,
-      registerLockWork,
-    )
+    registerHubEventHandlers(hub, getChallenge, handleLoginComplete, onError)
   }
 
   if (lenientHandled) {
     sealLog('hub:lenientRedirectHandled', {
-      lockCompletionAsync: Boolean(lockCompletion),
       loginHandled: loginRedirectHandled,
-      lockHandled: lockRedirectHandled,
     })
     return {
       redirectHandled: true,
       loginHandled: loginRedirectHandled,
-      lockHandled: lockRedirectHandled,
-      lockCompletion,
     }
   }
 
@@ -795,13 +651,13 @@ export async function setupHubRedirectHandlers(
     rpcId: new URLSearchParams(window.location.search).get(RPC_ID_SEARCH_PARAM),
   })
   await hub.checkRedirectResponse()
-  const redirectHandled = loginRedirectHandled || lockRedirectHandled
-  sealLog('hub:redirectHandlersReady', { redirectHandled, loginRedirectHandled, lockRedirectHandled })
+  sealLog('hub:redirectHandlersReady', {
+    redirectHandled: loginRedirectHandled,
+    loginRedirectHandled,
+  })
   return {
-    redirectHandled,
+    redirectHandled: loginRedirectHandled,
     loginHandled: loginRedirectHandled,
-    lockHandled: lockRedirectHandled,
-    lockCompletion,
   }
 }
 
@@ -916,12 +772,72 @@ export function getMiniAppWebUrl(appUrl?: string): string {
 }
 
 /**
+ * Origin used in QR / share links that a **phone** must open.
+ * Locally `window.location.origin` is often `http://localhost:5176` - the phone
+ * cannot reach your Mac’s localhost. Set `VITE_PUBLIC_APP_URL` to a tunnel
+ * (ngrok / Cloudflare) or LAN URL the phone can load, e.g.
+ * `https://abc.ngrok-free.app` or `http://192.168.1.12:5176`.
+ */
+export function getPublicAppOrigin(): string {
+  const fromEnv = (import.meta.env.VITE_PUBLIC_APP_URL as string | undefined)?.trim()
+  if (fromEnv) {
+    try {
+      return new URL(fromEnv).origin
+    } catch {
+      /* fall through */
+    }
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin
+  }
+  return ''
+}
+
+/** True when the public origin is loopback (phone cannot open desktop localhost). */
+export function isLoopbackAppOrigin(origin = getPublicAppOrigin()): boolean {
+  try {
+    const host = new URL(origin).hostname
+    return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1'
+  } catch {
+    return true
+  }
+}
+
+/** Absolute https/http URL for Pay QR login on the phone (`/m/login/:id`). */
+export function payLoginWebUrl(loginId: string, origin = getPublicAppOrigin()): string {
+  const base = origin.replace(/\/$/, '')
+  return `${base}/m/login/${encodeURIComponent(loginId)}`
+}
+
+/**
  * `nimiqpay://miniapp?url=<https url>`
  * @see https://www.nimiq.dev/mini-apps - Sharing Your Mini App
  */
 export function nimiqPayDeepLink(appUrl: string): string {
   const target = normalizeMiniAppUrl(appUrl)
   return `nimiqpay://miniapp?url=${encodeURIComponent(target)}`
+}
+
+/**
+ * Payload encoded in the desktop login QR.
+ * Uses the Nimiq Pay deeplink so a phone camera can open Pay directly when the
+ * scheme is registered; the embedded url must still be phone-reachable.
+ */
+export function payLoginQrPayload(loginId: string): {
+  webUrl: string
+  deeplink: string
+  /** Prefer deeplink in the QR so Pay opens without a browser hop. */
+  qrText: string
+  loopback: boolean
+} {
+  const webUrl = payLoginWebUrl(loginId)
+  const deeplink = nimiqPayDeepLink(webUrl)
+  return {
+    webUrl,
+    deeplink,
+    qrText: deeplink,
+    loopback: isLoopbackAppOrigin(),
+  }
 }
 
 export type NimiqPayLaunchResult = 'already-in-pay' | 'launched' | 'unavailable'
@@ -989,23 +905,6 @@ export function buildAttestationPayload(docId: string, finalSha256: string): str
   return bytesToHex(buildAttestationPayloadBytes(docId, finalSha256))
 }
 
-export async function sendLockAttestation(
-  nimiq: Awaited<ReturnType<typeof init>>,
-  _address: string,
-  docId: string,
-  finalSha256: string,
-) {
-  const txHash = await nimiq.sendBasicTransactionWithData({
-    recipient: getHubAttestationRecipient(),
-    value: getSealFeeLuna(),
-    data: buildAttestationPayload(docId, finalSha256.toLowerCase()),
-  })
-  const txError = getProviderErrorMessage(txHash)
-  if (txError) throw new Error(txError)
-  return txHash as string
-}
-
-/** Credit top-up payload: version=2, kind=1 - must match server creditTopup.ts */
 export const TOPUP_PAYLOAD_VERSION = 2
 export const TOPUP_PAYLOAD_KIND = 1
 
@@ -1109,75 +1008,6 @@ export async function sendCreditTopupViaHub(
     return txHash
   } catch (err) {
     sealError('hub:creditTopupFailed', err)
-    if (isPopupBlockedError(err)) {
-      throw new Error(popupBlockedHelp())
-    }
-    throw err
-  }
-}
-
-/**
- * Seal via Nimiq Hub using checkout() - signs and broadcasts (official path).
- * signTransaction is only kept as a handler for in-flight legacy redirects.
- */
-export async function sendLockAttestationViaHub(
-  address: string,
-  docId: string,
-  finalSha256: string,
-  options?: {
-    preferRedirect?: boolean
-    token?: string
-    broadcastFallback?: TransactionBroadcastFallback
-    /** Prebuilt checkout request to avoid await inside the gesture path. */
-    prebuiltRequest?: HubLockCheckoutRequest
-    finalSha256?: string
-  },
-): Promise<string> {
-  const hub = getHubApi()
-  const request =
-    options?.prebuiltRequest ??
-    (await buildHubLockCheckoutRequest(address, docId, finalSha256))
-
-  sealLog('hub:checkoutRequest', {
-    docId,
-    recipient: request.recipient,
-    extraDataBytes: request.extraData instanceof Uint8Array ? request.extraData.length : 0,
-    value: request.value,
-    preferRedirect: options?.preferRedirect ?? false,
-  })
-
-  const lockState = {
-    flow: 'lock' as const,
-    token: options?.token,
-    docId,
-    finalSha256: options?.finalSha256 ?? finalSha256,
-  }
-
-  const preferRedirect = options?.preferRedirect ?? true
-  if (preferRedirect) {
-    clearStaleHubRpcStateIfIdle()
-    saveHubReturnPath()
-    const behavior = hubRedirectBehavior(lockState)
-    // checkout with RedirectRequestBehavior must stay in the user-gesture stack.
-    await hub.checkout(
-      request,
-      behavior as Parameters<typeof hub.checkout>[1],
-    )
-    throw new Error(HUB_REDIRECT_MESSAGE)
-  }
-
-  try {
-    clearStaleHubRpcStateIfIdle()
-    sealLog('hub:popupCheckout', { docId })
-    const signed = await hub.checkout(request)
-    const txHash = await finalizeHubLockTransaction(signed as SignedTransaction, {
-      hubBroadcast: true,
-      broadcastFallback: options?.broadcastFallback,
-    })
-    sealLog('hub:checkoutSuccess', { txHash })
-    return txHash
-  } catch (err) {
-    sealError('hub:checkoutFailed', err)
     if (isPopupBlockedError(err)) {
       throw new Error(popupBlockedHelp())
     }

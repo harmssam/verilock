@@ -32,7 +32,7 @@ Fingerprint a document **on-device** (PDF or image), collect multi-party wallet 
 | Level | User-facing name | What they get | Price |
 |-------|------------------|---------------|-------|
 | **0** | **Sign free** | Create, set up fields, invite, co-sign with wallets, My agreements, print signed copy | **$0** |
-| **1** | **Lock on blockchain** | Permanent fingerprint anchor on Nimiq; re-verify without trusting VeriLock alone | **1 credit** (or live NIM fee) |
+| **1** | **Lock on blockchain** | Permanent fingerprint anchor on Nimiq; re-verify without trusting VeriLock alone | **1 credit** (service wallet posts proof) |
 | **2** | **On-chain data backup** | Signatures / initials / text placements multi-tx archive so proof can outlive servers | **Credits by frame count** |
 
 **Honest free disclaimer:** free signing stores agreement metadata on VeriLock servers. It is **not** a permanent public proof until locked. Files stay on each party’s device.

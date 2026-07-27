@@ -24,15 +24,12 @@ import {
 } from './db.js'
 import {
   addSignature,
-  assertSealBroadcastAllowed,
-  beginLock,
   configureDocumentCosigners,
   configureSigningRoster,
   createDocument,
   deleteDocument,
   getDocumentPublic,
   getMyDocuments,
-  prepareLock,
   setCreatorNotifyEmail,
   setMyDocumentListArchived,
   viewerMayAccessSignatureImage,
@@ -69,7 +66,7 @@ import {
   pdfAnnotationFeaturesPublic,
 } from './pdfAnnotationConfig.js'
 import { isServiceWalletConfigured } from './serviceWallet.js'
-import { broadcastRawTransaction, normalizeRawTransactionHex, verifySignature } from './nimiq-rpc.js'
+import { verifySignature } from './nimiq-rpc.js'
 import {
   assertSafeBootConfig,
   resolveCorsOrigin,
@@ -84,12 +81,10 @@ import {
   getAttestationStatus,
   resolveAttestation,
   startAttestationPoller,
-  submitAttestation,
 } from './attestations.js'
 import { applySecurityHeaders } from './http-headers.js'
 import { getNimPrices, warmNimPricesCache } from './nimPrices.js'
-import { getWalletBalanceLuna } from './nimiq-rpc.js'
-import { getMinimumSealBalanceLuna, getSealPricing, hasSufficientSealBalance } from './sealPricing.js'
+import { getSealPricing } from './sealPricing.js'
 import { startSessionCleanup } from './session-cleanup.js'
 import { attachLocalStudios } from './localStudios.js'
 import * as sigHandoff from './sigHandoff.js'
@@ -155,7 +150,6 @@ const authChallengeLimit = rateLimit(12, 60_000)
 const authVerifyLimit = rateLimit(24, 60_000)
 const docLimit = rateLimit(30, 60_000)
 const attestLimit = rateLimit(24, 60_000)
-const walletBalanceLimit = rateLimit(30, 60_000)
 /** Mutations / checkout - keep tight. */
 const creditsLimit = rateLimit(30, 60_000)
 /** Code redemption - tighter (brute-force codes). */
@@ -268,24 +262,6 @@ app.get('/api/nim-prices', async (_req, res) => {
   } catch (err) {
     res.status(502).json({
       error: err instanceof Error ? err.message : 'Could not fetch NIM prices',
-    })
-  }
-})
-
-app.get('/api/wallet-balance', authMiddleware, requireVerifiedWallet, walletBalanceLimit, async (_req, res) => {
-  try {
-    const address = res.locals.address as string
-    const balanceLuna = await getWalletBalanceLuna(address)
-    const requiredLuna = getMinimumSealBalanceLuna()
-    res.json({
-      address,
-      balanceLuna,
-      requiredLuna,
-      sufficient: hasSufficientSealBalance(balanceLuna),
-    })
-  } catch (err) {
-    res.status(502).json({
-      error: err instanceof Error ? err.message : 'Could not fetch wallet balance',
     })
   }
 })
@@ -920,6 +896,60 @@ app.post('/api/auth/verify', authVerifyLimit, authMiddleware, async (req, res) =
   res.json({ ok: true, address: session.address, verified: true })
 })
 
+/** Desktop Pay QR login: create short-lived room (no auth). */
+app.post('/api/auth/qr/start', authChallengeLimit, async (_req, res) => {
+  try {
+    const { startPayLoginQr } = await import('./payLoginQr.js')
+    const result = startPayLoginQr()
+    res.json(result)
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Could not start QR login' })
+  }
+})
+
+/**
+ * Desktop polls until phone completes Pay login.
+ * On first `ready` response, includes token+address and consumes the room.
+ */
+app.get('/api/auth/qr/:id', authChallengeLimit, async (req, res) => {
+  try {
+    const { pollPayLoginQr } = await import('./payLoginQr.js')
+    const result = pollPayLoginQr(routeParam(req.params.id))
+    if (result.status === 'not_found') {
+      res.status(404).json({ error: 'QR login session not found' })
+      return
+    }
+    res.json(result)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'QR login poll failed'
+    res.status(/expired|already used/i.test(message) ? 410 : 400).json({ error: message })
+  }
+})
+
+/** Phone (verified Pay session) attaches identity to the desktop QR room. */
+app.post(
+  '/api/auth/qr/:id/complete',
+  authVerifyLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  async (req, res) => {
+    try {
+      const { completePayLoginQrFromPhoneSession } = await import('./payLoginQr.js')
+      const token = res.locals.token as string
+      const result = completePayLoginQrFromPhoneSession(routeParam(req.params.id), token)
+      res.json(result)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'QR login complete failed'
+      const status = /not found/i.test(message)
+        ? 404
+        : /expired|already used/i.test(message)
+          ? 410
+          : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
+
 app.get('/api/me', authMiddleware, (req, res) => {
   const address = res.locals.address as string
   res.json({ address, documents: getMyDocuments(address) })
@@ -1337,73 +1367,6 @@ app.get('/api/documents/:docId/signatures/:sigId/image', (req, res) => {
     return
   }
   res.send(image.imageBlob)
-})
-
-app.post('/api/documents/:id/prepare-lock', docLimit, authMiddleware, requireVerifiedWallet, (req, res) => {
-  const { finalSha256 } = req.body as { finalSha256?: string }
-  if (!finalSha256 || !/^[a-f0-9]{64}$/i.test(finalSha256)) {
-    res.status(400).json({ error: 'Valid finalSha256 required' })
-    return
-  }
-  const address = res.locals.address as string
-  try {
-    const result = prepareLock(routeParam(req.params.id), finalSha256.toLowerCase(), address)
-    res.json(result)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Prepare lock failed'
-    res.status(lockErrorStatus(message)).json({ error: message })
-  }
-})
-
-app.post('/api/transactions/broadcast', attestLimit, authMiddleware, requireVerifiedWallet, async (req, res) => {
-  const { serializedTx, documentId } = req.body as { serializedTx?: string; documentId?: string }
-  if (!documentId?.trim()) {
-    res.status(400).json({ error: 'documentId required' })
-    return
-  }
-  if (!serializedTx?.trim()) {
-    res.status(400).json({ error: 'serializedTx required' })
-    return
-  }
-
-  const address = res.locals.address as string
-  try {
-    assertSealBroadcastAllowed(documentId, address)
-    normalizeRawTransactionHex(serializedTx)
-    const hash = await broadcastRawTransaction(serializedTx)
-    res.json({ hash })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Broadcast failed'
-    res.status(lockErrorStatus(message)).json({ error: message })
-  }
-})
-
-app.post('/api/documents/:id/begin-lock', docLimit, authMiddleware, requireVerifiedWallet, (req, res) => {
-  const address = res.locals.address as string
-  try {
-    const document = beginLock(routeParam(req.params.id), address)
-    res.json({ document })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Begin lock failed'
-    res.status(lockErrorStatus(message)).json({ error: message })
-  }
-})
-
-app.post('/api/documents/:id/attestations', attestLimit, authMiddleware, requireVerifiedWallet, async (req, res) => {
-  const { txHash } = req.body as { txHash?: string }
-  if (!txHash) {
-    res.status(400).json({ error: 'txHash required' })
-    return
-  }
-
-  const address = res.locals.address as string
-  try {
-    const result = await submitAttestation(routeParam(req.params.id), txHash, address)
-    res.json(result)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Attestation failed'
-    res.status(lockErrorStatus(message)).json({ error: message })
-  }
 })
 
 app.get('/api/attestations/status/:txHash', authMiddleware, async (req, res) => {
