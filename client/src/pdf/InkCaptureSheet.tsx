@@ -1,13 +1,18 @@
 /**
  * Full-screen ink capture for phones — shared by QR /m/sign and in-app field signing.
  *
- * - Real landscape devices: normal landscape pad sizing.
- * - Portrait browsers: rotate gate until they tip the phone.
- * - Nimiq Pay (portrait-locked): skip the gate, full-screen portrait UI with a large
- *   horizontal pad + one-shot iPhone guide. No CSS 90° transform (breaks Pay WebView).
+ * - Real landscape: normal landscape pad sizing.
+ * - Portrait Safari/Chrome: blocking rotate gate until tipped.
+ * - Nimiq Pay (portrait-locked): skip gate; **force landscape frame** via JS pixel
+ *   geometry + rotate(90deg) so chrome/pad/CTA are true landscape (hold phone on side).
  */
 import { X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  type CSSProperties,
+} from 'react'
 import { useIsLandscape, useIsRealPortrait } from '../useViewport'
 import {
   SignatureStrokePad,
@@ -58,6 +63,66 @@ function IPhoneOutlineIcon({ className }: { className?: string }) {
   )
 }
 
+/**
+ * Pixel-perfect forced landscape frame for portrait-locked hosts (Nimiq Pay).
+ * CSS-only 100vh/100vw + transform is unreliable in iOS mini-app WebViews.
+ *
+ * Layout box is landscape-sized (long = physical height, short = physical width),
+ * centered, then rotated 90° so it fills the portrait viewport. Hold phone on its side.
+ */
+function useForcedLandscapeFrame(enabled: boolean): CSSProperties | undefined {
+  const [style, setStyle] = useState<CSSProperties | undefined>(undefined)
+
+  useLayoutEffect(() => {
+    if (!enabled) {
+      setStyle(undefined)
+      return
+    }
+
+    const apply = () => {
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      if (vw < 1 || vh < 1) return
+      // Landscape logical size: wide edge along physical vertical after rotate
+      const width = vh
+      const height = vw
+      setStyle({
+        position: 'fixed',
+        zIndex: 230,
+        width,
+        height,
+        // Center the landscape box in the portrait viewport before rotate
+        top: (vh - height) / 2,
+        left: (vw - width) / 2,
+        right: 'auto',
+        bottom: 'auto',
+        margin: 0,
+        transform: 'rotate(90deg)',
+        transformOrigin: 'center center',
+        boxSizing: 'border-box',
+        // Expose short edge for pad max-height (physical phone width)
+        ['--ink-force-short' as string]: `${height}px`,
+        ['--ink-force-long' as string]: `${width}px`,
+      })
+    }
+
+    apply()
+    window.addEventListener('resize', apply)
+    window.addEventListener('orientationchange', apply)
+    const vv = window.visualViewport
+    vv?.addEventListener('resize', apply)
+    vv?.addEventListener('scroll', apply)
+    return () => {
+      window.removeEventListener('resize', apply)
+      window.removeEventListener('orientationchange', apply)
+      vv?.removeEventListener('resize', apply)
+      vv?.removeEventListener('scroll', apply)
+    }
+  }, [enabled])
+
+  return style
+}
+
 export interface InkCaptureSheetProps {
   fieldKind: InkCaptureFieldKind
   /** Field width÷height so the pad matches the PDF box (when layout allows). */
@@ -102,10 +167,11 @@ export function InkCaptureSheet({
   const isLandscape = useIsLandscape()
   const isRealPortrait = useIsRealPortrait()
   const isInitial = fieldKind === 'initial'
-  // Pay: isLandscape is forced true (skip gate). Real portrait → tall-frame pad layout.
+  // Pay: isLandscape forced true (skip blocking gate). Real portrait → force landscape frame.
   const needsLandscape = !isLandscape
   const isPortraitHost = !needsLandscape && isRealPortrait
   const canDraw = isLandscape && !disabled
+  const forceFrame = useForcedLandscapeFrame(isPortraitHost)
   const title = isInitial ? 'Draw your initials' : 'Draw your signature'
   const aspect =
     padAspect != null && Number.isFinite(padAspect) && padAspect > 0.05
@@ -115,8 +181,7 @@ export function InkCaptureSheet({
         : 2.8
 
   /**
-   * One-shot guide on portrait hosts (Nimiq Pay): iPhone SVG turns 2s, holds, fades.
-   * Educational only — pad stays usable underneath.
+   * One-shot guide: iPhone SVG turns 2s, holds, fades — tip the phone to match the frame.
    */
   const [portraitGuide, setPortraitGuide] = useState<'off' | 'play' | 'fade'>('off')
   useEffect(() => {
@@ -137,8 +202,8 @@ export function InkCaptureSheet({
   }, [isPortraitHost, padKey])
 
   useEffect(() => {
-    if (!isPortraitHost && variant !== 'overlay') return
     if (needsLandscape) return
+    if (variant !== 'overlay' && !isPortraitHost) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
@@ -147,117 +212,126 @@ export function InkCaptureSheet({
   }, [isPortraitHost, variant, needsLandscape])
 
   return (
-    <div
-      className={[
-        'ink-capture-sheet',
-        `ink-capture-sheet--${variant}`,
-        needsLandscape ? 'is-rotate' : 'is-draw',
-        isPortraitHost ? 'is-portrait-host' : '',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
-      role={variant === 'overlay' ? 'dialog' : undefined}
-      aria-modal={variant === 'overlay' ? true : undefined}
-      aria-labelledby={titleId}
-    >
-      {needsLandscape && (
-        <div className="ink-capture-rotate" role="status" aria-live="polite">
-          <div className="ink-capture-rotate-phone-wrap" aria-hidden>
-            <IPhoneOutlineIcon className="ink-capture-rotate-phone" />
+    <>
+      {isPortraitHost && (
+        <div className="ink-capture-force-backdrop" aria-hidden />
+      )}
+      <div
+        className={[
+          'ink-capture-sheet',
+          `ink-capture-sheet--${variant}`,
+          needsLandscape ? 'is-rotate' : 'is-draw',
+          isPortraitHost ? 'is-portrait-host' : '',
+          className,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        style={forceFrame}
+        role={variant === 'overlay' ? 'dialog' : undefined}
+        aria-modal={variant === 'overlay' ? true : undefined}
+        aria-labelledby={titleId}
+      >
+        {needsLandscape && (
+          <div className="ink-capture-rotate" role="status" aria-live="polite">
+            <div className="ink-capture-rotate-phone-wrap" aria-hidden>
+              <IPhoneOutlineIcon className="ink-capture-rotate-phone" />
+            </div>
+            <h1 id={titleId} className="ink-capture-rotate-title">
+              Rotate your phone
+            </h1>
+            <p className="ink-capture-rotate-copy">
+              Turn the phone sideways to{' '}
+              {isInitial ? 'draw your initials' : 'draw your signature'} so the pad
+              matches the box on your document. This message leaves when you do.
+            </p>
+            <p className="ink-capture-rotate-note muted">
+              If nothing changes, unlock portrait lock in Control Center or Quick
+              Settings, then rotate.
+            </p>
+            {onClose && (
+              <button
+                type="button"
+                className="btn btn-secondary ink-capture-rotate-cancel"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+            )}
           </div>
-          <h1 id={titleId} className="ink-capture-rotate-title">
-            Rotate your phone
-          </h1>
-          <p className="ink-capture-rotate-copy">
-            Turn the phone sideways to{' '}
-            {isInitial ? 'draw your initials' : 'draw your signature'} so the pad
-            matches the box on your document. This message leaves when you do.
-          </p>
-          <p className="ink-capture-rotate-note muted">
-            If nothing changes, unlock portrait lock in Control Center or Quick
-            Settings, then rotate.
-          </p>
+        )}
+
+        {portraitGuide !== 'off' && (
+          <div
+            className={`ink-capture-portrait-guide${
+              portraitGuide === 'fade' ? ' is-fade' : ''
+            }`}
+            role="status"
+            aria-live="polite"
+            aria-label="Tip the phone on its side to sign"
+          >
+            <div className="ink-capture-portrait-guide-phone" aria-hidden>
+              <IPhoneOutlineIcon className="ink-capture-portrait-guide-svg" />
+            </div>
+          </div>
+        )}
+
+        <header className="ink-capture-head" hidden={needsLandscape}>
+          <div className="ink-capture-head-text">
+            {kicker ? <p className="ink-capture-kicker">{kicker}</p> : null}
+            <h1
+              id={needsLandscape ? undefined : titleId}
+              className="ink-capture-title"
+            >
+              {title}
+            </h1>
+          </div>
           {onClose && (
             <button
               type="button"
-              className="btn btn-secondary ink-capture-rotate-cancel"
+              className="ink-capture-close"
+              aria-label="Close"
               onClick={onClose}
+              tabIndex={needsLandscape ? -1 : undefined}
             >
-              Cancel
+              <X size={18} strokeWidth={2.25} aria-hidden />
             </button>
           )}
-        </div>
-      )}
+        </header>
 
-      {portraitGuide !== 'off' && (
         <div
-          className={`ink-capture-portrait-guide${
-            portraitGuide === 'fade' ? ' is-fade' : ''
-          }`}
-          role="status"
-          aria-live="polite"
-          aria-label="Draw across the wide pad — tip the phone if that helps"
+          className="ink-capture-pad-stage"
+          hidden={needsLandscape}
+          aria-hidden={needsLandscape || undefined}
         >
-          <div className="ink-capture-portrait-guide-phone" aria-hidden>
-            <IPhoneOutlineIcon className="ink-capture-portrait-guide-svg" />
-          </div>
+          <SignatureStrokePad
+            key={padKey}
+            productMode
+            compact
+            disabled={!canDraw}
+            label={isInitial ? 'Initials' : 'Signature'}
+            padAspect={aspect}
+            onChange={onChange}
+          />
         </div>
-      )}
 
-      <header className="ink-capture-head" hidden={needsLandscape}>
-        <div className="ink-capture-head-text">
-          {kicker ? <p className="ink-capture-kicker">{kicker}</p> : null}
-          <h1 id={needsLandscape ? undefined : titleId} className="ink-capture-title">
-            {title}
-          </h1>
-        </div>
-        {onClose && (
+        <div
+          className="ink-capture-float-dock"
+          hidden={needsLandscape}
+          aria-hidden={needsLandscape || undefined}
+        >
           <button
             type="button"
-            className="ink-capture-close"
-            aria-label="Close"
-            onClick={onClose}
+            className={`btn btn-primary btn-lg ink-capture-primary${
+              !hasInk || primaryDisabled || !canDraw ? ' is-disabled' : ''
+            }`}
+            disabled={!hasInk || primaryDisabled || !canDraw}
+            onClick={onPrimary}
             tabIndex={needsLandscape ? -1 : undefined}
           >
-            <X size={18} strokeWidth={2.25} aria-hidden />
+            {primaryLabel}
           </button>
-        )}
-      </header>
-
-      <div
-        className="ink-capture-pad-stage"
-        hidden={needsLandscape}
-        aria-hidden={needsLandscape || undefined}
-      >
-        <SignatureStrokePad
-          key={padKey}
-          productMode
-          compact
-          disabled={!canDraw}
-          label={isInitial ? 'Initials' : 'Signature'}
-          padAspect={aspect}
-          onChange={onChange}
-        />
+        </div>
       </div>
-
-      <div
-        className="ink-capture-float-dock"
-        hidden={needsLandscape}
-        aria-hidden={needsLandscape || undefined}
-      >
-        <button
-          type="button"
-          className={`btn btn-primary btn-lg ink-capture-primary${
-            !hasInk || primaryDisabled || !canDraw ? ' is-disabled' : ''
-          }`}
-          disabled={!hasInk || primaryDisabled || !canDraw}
-          onClick={onPrimary}
-          tabIndex={needsLandscape ? -1 : undefined}
-        >
-          {primaryLabel}
-        </button>
-      </div>
-    </div>
+    </>
   )
 }
