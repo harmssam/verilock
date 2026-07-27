@@ -42,6 +42,7 @@ import {
 import { getDocumentPageCount } from '../pdf/documentSurface'
 import { sha256Hex, shortHash } from '../pdf/hashPdf'
 import { prepareSignatureImageUpload } from '../signatureImage'
+import { isMobileDevice } from '../nimiq'
 import { SealPricingDisplay } from '../SealPricingDisplay'
 import { canShareFiles, isValidEmailAddress, shareInviteWithPdf } from '../shareInvite'
 import {
@@ -2360,6 +2361,7 @@ export function DocumentJourney({
     inNimiqPay,
     mobilePayConnect,
     showOpenInPay,
+    isMobile: isMobileDevice(),
   })
   const loginNeedsSheet = journeyLoginNeedsSheet(connectMode)
   const [loginSheetOpen, setLoginSheetOpen] = useState(false)

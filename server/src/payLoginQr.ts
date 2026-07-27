@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { v4 as uuid } from 'uuid'
 import {
+  assertPayLoginQrPollSecret,
   createPayLoginQr,
   createSession,
   getPayLoginQr,
@@ -21,28 +22,20 @@ export function generatePayLoginQrId(): string {
   return randomBytes(18).toString('base64url')
 }
 
-export function startPayLoginQr(): { id: string; expiresAt: number } {
-  const id = generatePayLoginQrId()
-  const row = createPayLoginQr(id, PAY_LOGIN_QR_TTL_MS)
-  return { id: row.id, expiresAt: row.expiresAt }
+export function generatePayLoginPollSecret(): string {
+  return randomBytes(24).toString('base64url')
 }
 
-export function getPayLoginQrPublicStatus(id: string): {
-  status: 'pending' | 'ready' | 'consumed' | 'expired' | 'not_found'
-  expiresAt?: number
-} {
-  const row = getPayLoginQr(id)
-  if (!row) return { status: 'not_found' }
-  if (row.status === 'expired' || row.expiresAt < Date.now()) {
-    return { status: 'expired', expiresAt: row.expiresAt }
-  }
-  if (row.status === 'consumed') return { status: 'consumed', expiresAt: row.expiresAt }
-  if (row.status === 'ready') return { status: 'ready', expiresAt: row.expiresAt }
-  return { status: 'pending', expiresAt: row.expiresAt }
+export function startPayLoginQr(): { id: string; pollSecret: string; expiresAt: number } {
+  const id = generatePayLoginQrId()
+  const pollSecret = generatePayLoginPollSecret()
+  const row = createPayLoginQr(id, pollSecret, PAY_LOGIN_QR_TTL_MS)
+  return { id: row.id, pollSecret, expiresAt: row.expiresAt }
 }
 
 /**
  * Phone finished Pay verify. Mint a fresh desktop session so devices are independent.
+ * Does not need pollSecret (phone only has public id from QR).
  */
 export function completePayLoginQrFromPhoneSession(
   qrId: string,
@@ -88,42 +81,53 @@ export function completePayLoginQrFromPhoneSession(
 }
 
 /**
- * Desktop poll: if ready, return token once and consume the QR.
+ * Desktop poll: requires pollSecret. If ready, return token once and consume.
  */
-export function pollPayLoginQr(id: string): {
+export function pollPayLoginQr(
+  id: string,
+  pollSecret: string,
+): {
   status: 'pending' | 'ready' | 'expired' | 'consumed' | 'not_found'
   expiresAt?: number
   token?: string
   address?: string
 } {
-  const publicStatus = getPayLoginQrPublicStatus(id)
-  if (publicStatus.status === 'not_found') return { status: 'not_found' }
-  if (publicStatus.status === 'expired') {
-    return { status: 'expired', expiresAt: publicStatus.expiresAt }
+  let row: PayLoginQrRecord
+  try {
+    row = assertPayLoginQrPollSecret(id, pollSecret)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (/not found/i.test(message)) return { status: 'not_found' }
+    throw err
   }
-  if (publicStatus.status === 'consumed') {
-    return { status: 'consumed', expiresAt: publicStatus.expiresAt }
+
+  if (row.status === 'expired' || row.expiresAt < Date.now()) {
+    return { status: 'expired', expiresAt: row.expiresAt }
   }
-  if (publicStatus.status === 'pending') {
-    return { status: 'pending', expiresAt: publicStatus.expiresAt }
+  if (row.status === 'consumed') {
+    return { status: 'consumed', expiresAt: row.expiresAt }
+  }
+  if (row.status === 'pending') {
+    return { status: 'pending', expiresAt: row.expiresAt }
   }
 
   // ready → consume and hand token
   try {
-    const creds = consumePayLoginQr(id)
+    const creds = consumePayLoginQr(id, pollSecret)
     if (!creds) {
-      return { status: 'pending', expiresAt: publicStatus.expiresAt }
+      return { status: 'pending', expiresAt: row.expiresAt }
     }
     return {
       status: 'ready',
-      expiresAt: publicStatus.expiresAt,
+      expiresAt: row.expiresAt,
       token: creds.token,
       address: creds.address,
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    if (/already used/i.test(message)) return { status: 'consumed', expiresAt: publicStatus.expiresAt }
-    if (/expired/i.test(message)) return { status: 'expired', expiresAt: publicStatus.expiresAt }
+    if (/already used/i.test(message)) return { status: 'consumed', expiresAt: row.expiresAt }
+    if (/expired/i.test(message)) return { status: 'expired', expiresAt: row.expiresAt }
+    if (/poll secret/i.test(message)) throw err
     throw err
   }
 }

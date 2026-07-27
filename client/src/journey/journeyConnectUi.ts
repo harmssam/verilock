@@ -22,10 +22,15 @@ export function resolveJourneyConnectMode(options: {
   inNimiqPay: boolean
   mobilePayConnect: boolean
   showOpenInPay: boolean
+  /** True when navigator looks like a phone/tablet (not desktop). */
+  isMobile?: boolean
 }): JourneyConnectMode {
   if (options.inNimiqPay) return 'pay-native'
-  if (options.mobilePayConnect && options.showOpenInPay) return 'hub-fallback'
-  if (options.mobilePayConnect) return 'pay-open'
+  // Prefer mobilePayConnect; also treat generic mobile as pay-open so we never
+  // send phones into desktop QR login.
+  const onMobile = options.mobilePayConnect || options.isMobile === true
+  if (onMobile && options.showOpenInPay) return 'hub-fallback'
+  if (onMobile) return 'pay-open'
   // Desktop browser (not Pay): show Pay QR + Hub choice.
   return 'desktop-choice'
 }
@@ -102,8 +107,8 @@ export function journeyDesktopChoiceLabels(): {
     hubHint: 'Recommended - sign in on this computer in one step',
     payIdle: 'Sign in with Nimiq Pay on your phone',
     payBusy: 'Waiting for phone…',
-    payHint:
-      'Use this if your wallet lives in the Nimiq Pay app. Scan a QR, approve on your phone, and this computer finishes login.',
+    /** Shown only while the QR is visible (not under the choice button). */
+    payHint: 'Scan a QR, approve on your phone, and this computer finishes login.',
   }
 }
 
@@ -147,11 +152,15 @@ export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
   }
 }
 
-/** Options passed to useJourneyWallet.connect for the active mode. */
+/**
+ * Default connect options when the caller does not pass explicit ones.
+ * Mobile Pay (`pay-open`) and in-Pay (`pay-native`) must stay undefined so
+ * connect() deeplinks / uses the injected provider — never force Hub redirect.
+ * Desktop Hub button and mobile Hub choice always pass `{ useRedirect: true }`
+ * themselves from LoginSheet.
+ */
 export function journeyConnectOptions(mode: JourneyConnectMode): JourneyConnectRequest | undefined {
-  // Hub paths request redirect explicitly (desktop + mobile fallback).
   if (mode === 'hub' || mode === 'hub-fallback') return { useRedirect: true }
-  // Desktop choice Hub button also uses redirect when user picks Hub.
-  if (mode === 'desktop-choice') return { useRedirect: true }
+  // desktop-choice: no default — Hub/Pay buttons pass options; bare connect → Hub via shouldUseHubRedirect
   return undefined
 }

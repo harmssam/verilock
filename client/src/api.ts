@@ -118,25 +118,27 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  /** Desktop: start a Pay QR login room (3 min TTL). */
+  /** Desktop: start a Pay QR login room (3 min TTL). pollSecret never goes in the QR. */
   authQrStart: () =>
-    request<{ id: string; expiresAt: number }>('/api/auth/qr/start', {
+    request<{ id: string; pollSecret: string; expiresAt: number }>('/api/auth/qr/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     }),
 
   /**
-   * Desktop: poll QR room. When status is `ready`, response includes token+address
-   * once (room is consumed).
+   * Desktop: poll QR room with pollSecret. When status is `ready`, response includes
+   * token+address once (room is consumed).
    */
-  authQrStatus: (id: string) =>
+  authQrStatus: (id: string, pollSecret: string) =>
     request<{
       status: 'pending' | 'ready' | 'expired' | 'consumed' | 'not_found'
       expiresAt?: number
       token?: string
       address?: string
-    }>(`/api/auth/qr/${encodeURIComponent(id)}`),
+    }>(`/api/auth/qr/${encodeURIComponent(id)}`, {
+      headers: { 'X-VeriLock-Qr-Poll-Secret': pollSecret },
+    }),
 
   /** Phone: after Pay verify, attach this session to the desktop QR room. */
   authQrComplete: (id: string, token: string) =>

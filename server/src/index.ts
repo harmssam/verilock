@@ -148,6 +148,9 @@ app.use(express.json({ limit: '2mb' }))
 
 const authChallengeLimit = rateLimit(12, 60_000)
 const authVerifyLimit = rateLimit(24, 60_000)
+/** Desktop QR poll (~1.6s); allow steady wait for a few minutes without 429. */
+const authQrPollLimit = rateLimit(120, 60_000)
+const authQrStartLimit = rateLimit(20, 60_000)
 const docLimit = rateLimit(30, 60_000)
 const attestLimit = rateLimit(24, 60_000)
 /** Mutations / checkout - keep tight. */
@@ -896,8 +899,8 @@ app.post('/api/auth/verify', authVerifyLimit, authMiddleware, async (req, res) =
   res.json({ ok: true, address: session.address, verified: true })
 })
 
-/** Desktop Pay QR login: create short-lived room (no auth). */
-app.post('/api/auth/qr/start', authChallengeLimit, async (_req, res) => {
+/** Desktop Pay QR login: create short-lived room (no auth). Returns pollSecret for desktop only. */
+app.post('/api/auth/qr/start', authQrStartLimit, async (_req, res) => {
   try {
     const { startPayLoginQr } = await import('./payLoginQr.js')
     const result = startPayLoginQr()
@@ -909,12 +912,21 @@ app.post('/api/auth/qr/start', authChallengeLimit, async (_req, res) => {
 
 /**
  * Desktop polls until phone completes Pay login.
+ * Requires `X-VeriLock-Qr-Poll-Secret` (or `?secret=`) — never put secret in the QR.
  * On first `ready` response, includes token+address and consumes the room.
  */
-app.get('/api/auth/qr/:id', authChallengeLimit, async (req, res) => {
+app.get('/api/auth/qr/:id', authQrPollLimit, async (req, res) => {
   try {
     const { pollPayLoginQr } = await import('./payLoginQr.js')
-    const result = pollPayLoginQr(routeParam(req.params.id))
+    const headerSecret = req.headers['x-verilock-qr-poll-secret']
+    const querySecret = typeof req.query.secret === 'string' ? req.query.secret : ''
+    const pollSecret =
+      (typeof headerSecret === 'string' ? headerSecret : '') || querySecret
+    if (!pollSecret.trim()) {
+      res.status(401).json({ error: 'poll secret required' })
+      return
+    }
+    const result = pollPayLoginQr(routeParam(req.params.id), pollSecret.trim())
     if (result.status === 'not_found') {
       res.status(404).json({ error: 'QR login session not found' })
       return
@@ -922,6 +934,10 @@ app.get('/api/auth/qr/:id', authChallengeLimit, async (req, res) => {
     res.json(result)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'QR login poll failed'
+    if (/poll secret/i.test(message)) {
+      res.status(401).json({ error: message })
+      return
+    }
     res.status(/expired|already used/i.test(message) ? 410 : 400).json({ error: message })
   }
 })
