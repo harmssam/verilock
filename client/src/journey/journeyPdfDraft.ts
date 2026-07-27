@@ -203,15 +203,23 @@ export function fileFromCreatePdfDraft(draft: CreatePdfDraft): File {
   })
 }
 
-export function createPdfDraftFromFile(
+/**
+ * Build a draft payload with a detached Blob copy of the file bytes.
+ * Storing the live File from an input can leave Safari/WebKit with a handle that
+ * later throws NotFoundError ("The object can not be found here").
+ */
+export async function createPdfDraftFromFile(
   file: File,
   meta: CreatePdfDraftMeta,
-): CreatePdfDraftInput {
+): Promise<CreatePdfDraftInput> {
+  // Eager copy so IndexedDB does not depend on a temporary input File path.
+  const bytes = await file.arrayBuffer()
+  const blob = new Blob([bytes], { type: file.type || 'application/octet-stream' })
   return {
     fileName: file.name,
     fileType: file.type || '',
     lastModified: file.lastModified,
-    blob: file,
+    blob,
     ...meta,
   }
 }

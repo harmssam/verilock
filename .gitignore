@@ -27,6 +27,9 @@ tmp-*.jpg
 14.jpg
 client/tmp-home.png
 
+# Pixelmator source files (export PNGs only)
+*.pxm
+
 # Grok agent local artifacts (reviews, session notes)
 .grok/reviews/
 

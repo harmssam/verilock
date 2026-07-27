@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react'
+import { readFileBytes, STALE_LOCAL_DOCUMENT_MESSAGE } from '../pdf/documentRead'
 import type { DocumentType } from '../types'
 import {
   clearCreateFormCache,
@@ -47,6 +48,8 @@ export interface UseCreatePdfDraftArgs {
   /** Ensure creator role after restore when role was null. */
   ensureCreatorRole: () => void
   role: PathRole | null
+  /** Draft blob restored but browser cannot open bytes - prompt re-select. */
+  onUnreadableDraft?: (message: string) => void
 }
 
 export interface UseCreatePdfDraftResult {
@@ -114,6 +117,7 @@ export function useCreatePdfDraft({
   applyRestoredMeta,
   ensureCreatorRole,
   role,
+  onUnreadableDraft,
 }: UseCreatePdfDraftArgs): UseCreatePdfDraftResult {
   const metaRef = useRef(meta)
   metaRef.current = meta
@@ -121,6 +125,8 @@ export function useCreatePdfDraft({
   roleRef.current = role
   const pdfFileRef = useRef(pdfFile)
   pdfFileRef.current = pdfFile
+  const onUnreadableDraftRef = useRef(onUnreadableDraft)
+  onUnreadableDraftRef.current = onUnreadableDraft
 
   const lastBlobKeyRef = useRef<string | null>(null)
   const restoreAttemptedRef = useRef(false)
@@ -167,6 +173,24 @@ export function useCreatePdfDraft({
 
       // Apply form fields even when there is no PDF yet (type selected before file pick).
       const form = mergeFormFields(draft ?? undefined, formCache)
+
+      let restoredFile: File | null = null
+      if (draft) {
+        try {
+          const file = fileFromCreatePdfDraft(draft)
+          // Mobile Safari may restore a File handle whose bytes are gone.
+          await readFileBytes(file)
+          restoredFile = file
+        } catch {
+          await clearCreatePdfDraft()
+          if (!cancelled) {
+            onUnreadableDraftRef.current?.(STALE_LOCAL_DOCUMENT_MESSAGE)
+          }
+        }
+      }
+
+      if (cancelled) return
+
       if (draft || formCache) {
         applyRestoredMeta({
           title: form.title,
@@ -174,22 +198,19 @@ export function useCreatePdfDraft({
           creatorNotifyEmail: form.creatorNotifyEmail,
           docType: form.docType,
           docNotes: form.docNotes,
-          pdfHash: draft?.pdfHash ?? null,
-          pageCount: draft?.pageCount && draft.pageCount > 0 ? draft.pageCount : 0,
+          // Only restore hash/pageCount when the blob is still readable.
+          pdfHash: restoredFile ? (draft?.pdfHash ?? null) : null,
+          pageCount:
+            restoredFile && draft?.pageCount && draft.pageCount > 0 ? draft.pageCount : 0,
         })
       }
 
-      if (!draft) return
-      try {
-        const file = fileFromCreatePdfDraft(draft)
-        lastBlobKeyRef.current = fileKey(file)
-        setPdfFile(file)
-        ensureCreatorRole()
-        if (!roleRef.current) {
-          saveJourneyIntent('creator')
-        }
-      } catch {
-        await clearCreatePdfDraft()
+      if (!restoredFile) return
+      lastBlobKeyRef.current = fileKey(restoredFile)
+      setPdfFile(restoredFile)
+      ensureCreatorRole()
+      if (!roleRef.current) {
+        saveJourneyIntent('creator')
       }
     })()
     return () => {
@@ -203,9 +224,15 @@ export function useCreatePdfDraft({
     const key = fileKey(pdfFile)
     if (lastBlobKeyRef.current === key) return
     lastBlobKeyRef.current = key
-    void saveCreatePdfDraft(
-      createPdfDraftFromFile(pdfFile, draftMeta(metaRef.current, roleRef.current)),
-    )
+    void (async () => {
+      try {
+        await saveCreatePdfDraft(
+          await createPdfDraftFromFile(pdfFile, draftMeta(metaRef.current, roleRef.current)),
+        )
+      } catch {
+        /* private mode / unreadable - non-fatal; hash effect surfaces errors */
+      }
+    })()
   }, [enabled, pdfFile])
 
   // After restore, keep IndexedDB draft meta in sync when form fields change
@@ -219,9 +246,15 @@ export function useCreatePdfDraft({
     if (lastBlobKeyRef.current !== key) return
 
     const timer = window.setTimeout(() => {
-      void saveCreatePdfDraft(
-        createPdfDraftFromFile(pdfFile, draftMeta(metaRef.current, roleRef.current)),
-      )
+      void (async () => {
+        try {
+          await saveCreatePdfDraft(
+            await createPdfDraftFromFile(pdfFile, draftMeta(metaRef.current, roleRef.current)),
+          )
+        } catch {
+          /* ignore */
+        }
+      })()
     }, 300)
     return () => window.clearTimeout(timer)
   }, [
@@ -242,9 +275,13 @@ export function useCreatePdfDraft({
     // Always commit form cache (works even if PDF not chosen yet).
     saveCreateFormCache(formFieldsFromMeta(metaRef.current))
     if (!file) return
-    await saveCreatePdfDraft(
-      createPdfDraftFromFile(file, draftMeta(metaRef.current, roleRef.current)),
-    )
+    try {
+      await saveCreatePdfDraft(
+        await createPdfDraftFromFile(file, draftMeta(metaRef.current, roleRef.current)),
+      )
+    } catch {
+      /* Hub redirect still proceeds; form cache was already written */
+    }
   }, [])
 
   // Shell header Login can remount the SPA without DocumentJourney.connectFromPath.
@@ -273,9 +310,15 @@ export function useCreatePdfDraft({
         return
       }
       lastBlobKeyRef.current = fileKey(file)
-      void saveCreatePdfDraft(
-        createPdfDraftFromFile(file, draftMeta(metaRef.current, roleRef.current)),
-      )
+      void (async () => {
+        try {
+          await saveCreatePdfDraft(
+            await createPdfDraftFromFile(file, draftMeta(metaRef.current, roleRef.current)),
+          )
+        } catch {
+          /* hash effect will report unreadable files */
+        }
+      })()
       saveCreateFormCache(formFieldsFromMeta(metaRef.current))
     },
     [setPdfFile],
