@@ -84,6 +84,12 @@ This keeps SQLite (`verilock.db`) across deploys. PDF files are not stored - onl
 | `STRIPE_SECRET_KEY` | Stripe secret (set when ready; rotate after) |
 | `STRIPE_WEBHOOK_SECRET` | Webhook signing secret for `/api/stripe/webhook` |
 | `STRIPE_STATEMENT_DESCRIPTOR_SUFFIX` | Optional card-statement suffix (default `VERILOCK`; empty disables) |
+| `ADMIN_USERNAME` | Optional (default `admin`) for the operator stats portal |
+| `ADMIN_PASSWORD` | Required to enable `/admin` (and `admin.verilock.online`) - password login + Turnstile |
+| `ADMIN_SESSION_SECRET` | Optional cookie HMAC secret; defaults to a key derived from `ADMIN_PASSWORD` |
+| `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Bot protection on support form **and** admin sign-in |
+
+**Admin portal:** after setting `ADMIN_PASSWORD`, open `https://verilock.online/admin` or point `admin.verilock.online` (DNS CNAME/proxy) at the same Railway service. The SPA detects the `admin.*` host and shows sign-in + DB stats only (documents, wallets, locks). Not linked from the public product.
 
 **Stripe card credits:** mint happens on webhook `checkout.session.completed` **and** on return via `POST /api/credits/checkout/confirm` (success_url `?credits=success&session_id=…`). Also, `GET /api/credits/balance?syncStripe=1` re-checks pending sessions for the signed-in wallet (recovers missed webhooks).
 

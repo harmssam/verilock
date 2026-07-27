@@ -1,0 +1,621 @@
+/**
+ * Operator admin portal - sign-in (Turnstile + password) and DB stats dashboard.
+ * Mounted for `/admin` and `admin.*` hosts (see adminHost.ts).
+ */
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import {
+  adminApi,
+  type AdminFeatures,
+  type AdminStats,
+} from './adminApi'
+import { isAdminHost } from './adminHost'
+import './AdminApp.css'
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        el: HTMLElement,
+        options: {
+          sitekey: string
+          callback?: (token: string) => void
+          'expired-callback'?: () => void
+          'error-callback'?: () => void
+          theme?: 'light' | 'dark' | 'auto'
+          size?: 'normal' | 'compact' | 'flexible'
+        },
+      ) => string
+      reset: (widgetId?: string) => void
+      remove: (widgetId?: string) => void
+    }
+  }
+}
+
+const TURNSTILE_SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+
+let turnstileScriptPromise: Promise<void> | null = null
+
+function loadTurnstileScript(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve()
+  if (window.turnstile) return Promise.resolve()
+  if (turnstileScriptPromise) return turnstileScriptPromise
+
+  turnstileScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-verilock-turnstile]')
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true })
+      existing.addEventListener('error', () => reject(new Error('Turnstile script failed')), {
+        once: true,
+      })
+      return
+    }
+    const script = document.createElement('script')
+    script.src = TURNSTILE_SCRIPT
+    script.async = true
+    script.defer = true
+    script.dataset.verilockTurnstile = '1'
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Turnstile script failed to load'))
+    document.head.appendChild(script)
+  })
+
+  return turnstileScriptPromise
+}
+
+function formatWhen(ms: number): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(ms))
+  } catch {
+    return new Date(ms).toISOString()
+  }
+}
+
+function shortAddress(addr: string): string {
+  const a = addr.replace(/\s+/g, '')
+  if (a.length <= 14) return a
+  return `${a.slice(0, 6)}…${a.slice(-4)}`
+}
+
+function statusLabel(status: string): string {
+  return status.replace(/_/g, ' ')
+}
+
+type AuthState =
+  | { kind: 'loading' }
+  | { kind: 'login' }
+  | { kind: 'authed'; username: string }
+
+export function AdminApp() {
+  const [auth, setAuth] = useState<AuthState>({ kind: 'loading' })
+  const [features, setFeatures] = useState<AdminFeatures | null>(null)
+  const [stats, setStats] = useState<AdminStats | null>(null)
+  const [statsError, setStatsError] = useState<string | null>(null)
+  const [statsLoading, setStatsLoading] = useState(false)
+
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [website, setWebsite] = useState('')
+  const [loginError, setLoginError] = useState<string | null>(null)
+  const [loginBusy, setLoginBusy] = useState(false)
+
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const [turnstileReady, setTurnstileReady] = useState(false)
+  const turnstileHostRef = useRef<HTMLDivElement | null>(null)
+  const turnstileWidgetIdRef = useRef<string | null>(null)
+
+  const loadStats = useCallback(async () => {
+    setStatsLoading(true)
+    setStatsError(null)
+    try {
+      const s = await adminApi.stats()
+      setStats(s)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not load stats'
+      setStatsError(message)
+      if ((err as { status?: number }).status === 401) {
+        setAuth({ kind: 'login' })
+        setStats(null)
+      }
+    } finally {
+      setStatsLoading(false)
+    }
+  }, [])
+
+  // Boot: features + session
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const f = await adminApi.features()
+        if (cancelled) return
+        setFeatures(f)
+      } catch {
+        if (!cancelled) {
+          setFeatures({
+            adminEnabled: false,
+            turnstileRequired: false,
+            turnstileSiteKey: null,
+          })
+        }
+      }
+      try {
+        const me = await adminApi.me()
+        if (cancelled) return
+        if (me.authenticated && me.username) {
+          setAuth({ kind: 'authed', username: me.username })
+        } else {
+          setAuth({ kind: 'login' })
+        }
+      } catch {
+        if (!cancelled) setAuth({ kind: 'login' })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Load stats when authed
+  useEffect(() => {
+    if (auth.kind !== 'authed') return
+    void loadStats()
+  }, [auth, loadStats])
+
+  // Page title
+  useEffect(() => {
+    document.title =
+      auth.kind === 'authed' ? 'Admin · VeriLock stats' : 'Admin sign-in · VeriLock'
+  }, [auth.kind])
+
+  // Turnstile widget on login
+  useEffect(() => {
+    if (auth.kind !== 'login') return
+    const siteKey = features?.turnstileSiteKey?.trim()
+    if (!siteKey || !turnstileHostRef.current) return
+
+    let cancelled = false
+    setTurnstileReady(false)
+    setTurnstileToken(null)
+
+    void loadTurnstileScript()
+      .then(() => {
+        if (cancelled || !turnstileHostRef.current || !window.turnstile) return
+        if (turnstileWidgetIdRef.current && window.turnstile) {
+          try {
+            window.turnstile.remove(turnstileWidgetIdRef.current)
+          } catch {
+            /* ignore */
+          }
+          turnstileWidgetIdRef.current = null
+        }
+        turnstileHostRef.current.innerHTML = ''
+        const widgetId = window.turnstile.render(turnstileHostRef.current, {
+          sitekey: siteKey,
+          theme: 'light',
+          callback: token => {
+            setTurnstileToken(token)
+            setTurnstileReady(true)
+          },
+          'expired-callback': () => {
+            setTurnstileToken(null)
+          },
+          'error-callback': () => {
+            setTurnstileToken(null)
+            setTurnstileReady(false)
+          },
+        })
+        turnstileWidgetIdRef.current = widgetId
+        setTurnstileReady(true)
+      })
+      .catch(err => {
+        console.error('[admin] turnstile load', err)
+      })
+
+    return () => {
+      cancelled = true
+      const id = turnstileWidgetIdRef.current
+      if (id && window.turnstile) {
+        try {
+          window.turnstile.remove(id)
+        } catch {
+          /* ignore */
+        }
+      }
+      turnstileWidgetIdRef.current = null
+    }
+  }, [auth.kind, features?.turnstileSiteKey])
+
+  async function onLogin(e: FormEvent) {
+    e.preventDefault()
+    setLoginError(null)
+    if (features?.turnstileRequired && !turnstileToken) {
+      setLoginError('Please complete the bot check and try again.')
+      return
+    }
+    setLoginBusy(true)
+    try {
+      const result = await adminApi.login({
+        username,
+        password,
+        turnstileToken,
+        website: website || undefined,
+      })
+      setPassword('')
+      setAuth({ kind: 'authed', username: result.username })
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : 'Sign-in failed')
+      const id = turnstileWidgetIdRef.current
+      if (id && window.turnstile) {
+        try {
+          window.turnstile.reset(id)
+        } catch {
+          /* ignore */
+        }
+      }
+      setTurnstileToken(null)
+    } finally {
+      setLoginBusy(false)
+    }
+  }
+
+  async function onLogout() {
+    try {
+      await adminApi.logout()
+    } catch {
+      /* still clear local state */
+    }
+    setStats(null)
+    setAuth({ kind: 'login' })
+  }
+
+  const productHref = isAdminHost() ? 'https://verilock.online' : '/'
+
+  return (
+    <div className="admin-app">
+      <header className="admin-header">
+        <a className="admin-brand" href={productHref} title="VeriLock">
+          <img src="/verilock-mark-96.png" alt="" width={32} height={32} />
+          <span className="admin-brand-text">
+            <span className="admin-brand-name">VeriLock</span>
+            <span className="admin-brand-sub">Admin</span>
+          </span>
+        </a>
+        <div className="admin-header-actions">
+          {auth.kind === 'authed' && (
+            <>
+              <span className="admin-user">{auth.username}</span>
+              <button type="button" className="admin-btn admin-btn-ghost" onClick={() => void onLogout()}>
+                Sign out
+              </button>
+            </>
+          )}
+        </div>
+      </header>
+
+      <main className="admin-main">
+        {auth.kind === 'loading' && <p className="admin-loading">Loading…</p>}
+
+        {auth.kind === 'login' && (
+          <div className="admin-login-layout">
+            <section className="admin-login-copy">
+              <p className="eyebrow">Secure access</p>
+              <h1>Admin portal</h1>
+              <p>
+                Sign in to review database statistics: agreements created, unique wallets, and
+                on-chain locks. Product traffic stays on the main VeriLock site.
+              </p>
+            </section>
+
+            <article className="admin-login-card">
+              <h2>Sign in</h2>
+              <p className="lead">Session-protected operator access with bot protection.</p>
+
+              {features && !features.adminEnabled && (
+                <p className="admin-warn" role="status">
+                  Admin is not configured on this server. Set <code>ADMIN_PASSWORD</code> (and
+                  optionally <code>ADMIN_USERNAME</code>) in the environment, then redeploy.
+                </p>
+              )}
+
+              {loginError && (
+                <p className="admin-error" role="alert">
+                  {loginError}
+                </p>
+              )}
+
+              <form className="admin-form" onSubmit={e => void onLogin(e)} autoComplete="on">
+                <div className="admin-hp" aria-hidden="true">
+                  <label htmlFor="admin-website">Website</label>
+                  <input
+                    id="admin-website"
+                    name="website"
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={website}
+                    onChange={e => setWebsite(e.target.value)}
+                  />
+                </div>
+
+                <div className="admin-field">
+                  <label htmlFor="admin-username">Username</label>
+                  <input
+                    id="admin-username"
+                    name="username"
+                    type="text"
+                    autoComplete="username"
+                    required
+                    autoFocus
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    disabled={!features?.adminEnabled || loginBusy}
+                  />
+                </div>
+
+                <div className="admin-field">
+                  <label htmlFor="admin-password">Password</label>
+                  <input
+                    id="admin-password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    disabled={!features?.adminEnabled || loginBusy}
+                  />
+                </div>
+
+                {features?.turnstileSiteKey ? (
+                  <div className="admin-turnstile">
+                    <div ref={turnstileHostRef} />
+                    {!turnstileReady && (
+                      <p className="admin-turnstile-loading">Loading bot check…</p>
+                    )}
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  className="admin-btn admin-btn-primary"
+                  disabled={!features?.adminEnabled || loginBusy}
+                >
+                  {loginBusy ? 'Signing in…' : 'Sign in'}
+                </button>
+              </form>
+            </article>
+          </div>
+        )}
+
+        {auth.kind === 'authed' && (
+          <Dashboard
+            stats={stats}
+            loading={statsLoading}
+            error={statsError}
+            onRefresh={() => void loadStats()}
+          />
+        )}
+      </main>
+
+      <footer className="admin-footer">Operator-only · not linked from the public product</footer>
+    </div>
+  )
+}
+
+function Dashboard({
+  stats,
+  loading,
+  error,
+  onRefresh,
+}: {
+  stats: AdminStats | null
+  loading: boolean
+  error: string | null
+  onRefresh: () => void
+}) {
+  if (loading && !stats) {
+    return <p className="admin-loading">Loading statistics…</p>
+  }
+
+  if (error && !stats) {
+    return (
+      <div>
+        <p className="admin-error" role="alert">
+          {error}
+        </p>
+        <button type="button" className="admin-btn admin-btn-primary" onClick={onRefresh}>
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  if (!stats) return null
+
+  const statusEntries = Object.entries(stats.documents.byStatus).sort((a, b) => b[1] - a[1])
+  const attEntries = Object.entries(stats.attestations.byStatus).sort((a, b) => b[1] - a[1])
+
+  return (
+    <div>
+      <div className="admin-dash-head">
+        <div>
+          <h1>Database stats</h1>
+          <p className="admin-dash-meta">Updated {formatWhen(stats.generatedAt)}</p>
+        </div>
+        <button
+          type="button"
+          className="admin-btn admin-btn-ghost"
+          onClick={onRefresh}
+          disabled={loading}
+        >
+          {loading ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
+
+      {error && (
+        <p className="admin-error" role="alert" style={{ marginBottom: '1rem' }}>
+          {error}
+        </p>
+      )}
+
+      <div className="admin-stat-grid">
+        <StatCard
+          label="Documents"
+          value={stats.documents.total}
+          hint={`${stats.documents.createdLast24h} last 24h · ${stats.documents.createdLast7d} last 7d`}
+          accent
+        />
+        <StatCard
+          label="Locked on chain"
+          value={stats.documents.locked}
+          hint={
+            stats.documents.withLockedAt !== stats.documents.locked
+              ? `${stats.documents.withLockedAt} with locked_at`
+              : 'status = locked'
+          }
+          accent
+        />
+        <StatCard
+          label="Unique wallets"
+          value={stats.wallets.uniqueAll}
+          hint={`${stats.wallets.uniqueCreators} creators · ${stats.wallets.uniqueSigners} signers`}
+          accent
+        />
+        <StatCard label="Signatures" value={stats.signatures.total} />
+        <StatCard
+          label="Parties"
+          value={stats.parties.total}
+          hint={`${stats.parties.withWallet} with wallet`}
+        />
+        <StatCard
+          label="Attestations"
+          value={stats.attestations.total}
+          hint={
+            attEntries.length
+              ? attEntries.map(([k, v]) => `${v} ${k}`).join(' · ')
+              : 'none yet'
+          }
+        />
+        <StatCard
+          label="Data archives"
+          value={stats.dataArchives.total}
+          hint={`${stats.dataArchives.onChain} on-chain`}
+        />
+        <StatCard
+          label="Credit balance"
+          value={stats.credits.totalBalance}
+          hint={`${stats.credits.accountsWithBalance} wallets with balance`}
+        />
+        <StatCard label="Active sessions" value={stats.sessions.verifiedActive} />
+      </div>
+
+      <div className="admin-panels">
+        <section className="admin-panel">
+          <h2>Documents by status</h2>
+          {statusEntries.length === 0 ? (
+            <p className="admin-empty">No documents yet.</p>
+          ) : (
+            <ul className="admin-status-list">
+              {statusEntries.map(([key, n]) => (
+                <li key={key}>
+                  <span className="key">{statusLabel(key)}</span>
+                  <span className="val">{n}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <h2 style={{ marginTop: '1.25rem' }}>Wallets breakdown</h2>
+          <ul className="admin-status-list">
+            <li>
+              <span className="key">Creators</span>
+              <span className="val">{stats.wallets.uniqueCreators}</span>
+            </li>
+            <li>
+              <span className="key">Signers (from signatures)</span>
+              <span className="val">{stats.wallets.uniqueSigners}</span>
+            </li>
+            <li>
+              <span className="key">Party wallets assigned</span>
+              <span className="val">{stats.wallets.uniquePartyWallets}</span>
+            </li>
+            <li>
+              <span className="key">Union (all distinct)</span>
+              <span className="val">{stats.wallets.uniqueAll}</span>
+            </li>
+          </ul>
+        </section>
+
+        <section className="admin-panel">
+          <h2>Recent documents</h2>
+          {stats.recentDocuments.length === 0 ? (
+            <p className="admin-empty">No documents yet.</p>
+          ) : (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Status</th>
+                    <th>Creator</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.recentDocuments.map(doc => (
+                    <tr key={doc.id}>
+                      <td>
+                        <div>{doc.title || 'Untitled'}</div>
+                        <div className="mono" style={{ opacity: 0.7 }}>
+                          {doc.slug}
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          className={
+                            doc.status === 'locked'
+                              ? 'admin-badge admin-badge--locked'
+                              : 'admin-badge'
+                          }
+                        >
+                          {statusLabel(doc.status)}
+                        </span>
+                      </td>
+                      <td className="mono" title={doc.creatorAddress}>
+                        {shortAddress(doc.creatorAddress)}
+                      </td>
+                      <td>{formatWhen(doc.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string
+  value: number
+  hint?: string
+  accent?: boolean
+}) {
+  return (
+    <div className={accent ? 'admin-stat-card admin-stat-card--accent' : 'admin-stat-card'}>
+      <p className="admin-stat-label">{label}</p>
+      <p className="admin-stat-value">{value.toLocaleString()}</p>
+      {hint ? <p className="admin-stat-hint">{hint}</p> : null}
+    </div>
+  )
+}

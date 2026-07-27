@@ -10,6 +10,8 @@ import './index.css'
 /* Journey product styles - light production theme (dark base archived) */
 import './journey/Journey.css'
 import { App } from './App'
+import { AdminApp } from './admin/AdminApp'
+import { isAdminSurface } from './admin/adminHost'
 /* Shell layout (header/home/footer) then page chrome (pricing/404) */
 import './App.css'
 import './shellPages.css'
@@ -78,8 +80,11 @@ window.addEventListener('unhandledrejection', event => {
   reloadOnceForStaleAssets()
 })
 
+// Admin portal is a separate shell (password + stats) for /admin and admin.* hosts.
+const Root = isAdminSurface() ? AdminApp : App
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <Root />
   </StrictMode>,
 )

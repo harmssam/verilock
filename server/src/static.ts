@@ -15,6 +15,8 @@ function isKnownAppPath(path: string): boolean {
   if (/^\/redeem\/?$/.test(path)) return true
   if (/^\/esignature-pricing\/?$/.test(path)) return true
   if (/^\/faq\/?$/.test(path)) return true
+  // Operator admin portal (sign-in + stats dashboard)
+  if (/^\/admin(?:\/.*)?\/?$/.test(path)) return true
   // Blog index + post slugs (SPA deep links must get index.html, not 404.html)
   if (/^\/blog(?:\/[a-zA-Z0-9_-]+)?\/?$/.test(path)) return true
   // PDF lab (parallel to seal) - kill-switch via PDF_ANNOTATION_UI=false
