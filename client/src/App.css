@@ -9,8 +9,10 @@
 .lr-app {
   position: relative;
   z-index: 1;
-  /* Default shell width; landing/pricing override. Header inner uses this. */
-  --lr-shell-max: min(760px, calc(100vw - 2rem));
+  /* Default shell width; landing/pricing override. Header inner uses this.
+     Prefer 100% over 100vw so shell width tracks the layout viewport (not
+     scrollbar/gutter-inflated vw, which causes horizontal pan on mobile). */
+  --lr-shell-max: min(760px, 100%);
   --lr-shell-pad-x: max(1rem, env(safe-area-inset-left));
   --lr-shell-pad-r: max(1rem, env(safe-area-inset-right));
 }
@@ -28,7 +30,7 @@
    Header .lr-header-inner uses the same max so nav aligns with modules. */
 .lr-app--landing,
 .lr-app--pricing {
-  --lr-shell-max: min(960px, calc(100vw - 2rem));
+  --lr-shell-max: min(960px, 100%);
   max-width: var(--lr-shell-max);
 }
 
@@ -43,18 +45,18 @@
 /* Beat production .exp-app--wide (1120px) when pricing is mounted */
 @media (min-width: 900px) {
   .lr-app.exp-app--wide {
-    --lr-shell-max: min(1120px, calc(100vw - 3rem));
+    --lr-shell-max: min(1120px, calc(100% - 3rem));
   }
 
   .lr-app.exp-app--wide.lr-app--pricing {
-    --lr-shell-max: min(960px, calc(100vw - 2rem));
+    --lr-shell-max: min(960px, 100%);
     max-width: var(--lr-shell-max);
   }
 }
 
 @media (min-width: 1280px) {
   .lr-app.exp-app--wide:not(.lr-app--pricing) {
-    --lr-shell-max: min(1200px, calc(100vw - 4rem));
+    --lr-shell-max: min(1200px, calc(100% - 4rem));
   }
 }
 
@@ -71,11 +73,18 @@
   top: 0;
   z-index: 40;
   box-sizing: border-box;
-  width: 100vw;
-  max-width: 100vw;
+  /*
+   * Full-bleed sticky bar (mobile-safe): cancel .exp-app horizontal padding only.
+   * Avoid width:100vw + margin:calc(50% - 50vw) on small viewports — that expands
+   * document scroll width (side-pan, white gutters, page off-center).
+   * Shell is max-width:100% of #root, so canceling padding reaches the edges.
+   * Desktop (min-width:900px) uses a true viewport breakout below.
+   */
+  width: auto;
+  max-width: none;
   margin: 0 0 1.5rem;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  margin-left: calc(-1 * var(--lr-shell-pad-x, 1rem));
+  margin-right: calc(-1 * var(--lr-shell-pad-r, 1rem));
   /* Extend under the status bar; keep brand/actions below the notch. */
   padding: env(safe-area-inset-top, 0px) 0 0;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
@@ -88,6 +97,17 @@
   backdrop-filter: blur(20px) saturate(1.2);
   -webkit-backdrop-filter: blur(20px) saturate(1.2);
   box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+}
+
+/* Desktop: frosted bar spans the full browser width past the centered shell.
+   html/body overflow-x:clip keeps the classic breakout from creating side-pan. */
+@media (min-width: 900px) {
+  .lr-header {
+    width: 100vw;
+    max-width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+  }
 }
 
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
@@ -104,7 +124,7 @@
   gap: 0.85rem;
   box-sizing: border-box;
   width: 100%;
-  max-width: var(--lr-shell-max, min(960px, calc(100vw - 2rem)));
+  max-width: var(--lr-shell-max, min(960px, 100%));
   margin: 0 auto;
   /* Match .exp-app horizontal padding so brand/actions line up with modules */
   padding:
