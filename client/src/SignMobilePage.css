@@ -14,6 +14,94 @@
   color: var(--text, #0f172a);
 }
 
+/* Portrait gate: full-viewport rotate prompt before draw UI */
+.sign-mobile-page--rotate {
+  justify-content: center;
+  align-items: center;
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+}
+
+.sign-mobile-rotate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.65rem;
+  max-width: 20rem;
+  margin: auto;
+  padding: 0.5rem;
+}
+
+.sign-mobile-rotate-visual {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 5.5rem;
+  height: 5.5rem;
+  margin-bottom: 0.35rem;
+  border-radius: 1.25rem;
+  background: color-mix(in srgb, var(--mint, #0d9488) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--mint, #0d9488) 22%, #e2e8f0);
+  color: var(--mint-deep, #0f766e);
+}
+
+.sign-mobile-rotate-phone {
+  /* Hint: phone is currently upright; user should tip it */
+  transform: rotate(0deg);
+  animation: sign-mobile-rotate-nudge 1.8s ease-in-out infinite;
+}
+
+.sign-mobile-rotate-hint {
+  position: absolute;
+  right: 0.45rem;
+  bottom: 0.4rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--mint-deep, #0f766e);
+  opacity: 0.85;
+}
+
+@keyframes sign-mobile-rotate-nudge {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  40%,
+  60% {
+    transform: rotate(90deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sign-mobile-rotate-phone {
+    animation: none;
+    transform: rotate(90deg);
+  }
+}
+
+.sign-mobile-rotate-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.sign-mobile-rotate-copy {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: #334155;
+}
+
+.sign-mobile-rotate-note {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  max-width: 18rem;
+}
+
 /* Maximize draw surface: minimal chrome, pad fills remaining space */
 .sign-mobile-page--draw {
   gap: 0.35rem;

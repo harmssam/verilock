@@ -9,7 +9,6 @@ import {
   Minus,
   Plus,
   Square,
-  Trash2,
   UserRound,
   X,
 } from 'lucide-react'
@@ -93,11 +92,11 @@ function InitialsToolIcon() {
   )
 }
 
-/** Bracket label icons for name / text tools (reads as the field type). */
+/** Text label icons for name / text tools (reads as the field type). */
 function BracketToolLabel({ children }: { children: string }) {
   return (
     <span className="placement-tool-bracket" aria-hidden>
-      [{children}]
+      {children}
     </span>
   )
 }
@@ -1052,16 +1051,6 @@ export function PlacementEditor({
               {selectedScalePercent}%
             </span>
           </label>
-          <button
-            type="button"
-            className="placement-tool-btn placement-tool-btn--danger"
-            onClick={() => removeSlot(selectedId)}
-            disabled={editDisabled}
-            title="Delete selected box"
-            aria-label="Delete selected box"
-          >
-            <Trash2 size={17} strokeWidth={2.1} aria-hidden />
-          </button>
         </>
       )}
       {tool === 'text' && !locked && (
