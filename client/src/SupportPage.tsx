@@ -214,6 +214,7 @@ export function SupportPage() {
   if (status === 'success') {
     return (
       <div className="card support-page">
+        <p className="support-eyebrow">Contact</p>
         <h2>Support</h2>
         <div className="support-success" role="status">
           <p className="support-success-title">Message sent</p>
@@ -239,6 +240,7 @@ export function SupportPage() {
 
   return (
     <div className="card support-page">
+      <p className="support-eyebrow">Contact</p>
       <h2>Support</h2>
       <p className="muted support-lead">
         Questions about signing, locking, verification, or billing? Send a message and we&apos;ll get back

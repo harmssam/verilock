@@ -17,23 +17,25 @@ export function NotFoundPage({
 }: NotFoundPageProps) {
   return (
     <section className="not-found-page card" aria-labelledby="not-found-title">
-      <img
-        className="not-found-logo"
-        src="/verilock-mark.png"
-        alt=""
-        width={72}
-        height={72}
-        decoding="async"
-      />
-      <p className="not-found-kicker">Page not found</p>
-      <h2 id="not-found-title">{title}</h2>
-      <p className="muted not-found-message">{message}</p>
-      {path ? (
-        <p className="not-found-path muted">
-          <code className="mono">{path}</code>
-        </p>
-      ) : null}
-      <button type="button" className="btn btn-primary" onClick={onHome}>
+      <header className="not-found-hero">
+        <img
+          className="not-found-logo"
+          src="/verilock-mark.png"
+          alt=""
+          width={72}
+          height={72}
+          decoding="async"
+        />
+        <p className="not-found-kicker">Page not found</p>
+        <h2 id="not-found-title">{title}</h2>
+        <p className="muted not-found-message">{message}</p>
+        {path ? (
+          <p className="not-found-path muted">
+            <code className="mono">{path}</code>
+          </p>
+        ) : null}
+      </header>
+      <button type="button" className="btn btn-primary not-found-cta" onClick={onHome}>
         Back to home
       </button>
     </section>
