@@ -33,6 +33,12 @@ import {
   MAX_TITLE_LENGTH,
 } from '../fieldLimits'
 import { DOCUMENT_FORMATS_LABEL, stripDocumentExtension } from '../pdf/documentKinds'
+import {
+  documentReadErrorMessage,
+  isUnreadableDocumentError,
+  readFileBytes,
+  STALE_LOCAL_DOCUMENT_MESSAGE,
+} from '../pdf/documentRead'
 import { getDocumentPageCount } from '../pdf/documentSurface'
 import { sha256Hex, shortHash } from '../pdf/hashPdf'
 import { prepareSignatureImageUpload } from '../signatureImage'
@@ -61,7 +67,11 @@ import {
   saveJourneyIntent,
   syncIntentToUrl,
 } from './journeyIntent'
-import { loadCreateFormCache } from './journeyPdfDraft'
+import {
+  fileFromCreatePdfDraft,
+  loadCreateFormCache,
+  loadCreatePdfDraft,
+} from './journeyPdfDraft'
 import { useCreatePdfDraft } from './useCreatePdfDraft'
 import { useRevealDocumentOnAuth } from './useRevealDocumentOnAuth'
 import {
@@ -222,6 +232,8 @@ export function DocumentJourney({
   const [title, setTitle] = useState(() => loadCreateFormCache()?.title ?? '')
   /** Last title we auto-filled from a file name - used so a new file replaces it. */
   const autoTitleFromFileRef = useRef<string | null>(null)
+  /** One IDB recovery attempt per dead create-path File (avoids recover loops). */
+  const createFileIdbRecoveryAttemptedRef = useRef(false)
   const [creatorName, setCreatorName] = useState(
     () => loadCreateFormCache()?.creatorName ?? '',
   )
@@ -1030,47 +1042,6 @@ export function DocumentJourney({
     }
   }, [])
 
-  // Hash PDF on select (create path)
-  useEffect(() => {
-    if (!pdfFile) {
-      setPdfHash(null)
-      return
-    }
-    let cancelled = false
-    void (async () => {
-      try {
-        const buffer = await pdfFile.arrayBuffer()
-        const hash = await sha256Hex(buffer)
-        const pages = await getDocumentPageCount(pdfFile)
-        if (cancelled) return
-        setPdfHash(hash)
-        setPageCount(pages)
-        // Auto-fill title from the file name when empty, or when the field still
-        // holds the previous auto-fill (user has not customized it). Always track
-        // this file's suggestion so a later replace can detect an untouched title.
-        const suggested = clampField(
-          stripDocumentExtension(pdfFile.name),
-          MAX_TITLE_LENGTH,
-        )
-        setTitle(prev => {
-          const cur = (prev ?? '').trim()
-          const lastAuto = autoTitleFromFileRef.current
-          const shouldReplace = !cur || cur === lastAuto
-          autoTitleFromFileRef.current = suggested
-          return shouldReplace ? suggested : prev
-        })
-      } catch (err) {
-        if (!cancelled) {
-          setLocalError(err instanceof Error ? err.message : 'Failed to read document')
-          setPdfHash(null)
-        }
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [pdfFile])
-
   const applyRestoredCreateMeta = useCallback(
     (m: {
       title: string
@@ -1089,13 +1060,19 @@ export function DocumentJourney({
       setDocType(m.docType)
       setDocNotes(m.docNotes)
       if (m.pdfHash) setPdfHash(m.pdfHash)
+      else setPdfHash(null)
       if (m.pageCount > 0) setPageCount(m.pageCount)
+      else if (!m.pdfHash) setPageCount(0)
     },
     [],
   )
 
   const ensureCreatorRole = useCallback(() => {
     setRole(prev => prev ?? 'creator')
+  }, [])
+
+  const onUnreadableCreateDraft = useCallback((message: string) => {
+    setLocalError(message)
   }, [])
 
   const {
@@ -1121,7 +1098,77 @@ export function DocumentJourney({
     applyRestoredMeta: applyRestoredCreateMeta,
     ensureCreatorRole,
     role,
+    onUnreadableDraft: onUnreadableCreateDraft,
   })
+
+  // Hash PDF on select / restore (create path).
+  // Dead File handles (common after long mobile backgrounding) are recovered from
+  // IndexedDB once; otherwise the draft is cleared so Login is not stuck disabled.
+  useEffect(() => {
+    if (!pdfFile) {
+      setPdfHash(null)
+      createFileIdbRecoveryAttemptedRef.current = false
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const buffer = await readFileBytes(pdfFile)
+        const hash = await sha256Hex(buffer)
+        const pages = await getDocumentPageCount(pdfFile)
+        if (cancelled) return
+        setPdfHash(hash)
+        setPageCount(pages)
+        setLocalError(prev => (prev === STALE_LOCAL_DOCUMENT_MESSAGE ? null : prev))
+        // Auto-fill title from the file name when empty, or when the field still
+        // holds the previous auto-fill (user has not customized it). Always track
+        // this file's suggestion so a later replace can detect an untouched title.
+        const suggested = clampField(
+          stripDocumentExtension(pdfFile.name),
+          MAX_TITLE_LENGTH,
+        )
+        setTitle(prev => {
+          const cur = (prev ?? '').trim()
+          const lastAuto = autoTitleFromFileRef.current
+          const shouldReplace = !cur || cur === lastAuto
+          autoTitleFromFileRef.current = suggested
+          return shouldReplace ? suggested : prev
+        })
+      } catch (err) {
+        if (cancelled) return
+
+        if (isUnreadableDocumentError(err)) {
+          // In-memory File may be the dead input handle; IDB draft can still be good.
+          if (!createFileIdbRecoveryAttemptedRef.current) {
+            createFileIdbRecoveryAttemptedRef.current = true
+            try {
+              const draft = await loadCreatePdfDraft()
+              if (draft && !cancelled) {
+                const recovered = fileFromCreatePdfDraft(draft)
+                await readFileBytes(recovered)
+                setPdfFile(recovered)
+                return
+              }
+            } catch {
+              /* fall through to clear */
+            }
+          }
+          if (cancelled) return
+          setLocalError(STALE_LOCAL_DOCUMENT_MESSAGE)
+          setPdfHash(null)
+          // Clears React file + IndexedDB draft; keeps form field cache.
+          onCreatePdfFileChange(null)
+          return
+        }
+
+        setLocalError(documentReadErrorMessage(err))
+        setPdfHash(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [pdfFile, onCreatePdfFileChange])
 
   useRevealDocumentOnAuth(doc, token, setActiveFromSeal)
 
@@ -1141,7 +1188,7 @@ export function DocumentJourney({
     let cancelled = false
     void (async () => {
       try {
-        const hash = await sha256Hex(await signFile.arrayBuffer())
+        const hash = await sha256Hex(await readFileBytes(signFile))
         if (cancelled) return
         if (hash !== doc.fingerprint) {
           setSignHash(null)
@@ -1154,8 +1201,11 @@ export function DocumentJourney({
         setSignHash(hash)
       } catch (err) {
         if (!cancelled) {
-          setLocalError(err instanceof Error ? err.message : 'Failed to read document')
+          setLocalError(documentReadErrorMessage(err))
           setSignHash(null)
+          if (isUnreadableDocumentError(err)) {
+            setSignFile(null)
+          }
         }
       }
     })()
@@ -1214,7 +1264,7 @@ export function DocumentJourney({
 
     void (async () => {
       try {
-        const got = await sha256Hex(await verifyFile.arrayBuffer())
+        const got = await sha256Hex(await readFileBytes(verifyFile))
         if (runId !== verifyRunIdRef.current) return
 
         const { matches } = await api.verifyHash(got)
@@ -1272,11 +1322,10 @@ export function DocumentJourney({
         }
       } catch (err) {
         if (runId !== verifyRunIdRef.current) return
-        const message = err instanceof Error ? err.message : 'Verify failed'
-        setLocalError(message)
-        // Keep a local hash preview so the drop still feels responsive
+        setLocalError(documentReadErrorMessage(err))
+        // Keep a local hash preview so the drop still feels responsive (when bytes open).
         try {
-          const got = await sha256Hex(await verifyFile.arrayBuffer())
+          const got = await sha256Hex(await readFileBytes(verifyFile))
           if (runId !== verifyRunIdRef.current) return
           setVerifyOutcome({
             kind: 'local',
