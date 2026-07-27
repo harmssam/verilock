@@ -87,7 +87,7 @@ export function journeyMobileChoiceLabels(): {
   }
 }
 
-/** Labels for desktop dual-choice (Pay QR vs Hub). */
+/** Labels for desktop dual-choice (Hub default, Pay QR optional). */
 export function journeyDesktopChoiceLabels(): {
   payIdle: string
   payBusy: string
@@ -97,12 +97,13 @@ export function journeyDesktopChoiceLabels(): {
   hubHint: string
 } {
   return {
-    payIdle: 'Login with Nimiq Pay',
-    payBusy: 'Waiting for phone…',
-    payHint: 'Scan a QR code with your phone - no Hub install needed',
     hubIdle: 'Continue with Nimiq Hub',
     hubBusy: 'Opening Hub…',
-    hubHint: 'Browser wallet - one step on this device',
+    hubHint: 'Recommended - sign in on this computer in one step',
+    payIdle: 'Sign in with Nimiq Pay on your phone',
+    payBusy: 'Waiting for phone…',
+    payHint:
+      'Use this if your wallet lives in the Nimiq Pay app. Scan a QR, approve on your phone, and this computer finishes login.',
   }
 }
 
@@ -131,8 +132,8 @@ export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
     case 'desktop-choice':
       return {
         title: 'Login with Nimiq',
-        about,
-        // Dual-choice sheet: options carry the how-to, not a step list.
+        about:
+          'Connect a Nimiq wallet to sign and lock on the blockchain. VeriLock never holds your keys. Prefer Hub on this computer; use Nimiq Pay only if you want to authenticate with the wallet on your phone.',
         steps: [],
       }
     case 'hub':
