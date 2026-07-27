@@ -127,9 +127,7 @@ export const PdfReconstructor = forwardRef<PdfReconstructorHandle, PdfReconstruc
 )
 
 const PRINT_ROOT_ID = 'verilock-print-root'
-const PRINT_STYLE_ID = 'verilock-print-style'
-/** Applied to <html> so mobile browsers that snapshot the live page (not only @media print) still drop app chrome. */
-const PRINTING_CLASS = 'verilock-printing'
+const PRINT_HIDE_ATTR = 'data-verilock-print-hide'
 
 function waitForImage(img: HTMLImageElement): Promise<void> {
   return new Promise(resolve => {
@@ -150,161 +148,163 @@ function waitForNextPaint(): Promise<void> {
   })
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
 /**
- * Open a print dialog with the rendered page canvases (signatures already painted).
- * Prints from the current window (no pop-up) so mobile Safari/Chrome work —
- * window.open print sheets are blocked or unusable on many phones.
- *
- * Isolation strategy: add `verilock-printing` on <html> *before* calling print so
- * only the signed page images are in the layout (screen + print). Relying on
- * @media print alone often fails on mobile, which then prints the full SPA chrome
- * (logo, path titles, docks, etc.).
+ * Standalone HTML that contains *only* signed page images (plus a small screen-only toolbar).
+ * Used in a separate browsing context so the SPA chrome can never appear in the print sheet.
  */
-export async function printRenderedPages(
-  pagesRoot: HTMLElement | null,
-  title = 'Signed document',
-): Promise<void> {
-  if (!pagesRoot) throw new Error('Document is not ready to print')
+function buildPrintDocumentHtml(dataUrls: string[], title: string): string {
+  const safeTitle = escapeHtml(title)
+  const images = dataUrls
+    .map(
+      (src, i) =>
+        `<img class="page" src="${src}" alt="Page ${i + 1}" width="100%" />`,
+    )
+    .join('\n')
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="light"/>
+<title>${safeTitle}</title>
+<style>
+  @page { margin: 10mm; size: auto; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    color: #0f172a;
+  }
+  .page {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+    page-break-after: always;
+    break-after: page;
+  }
+  .page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+  @media screen {
+    body { padding: 12px; box-sizing: border-box; }
+    .chrome {
+      font: 500 14px/1.4 system-ui, -apple-system, sans-serif;
+      margin: 0 0 12px;
+    }
+    .chrome p { margin: 0 0 10px; color: #334155; }
+    .chrome button {
+      font: 600 15px/1 system-ui, -apple-system, sans-serif;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid #0f172a;
+      background: #0f172a;
+      color: #fff;
+    }
+  }
+  @media print {
+    .chrome { display: none !important; }
+    html, body {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="chrome">
+    <p>Signed document — print preview has only the pages below (no VeriLock app chrome).</p>
+    <button type="button" id="print-btn">Print</button>
+  </div>
+  ${images}
+  <script>
+    (function () {
+      function doPrint() {
+        try { window.focus(); window.print(); } catch (e) {}
+      }
+      var btn = document.getElementById('print-btn');
+      if (btn) btn.addEventListener('click', doPrint);
+      var images = Array.prototype.slice.call(document.images || []);
+      var left = images.length;
+      function tick() {
+        left -= 1;
+        if (left <= 0) setTimeout(doPrint, 150);
+      }
+      if (!images.length) setTimeout(doPrint, 150);
+      else {
+        images.forEach(function (img) {
+          if (img.complete && img.naturalWidth > 0) tick();
+          else {
+            img.onload = tick;
+            img.onerror = tick;
+          }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>`
+}
+
+function capturePageDataUrls(pagesRoot: HTMLElement): string[] {
   const canvases = Array.from(pagesRoot.querySelectorAll('canvas'))
   if (canvases.length === 0) throw new Error('No pages to print')
-
-  const dataUrls = canvases.map(c => {
+  return canvases.map(c => {
     try {
       return c.toDataURL('image/png')
     } catch {
       throw new Error('Could not capture page for print')
     }
   })
+}
 
-  // Drop leftovers if a prior print was interrupted.
-  document.documentElement.classList.remove(PRINTING_CLASS)
+/**
+ * Write a document-only HTML sheet into an already-opened window (about:blank).
+ * Preferred path: the print context never contains the SPA.
+ */
+function printViaSeparateDocument(target: Window, dataUrls: string[], title: string): void {
+  const html = buildPrintDocumentHtml(dataUrls, title)
+  const doc = target.document
+  doc.open()
+  doc.write(html)
+  doc.close()
+  try {
+    target.focus()
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Same-window fallback when popups are blocked.
+ * Physically hides every body child (inline styles + hidden) and mounts only page images,
+ * then prints. Avoids @media-print-only tricks that mobile browsers often ignore.
+ */
+async function printViaSameWindowIsolation(
+  dataUrls: string[],
+  title: string,
+): Promise<void> {
+  // Tear down any prior attempt.
   document.getElementById(PRINT_ROOT_ID)?.remove()
-  document.getElementById(PRINT_STYLE_ID)?.remove()
-
-  const style = document.createElement('style')
-  style.id = PRINT_STYLE_ID
-  style.textContent = `
-    /* Park print sheets until we enter print mode. */
-    #${PRINT_ROOT_ID} {
-      position: fixed !important;
-      left: 0 !important;
-      top: 0 !important;
-      width: 100% !important;
-      height: 0 !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      overflow: hidden !important;
-      opacity: 0 !important;
-      pointer-events: none !important;
-      z-index: -1 !important;
-    }
-
-    /*
-     * Live isolation (screen + print): hide every body child except the signed pages.
-     * Mobile Safari/Chrome often capture the on-screen DOM instead of re-layout from
-     * @media print alone — so this class must be active before window.print().
-     */
-    html.${PRINTING_CLASS},
-    html.${PRINTING_CLASS} body {
-      margin: 0 !important;
-      padding: 0 !important;
-      background: #fff !important;
-      height: auto !important;
-      min-height: 0 !important;
-      overflow: visible !important;
-    }
-    html.${PRINTING_CLASS} body > *:not(#${PRINT_ROOT_ID}) {
-      display: none !important;
-      visibility: hidden !important;
-    }
-    html.${PRINTING_CLASS} #${PRINT_ROOT_ID} {
-      display: block !important;
-      position: static !important;
-      left: auto !important;
-      top: auto !important;
-      width: 100% !important;
-      height: auto !important;
-      min-height: 0 !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      overflow: visible !important;
-      opacity: 1 !important;
-      pointer-events: none !important;
-      z-index: auto !important;
-      background: #fff !important;
-      color: #0f172a !important;
-    }
-    html.${PRINTING_CLASS} #${PRINT_ROOT_ID} .print-page {
-      display: block !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      height: auto !important;
-      margin: 0 auto 0 !important;
-      page-break-after: always;
-      break-after: page;
-    }
-    html.${PRINTING_CLASS} #${PRINT_ROOT_ID} .print-page:last-child {
-      page-break-after: auto;
-      break-after: auto;
-    }
-
-    @media print {
-      @page { margin: 10mm; size: auto; }
-      html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #fff !important;
-        height: auto !important;
-        overflow: visible !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      /* Belt-and-suspenders if the class was stripped mid-dialog. */
-      body > *:not(#${PRINT_ROOT_ID}) {
-        display: none !important;
-        visibility: hidden !important;
-      }
-      #${PRINT_ROOT_ID} {
-        display: block !important;
-        position: static !important;
-        width: 100% !important;
-        height: auto !important;
-        overflow: visible !important;
-        opacity: 1 !important;
-        background: #fff !important;
-        color: #0f172a !important;
-      }
-      #${PRINT_ROOT_ID} .print-page {
-        display: block !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        height: auto !important;
-        margin: 0 auto !important;
-        page-break-after: always;
-        break-after: page;
-      }
-      #${PRINT_ROOT_ID} .print-page:last-child {
-        page-break-after: auto;
-        break-after: auto;
-      }
-    }
-  `
-  document.head.appendChild(style)
-
-  const root = document.createElement('div')
-  root.id = PRINT_ROOT_ID
-  root.setAttribute('aria-hidden', 'true')
-
-  dataUrls.forEach((src, i) => {
-    const img = document.createElement('img')
-    img.className = 'print-page'
-    img.src = src
-    img.alt = `Page ${i + 1}`
-    root.appendChild(img)
+  document.querySelectorAll(`[${PRINT_HIDE_ATTR}]`).forEach(el => {
+    const node = el as HTMLElement
+    const prev = node.getAttribute(PRINT_HIDE_ATTR)
+    node.removeAttribute(PRINT_HIDE_ATTR)
+    if (prev === '') node.style.removeProperty('display')
+    else if (prev != null) node.style.display = prev
+    node.removeAttribute('hidden')
   })
-  document.body.appendChild(root)
-
-  await Promise.all(Array.from(root.querySelectorAll('img')).map(waitForImage))
 
   const previousTitle = document.title
   const previousScrollX = window.scrollX
@@ -312,40 +312,82 @@ export async function printRenderedPages(
   const safeTitle = title.replace(/[<>&"]/g, '').trim()
   if (safeTitle) document.title = safeTitle
 
-  // Swap the live layout to document-only *before* the system print UI opens.
-  document.documentElement.classList.add(PRINTING_CLASS)
+  const overlay = document.createElement('div')
+  overlay.id = PRINT_ROOT_ID
+  // Inline styles so print capture cannot miss a late stylesheet.
+  overlay.setAttribute(
+    'style',
+    [
+      'position:fixed',
+      'inset:0',
+      'z-index:2147483647',
+      'background:#fff',
+      'color:#0f172a',
+      'overflow:auto',
+      'margin:0',
+      'padding:0',
+      'width:100%',
+      'height:100%',
+    ].join(';'),
+  )
+
+  dataUrls.forEach((src, i) => {
+    const img = document.createElement('img')
+    img.src = src
+    img.alt = `Page ${i + 1}`
+    img.setAttribute(
+      'style',
+      'display:block;width:100%;max-width:100%;height:auto;margin:0 auto;page-break-after:always;break-after:page',
+    )
+    overlay.appendChild(img)
+  })
+  const last = overlay.lastElementChild as HTMLElement | null
+  if (last) {
+    last.style.pageBreakAfter = 'auto'
+    last.style.breakAfter = 'auto'
+  }
+
+  // Hide every existing body child with inline display:none (harder for engines to ignore).
+  Array.from(document.body.children).forEach(child => {
+    if (child === overlay) return
+    const el = child as HTMLElement
+    el.setAttribute(PRINT_HIDE_ATTR, el.style.display || '')
+    el.style.display = 'none'
+    el.setAttribute('hidden', '')
+  })
+  document.body.appendChild(overlay)
+
+  await Promise.all(Array.from(overlay.querySelectorAll('img')).map(waitForImage))
   window.scrollTo(0, 0)
   await waitForNextPaint()
-  // Extra beat for mobile WebKit layout + image decode before the print sheet.
   await new Promise<void>(r => {
-    window.setTimeout(r, 120)
+    window.setTimeout(r, 150)
   })
 
   let cleaned = false
-  const mql = typeof window.matchMedia === 'function' ? window.matchMedia('print') : null
+  const minAliveUntil = Date.now() + 2500
   const cleanup = () => {
     if (cleaned) return
+    if (Date.now() < minAliveUntil) {
+      window.setTimeout(cleanup, minAliveUntil - Date.now() + 50)
+      return
+    }
     cleaned = true
-    document.documentElement.classList.remove(PRINTING_CLASS)
     document.title = previousTitle
-    root.remove()
-    style.remove()
+    overlay.remove()
+    document.querySelectorAll(`[${PRINT_HIDE_ATTR}]`).forEach(node => {
+      const el = node as HTMLElement
+      const prev = el.getAttribute(PRINT_HIDE_ATTR)
+      el.removeAttribute(PRINT_HIDE_ATTR)
+      if (prev === '') el.style.removeProperty('display')
+      else if (prev != null) el.style.display = prev
+      el.removeAttribute('hidden')
+    })
     window.removeEventListener('afterprint', onAfterPrint)
-    window.removeEventListener('focus', onFocusCleanup)
-    mql?.removeEventListener?.('change', onPrintMediaChange)
     window.scrollTo(previousScrollX, previousScrollY)
   }
   const onAfterPrint = () => cleanup()
-  const onPrintMediaChange = (event: MediaQueryListEvent) => {
-    if (!event.matches) cleanup()
-  }
-  // iOS often skips afterprint; focus returns when the share/print sheet closes.
-  // Delay attaching so we never tear down while the sheet is still opening.
-  const onFocusCleanup = () => {
-    window.setTimeout(cleanup, 250)
-  }
   window.addEventListener('afterprint', onAfterPrint)
-  mql?.addEventListener?.('change', onPrintMediaChange)
 
   try {
     window.print()
@@ -354,10 +396,51 @@ export async function printRenderedPages(
     throw err instanceof Error ? err : new Error('Could not open print')
   }
 
-  window.setTimeout(() => {
-    if (!cleaned) window.addEventListener('focus', onFocusCleanup)
-  }, 1500)
-
-  // Last-resort teardown if neither afterprint nor focus fire.
   window.setTimeout(cleanup, 60_000)
+}
+
+/**
+ * Open a print dialog with the rendered page canvases (signatures already painted).
+ *
+ * @param preOpenedWindow Optional window opened synchronously from the Print click
+ *   (`window.open('about:blank')`). Required for reliable mobile isolation: the sheet
+ *   document contains only page images, never the VeriLock SPA.
+ */
+export async function printRenderedPages(
+  pagesRoot: HTMLElement | null,
+  title = 'Signed document',
+  preOpenedWindow: Window | null = null,
+): Promise<void> {
+  if (!pagesRoot) throw new Error('Document is not ready to print')
+
+  const dataUrls = capturePageDataUrls(pagesRoot)
+  const safeTitle = title.replace(/[<>&"]/g, '').trim() || 'Signed document'
+
+  // 1) Preferred: separate document that has zero app chrome.
+  if (preOpenedWindow && !preOpenedWindow.closed) {
+    try {
+      printViaSeparateDocument(preOpenedWindow, dataUrls, safeTitle)
+      return
+    } catch {
+      try {
+        preOpenedWindow.close()
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  // 2) Try opening a sheet now (may be blocked outside the user-gesture turn).
+  try {
+    const fresh = window.open('about:blank', 'verilock-print')
+    if (fresh && !fresh.closed) {
+      printViaSeparateDocument(fresh, dataUrls, safeTitle)
+      return
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // 3) Popup blocked — isolate in-place with inline hide of the SPA.
+  await printViaSameWindowIsolation(dataUrls, safeTitle)
 }
