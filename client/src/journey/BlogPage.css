@@ -82,7 +82,8 @@
 }
 
 .blog-cat--pricing {
-  color: #fcd34d;
+  /* Darkest stop from public/nimiq-hexagon.svg (#EC991C → #E9B213) */
+  color: #ec991c;
 }
 
 /* Featured hero (Anthropic top story) */

@@ -425,7 +425,7 @@ export function createDocument(input: {
   const priorMatches = findDocumentsByHash(doc.originalSha256).filter(existing => existing.id !== id)
   const hashWarning =
     priorMatches.length > 0
-      ? `${priorMatches.length} other agreement(s) already use this PDF fingerprint. Verify the sealed record before trusting a match.`
+      ? `${priorMatches.length} other agreement(s) already use this PDF fingerprint. The same file always matches the same records, so a shared template can show multiple agreements when verified. Edit the document if you want this one unique.`
       : undefined
 
   if (!isDirectSeal) {
