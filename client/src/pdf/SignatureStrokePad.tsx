@@ -67,11 +67,15 @@ function clientPointToCanvasLocal(
 }
 
 /**
- * Map client → canvas local when an ancestor is rotate(90deg) about its center
+ * Map client → canvas local when an ancestor is CSS rotate(90deg) about its center
  * (Nimiq Pay forced landscape). Uses layout geometry, not AABB subtraction.
  *
- * rotate(90deg) CW: local offset (lx, ly) from center → client (ly, −lx).
- * Inverse: client (dx, dy) from center → local (lx, ly) = (−dy, dx).
+ * CSS rotate(a) ≡ matrix(cos a, sin a, −sin a, cos a). For 90° (y-down screen):
+ *   local (lx, ly) → client-from-center (−ly, lx)
+ * Inverse:
+ *   client (dx, dy) → local (dy, −dx)
+ *
+ * (The previous inverse (−dy, dx) was 180° off — both axes reversed under the pad.)
  */
 function clientPointUnderRotate90Ancestor(
   canvas: HTMLElement,
@@ -88,9 +92,9 @@ function clientPointUnderRotate90Ancestor(
 
   const dx = clientX - cx
   const dy = clientY - cy
-  // Inverse of rotate(90deg) CW about center
-  const preX = -dy
-  const preY = dx
+  // Inverse of CSS rotate(90deg) about center
+  const preX = dy
+  const preY = -dx
   const sheetX = W / 2 + preX
   const sheetY = H / 2 + preY
 
