@@ -16,8 +16,10 @@ interface AccountMenuProps {
   account: JourneyAccount | null
   connecting: boolean
   walletStatus?: string | null
-  /** Resolved single-button connect mode (desktop Hub / mobile Pay / fallback). */
+  /** Resolved login surface (in-pay / mobile / desktop). */
   connectMode?: JourneyConnectMode
+  /** Mobile: Pay deeplink failed — prefer Hub in the sheet. */
+  showOpenInPay?: boolean
   /** Seal credit balance when credits are enabled (header chip). */
   creditBalance?: number | null
   /** True when the shell is on Pricing — matches Agreements `lr-nav--active`. */
@@ -35,7 +37,8 @@ export function AccountMenu({
   account,
   connecting,
   walletStatus,
-  connectMode = 'hub',
+  connectMode = 'desktop',
+  showOpenInPay = false,
   creditBalance = null,
   creditsActive = false,
   onConnect,
@@ -102,6 +105,7 @@ export function AccountMenu({
             connectMode={connectMode}
             connecting={connecting}
             walletStatus={walletStatus}
+            showOpenInPay={showOpenInPay}
             onClose={() => setLoginOpen(false)}
             onProceed={onConnect}
             onSession={onSession}

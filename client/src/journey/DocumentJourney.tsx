@@ -2846,6 +2846,7 @@ export function DocumentJourney({
                       connectMode={connectMode}
                       connecting={connecting}
                       walletStatus={walletStatus}
+                      showOpenInPay={showOpenInPay}
                       onClose={() => setLoginSheetOpen(false)}
                       onProceed={connectFromPath}
                       onSession={applySession}
@@ -3162,6 +3163,7 @@ export function DocumentJourney({
                                   connectMode={connectMode}
                                   connecting={connecting}
                                   walletStatus={walletStatus}
+                                  showOpenInPay={showOpenInPay}
                                   onClose={() => setLoginSheetOpen(false)}
                                   onProceed={connectFromPath}
                                   onSession={applySession}

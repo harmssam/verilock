@@ -65,7 +65,7 @@ export function PricePage({
   nimiq = null,
   setNimiq,
   connecting = false,
-  connectMode = 'hub',
+  connectMode = 'desktop',
   onConnect,
   onSession,
   onCreditsPurchased,

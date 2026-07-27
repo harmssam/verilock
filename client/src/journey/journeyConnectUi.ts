@@ -1,73 +1,89 @@
 /**
- * Connect UX for Journey:
- * - Desktop → chooser sheet: Nimiq Pay QR or Hub in browser
- * - Mobile → chooser sheet: Nimiq Pay app or Hub in browser
- * - Inside Pay → native wallet connect (no sheet)
+ * Login surface policy for Journey / shell.
  *
- * Entry points use a short “Login” label; mode-specific labels live on the
- * Login sheet (and in busy states after proceed).
+ * Three surfaces only:
+ * - in-pay: Nimiq Pay WebView → native connect (no sheet)
+ * - mobile: phone browser → deeplink chooser (Pay app vs Hub)
+ * - desktop: browser → Hub primary + optional Pay QR
  */
 
-export type JourneyConnectMode =
-  | 'pay-native'
-  | 'pay-open'
-  | 'hub-fallback'
-  | 'desktop-choice'
-  | 'hub'
+/** Where the user is sitting. */
+export type LoginSurface = 'in-pay' | 'mobile' | 'desktop'
+
+/**
+ * @deprecated Prefer LoginSurface. Kept as alias so older prop names compile during rename.
+ * Maps: pay-native→in-pay, pay-open|hub-fallback→mobile, desktop-choice|hub→desktop
+ */
+export type JourneyConnectMode = LoginSurface | 'pay-native' | 'pay-open' | 'hub-fallback' | 'desktop-choice' | 'hub'
 
 /** Options passed into useJourneyWallet.connect */
 export type JourneyConnectRequest = { useRedirect?: boolean }
 
+export function resolveLoginSurface(options: {
+  inNimiqPay: boolean
+  isMobile: boolean
+}): LoginSurface {
+  if (options.inNimiqPay) return 'in-pay'
+  if (options.isMobile) return 'mobile'
+  return 'desktop'
+}
+
+/**
+ * @deprecated Use resolveLoginSurface. Bridges old mobilePayConnect / showOpenInPay flags.
+ */
 export function resolveJourneyConnectMode(options: {
   inNimiqPay: boolean
   mobilePayConnect: boolean
   showOpenInPay: boolean
-  /** True when navigator looks like a phone/tablet (not desktop). */
   isMobile?: boolean
-}): JourneyConnectMode {
-  if (options.inNimiqPay) return 'pay-native'
-  // Prefer mobilePayConnect; also treat generic mobile as pay-open so we never
-  // send phones into desktop QR login.
-  const onMobile = options.mobilePayConnect || options.isMobile === true
-  if (onMobile && options.showOpenInPay) return 'hub-fallback'
-  if (onMobile) return 'pay-open'
-  // Desktop browser (not Pay): show Pay QR + Hub choice.
-  return 'desktop-choice'
+}): LoginSurface {
+  return resolveLoginSurface({
+    inNimiqPay: options.inNimiqPay,
+    isMobile: options.mobilePayConnect || options.isMobile === true,
+  })
 }
 
-/**
- * Desktop choice + mobile Pay/Hub: show Login sheet.
- * In-app Pay: go straight to connect (optional sheet for copy only).
- */
+/** Normalize legacy mode names to LoginSurface. */
+export function asLoginSurface(mode: JourneyConnectMode): LoginSurface {
+  switch (mode) {
+    case 'in-pay':
+    case 'pay-native':
+      return 'in-pay'
+    case 'mobile':
+    case 'pay-open':
+    case 'hub-fallback':
+      return 'mobile'
+    case 'desktop':
+    case 'desktop-choice':
+    case 'hub':
+    default:
+      return 'desktop'
+  }
+}
+
+/** Sheet for mobile chooser + desktop Hub/Pay chooser. In-Pay goes straight to connect. */
 export function journeyLoginNeedsSheet(mode: JourneyConnectMode): boolean {
-  return (
-    mode === 'pay-open' ||
-    mode === 'hub-fallback' ||
-    mode === 'desktop-choice'
-  )
+  const surface = asLoginSurface(mode)
+  return surface === 'mobile' || surface === 'desktop'
 }
 
-/** Short labels for header / page entry buttons (opens sheet or starts connect). */
+/** Short labels for header / page entry buttons. */
 export function journeyLoginEntryLabels(): { idle: string; busy: string } {
   return { idle: 'Login', busy: 'Logging in…' }
 }
 
-/** Mode-specific proceed labels (after user reads Nimiq how-to). */
+/** Mode-specific proceed labels. */
 export function journeyConnectLabels(mode: JourneyConnectMode): {
   idle: string
   busy: string
 } {
-  switch (mode) {
-    case 'pay-native':
+  switch (asLoginSurface(mode)) {
+    case 'in-pay':
       return { idle: 'Connect wallet', busy: 'Connecting…' }
-    case 'pay-open':
+    case 'mobile':
       return { idle: 'Open in Nimiq Pay', busy: 'Opening…' }
-    case 'hub-fallback':
-      return { idle: 'Continue with Nimiq Hub', busy: 'Opening Hub…' }
-    case 'desktop-choice':
+    case 'desktop':
       return { idle: 'Login with Nimiq', busy: 'Logging in…' }
-    case 'hub':
-      return { idle: 'Continue with Nimiq Hub', busy: 'Opening Hub…' }
   }
 }
 
@@ -107,60 +123,61 @@ export function journeyDesktopChoiceLabels(): {
     hubHint: 'Recommended - sign in on this computer in one step',
     payIdle: 'Sign in with Nimiq Pay on your phone',
     payBusy: 'Waiting for phone…',
-    /** Shown only while the QR is visible (not under the choice button). */
+    /** Shown only while the QR is visible. */
     payHint: 'Scan a QR, approve on your phone, and this computer finishes login.',
   }
 }
 
-/** Copy for the Login sheet (about Nimiq + how to proceed). */
+/** Copy for the Login sheet. */
 export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
   title: string
   about: string
-  /** Ordered steps for single-path modes; empty for chooser sheets. */
   steps: string[]
 } {
-  const about =
-    'Connect a Nimiq wallet to sign and lock on the blockchain. VeriLock never holds your keys.'
-
-  switch (mode) {
-    case 'pay-native':
-      return {
-        title: 'Login with Nimiq Pay',
-        about,
-        steps: [
-          'Approve the connection when Nimiq Pay prompts you.',
-          'Your wallet address becomes your VeriLock identity.',
-        ],
-      }
-    case 'pay-open':
-    case 'hub-fallback':
-    case 'desktop-choice':
-      return {
-        title: 'Login with Nimiq',
-        about: 'Connect via browser Hub or the Nimiq Pay app.',
-        steps: [],
-      }
-    case 'hub':
-      return {
-        title: 'Login with Nimiq',
-        about,
-        steps: [
-          'Continue opens Nimiq Hub once in this browser - no app install, no pop-up chain.',
-          'Pick or create a wallet, approve the sign-in, and return logged in.',
-        ],
-      }
+  const surface = asLoginSurface(mode)
+  if (surface === 'in-pay') {
+    return {
+      title: 'Login with Nimiq Pay',
+      about:
+        'Connect a Nimiq wallet to sign and lock on the blockchain. VeriLock never holds your keys.',
+      steps: [
+        'Approve the connection when Nimiq Pay prompts you.',
+        'Your wallet address becomes your VeriLock identity.',
+      ],
+    }
+  }
+  if (surface === 'mobile') {
+    return {
+      title: 'Login with Nimiq',
+      about: 'Connect via browser Hub or the Nimiq Pay app.',
+      steps: [],
+    }
+  }
+  return {
+    title: 'Login with Nimiq',
+    about: 'Connect via browser Hub or the Nimiq Pay app.',
+    steps: [],
   }
 }
 
 /**
  * Default connect options when the caller does not pass explicit ones.
- * Mobile Pay (`pay-open`) and in-Pay (`pay-native`) must stay undefined so
- * connect() deeplinks / uses the injected provider — never force Hub redirect.
- * Desktop Hub button and mobile Hub choice always pass `{ useRedirect: true }`
- * themselves from LoginSheet.
+ * Mobile Pay and in-Pay must stay undefined so connect() deeplinks / uses provider.
+ * Hub buttons always pass `{ useRedirect: true }` themselves.
  */
 export function journeyConnectOptions(mode: JourneyConnectMode): JourneyConnectRequest | undefined {
-  if (mode === 'hub' || mode === 'hub-fallback') return { useRedirect: true }
-  // desktop-choice: no default — Hub/Pay buttons pass options; bare connect → Hub via shouldUseHubRedirect
+  // No defaults that force Hub on desktop/mobile Pay paths.
+  void mode
   return undefined
+}
+
+/** Hub is primary on desktop, or on mobile after Pay deeplink failed. */
+export function journeyHubPreferred(
+  mode: JourneyConnectMode,
+  showOpenInPay = false,
+): boolean {
+  const surface = asLoginSurface(mode)
+  if (surface === 'desktop') return true
+  if (surface === 'mobile' && showOpenInPay) return true
+  return false
 }
