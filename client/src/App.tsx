@@ -85,7 +85,7 @@ const TRACK_META: Record<
 > = {
   creator: {
     title: 'Create & sign',
-    detail: 'Start free: invite co-signers — lock on blockchain if needed',
+    detail: 'Start free: invite co-signers, lock on blockchain if needed',
     icon: Fingerprint,
     accent: 'creator',
   },
