@@ -295,7 +295,7 @@ export function InkCaptureSheet({
               onClick={onClose}
               tabIndex={needsLandscape ? -1 : undefined}
             >
-              <X size={18} strokeWidth={2.25} aria-hidden />
+              <X size={isPortraitHost ? 22 : 20} strokeWidth={2.35} aria-hidden />
             </button>
           )}
         </header>
