@@ -4052,15 +4052,16 @@ a.hash-chip.text-link:focus-visible {
   font-weight: 550;
 }
 
+/* Darkest Nimiq hex stop (#EC991C) — stronger than light amber for drop-to-match */
 .doc-stage--needs-local {
-  border-color: rgba(251, 191, 36, 0.45);
-  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.12);
+  border-color: color-mix(in srgb, #ec991c 55%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #ec991c 22%, transparent);
 }
 
 .doc-stage--needs-local .doc-card {
   border-style: dashed;
-  border-color: rgba(251, 191, 36, 0.45);
-  background: rgba(251, 191, 36, 0.04);
+  border-color: color-mix(in srgb, #ec991c 55%, transparent);
+  background: color-mix(in srgb, #ec991c 10%, #fff);
 }
 
 .doc-stage--mismatch {
@@ -4076,8 +4077,8 @@ a.hash-chip.text-link:focus-visible {
   margin-bottom: 0.65rem;
   padding: 0.75rem 0.9rem;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(251, 191, 36, 0.35);
-  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid color-mix(in srgb, #ec991c 45%, transparent);
+  background: color-mix(in srgb, #ec991c 8%, #fff);
   text-align: left;
 }
 
@@ -4112,7 +4113,7 @@ a.hash-chip.text-link:focus-visible {
   margin-top: 0.35rem;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #fbbf24;
+  color: #ec991c;
 }
 
 .doc-card-empty-sub--hint {
@@ -4139,15 +4140,15 @@ a.hash-chip.text-link:focus-visible {
 }
 
 .doc-stage-browse--primary {
-  background: rgba(251, 191, 36, 0.16);
-  border-color: rgba(251, 191, 36, 0.45);
-  color: #fde68a;
+  background: color-mix(in srgb, #ec991c 18%, #fff);
+  border-color: color-mix(in srgb, #ec991c 50%, transparent);
+  color: #b45309;
   font-weight: 600;
 }
 
 .doc-stage-browse--primary:hover:not(:disabled) {
-  background: rgba(251, 191, 36, 0.24);
-  border-color: rgba(251, 191, 36, 0.6);
+  background: color-mix(in srgb, #ec991c 28%, #fff);
+  border-color: color-mix(in srgb, #ec991c 65%, transparent);
 }
 
 .sig-pad {
