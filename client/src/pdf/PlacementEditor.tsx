@@ -849,7 +849,7 @@ export function PlacementEditor({
     // Date tool always labels the field "Date" (opens calendar picker at sign time).
     const label =
       tool === 'date' ? 'Date' : textFieldLabel.trim().slice(0, 80)
-    // Check / X start as empty squares; click the slot to toggle the mark on or off.
+    // Check / X always place empty — signers must activate them on the Sign step.
     const slot: PlacementSlot = {
       id: newSlotId(),
       personSlotIndex: activePerson,
@@ -886,37 +886,6 @@ export function PlacementEditor({
     }
     setPlacing(null)
   }
-
-  /**
-   * Toggle empty check/X ↔ filled. Design-time only (draft layout).
-   * Called from pointerup when the gesture was a click, not a drag.
-   */
-  const toggleMarkSlot = useCallback(
-    (id: string) => {
-      if (locked || editDisabled) return
-      patchPlan(p => ({
-        ...p,
-        slots: p.slots.map(s => {
-          if (s.id !== id) return s
-          if (s.kind !== 'checkmark' && s.kind !== 'cross') return s
-          const isOn = s.lockedContent?.mark === s.kind
-          if (isOn) {
-            // Drop lockedContent entirely (undefined spread is easy to miss in state).
-            const { lockedContent: _drop, ...rest } = s
-            return rest
-          }
-          return {
-            ...s,
-            lockedContent: {
-              mark: s.kind,
-              color: personColor(s.personSlotIndex),
-            },
-          }
-        }),
-      }))
-    },
-    [locked, editDisabled, patchPlan],
-  )
 
   const onStagePointerDown = (e: React.PointerEvent) => {
     if (editDisabled) return
@@ -971,16 +940,9 @@ export function PlacementEditor({
   }
 
   const endDrag = () => {
-    const drag = dragRef.current
     dragRef.current = null
     stopDragAutoScroll()
-    // Check/X: pointerup click (not moved) toggles. Do not rely on browser click
-    // events — capture + preventDefault paths made those unreliable.
-    if (!drag || drag.moved || editDisabled) return
-    const slot = slots.find(s => s.id === drag.id)
-    if (slot && (slot.kind === 'checkmark' || slot.kind === 'cross')) {
-      toggleMarkSlot(drag.id)
-    }
+    // Check/X default state is toggled only via double-click (not single-click / drag end).
   }
 
   const onStagePointerUp = (e: React.PointerEvent) => {
@@ -1010,23 +972,11 @@ export function PlacementEditor({
   }
 
   const startItemDrag = (e: React.PointerEvent, id: string) => {
-    // Existing slots stay interactive even when a place tool is active
-    // (clicking a check/X must not no-op just because the place tool is selected).
+    // Existing slots stay interactive for move/select even when a place tool is active.
     e.stopPropagation()
     const slot = slots.find(s => s.id === id)
     if (!slot) return
-    if (editDisabled) {
-      // Silent no-op feels broken — locked layout is the usual case for “clicks do nothing”.
-      if (
-        locked &&
-        (slot.kind === 'checkmark' || slot.kind === 'cross')
-      ) {
-        setPlaceError(
-          'Empty check/X boxes are for signers on the Sign step. To pre-check one as the organizer, unlock layout first (Back to edit placements).',
-        )
-      }
-      return
-    }
+    if (editDisabled) return
     e.preventDefault()
     setSelectedId(id)
     setPlaceError(null)
@@ -1840,12 +1790,11 @@ export function PlacementEditor({
                             }}
                             onPointerDown={e => {
                               // Don't let place tools also drop a new box when clicking an
-                              // existing slot (especially check/X toggle).
+                              // existing slot.
                               e.stopPropagation()
                               startItemDrag(e, slot.id)
                             }}
                             onPointerUp={e => {
-                              // Stop bubble so stage pointerup doesn't clear drag before we toggle.
                               e.stopPropagation()
                               endDrag()
                             }}
@@ -1853,27 +1802,9 @@ export function PlacementEditor({
                               e.stopPropagation()
                               endDrag()
                             }}
-                            onKeyDown={
-                              isMark
-                                ? e => {
-                                    if (e.key === ' ' || e.key === 'Enter') {
-                                      e.preventDefault()
-                                      e.stopPropagation()
-                                      toggleMarkSlot(slot.id)
-                                    }
-                                  }
-                                : undefined
-                            }
-                            role={isMark ? 'checkbox' : undefined}
-                            tabIndex={isMark && !editDisabled ? 0 : undefined}
-                            aria-checked={
-                              isMark
-                                ? slot.lockedContent?.mark === slot.kind
-                                : undefined
-                            }
                             aria-label={
                               isMark
-                                ? `${slot.kind === 'cross' ? 'X mark' : 'Checkbox'} for ${person}`
+                                ? `${slot.kind === 'cross' ? 'X' : 'Checkbox'} for ${person} (signers fill this)`
                                 : undefined
                             }
                           >
@@ -1898,8 +1829,8 @@ export function PlacementEditor({
                             {slot.kind === 'checkmark' || slot.kind === 'cross' ? (
                               <MarkFieldCanvas
                                 kind={slot.kind}
-                                checked={slot.lockedContent?.mark === slot.kind}
-                                color={slot.lockedContent?.color ?? color}
+                                checked={false}
+                                color={color}
                                 width={r.width}
                                 height={r.height}
                                 className="placement-mark-preview"
