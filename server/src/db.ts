@@ -3023,16 +3023,23 @@ export function getAdminStats(): AdminStats {
       accountsWithBalance: Number(creditRow?.accounts ?? 0),
       totalBalance: Number(creditRow?.total ?? 0),
     },
-    support: {
-      total: countScalar(`SELECT COUNT(*) AS n FROM support_tickets`),
-      open: countScalar(
-        `SELECT COUNT(*) AS n FROM support_tickets
-         WHERE status IN ('open', 'in_progress', 'waiting_customer')`,
-      ),
-      byStatus: countsByColumn(
-        `SELECT status AS key, COUNT(*) AS n FROM support_tickets GROUP BY status`,
-      ),
-    },
+    support: (() => {
+      // Defensive: table is created at module load; never let support stats break the dashboard.
+      try {
+        const byStatus = countsByColumn(
+          `SELECT status AS key, COUNT(*) AS n FROM support_tickets GROUP BY status`,
+        )
+        const total = Object.values(byStatus).reduce((sum, n) => sum + Number(n || 0), 0)
+        const open =
+          Number(byStatus.open || 0) +
+          Number(byStatus.in_progress || 0) +
+          Number(byStatus.waiting_customer || 0)
+        return { total, open, byStatus }
+      } catch (err) {
+        console.error('[admin] support stats unavailable', err)
+        return { total: 0, open: 0, byStatus: {} as Record<string, number> }
+      }
+    })(),
     recentDocuments: recentRows.map(r => ({
       id: r.id,
       slug: r.slug,

@@ -132,6 +132,13 @@ export interface SupportTicketMessage {
   createdAt: number
 }
 
+export interface SupportReplyTemplate {
+  id: string
+  label: string
+  category: string
+  body: string
+}
+
 export const adminApi = {
   features: () => adminRequest<AdminFeatures>('/api/admin/features'),
   me: () => adminRequest<AdminMe>('/api/admin/me'),
@@ -162,6 +169,8 @@ export const adminApi = {
       tickets: SupportTicketListItem[]
       total: number
       statuses: SupportTicketStatus[]
+      /** Global counts (not scoped to the current list filter). */
+      counts?: { total: number; open: number }
     }>(`/api/admin/tickets${qs ? `?${qs}` : ''}`)
   },
   ticket: (id: string) =>
@@ -191,4 +200,6 @@ export const adminApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  supportTemplates: () =>
+    adminRequest<{ templates: SupportReplyTemplate[] }>('/api/admin/support/templates'),
 }

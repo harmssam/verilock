@@ -23,6 +23,7 @@ import {
   isTurnstileRequired,
   verifyTurnstileToken,
 } from './supportContact.js'
+import { listSupportReplyTemplates } from './supportTemplates.js'
 
 const COOKIE_NAME = 'verilock_admin'
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -362,6 +363,7 @@ export function attachAdminRoutes(app: Express): void {
 
   app.get('/api/admin/stats', statsLimit, requireAdmin, (_req, res) => {
     try {
+      res.setHeader('Cache-Control', 'no-store')
       const stats = getAdminStats()
       res.json(stats)
     } catch (err) {
@@ -372,8 +374,18 @@ export function attachAdminRoutes(app: Express): void {
 
   // ── Support ticket queue ────────────────────────────────────────────────
 
+  app.get('/api/admin/support/templates', ticketsLimit, requireAdmin, (_req, res) => {
+    try {
+      res.json({ templates: listSupportReplyTemplates() })
+    } catch (err) {
+      console.error('[admin] support templates', err)
+      res.status(500).json({ error: 'Could not load templates.' })
+    }
+  })
+
   app.get('/api/admin/tickets', ticketsLimit, requireAdmin, (req, res) => {
     try {
+      res.setHeader('Cache-Control', 'no-store')
       const statusRaw =
         typeof req.query.status === 'string' ? req.query.status.trim() : 'active'
       const status =
@@ -391,9 +403,17 @@ export function attachAdminRoutes(app: Express): void {
         limit: Number.isFinite(limit) ? limit : undefined,
         offset: Number.isFinite(offset) ? offset : undefined,
       })
+      // Always include global open/total so the stats card / badge stay accurate
+      // regardless of the list filter (filter only affects `tickets` + `total`).
+      const allForCounts = listSupportTickets({ status: 'all', limit: 1, offset: 0 })
+      const activeForCounts = listSupportTickets({ status: 'active', limit: 1, offset: 0 })
       res.json({
         ...result,
         statuses: SUPPORT_TICKET_STATUSES,
+        counts: {
+          total: allForCounts.total,
+          open: activeForCounts.total,
+        },
       })
     } catch (err) {
       console.error('[admin] tickets list', err)
@@ -511,7 +531,9 @@ export function attachAdminRoutes(app: Express): void {
             : adminUsername()
 
         let resendMessageId: string | null = null
+        let threadBody = replyBody
         if (!internalOnly) {
+          const mailSubject = `Re: [${ticket.publicId}] ${ticket.subject}`
           const sent = await sendOperatorSupportReply({
             to: ticket.email,
             name: ticket.name,
@@ -527,13 +549,15 @@ export function attachAdminRoutes(app: Express): void {
             return
           }
           resendMessageId = sent.id
+          // Store what the customer received so the thread is a full audit of outbound mail.
+          threadBody = `[Emailed to customer]\nSubject: ${mailSubject}\n\n${replyBody}`
         }
 
         const message = addSupportTicketMessage({
           ticketId: ticket.id,
           authorKind: internalOnly ? 'system' : 'operator',
           authorName: operatorName,
-          body: replyBody,
+          body: threadBody,
           resendMessageId,
           bumpStatus: !internalOnly && body.status === undefined,
         })

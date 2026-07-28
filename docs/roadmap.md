@@ -90,18 +90,20 @@ Always       Placement/print polish, email reliability, offline companion
 
 ### 0.2 Support Portal (v1) — **IN PROGRESS**
 
-**Shipped (2026-07-28 operator slice):**
+**Shipped (operator slice + auto-reply / templates):**
 
 - `POST /api/support/contact` creates a `support_tickets` row (+ first message); best-effort email to ops inbox
+- **Customer auto-reply** on submit (when Resend enabled); full text logged on the ticket thread
+- All **outbound customer emails** (auto-reply + operator replies) stored on the thread with **Emailed** marker
 - Success UI shows ticket reference (`VL-…`)
 - Document slug auto-extracted from `/d/…` in subject/message
 - `/admin` → **Support** tab: list, filter, search, thread, status, email reply, internal notes
+- **Canned templates**: Nimiq wallet, wallet mismatch, free vs lock, lock failed, credits, invite, re-verify, ack
 - Statuses: `open` · `in_progress` · `waiting_customer` · `resolved` · `closed`
 
 **Still TODO for full v1:**
 
 - Ticket list for submitters (email magic link and/or wallet-bound tickets)
-- Canned replies
 - FAQ + known issues on `/support`
 - Diagnostic bundle / SLA timestamps (v1.5)
 
@@ -446,3 +448,4 @@ Lock these before implementing the related phase:
 |------|------|
 | 2026-07-28 | Initial roadmap from product discussion. Domain postponed; Support Portal as first likely ship after presentation. |
 | 2026-07-28 | Support portal operator slice: tickets on contact form + `/admin` queue (list/filter/reply). User-facing ticket list still open. |
+| 2026-07-28 | Support: customer auto-reply logged on ticket; canned reply templates (wallet / lock / credits). |
