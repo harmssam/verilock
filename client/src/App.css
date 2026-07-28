@@ -597,11 +597,30 @@
   display: block;
   /* Breathing room around the hero plate */
   padding: 0.65rem 0 0.85rem;
+  box-sizing: border-box;
 }
 
+/*
+ * Desktop hero breakout (Option A): plate wider than the 960 shell, not
+ * edge-to-edge. Centered relative to shell; ≥2rem viewport gutters.
+ * Copy nudges left; still stays pinned right via object-position.
+ */
 @media (min-width: 860px) {
   .lr-hero-band {
+    --lr-hero-breakout: min(1120px, calc(100vw - 4rem));
+    width: var(--lr-hero-breakout);
+    max-width: none;
+    /* (parentWidth - breakout) / 2 — negative when breakout > shell */
+    margin-left: calc(50% - (var(--lr-hero-breakout) / 2));
+    margin-right: 0;
     padding: 1rem 0 1.25rem;
+  }
+}
+
+/* Large desktops: a touch more plate without going full-bleed */
+@media (min-width: 1280px) {
+  .lr-hero-band {
+    --lr-hero-breakout: min(1180px, calc(100vw - 5rem));
   }
 }
 
@@ -704,27 +723,29 @@ html {
 /*
  * Desktop: copy overlays the open left; image fills the frame.
  * Frame grows with copy height + extra breathing room so the lock isn't cramped.
+ * With hero breakout, copy sits slightly left; still biased hard-right.
  */
 @media (min-width: 860px) {
   .lr-hero-frame {
     display: block;
     /* Taller plate — more air above/below type and around the lock */
-    min-height: 26rem;
+    min-height: 27rem;
   }
 
   .lr-hero-copy {
     order: unset;
-    width: 56%;
-    max-width: 36rem;
+    /* Narrower column + left bias so type clears the lock on the wide plate */
+    width: 50%;
+    max-width: 34rem;
     box-sizing: border-box;
     /* Room above the frame-centered status chip at the plate foot */
-    padding: 3.15rem 1.85rem 4.5rem 2.15rem;
+    padding: 3.25rem 1.5rem 4.5rem 2.65rem;
     gap: 1.35rem;
     /* Fade into the wash; no hard white slab */
     background: linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.82) 0%,
-      rgba(255, 255, 255, 0.45) 68%,
+      rgba(255, 255, 255, 0.86) 0%,
+      rgba(255, 255, 255, 0.48) 62%,
       rgba(255, 255, 255, 0) 100%
     );
   }
@@ -737,6 +758,11 @@ html {
     width: auto;
     height: auto;
     max-height: none;
+  }
+
+  .lr-hero-visual-img {
+    /* Lock sits farther right in the wider plate */
+    object-position: 100% 50%;
   }
 }
 
