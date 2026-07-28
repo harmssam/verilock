@@ -792,6 +792,12 @@
   font-size: 0.72rem;
 }
 
+/* Blocking requirement: every person needs ≥1 field before Continue. */
+.placement-person-counts--empty {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 .placement-editor-hint {
   margin: 0;
   font-size: 0.8rem;

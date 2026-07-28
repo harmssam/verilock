@@ -172,8 +172,8 @@ export function PlacementEditor({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [tool, setTool] = useState<Tool>('select')
-  /** No person pre-selected - user must choose Person 1/2/… before tools unlock. */
-  const [activePerson, setActivePerson] = useState<number | null>(null)
+  /** Person 1 starts selected so tools are ready immediately. */
+  const [activePerson, setActivePerson] = useState<number | null>(1)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [placeError, setPlaceError] = useState<string | null>(null)
   /** Optional label on fillable text fields (e.g. "Date", "Printed name"). */
@@ -243,7 +243,7 @@ export function PlacementEditor({
 
   const people = plan.people.length > 0 ? plan.people : defaultPeople(1)
   const slots = plan.slots
-  /** Placement tools stay off until a person chip is selected. */
+  /** Placement tools need an active person (Person 1 is pre-selected). */
   const toolsDisabled = editDisabled || activePerson == null
 
   // Dismiss wallet address help when clicking outside or pressing Escape.
@@ -332,10 +332,10 @@ export function PlacementEditor({
     }
   }, [stageFullscreen])
 
-  // Drop selection if that person slot was removed (never auto-pick another).
+  // If the active person was removed, fall back to the first remaining person.
   useEffect(() => {
     if (activePerson != null && !people.some(p => p.slotIndex === activePerson)) {
-      setActivePerson(null)
+      setActivePerson(people[0]?.slotIndex ?? 1)
       setTool('select')
       setPlacing(null)
     }
@@ -523,7 +523,7 @@ export function PlacementEditor({
         if (prev != null && prev > count) {
           setTool('select')
           setPlacing(null)
-          return null
+          return 1
         }
         return prev
       })
@@ -1450,6 +1450,22 @@ export function PlacementEditor({
             const nText = slots.filter(
               s => s.personSlotIndex === p.slotIndex && s.kind === 'text',
             ).length
+            const nMark = slots.filter(
+              s =>
+                s.personSlotIndex === p.slotIndex &&
+                (s.kind === 'checkmark' || s.kind === 'cross'),
+            ).length
+            const hasAnySlot = nSig + nInit + nName + nText + nMark > 0
+            const fieldSummary =
+              [
+                nSig > 0 ? `${nSig} sig` : null,
+                nInit > 0 ? `${nInit} init` : null,
+                nName > 0 ? `${nName} name` : null,
+                nText > 0 ? `${nText} text` : null,
+                nMark > 0 ? `${nMark} mark` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ') || 'No fields yet'
             const walletRaw = p.walletAddress ?? ''
             const walletOk = !walletRaw || isValidNimiqAddress(walletRaw)
             return (
@@ -1610,15 +1626,14 @@ export function PlacementEditor({
                         )}
                       </>
                     )}
-                    <span className="muted placement-person-counts">
-                      {[
-                        nSig > 0 ? `${nSig} sig` : null,
-                        nInit > 0 ? `${nInit} init` : null,
-                        nName > 0 ? `${nName} name` : null,
-                        nText > 0 ? `${nText} text` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ') || 'No fields yet'}
+                    <span
+                      className={
+                        hasAnySlot
+                          ? 'muted placement-person-counts'
+                          : 'placement-person-counts placement-person-counts--empty'
+                      }
+                    >
+                      {fieldSummary}
                     </span>
                   </span>
                 </div>
@@ -1628,11 +1643,6 @@ export function PlacementEditor({
         </ul>
       </div>
 
-      {!locked && !reviewMode && activePerson == null && !stageFullscreen && (
-        <p className="placement-editor-hint placement-editor-hint--pick" role="status">
-          <strong>Select a person</strong> above to unlock the toolbar and place fields for them.
-        </p>
-      )}
       {reviewMode && !stageFullscreen && (
         <p className="placement-editor-hint placement-editor-hint--locked" role="status">
           Field layout the organizer designed
@@ -1695,12 +1705,6 @@ export function PlacementEditor({
                 ? createPortal(toolbarNode, document.body)
                 : toolbarNode}
             </div>
-
-            {stageFullscreen && !locked && !reviewMode && activePerson == null && (
-              <p className="placement-editor-hint placement-editor-hint--pick" role="status">
-                <strong>Select a person</strong> above to unlock tools and place their fields.
-              </p>
-            )}
 
             {stageFullscreen && placeError && (
               <p className="placement-editor-error" role="alert">

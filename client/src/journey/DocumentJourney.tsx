@@ -99,6 +99,8 @@ import {
   computePlanRoot,
   emptyPlan,
   lockPlan as lockConstructionPlanLocal,
+  peopleWithoutSlotsMessage,
+  planHasSlotPerPerson,
   unlockPlanLocal,
   type ConstructionPlan,
   type PlacementSlot,
@@ -2141,6 +2143,11 @@ export function DocumentJourney({
       setLocalError('Place at least one signature or name box before locking.')
       return
     }
+    const missingFields = peopleWithoutSlotsMessage(constructionPlan)
+    if (missingFields) {
+      setLocalError(missingFields)
+      return
+    }
     for (const p of constructionPlan.people) {
       if (p.walletAddress && !isValidNimiqAddress(p.walletAddress)) {
         setLocalError(
@@ -3037,14 +3044,7 @@ export function DocumentJourney({
                               busy ||
                               !token ||
                               placementLockBusy ||
-                              constructionPlan.slots.length === 0 ||
-                              !constructionPlan.slots.some(
-                                s =>
-                                  s.kind === 'signature' ||
-                                  s.kind === 'initial' ||
-                                  s.kind === 'name' ||
-                                  s.kind === 'text',
-                              )
+                              !planHasSlotPerPerson(constructionPlan)
                             }
                             onClick={() => void lockPlacements()}
                           >

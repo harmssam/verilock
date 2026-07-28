@@ -517,6 +517,40 @@ export async function makeContentBlob(payload: BlobPayload): Promise<ContentBlob
   }
 }
 
+/** People who have no placement slots assigned (any kind). */
+export function peopleWithoutSlots(
+  plan: Pick<ConstructionPlan, 'people' | 'slots'>,
+): ConstructionPerson[] {
+  const people = plan.people.length > 0 ? plan.people : []
+  return people.filter(p => !plan.slots.some(s => s.personSlotIndex === p.slotIndex))
+}
+
+/** True when every person has ≥1 slot and the plan has at least one placement. */
+export function planHasSlotPerPerson(
+  plan: Pick<ConstructionPlan, 'people' | 'slots'>,
+): boolean {
+  if (plan.slots.length === 0) return false
+  if (plan.people.length === 0) return false
+  return peopleWithoutSlots(plan).length === 0
+}
+
+/** Human-readable lock blocker when someone still has zero fields. */
+export function peopleWithoutSlotsMessage(
+  plan: Pick<ConstructionPlan, 'people' | 'slots'>,
+): string | null {
+  const missing = peopleWithoutSlots(plan)
+  if (missing.length === 0) return null
+  const labels = missing.map(p => `Person ${p.slotIndex}`)
+  if (labels.length === 1) {
+    return `${labels[0]} has no fields yet — place at least one field for each person.`
+  }
+  if (labels.length === 2) {
+    return `${labels[0]} and ${labels[1]} have no fields yet — place at least one field for each person.`
+  }
+  const last = labels[labels.length - 1]
+  return `${labels.slice(0, -1).join(', ')}, and ${last} have no fields yet — place at least one field for each person.`
+}
+
 export function lockPlan(
   plan: ConstructionPlan,
   planRoot: string,
@@ -527,6 +561,10 @@ export function lockPlan(
   }
   if (plan.people.length === 0) {
     throw new Error('Add at least one person before locking')
+  }
+  const missingMsg = peopleWithoutSlotsMessage(plan)
+  if (missingMsg) {
+    throw new Error(missingMsg)
   }
   const cs =
     plan.creatorSigningAs == null || plan.creatorSigningAs === 0
