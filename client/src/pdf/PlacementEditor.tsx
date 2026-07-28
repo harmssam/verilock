@@ -216,10 +216,10 @@ export function PlacementEditor({
   /** Finger/mouse movement above this = pan/scroll, not a place tap. */
   const PLACE_TAP_SLOP_PX = 12
   /**
-   * After dragging a check/X, suppress the synthetic click so we don't toggle.
-   * Mark toggle is click-driven (not drag-end) — click is more reliable.
+   * Drag vs click for slots. Must be larger than typical trackpad/mouse jitter
+   * (~4–8px) or a normal click is treated as a drag and check/X never toggles.
    */
-  const suppressMarkClickRef = useRef(false)
+  const SLOT_DRAG_SLOP_PX = 10
   const [dragTick, setDragTick] = useState(0)
   /** Last pointer position during a slot drag (for continuous edge auto-scroll). */
   const lastDragPointerRef = useRef<{ x: number; y: number } | null>(null)
@@ -887,7 +887,10 @@ export function PlacementEditor({
     setPlacing(null)
   }
 
-  /** Toggle empty check/X square ↔ filled mark (click on the slot). */
+  /**
+   * Toggle empty check/X ↔ filled. Design-time only (draft layout).
+   * Called from pointerup when the gesture was a click, not a drag.
+   */
   const toggleMarkSlot = useCallback(
     (id: string) => {
       if (locked || editDisabled) return
@@ -960,7 +963,7 @@ export function PlacementEditor({
     const drag = dragRef.current
     if (!drag || editDisabled) return
     const dist = Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY)
-    if (dist > 4) drag.moved = true
+    if (dist > SLOT_DRAG_SLOP_PX) drag.moved = true
     if (!drag.moved) return
     lastDragPointerRef.current = { x: e.clientX, y: e.clientY }
     applyDragPosition(e.clientX, e.clientY)
@@ -971,8 +974,13 @@ export function PlacementEditor({
     const drag = dragRef.current
     dragRef.current = null
     stopDragAutoScroll()
-    // Mark toggle is onClick only. If we dragged, suppress the trailing click.
-    if (drag?.moved) suppressMarkClickRef.current = true
+    // Check/X: pointerup click (not moved) toggles. Do not rely on browser click
+    // events — capture + preventDefault paths made those unreliable.
+    if (!drag || drag.moved || editDisabled) return
+    const slot = slots.find(s => s.id === drag.id)
+    if (slot && (slot.kind === 'checkmark' || slot.kind === 'cross')) {
+      toggleMarkSlot(drag.id)
+    }
   }
 
   const onStagePointerUp = (e: React.PointerEvent) => {
@@ -1004,17 +1012,24 @@ export function PlacementEditor({
   const startItemDrag = (e: React.PointerEvent, id: string) => {
     // Existing slots stay interactive even when a place tool is active
     // (clicking a check/X must not no-op just because the place tool is selected).
-    if (editDisabled) return
     e.stopPropagation()
     const slot = slots.find(s => s.id === id)
     if (!slot) return
-    const isMark = slot.kind === 'checkmark' || slot.kind === 'cross'
-    // preventDefault suppresses the following click on some browsers — never do
-    // that for marks (toggle is click-driven). Still prevent for other fields so
-    // drag doesn't select page text.
-    if (!isMark) e.preventDefault()
+    if (editDisabled) {
+      // Silent no-op feels broken — locked layout is the usual case for “clicks do nothing”.
+      if (
+        locked &&
+        (slot.kind === 'checkmark' || slot.kind === 'cross')
+      ) {
+        setPlaceError(
+          'Layout is locked. Use “Back to edit placements” to toggle checkboxes.',
+        )
+      }
+      return
+    }
+    e.preventDefault()
     setSelectedId(id)
-    suppressMarkClickRef.current = false
+    setPlaceError(null)
     const stage = stageRef.current
     dragRef.current = {
       id,
@@ -1029,17 +1044,11 @@ export function PlacementEditor({
       slotHeight: slot.height,
     }
     lastDragPointerRef.current = { x: e.clientX, y: e.clientY }
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-  }
-
-  const onMarkClick = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation()
-    e.preventDefault()
-    if (suppressMarkClickRef.current) {
-      suppressMarkClickRef.current = false
-      return
+    try {
+      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    } catch {
+      /* capture optional */
     }
-    toggleMarkSlot(id)
   }
 
   void dragTick
@@ -1836,13 +1845,14 @@ export function PlacementEditor({
                               startItemDrag(e, slot.id)
                             }}
                             onPointerUp={e => {
-                              if (isMark) e.stopPropagation()
+                              // Stop bubble so stage pointerup doesn't clear drag before we toggle.
+                              e.stopPropagation()
                               endDrag()
                             }}
-                            onPointerCancel={endDrag}
-                            onClick={
-                              isMark ? e => onMarkClick(e, slot.id) : undefined
-                            }
+                            onPointerCancel={e => {
+                              e.stopPropagation()
+                              endDrag()
+                            }}
                             onKeyDown={
                               isMark
                                 ? e => {
