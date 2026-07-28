@@ -1300,7 +1300,7 @@ a.lr-cta {
 
 /*
  * Path stage — one full-bleed still, three paths listed at the bottom.
- * Hover/focus a list item crossfades the image; Create & sign is default.
+ * Hover/focus a list item crossfades the image; Create & invite is default.
  */
 .lr-path-stage {
   --lr-path-ease: var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1));
@@ -1708,7 +1708,7 @@ a.lr-cta {
   gap: 0.45rem;
 }
 
-/* Agreements page: Create & lock / New agreement - match light CTA style */
+/* Agreements page: Create & invite / New agreement - match light CTA style */
 /* Agreements page primary CTAs (header / empty / login) */
 .lr-app .agreements-page .btn-primary {
   display: inline-flex;

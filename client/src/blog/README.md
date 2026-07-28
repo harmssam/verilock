@@ -9,7 +9,7 @@ Journey SPA blog under `/blog`. Content lives in `client/src/blog/posts/`. UI in
 - Prefer: sign, **lock on the blockchain**, fingerprint, permanent record, stays on your device, verify
 - Avoid seal-as-a-verb in reader copy (“seal the hash”, “when you seal”, “after seal”). Say lock / lock on the blockchain / locked.
 - Avoid: legal overclaims (legally binding / court-admissible unless counsel-approved), moon language, absolute security claims
-- **No internal codenames in reader copy.** Do not write "Journey", "Journey Edition", or "Journey home". Say "home screen", "Create & lock", "I was invited", "Verify a PDF", or "the app".
+- **No internal codenames in reader copy.** Do not write "Journey", "Journey Edition", or "Journey home". Say "home screen", "Create & invite", "I was invited", "Verify a PDF", or "the app".
 
 ## Hard rules
 

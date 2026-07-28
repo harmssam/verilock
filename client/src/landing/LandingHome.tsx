@@ -140,8 +140,8 @@ const PATHS: {
 }[] = [
   {
     role: 'creator',
-    title: 'Create & sign',
-    detail: 'Start free: invite co-signers, lock on blockchain if needed',
+    title: 'Create & invite',
+    detail: 'Fingerprint, invite co-signers, sign free; lock if needed',
     icon: Fingerprint,
     imageAlt: '',
   },
@@ -192,7 +192,7 @@ export function LandingHome({
 }: LandingHomeProps) {
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [howOpen, setHowOpen] = useState(false)
-  /** Path stage preview — Create & sign default; hover/focus swaps the still. */
+  /** Path stage preview — Create & invite default; hover/focus swaps the still. */
   const [previewRole, setPreviewRole] = useState<PathRole>('creator')
   /** Featured + up to two more for a stronger home teaser. */
   const blogTeaser = useMemo(() => {
@@ -295,7 +295,7 @@ export function LandingHome({
                 className="lr-cta lr-cta--primary"
                 onClick={() => onPickRole('creator')}
               >
-                Create &amp; sign free
+                Create &amp; invite free
                 <ArrowRight size={16} strokeWidth={2.25} aria-hidden />
               </AppLink>
               <a
@@ -397,13 +397,13 @@ export function LandingHome({
             What are you here to do?
           </h2>
           <p className="lr-paths-lead">
-            Pick a path. Create and sign free, open an invite, or verify a locked proof.
+            Pick a path. Create and invite free, open an invite, or verify a locked proof.
           </p>
         </div>
 
         {/*
           One stage, three stills. Hover/focus the list at the bottom to crossfade
-          the image; click navigates. Create & sign is the default still.
+          the image; click navigates. Create & invite is the default still.
         */}
         <div
           className={`lr-path-stage lr-path-stage--${previewRole}`}

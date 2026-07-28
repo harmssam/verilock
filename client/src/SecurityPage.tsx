@@ -432,11 +432,11 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
             <div className="security-footer-actions">
               {onCreate ? (
                 <button type="button" className="security-btn security-btn--primary" onClick={onCreate}>
-                  Create &amp; sign free
+                  Create &amp; invite free
                 </button>
               ) : (
                 <a className="security-btn security-btn--primary" href="/?intent=creator">
-                  Create &amp; sign free
+                  Create &amp; invite free
                 </a>
               )}
               {onVerify ? (
