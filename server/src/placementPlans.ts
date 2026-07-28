@@ -553,6 +553,27 @@ export function lockPlan(input: {
   ) {
     throw new Error('Add at least one signature, initial, name, or text field before locking')
   }
+  // Every listed person must have ≥1 placement slot (any kind).
+  const missingPeople = sanitized.plan.people.filter(
+    p => !sanitized.plan.slots.some(s => Number(s.personSlotIndex) === Number(p.slotIndex)),
+  )
+  if (missingPeople.length > 0) {
+    const labels = missingPeople.map(p => `Person ${p.slotIndex}`)
+    if (labels.length === 1) {
+      throw new Error(
+        `${labels[0]} has no fields yet — place at least one field for each person.`,
+      )
+    }
+    if (labels.length === 2) {
+      throw new Error(
+        `${labels[0]} and ${labels[1]} have no fields yet — place at least one field for each person.`,
+      )
+    }
+    const last = labels[labels.length - 1]
+    throw new Error(
+      `${labels.slice(0, -1).join(', ')}, and ${last} have no fields yet — place at least one field for each person.`,
+    )
+  }
 
   const documentId = requireDocumentId(input.documentId)
   const existing = resolvePlacementPlan({
