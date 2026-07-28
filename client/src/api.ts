@@ -414,7 +414,7 @@ export const api = {
     formStartedAt: number
     turnstileToken?: string
   }) =>
-    request<{ ok: boolean }>('/api/support/contact', {
+    request<{ ok: boolean; ticketPublicId?: string }>('/api/support/contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
