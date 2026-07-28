@@ -599,7 +599,7 @@ export function SignerFillView({
     !isServerFilled(activeSlot.id) &&
     isInkPlacementKind(activeSlot.kind) &&
     sigModalMode === 'draw' &&
-    // Full-screen sheet on phones; always in Nimiq Pay (viewport heuristics can miss).
+    // Full-screen sheet on phones (Safari/Chrome) and Nimiq Pay — same ink path.
     (isMobileViewport || isNimiqPayMiniAppHost())
 
   const inkApplyLabel =
@@ -1040,14 +1040,18 @@ export function SignerFillView({
         >
           <PenLine size={18} strokeWidth={2.25} aria-hidden />
           {submitting || busy
-            ? 'Saving…'
+            ? 'Recording…'
             : myFillable.length === 0 || allAlreadyOnServer
               ? 'Continue'
-              : 'Finish & save my fields'}
+              : 'Finish & sign'}
         </button>
-        {myFillable.length === 0 && (
+        {myFillable.length === 0 ? (
           <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-            No page fields were assigned to you - continue to submit your signature.
+            No page fields were assigned to you - continue to record your signature.
+          </p>
+        ) : (
+          <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+            Saves your fields and records your wallet signature on this agreement.
           </p>
         )}
       </div>

@@ -2024,9 +2024,10 @@ export function DocumentJourney({
 
         const finishFieldsAndMaybeAutoSign = async () => {
           setPageFieldsConfirmed(true)
-          // Solo + on-document ink: record the party signature immediately (no second CTA).
-          // Multi-party always uses an explicit Submit step.
-          if (requiredCount(doc) > 1 || !inkBlob || !resolution.ok) return
+          // On-document ink + resolved party: record the wallet signature immediately
+          // (solo and multi-party). Avoids “fields done / 0 signatures” limbo.
+          // Explicit Submit remains when ink is missing, name is still needed, or auto-sign fails.
+          if (!inkBlob || !resolution.ok) return
           if (partyNeedsSignerName(resolution.party) && !nameHint) return
           // Sign errors are reported via localError; do not retry fill append.
           await signAsCurrentUser({
@@ -3429,9 +3430,8 @@ export function DocumentJourney({
                                 const needsNameField =
                                   partyNeedsSignerName(signingResolution.party) &&
                                   !resolvedName
-                                // Solo: after on-doc fields + ink, party sign runs automatically.
-                                const soloAutoRecording =
-                                  !isMultiParty &&
+                                // After on-doc fields + ink, party sign runs automatically (solo + multi).
+                                const autoRecording =
                                   pageFieldsRequired &&
                                   pageFieldsDone &&
                                   Boolean(sigBlob) &&
@@ -3460,26 +3460,28 @@ export function DocumentJourney({
                                   />
                                 )}
 
-                              {canPartySubmit && soloAutoRecording && (
+                              {canPartySubmit && autoRecording && (
                                 <div className="result-banner result-banner--ok">
                                   <LoaderCircle
                                     className="btn-spinner"
                                     size={16}
                                     strokeWidth={2.5}
                                   />
-                                  Submitting your signature…
+                                  Recording your signature…
                                 </div>
                               )}
 
-                              {/* Party submit: multi always; solo when pad-only, name needed, or auto failed */}
-                              {canPartySubmit && !soloAutoRecording && (
+                              {/* Party submit only when auto-sign cannot run (no ink, need name, or failed). */}
+                              {canPartySubmit && !autoRecording && (
                                 <>
                                   {pageFieldsDone && pageFieldsRequired && (
                                     <div className="result-banner result-banner--ok">
                                       <Check size={16} strokeWidth={2.5} />
-                                      {isMultiParty
-                                        ? 'Page fields saved. Submit to record your signature on this agreement.'
-                                        : 'Page fields saved. Submit to finish signing.'}
+                                      {needsNameField
+                                        ? 'Page fields saved. Enter your name, then submit to record your signature.'
+                                        : !sigBlob
+                                          ? 'Page fields saved. Draw your signature below, then submit.'
+                                          : 'Page fields saved. Submit to record your signature on this agreement.'}
                                     </div>
                                   )}
 
@@ -3618,8 +3620,8 @@ export function DocumentJourney({
                                   <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
                                     {isMultiParty
                                       ? role === 'creator'
-                                        ? 'Records your signature, then invite co-signers to complete their fields on the same document.'
-                                        : 'Records you as this party on the agreement. You are already signed in - this does not open a new wallet login.'
+                                        ? 'Records your signature, then you can invite co-signers.'
+                                        : 'Records you as this party on the agreement.'
                                       : 'Records you as the signer. Next you can lock on the blockchain.'}
                                   </p>
                                 </>

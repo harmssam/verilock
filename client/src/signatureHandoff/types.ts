@@ -75,3 +75,4 @@ export type GuestPhase =
   | 'sending'
   | 'sent'
   | 'error'
+  | 'aborted'

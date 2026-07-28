@@ -1427,6 +1427,12 @@ export function PlacementEditor({
             ))}
           </select>
         </label>
+        {!locked && !reviewMode && (
+          <p className="placement-editor-hint placement-editor-hint--design" role="status">
+            <strong>Designing, not signing.</strong> These boxes mark where people will sign later.
+            Tap to place a field; drag to pan the page.
+          </p>
+        )}
 
         <ul className="placement-editor-people-list">
           {people.map(p => {
@@ -1625,13 +1631,6 @@ export function PlacementEditor({
       {!locked && !reviewMode && activePerson == null && !stageFullscreen && (
         <p className="placement-editor-hint placement-editor-hint--pick" role="status">
           <strong>Select a person</strong> above to unlock the toolbar and place fields for them.
-        </p>
-      )}
-      {!locked && !reviewMode && activePerson != null && !stageFullscreen && (
-        <p className="placement-editor-hint placement-editor-hint--design" role="status">
-          <strong>Designing, not signing.</strong> These boxes mark where people will sign later.
-          No ink or wallet signature is collected on this step. Tap to place a field; drag to pan the
-          page. Check and X boxes start empty - click a placed box to toggle the mark.
         </p>
       )}
       {reviewMode && !stageFullscreen && (

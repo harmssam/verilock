@@ -27,6 +27,8 @@
 .ink-capture-sheet--page.is-rotate {
   justify-content: center;
   align-items: center;
+  /* Room for absolute head (brand + X) above the rotate card */
+  padding-top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3rem));
   padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
 }
 
@@ -52,6 +54,7 @@
 .ink-capture-sheet--overlay.is-rotate {
   justify-content: center;
   align-items: center;
+  padding-top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3rem));
   padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
 }
 
@@ -78,6 +81,9 @@
   max-width: 20rem;
   margin: auto;
   padding: 0.5rem;
+  /* Sit below absolute head chrome */
+  position: relative;
+  z-index: 1;
 }
 
 .ink-capture-rotate-phone-wrap {
@@ -131,10 +137,6 @@
   font-size: 0.82rem;
   line-height: 1.4;
   max-width: 18rem;
-}
-
-.ink-capture-rotate-cancel {
-  margin-top: 0.5rem;
 }
 
 /* One-shot guide inside forced landscape frame */
@@ -195,34 +197,80 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.65rem;
   flex-shrink: 0;
   /* Keep close control out of the display’s rounded corners */
   padding-top: max(0.2rem, env(safe-area-inset-top, 0px));
   padding-right: max(0.15rem, env(safe-area-inset-right, 0px));
   padding-left: max(0.1rem, env(safe-area-inset-left, 0px));
+  z-index: 4;
+}
+
+/* Rotate gate: keep brand + X fixed at top; copy centered below */
+.ink-capture-head--rotate {
+  align-self: stretch;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding:
+    max(0.45rem, env(safe-area-inset-top, 0px))
+    max(0.55rem, env(safe-area-inset-right, 0px))
+    0.25rem
+    max(0.55rem, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
 }
 
 .ink-capture-head-text {
   min-width: 0;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  justify-content: center;
 }
 
+/* Brand sits with the title row, not floating between OS chrome and the h1 */
 .ink-capture-kicker {
-  margin: 0 0 0.1rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  margin: 0;
+  font-size: 0.65rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted, #64748b);
+  line-height: 1.2;
 }
 
 .ink-capture-title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: clamp(0.95rem, 2.8vw, 1.1rem);
   font-weight: 650;
   letter-spacing: -0.02em;
-  line-height: 1.25;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Screen-reader only title when rotate UI shows its own visible heading */
+.ink-capture-title--sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ink-capture-head--rotate .ink-capture-kicker {
+  /* Keep brand visible on rotate gate; hide the SR title */
+  display: block;
 }
 
 /* Large close — 44px+ target, clear of iPhone continuous-corner radius */
@@ -347,8 +395,8 @@
 }
 
 /*
- * Portrait host (Nimiq Pay): geometry comes from inline JS style
- * (width=innerHeight, height=innerWidth, rotate 90deg, centered).
+ * Forced-landscape host (Nimiq Pay + mobile browser in portrait): geometry from
+ * inline JS (width=innerHeight, height=innerWidth, rotate 90deg, centered).
  * Layout inside the box is normal landscape flex — not a tall portrait stack.
  */
 .ink-capture-sheet.is-portrait-host.is-draw {
@@ -394,11 +442,13 @@
 }
 
 .ink-capture-sheet.is-portrait-host .ink-capture-kicker {
-  display: none;
+  /* Keep brand in the head row on Pay (forced landscape) */
+  display: block;
 }
 
 .ink-capture-sheet.is-portrait-host .ink-capture-title {
   font-size: 0.95rem;
+  white-space: nowrap;
 }
 
 /* Fill remaining space; pad size is exact pixels from JS (--ink-pad-w/h) */
@@ -454,12 +504,9 @@
 
 /* True landscape devices (OS orientation landscape) */
 @media (orientation: landscape) {
-  .ink-capture-kicker {
-    display: none;
-  }
-
   .ink-capture-title {
     font-size: 0.95rem;
+    white-space: nowrap;
   }
 
   .ink-capture-pad-stage {

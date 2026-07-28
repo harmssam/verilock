@@ -1,10 +1,11 @@
 /**
  * Full-screen ink capture for phones — shared by QR /m/sign and in-app field signing.
  *
- * - Real landscape: normal landscape pad sizing.
- * - Portrait Safari/Chrome: blocking rotate gate until tipped.
- * - Nimiq Pay (portrait-locked): skip gate; **force landscape frame** via JS pixel
- *   geometry + rotate(90deg) so chrome/pad/CTA are true landscape (hold phone on side).
+ * - Real OS landscape: normal landscape pad sizing.
+ * - Phone portrait (mobile browser **or** Nimiq Pay): skip the rotate gate; **force
+ *   landscape frame** via JS pixel geometry + rotate(90deg). Pay is a portrait-locked
+ *   browser shell — same pad UX works in Safari/Chrome without requiring OS rotate.
+ * - Desktop portrait (rare): blocking rotate gate if this sheet is shown.
  */
 import { X } from 'lucide-react'
 import {
@@ -192,7 +193,8 @@ export function InkCaptureSheet({
   const isLandscape = useIsLandscape()
   const isRealPortrait = useIsRealPortrait()
   const isInitial = fieldKind === 'initial'
-  // Pay: isLandscape forced true (skip blocking gate). Real portrait → force landscape frame.
+  // Phone / Pay: isLandscape true while still real-portrait → force landscape frame
+  // (no “turn sideways” gate). OS landscape: normal draw layout.
   const needsLandscape = !isLandscape
   const isPortraitHost = !needsLandscape && isRealPortrait
   const canDraw = isLandscape && !disabled
@@ -258,32 +260,63 @@ export function InkCaptureSheet({
         aria-modal={variant === 'overlay' ? true : undefined}
         aria-labelledby={titleId}
       >
+        {/*
+          Always-visible chrome: brand + title (draw) / title only on rotate,
+          and abort X whenever parent provides onClose (rotate + draw).
+        */}
+        <header
+          className={[
+            'ink-capture-head',
+            needsLandscape ? 'ink-capture-head--rotate' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <div className="ink-capture-head-text">
+            {kicker ? (
+              <p className="ink-capture-kicker" aria-hidden={needsLandscape || undefined}>
+                {kicker}
+              </p>
+            ) : null}
+            <h1
+              id={titleId}
+              className={
+                needsLandscape ? 'ink-capture-title ink-capture-title--sr' : 'ink-capture-title'
+              }
+            >
+              {needsLandscape
+                ? isInitial
+                  ? 'Rotate to draw initials'
+                  : 'Rotate to draw signature'
+                : title}
+            </h1>
+          </div>
+          {onClose && (
+            <button
+              type="button"
+              className="ink-capture-close"
+              aria-label="Close"
+              onClick={onClose}
+            >
+              <X size={isPortraitHost ? 22 : 20} strokeWidth={2.35} aria-hidden />
+            </button>
+          )}
+        </header>
+
         {needsLandscape && (
           <div className="ink-capture-rotate" role="status" aria-live="polite">
             <div className="ink-capture-rotate-phone-wrap" aria-hidden>
               <IPhoneOutlineIcon className="ink-capture-rotate-phone" />
             </div>
-            <h1 id={titleId} className="ink-capture-rotate-title">
-              Rotate your phone
-            </h1>
+            <p className="ink-capture-rotate-title">Rotate your phone</p>
             <p className="ink-capture-rotate-copy">
               Turn the phone sideways to{' '}
-              {isInitial ? 'draw your initials' : 'draw your signature'} so the pad
-              matches the box on your document. This message leaves when you do.
+              {isInitial ? 'draw your initials' : 'draw your signature'}.
             </p>
             <p className="ink-capture-rotate-note muted">
               If nothing changes, unlock portrait lock in Control Center or Quick
               Settings, then rotate.
             </p>
-            {onClose && (
-              <button
-                type="button"
-                className="btn btn-secondary ink-capture-rotate-cancel"
-                onClick={onClose}
-              >
-                Cancel
-              </button>
-            )}
           </div>
         )}
 
@@ -301,29 +334,6 @@ export function InkCaptureSheet({
             </div>
           </div>
         )}
-
-        <header className="ink-capture-head" hidden={needsLandscape}>
-          <div className="ink-capture-head-text">
-            {kicker ? <p className="ink-capture-kicker">{kicker}</p> : null}
-            <h1
-              id={needsLandscape ? undefined : titleId}
-              className="ink-capture-title"
-            >
-              {title}
-            </h1>
-          </div>
-          {onClose && (
-            <button
-              type="button"
-              className="ink-capture-close"
-              aria-label="Close"
-              onClick={onClose}
-              tabIndex={needsLandscape ? -1 : undefined}
-            >
-              <X size={isPortraitHost ? 22 : 20} strokeWidth={2.35} aria-hidden />
-            </button>
-          )}
-        </header>
 
         <div
           className="ink-capture-pad-stage"

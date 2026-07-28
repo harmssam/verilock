@@ -503,7 +503,12 @@
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  margin: 0 0 0.65rem;
+  margin: 0 0 0.35rem;
+}
+
+/* Design note sits directly under “You sign as” */
+.placement-editor-sidebar .placement-editor-hint--design {
+  margin: 0 0 0.75rem;
 }
 
 .placement-creator-role .field-label {
