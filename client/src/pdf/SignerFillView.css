@@ -115,6 +115,18 @@
   animation: signer-fill-pulse 2.2s ease-in-out infinite;
 }
 
+/* Check/X: square glyph only — no dashed field chrome around it */
+.signer-fill-field.is-mark,
+.signer-fill-field.is-mark.is-mine,
+.signer-fill-field.is-mark.is-theirs {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  animation: none !important;
+  overflow: visible;
+  padding: 0;
+}
+
 .signer-fill-field.is-mine.is-complete {
   animation: none;
   background: color-mix(in srgb, var(--person-color, #0f766e) 8%, #fff);

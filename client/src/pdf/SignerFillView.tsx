@@ -672,7 +672,20 @@ export function SignerFillView({
                 const serverDone = isServerFilled(slot.id)
                 const draft = mine ? previewForSlot(slot) : null
                 const isActive = activeSlotId === slot.id
-                const r = normalizedToCanvasRect(slot, cssSize.width, cssSize.height)
+                const raw = normalizedToCanvasRect(slot, cssSize.width, cssSize.height)
+                const isMark = slot.kind === 'checkmark' || slot.kind === 'cross'
+                // Force perfect square for check/X (legacy slots may be non-square).
+                const r = isMark
+                  ? (() => {
+                      const side = Math.min(raw.width, raw.height)
+                      return {
+                        left: raw.left + (raw.width - side) / 2,
+                        top: raw.top + (raw.height - side) / 2,
+                        width: side,
+                        height: side,
+                      }
+                    })()
+                  : raw
                 const slotColor = personColor(slot.personSlotIndex)
                 const clickable =
                   mine &&
@@ -693,6 +706,7 @@ export function SignerFillView({
                       serverDone || draft ? 'is-complete' : '',
                       isActive ? 'is-active' : '',
                       clickable ? 'is-clickable' : '',
+                      isMark ? 'is-mark' : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}
@@ -711,7 +725,7 @@ export function SignerFillView({
                         : `Reserved for person ${slot.personSlotIndex}`
                     }
                   >
-                    {slot.kind === 'checkmark' || slot.kind === 'cross' ? (
+                    {isMark ? (
                       <MarkFieldCanvas
                         kind={slot.kind}
                         checked={slot.lockedContent?.mark === slot.kind}
