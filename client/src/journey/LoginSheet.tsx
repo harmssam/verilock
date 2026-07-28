@@ -167,7 +167,7 @@ export function LoginSheet({
           )}
 
           {surface === 'desktop' ? (
-            <div className="login-sheet-choices">
+            <div className="login-sheet-choices login-sheet-choices--side">
               <div className="login-sheet-choice">
                 <button
                   type="button"
@@ -215,8 +215,8 @@ export function LoginSheet({
                 </button>
                 <p className="muted login-sheet-choice-hint">
                   {payQrUnavailableLocal
-                    ? 'Nimiq Pay QR is not available on localhost - use Hub above, or try this on production.'
-                    : null}
+                    ? 'Nimiq Pay QR is not available on localhost — use Hub, or try this on production.'
+                    : desktopChoice.payHint}
                 </p>
               </div>
             </div>

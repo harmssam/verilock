@@ -136,6 +136,8 @@ export interface JourneyParty {
   hasInk: boolean
   walletAddress: string | null
   required: boolean
+  inviteEmail: string | null
+  inviteSentAt: number | null
 }
 
 /** UI-facing document view over a live SealDocument. */
@@ -199,6 +201,8 @@ export function toJourneyDoc(doc: SealDocument, fileSize = 0): JourneyDoc {
       hasInk: Boolean(sig?.imageUrl || sig?.hasImage),
       walletAddress: p.walletAddress,
       required: p.required,
+      inviteEmail: p.inviteEmail ?? null,
+      inviteSentAt: p.inviteSentAt ?? null,
     }
   })
 

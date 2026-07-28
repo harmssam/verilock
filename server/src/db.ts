@@ -130,6 +130,49 @@ if (!documentColumns.some(col => col.name === 'creator_display_name')) {
   db.exec('ALTER TABLE documents ADD COLUMN creator_display_name TEXT')
 }
 
+/** Co-signer invite email (latest) - creator-visible; not a public capability secret. */
+const partyColumns = db.prepare('PRAGMA table_info(document_parties)').all() as Array<{ name: string }>
+if (!partyColumns.some(col => col.name === 'invite_email')) {
+  db.exec('ALTER TABLE document_parties ADD COLUMN invite_email TEXT')
+}
+if (!partyColumns.some(col => col.name === 'invite_sent_at')) {
+  db.exec('ALTER TABLE document_parties ADD COLUMN invite_sent_at INTEGER')
+}
+
+/** Signature audit: email invite used when this wallet signed (nullable for open-claim). */
+const signatureColumns = db.prepare('PRAGMA table_info(signatures)').all() as Array<{ name: string }>
+if (!signatureColumns.some(col => col.name === 'invited_as_email')) {
+  db.exec('ALTER TABLE signatures ADD COLUMN invited_as_email TEXT')
+}
+if (!signatureColumns.some(col => col.name === 'invite_id')) {
+  db.exec('ALTER TABLE signatures ADD COLUMN invite_id TEXT')
+}
+
+/**
+ * Opaque personal invite tokens (email-only capability).
+ * Store token_hash only; raw token lives in the email body, never in API responses.
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS party_invites (
+    id TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL,
+    party_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    channel TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER,
+    revoked_at INTEGER,
+    redeemed_at INTEGER,
+    redeemed_by_wallet TEXT,
+    resend_message_id TEXT,
+    FOREIGN KEY (document_id) REFERENCES documents(id),
+    FOREIGN KEY (party_id) REFERENCES document_parties(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_party_invites_party ON party_invites(party_id);
+  CREATE INDEX IF NOT EXISTS idx_party_invites_doc ON party_invites(document_id);
+`)
+
 /** Drop duplicate rows so unique indexes can be applied on existing DBs. */
 function dedupeSignaturesForUniqueness(): void {
   db.exec(`
@@ -228,6 +271,9 @@ export interface PartyRecord {
   required: boolean
   status: 'pending' | 'signed' | 'declined'
   signedAt: number | null
+  /** Latest invite recipient (normalized). Creator-visible only in publicDocument. */
+  inviteEmail: string | null
+  inviteSentAt: number | null
 }
 
 export interface SignatureRecord {
@@ -238,6 +284,24 @@ export interface SignatureRecord {
   signatureType: string
   clientSha256: string
   signedAt: number
+  /** Frozen invite email when signed via personal invite token. */
+  invitedAsEmail: string | null
+  inviteId: string | null
+}
+
+export interface PartyInviteRecord {
+  id: string
+  documentId: string
+  partyId: string
+  email: string
+  tokenHash: string
+  channel: string
+  createdAt: number
+  expiresAt: number | null
+  revokedAt: number | null
+  redeemedAt: number | null
+  redeemedByWallet: string | null
+  resendMessageId: string | null
 }
 
 export interface SignatureImageRecord {
@@ -626,6 +690,11 @@ export function updateDocumentRequiredSignatures(id: string, requiredSignatures:
 }
 
 export function deletePartyById(partyId: string): void {
+  try {
+    db.prepare('DELETE FROM party_invites WHERE party_id = ?').run(partyId)
+  } catch {
+    /* optional during early migrate */
+  }
   db.prepare('DELETE FROM document_parties WHERE id = ?').run(partyId)
 }
 
@@ -650,6 +719,11 @@ export function deleteDocumentById(documentId: string): boolean {
     }
     db.prepare('DELETE FROM signatures WHERE document_id = ?').run(id)
     db.prepare('DELETE FROM attestations WHERE document_id = ?').run(id)
+    try {
+      db.prepare('DELETE FROM party_invites WHERE document_id = ?').run(id)
+    } catch {
+      /* table always present after migrate; defensive for odd envs */
+    }
     db.prepare('DELETE FROM document_parties WHERE document_id = ?').run(id)
     // Placement plans + data-archive index rows (chain txs stay on Nimiq).
     try {
@@ -802,11 +876,8 @@ export function insertParty(party: PartyRecord): void {
   })
 }
 
-export function getPartiesForDocument(documentId: string): PartyRecord[] {
-  const rows = db
-    .prepare('SELECT * FROM document_parties WHERE document_id = ? ORDER BY sort_order ASC')
-    .all(documentId) as Record<string, unknown>[]
-  return rows.map(row => ({
+function mapPartyRow(row: Record<string, unknown>): PartyRecord {
+  return {
     id: row.id as string,
     documentId: row.document_id as string,
     role: row.role as string,
@@ -816,7 +887,47 @@ export function getPartiesForDocument(documentId: string): PartyRecord[] {
     required: Boolean(row.required),
     status: row.status as PartyRecord['status'],
     signedAt: (row.signed_at as number | null) ?? null,
-  }))
+    inviteEmail: (row.invite_email as string | null | undefined) ?? null,
+    inviteSentAt: (row.invite_sent_at as number | null | undefined) ?? null,
+  }
+}
+
+function mapSignatureRow(row: Record<string, unknown>): SignatureRecord {
+  return {
+    id: row.id as string,
+    documentId: row.document_id as string,
+    partyId: row.party_id as string,
+    signerAddress: row.signer_address as string,
+    signatureType: row.signature_type as string,
+    clientSha256: row.client_sha256 as string,
+    signedAt: row.signed_at as number,
+    invitedAsEmail: (row.invited_as_email as string | null | undefined) ?? null,
+    inviteId: (row.invite_id as string | null | undefined) ?? null,
+  }
+}
+
+function mapPartyInviteRow(row: Record<string, unknown>): PartyInviteRecord {
+  return {
+    id: row.id as string,
+    documentId: row.document_id as string,
+    partyId: row.party_id as string,
+    email: row.email as string,
+    tokenHash: row.token_hash as string,
+    channel: row.channel as string,
+    createdAt: row.created_at as number,
+    expiresAt: (row.expires_at as number | null | undefined) ?? null,
+    revokedAt: (row.revoked_at as number | null | undefined) ?? null,
+    redeemedAt: (row.redeemed_at as number | null | undefined) ?? null,
+    redeemedByWallet: (row.redeemed_by_wallet as string | null | undefined) ?? null,
+    resendMessageId: (row.resend_message_id as string | null | undefined) ?? null,
+  }
+}
+
+export function getPartiesForDocument(documentId: string): PartyRecord[] {
+  const rows = db
+    .prepare('SELECT * FROM document_parties WHERE document_id = ? ORDER BY sort_order ASC')
+    .all(documentId) as Record<string, unknown>[]
+  return rows.map(mapPartyRow)
 }
 
 export function markPartySigned(partyId: string): void {
@@ -872,17 +983,126 @@ export function getPartyById(partyId: string): PartyRecord | null {
     .prepare('SELECT * FROM document_parties WHERE id = ?')
     .get(partyId) as Record<string, unknown> | undefined
   if (!row) return null
-  return {
-    id: row.id as string,
-    documentId: row.document_id as string,
-    role: row.role as string,
-    displayName: row.display_name as string,
-    walletAddress: (row.wallet_address as string | null) ?? null,
-    sortOrder: row.sort_order as number,
-    required: Boolean(row.required),
-    status: row.status as PartyRecord['status'],
-    signedAt: (row.signed_at as number | null) ?? null,
-  }
+  return mapPartyRow(row)
+}
+
+export function setPartyInviteEmail(
+  partyId: string,
+  email: string | null,
+  sentAt: number | null,
+): void {
+  db.prepare(
+    'UPDATE document_parties SET invite_email = ?, invite_sent_at = ? WHERE id = ?',
+  ).run(email, sentAt, partyId)
+}
+
+export function insertPartyInvite(invite: PartyInviteRecord): void {
+  db.prepare(`
+    INSERT INTO party_invites (
+      id, document_id, party_id, email, token_hash, channel,
+      created_at, expires_at, revoked_at, redeemed_at, redeemed_by_wallet, resend_message_id
+    ) VALUES (
+      @id, @documentId, @partyId, @email, @tokenHash, @channel,
+      @createdAt, @expiresAt, @revokedAt, @redeemedAt, @redeemedByWallet, @resendMessageId
+    )
+  `).run({
+    id: invite.id,
+    documentId: invite.documentId,
+    partyId: invite.partyId,
+    email: invite.email,
+    tokenHash: invite.tokenHash,
+    channel: invite.channel,
+    createdAt: invite.createdAt,
+    expiresAt: invite.expiresAt,
+    revokedAt: invite.revokedAt,
+    redeemedAt: invite.redeemedAt,
+    redeemedByWallet: invite.redeemedByWallet,
+    resendMessageId: invite.resendMessageId,
+  })
+}
+
+/** Revoke all non-revoked, non-redeemed invites for a party (resend rotates). */
+export function revokeActivePartyInvites(partyId: string, at = Date.now()): number {
+  const result = db
+    .prepare(
+      `UPDATE party_invites
+       SET revoked_at = ?
+       WHERE party_id = ?
+         AND revoked_at IS NULL
+         AND redeemed_at IS NULL`,
+    )
+    .run(at, partyId)
+  return result.changes
+}
+
+export function revokePartyInviteById(inviteId: string, at = Date.now()): boolean {
+  const result = db
+    .prepare(
+      `UPDATE party_invites
+       SET revoked_at = ?
+       WHERE id = ?
+         AND revoked_at IS NULL
+         AND redeemed_at IS NULL`,
+    )
+    .run(at, inviteId)
+  return result.changes === 1
+}
+
+export function getActiveInviteForParty(
+  partyId: string,
+  now = Date.now(),
+): PartyInviteRecord | null {
+  const row = db
+    .prepare(
+      `SELECT * FROM party_invites
+       WHERE party_id = ?
+         AND revoked_at IS NULL
+         AND redeemed_at IS NULL
+         AND (expires_at IS NULL OR expires_at > ?)
+       ORDER BY created_at DESC
+       LIMIT 1`,
+    )
+    .get(partyId, now) as Record<string, unknown> | undefined
+  return row ? mapPartyInviteRow(row) : null
+}
+
+export function getPartyInviteByTokenHash(
+  tokenHash: string,
+  now = Date.now(),
+): PartyInviteRecord | null {
+  const row = db
+    .prepare('SELECT * FROM party_invites WHERE token_hash = ?')
+    .get(tokenHash) as Record<string, unknown> | undefined
+  if (!row) return null
+  const invite = mapPartyInviteRow(row)
+  if (invite.revokedAt) return null
+  if (invite.redeemedAt) return null
+  if (invite.expiresAt != null && invite.expiresAt <= now) return null
+  return invite
+}
+
+export function markPartyInviteRedeemed(
+  inviteId: string,
+  walletAddress: string,
+  at = Date.now(),
+): boolean {
+  const result = db
+    .prepare(
+      `UPDATE party_invites
+       SET redeemed_at = ?, redeemed_by_wallet = ?
+       WHERE id = ?
+         AND redeemed_at IS NULL
+         AND revoked_at IS NULL`,
+    )
+    .run(at, normalizeAddress(walletAddress), inviteId)
+  return result.changes === 1
+}
+
+export function setPartyInviteMessageId(inviteId: string, messageId: string | null): void {
+  db.prepare('UPDATE party_invites SET resend_message_id = ? WHERE id = ?').run(
+    messageId,
+    inviteId,
+  )
 }
 
 /** Run work inside an IMMEDIATE SQLite transaction (serialized writers). */
@@ -901,8 +1121,14 @@ export function updatePartyDisplayName(partyId: string, displayName: string): vo
 
 export function insertSignature(sig: SignatureRecord): void {
   db.prepare(`
-    INSERT INTO signatures (id, document_id, party_id, signer_address, signature_type, client_sha256, signed_at)
-    VALUES (@id, @documentId, @partyId, @signerAddress, @signatureType, @clientSha256, @signedAt)
+    INSERT INTO signatures (
+      id, document_id, party_id, signer_address, signature_type, client_sha256, signed_at,
+      invited_as_email, invite_id
+    )
+    VALUES (
+      @id, @documentId, @partyId, @signerAddress, @signatureType, @clientSha256, @signedAt,
+      @invitedAsEmail, @inviteId
+    )
   `).run({
     id: sig.id,
     documentId: sig.documentId,
@@ -911,6 +1137,8 @@ export function insertSignature(sig: SignatureRecord): void {
     signatureType: sig.signatureType,
     clientSha256: sig.clientSha256,
     signedAt: sig.signedAt,
+    invitedAsEmail: sig.invitedAsEmail,
+    inviteId: sig.inviteId,
   })
 }
 
@@ -918,15 +1146,7 @@ export function getSignaturesForDocument(documentId: string): SignatureRecord[] 
   const rows = db
     .prepare('SELECT * FROM signatures WHERE document_id = ? ORDER BY signed_at ASC')
     .all(documentId) as Record<string, unknown>[]
-  return rows.map(row => ({
-    id: row.id as string,
-    documentId: row.document_id as string,
-    partyId: row.party_id as string,
-    signerAddress: row.signer_address as string,
-    signatureType: row.signature_type as string,
-    clientSha256: row.client_sha256 as string,
-    signedAt: row.signed_at as number,
-  }))
+  return rows.map(mapSignatureRow)
 }
 
 export function insertSignatureImage(image: SignatureImageRecord): void {
@@ -973,15 +1193,7 @@ export function getSignatureForDocument(documentId: string, signatureId: string)
     .prepare('SELECT * FROM signatures WHERE id = ? AND document_id = ?')
     .get(signatureId, documentId) as Record<string, unknown> | undefined
   if (!row) return null
-  return {
-    id: row.id as string,
-    documentId: row.document_id as string,
-    partyId: row.party_id as string,
-    signerAddress: row.signer_address as string,
-    signatureType: row.signature_type as string,
-    clientSha256: row.client_sha256 as string,
-    signedAt: row.signed_at as number,
-  }
+  return mapSignatureRow(row)
 }
 
 export function createAttestation(att: AttestationRecord): void {

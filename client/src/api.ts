@@ -88,6 +88,8 @@ export interface SignDocumentBody {
   clientSha256: string
   displayName?: string
   signatureImage?: string
+  /** Raw personal invite token from email deep link (`?invite=`). */
+  inviteToken?: string
 }
 
 export const api = {
@@ -425,19 +427,30 @@ export const api = {
       body: JSON.stringify({ email }),
     }),
 
-  /** Creator: send branded invite email (personal link, no PDF). Requires Resend enabled. */
+  /** Creator: send branded invite email (opaque personal link, no PDF). Requires Resend. */
   sendPartyInviteEmail: (
     token: string,
     docId: string,
     body: { partyId: string; to: string },
   ) =>
-    request<{ ok: boolean; id: string; to: string; partyId: string }>(
-      `/api/documents/${docId}/invite-email`,
-      {
-        method: 'POST',
-        headers: { ...withAuth(token), 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      },
+    request<{
+      ok: boolean
+      id: string
+      to: string
+      partyId: string
+      inviteSentAt?: number
+    }>(`/api/documents/${docId}/invite-email`, {
+      method: 'POST',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+
+  /**
+   * Resolve opaque email invite token → document slug + party (no email, no token echo).
+   */
+  lookupInviteToken: (inviteToken: string) =>
+    request<{ documentId: string; slug: string; partyId: string }>(
+      `/api/invites/lookup?token=${encodeURIComponent(inviteToken)}`,
     ),
 
   /** Creator share step: set total required signatures (1–10) and optional co-signer names. */

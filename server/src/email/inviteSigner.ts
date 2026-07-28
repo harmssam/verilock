@@ -1,8 +1,18 @@
 /**
  * Per-person signing invite (Resend). No PDF attachment - link + copy only.
+ * Mints an opaque invite token (stored as hash only) so the email link is not
+ * reconstructible from the public document / party id.
  */
-import { assertDocumentCreator } from '../documents.js'
-import { getPartiesForDocument, getPartyById } from '../db.js'
+import { v4 as uuid } from 'uuid'
+import { assertDocumentCreator, hashInviteToken, mintInviteTokenRaw } from '../documents.js'
+import {
+  getPartiesForDocument,
+  getPartyById,
+  insertPartyInvite,
+  revokeActivePartyInvites,
+  setPartyInviteEmail,
+  setPartyInviteMessageId,
+} from '../db.js'
 import { normalizeAddress } from '../addresses.js'
 import { sanitizeNotifyEmail } from '../security.js'
 import { appPublicUrl, isResendSendEnabled } from './config.js'
@@ -46,12 +56,12 @@ function resolveOrganizerName(doc: {
 }
 
 export type InviteSignerResult =
-  | { ok: true; id: string; to: string; partyId: string }
+  | { ok: true; id: string; to: string; partyId: string; inviteSentAt: number }
   | { ok: false; status: number; error: string }
 
 /**
  * Creator sends a signed invite email for one party.
- * Body includes unique ?party= deep link; never attaches the PDF.
+ * Body includes opaque ?invite= deep link (not shown in creator UI); never attaches the PDF.
  */
 export async function sendPartyInviteEmail(input: {
   documentId: string
@@ -106,8 +116,15 @@ export async function sendPartyInviteEmail(input: {
     }
   }
 
+  // Mint token in memory first; persist only after Resend accepts the message so a
+  // failed send never leaves the party email-gated without a working link.
+  const rawToken = mintInviteTokenRaw()
+  const tokenHash = hashInviteToken(rawToken)
+  const inviteId = uuid()
+
   const base = documentDeepLink(doc.slug)
-  const link = `${base}${base.includes('?') ? '&' : '?'}party=${encodeURIComponent(party.id)}`
+  // Personal capability is ?invite= only (not reconstructible from party UUID).
+  const link = `${base}${base.includes('?') ? '&' : '?'}invite=${encodeURIComponent(rawToken)}`
   // HTTPS bridge with openPay=1 - email clients often block nimiqpay:// schemes.
   // Client strips the flag, stashes the path, then launches Nimiq Pay with the full URL.
   const payHttpsBridge = `${link}${link.includes('?') ? '&' : '?'}openPay=1`
@@ -132,7 +149,7 @@ export async function sendPartyInviteEmail(input: {
     '',
     `${organizerName} has requested you sign “${doc.title}” on VeriLock.`,
     '',
-    'Open in your browser (Nimiq Hub login works here):',
+    'Open in your browser (Nimiq Hub login works here) — this personal link is only in this email:',
     link,
     '',
     'Or open in the Nimiq Pay app (best on phone - installs Pay if needed via the site first):',
@@ -171,7 +188,7 @@ export async function sendPartyInviteEmail(input: {
                 <strong>${safeOrganizer}</strong> has requested you sign <strong>${safeTitle}</strong> on VeriLock.
               </p>
               <p style="margin:0 0 10px;font-size:14px;color:#475569;text-align:center;">
-                Choose how you want to open your personal signing link:
+                Choose how you want to open your personal signing link (only in this email):
               </p>
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 12px;">
                 <tr>
@@ -232,14 +249,34 @@ export async function sendPartyInviteEmail(input: {
   const result = await sendTransactionalEmail({ to, subject, text, html })
 
   if (result.ok) {
+    const sentAt = Date.now()
+    // Rotate prior invites only after delivery so resend failure keeps the old link alive.
+    revokeActivePartyInvites(party.id, sentAt)
+    insertPartyInvite({
+      id: inviteId,
+      documentId: doc.id,
+      partyId: party.id,
+      email: to,
+      tokenHash,
+      channel: 'email',
+      createdAt: sentAt,
+      expiresAt: null,
+      revokedAt: null,
+      redeemedAt: null,
+      redeemedByWallet: null,
+      resendMessageId: result.id ?? null,
+    })
+    setPartyInviteEmail(party.id, to, sentAt)
+    if (result.id) setPartyInviteMessageId(inviteId, result.id)
     console.log('[email] party-invite sent', {
       documentId: doc.id,
       partyId: party.id,
+      inviteId,
       to,
       id: result.id,
       organizer: organizerName,
     })
-    return { ok: true, id: result.id, to, partyId: party.id }
+    return { ok: true, id: result.id, to, partyId: party.id, inviteSentAt: sentAt }
   }
 
   if ('skipped' in result && result.skipped) {

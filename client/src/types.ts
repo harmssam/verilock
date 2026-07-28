@@ -8,6 +8,9 @@ export interface DocumentParty {
   required: boolean
   status: 'pending' | 'signed' | 'declined'
   signedAt: number | null
+  /** Creator/participant only: last email invite was sent to. */
+  inviteEmail?: string | null
+  inviteSentAt?: number | null
 }
 
 export interface DocumentSignature {
@@ -19,6 +22,8 @@ export interface DocumentSignature {
   imageUrl?: string | null
   /** True when an ink image exists but may be redacted for this viewer. */
   hasImage?: boolean
+  /** Frozen email from personal invite when signed via ?invite= token. */
+  invitedAsEmail?: string | null
 }
 
 export interface DocumentAttestation {
