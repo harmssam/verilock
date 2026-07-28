@@ -982,7 +982,7 @@ app.get('/api/features', (_req, res) => {
   })
 })
 
-// Operator admin portal (password + Turnstile cookie session). Stats-only.
+// Operator admin portal (password + Turnstile cookie session): stats + support queue.
 attachAdminRoutes(app)
 
 app.post('/api/support/contact', supportContactLimit, async (req, res) => {
@@ -1022,7 +1022,10 @@ app.post('/api/support/contact', supportContactLimit, async (req, res) => {
     return
   }
 
-  res.json({ ok: true })
+  res.json({
+    ok: true,
+    ticketPublicId: delivered.ticket.publicId,
+  })
 })
 
 app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req, res) => {

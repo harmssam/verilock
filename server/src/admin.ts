@@ -1,10 +1,22 @@
 /**
  * Operator admin portal API (password + Turnstile, cookie session).
- * Stats-only for now - no product data export / mutation routes.
+ * Stats + support ticket queue.
  */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { Express, NextFunction, Request, Response } from 'express'
-import { getAdminStats } from './db.js'
+import {
+  SUPPORT_TICKET_STATUSES,
+  addSupportTicketMessage,
+  getAdminStats,
+  getSupportTicketById,
+  listSupportTicketMessages,
+  listSupportTickets,
+  updateSupportTicketDocumentSlug,
+  updateSupportTicketStatus,
+  type SupportTicketStatus,
+} from './db.js'
+import { appPublicUrl, isResendSendEnabled } from './email/config.js'
+import { sendTransactionalEmail } from './email/resend.js'
 import { rateLimit } from './rate-limit.js'
 import {
   clientIpFromRequest,
@@ -189,6 +201,82 @@ export function adminPublicFeatures() {
 
 const loginLimit = rateLimit(10, 15 * 60_000)
 const statsLimit = rateLimit(60, 60_000)
+const ticketsLimit = rateLimit(120, 60_000)
+const ticketMutateLimit = rateLimit(30, 60_000)
+
+const MAX_REPLY_LENGTH = 8000
+
+function isTicketStatus(value: unknown): value is SupportTicketStatus {
+  return (
+    typeof value === 'string' &&
+    (SUPPORT_TICKET_STATUSES as readonly string[]).includes(value)
+  )
+}
+
+function paramId(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) return value[0] ?? ''
+  return value ?? ''
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+async function sendOperatorSupportReply(input: {
+  to: string
+  name: string
+  publicId: string
+  subject: string
+  body: string
+  operatorName: string
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  if (!isResendSendEnabled()) {
+    return { ok: false, error: 'Outbound email is not enabled on this server.' }
+  }
+  const site = appPublicUrl()
+  const mailSubject = `Re: [${input.publicId}] ${input.subject}`
+  const greeting = input.name ? `Hi ${input.name},` : 'Hi,'
+  const text = [
+    greeting,
+    '',
+    input.body,
+    '',
+    '—',
+    `${input.operatorName} · VeriLock Support`,
+    `Ticket ${input.publicId}`,
+    site,
+  ].join('\n')
+  const html = `
+    <div style="font-family:system-ui,sans-serif;line-height:1.55;color:#0f172a;max-width:560px">
+      <p style="margin:0 0 1rem">${escapeHtml(greeting)}</p>
+      <div style="white-space:pre-wrap;margin:0 0 1.25rem">${escapeHtml(input.body)}</div>
+      <p style="margin:0;font-size:13px;color:#64748b">
+        ${escapeHtml(input.operatorName)} · VeriLock Support<br/>
+        Ticket <strong>${escapeHtml(input.publicId)}</strong> ·
+        <a href="${escapeHtml(site)}">${escapeHtml(site)}</a>
+      </p>
+    </div>
+  `.trim()
+
+  const result = await sendTransactionalEmail({
+    to: input.to,
+    subject: mailSubject,
+    text,
+    html,
+  })
+  if (result.ok) return { ok: true, id: result.id }
+  if ('skipped' in result && result.skipped) {
+    return { ok: false, error: result.reason }
+  }
+  return {
+    ok: false,
+    error: 'error' in result ? result.error : 'Could not send email',
+  }
+}
 
 export function attachAdminRoutes(app: Express): void {
   app.get('/api/admin/features', (_req, res) => {
@@ -281,6 +369,197 @@ export function attachAdminRoutes(app: Express): void {
       res.status(500).json({ error: 'Could not load admin statistics.' })
     }
   })
+
+  // ── Support ticket queue ────────────────────────────────────────────────
+
+  app.get('/api/admin/tickets', ticketsLimit, requireAdmin, (req, res) => {
+    try {
+      const statusRaw =
+        typeof req.query.status === 'string' ? req.query.status.trim() : 'active'
+      const status =
+        statusRaw === 'all' || statusRaw === 'active' || isTicketStatus(statusRaw)
+          ? statusRaw
+          : 'active'
+      const q = typeof req.query.q === 'string' ? req.query.q : undefined
+      const limit =
+        typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined
+      const offset =
+        typeof req.query.offset === 'string' ? Number(req.query.offset) : undefined
+      const result = listSupportTickets({
+        status,
+        q,
+        limit: Number.isFinite(limit) ? limit : undefined,
+        offset: Number.isFinite(offset) ? offset : undefined,
+      })
+      res.json({
+        ...result,
+        statuses: SUPPORT_TICKET_STATUSES,
+      })
+    } catch (err) {
+      console.error('[admin] tickets list', err)
+      res.status(500).json({ error: 'Could not load support tickets.' })
+    }
+  })
+
+  app.get('/api/admin/tickets/:id', ticketsLimit, requireAdmin, (req, res) => {
+    try {
+      const ticket = getSupportTicketById(paramId(req.params.id))
+      if (!ticket) {
+        res.status(404).json({ error: 'Ticket not found' })
+        return
+      }
+      const messages = listSupportTicketMessages(ticket.id)
+      res.json({ ticket, messages, statuses: SUPPORT_TICKET_STATUSES })
+    } catch (err) {
+      console.error('[admin] ticket get', err)
+      res.status(500).json({ error: 'Could not load ticket.' })
+    }
+  })
+
+  app.patch(
+    '/api/admin/tickets/:id',
+    ticketMutateLimit,
+    requireAdmin,
+    (req, res) => {
+      try {
+        const ticket = getSupportTicketById(paramId(req.params.id))
+        if (!ticket) {
+          res.status(404).json({ error: 'Ticket not found' })
+          return
+        }
+        const body = (req.body ?? {}) as {
+          status?: unknown
+          documentSlug?: unknown
+        }
+
+        let updated = ticket
+        if (body.status !== undefined) {
+          if (!isTicketStatus(body.status)) {
+            res.status(400).json({
+              error: `Invalid status. Use one of: ${SUPPORT_TICKET_STATUSES.join(', ')}`,
+            })
+            return
+          }
+          const next = updateSupportTicketStatus(ticket.id, body.status)
+          if (!next) {
+            res.status(400).json({ error: 'Could not update status' })
+            return
+          }
+          updated = next
+        }
+
+        if (body.documentSlug !== undefined) {
+          const slug =
+            body.documentSlug === null || body.documentSlug === ''
+              ? null
+              : typeof body.documentSlug === 'string'
+                ? body.documentSlug.trim()
+                : null
+          if (body.documentSlug !== null && body.documentSlug !== '' && slug === null) {
+            res.status(400).json({ error: 'documentSlug must be a string or null' })
+            return
+          }
+          const next = updateSupportTicketDocumentSlug(ticket.id, slug)
+          if (!next) {
+            res.status(400).json({ error: 'Could not update document slug' })
+            return
+          }
+          updated = next
+        }
+
+        res.json({ ticket: updated })
+      } catch (err) {
+        console.error('[admin] ticket patch', err)
+        res.status(500).json({ error: 'Could not update ticket.' })
+      }
+    },
+  )
+
+  app.post(
+    '/api/admin/tickets/:id/reply',
+    ticketMutateLimit,
+    requireAdmin,
+    async (req, res) => {
+      try {
+        const ticket = getSupportTicketById(paramId(req.params.id))
+        if (!ticket) {
+          res.status(404).json({ error: 'Ticket not found' })
+          return
+        }
+        const body = (req.body ?? {}) as {
+          body?: unknown
+          status?: unknown
+          internalOnly?: unknown
+        }
+        const replyBody =
+          typeof body.body === 'string' ? body.body.trim().slice(0, MAX_REPLY_LENGTH) : ''
+        if (!replyBody || replyBody.length < 2) {
+          res.status(400).json({ error: 'Reply body is required (at least 2 characters).' })
+          return
+        }
+        if (body.status !== undefined && !isTicketStatus(body.status)) {
+          res.status(400).json({
+            error: `Invalid status. Use one of: ${SUPPORT_TICKET_STATUSES.join(', ')}`,
+          })
+          return
+        }
+
+        const internalOnly = body.internalOnly === true
+        const operatorName =
+          typeof res.locals.adminUser === 'string' && res.locals.adminUser
+            ? res.locals.adminUser
+            : adminUsername()
+
+        let resendMessageId: string | null = null
+        if (!internalOnly) {
+          const sent = await sendOperatorSupportReply({
+            to: ticket.email,
+            name: ticket.name,
+            publicId: ticket.publicId,
+            subject: ticket.subject,
+            body: replyBody,
+            operatorName,
+          })
+          if (!sent.ok) {
+            res.status(502).json({
+              error: `Could not email customer: ${sent.error}`,
+            })
+            return
+          }
+          resendMessageId = sent.id
+        }
+
+        const message = addSupportTicketMessage({
+          ticketId: ticket.id,
+          authorKind: internalOnly ? 'system' : 'operator',
+          authorName: operatorName,
+          body: replyBody,
+          resendMessageId,
+          bumpStatus: !internalOnly && body.status === undefined,
+        })
+        if (!message) {
+          res.status(500).json({ error: 'Could not save reply.' })
+          return
+        }
+
+        if (body.status !== undefined && isTicketStatus(body.status)) {
+          updateSupportTicketStatus(ticket.id, body.status)
+        }
+
+        const updated = getSupportTicketById(ticket.id)!
+        const messages = listSupportTicketMessages(ticket.id)
+        res.json({
+          ok: true,
+          ticket: updated,
+          messages,
+          emailed: !internalOnly,
+        })
+      } catch (err) {
+        console.error('[admin] ticket reply', err)
+        res.status(500).json({ error: 'Could not send reply.' })
+      }
+    },
+  )
 
   if (isAdminConfigured()) {
     console.log('[admin] portal enabled (username=%s)', adminUsername())

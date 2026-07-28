@@ -88,6 +88,48 @@ export interface AdminStats {
     createdAt: number
     lockedAt: number | null
   }>
+  support: {
+    total: number
+    open: number
+    byStatus: Record<string, number>
+  }
+}
+
+export type SupportTicketStatus =
+  | 'open'
+  | 'in_progress'
+  | 'waiting_customer'
+  | 'resolved'
+  | 'closed'
+
+export interface SupportTicket {
+  id: string
+  publicId: string
+  name: string
+  email: string
+  subject: string
+  status: SupportTicketStatus
+  documentSlug: string | null
+  createdAt: number
+  updatedAt: number
+  resolvedAt: number | null
+}
+
+export interface SupportTicketListItem extends SupportTicket {
+  messageCount: number
+  lastMessageAt: number
+  lastMessagePreview: string | null
+  lastAuthorKind: 'customer' | 'operator' | 'system' | null
+}
+
+export interface SupportTicketMessage {
+  id: string
+  ticketId: string
+  authorKind: 'customer' | 'operator' | 'system'
+  authorName: string | null
+  body: string
+  resendMessageId: string | null
+  createdAt: number
 }
 
 export const adminApi = {
@@ -109,4 +151,44 @@ export const adminApi = {
       body: JSON.stringify({}),
     }),
   stats: () => adminRequest<AdminStats>('/api/admin/stats'),
+  tickets: (params?: { status?: string; q?: string; limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams()
+    if (params?.status) sp.set('status', params.status)
+    if (params?.q) sp.set('q', params.q)
+    if (params?.limit != null) sp.set('limit', String(params.limit))
+    if (params?.offset != null) sp.set('offset', String(params.offset))
+    const qs = sp.toString()
+    return adminRequest<{
+      tickets: SupportTicketListItem[]
+      total: number
+      statuses: SupportTicketStatus[]
+    }>(`/api/admin/tickets${qs ? `?${qs}` : ''}`)
+  },
+  ticket: (id: string) =>
+    adminRequest<{
+      ticket: SupportTicket
+      messages: SupportTicketMessage[]
+      statuses: SupportTicketStatus[]
+    }>(`/api/admin/tickets/${encodeURIComponent(id)}`),
+  updateTicket: (
+    id: string,
+    body: { status?: SupportTicketStatus; documentSlug?: string | null },
+  ) =>
+    adminRequest<{ ticket: SupportTicket }>(`/api/admin/tickets/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  replyTicket: (
+    id: string,
+    body: { body: string; status?: SupportTicketStatus; internalOnly?: boolean },
+  ) =>
+    adminRequest<{
+      ok: true
+      ticket: SupportTicket
+      messages: SupportTicketMessage[]
+      emailed: boolean
+    }>(`/api/admin/tickets/${encodeURIComponent(id)}/reply`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 }

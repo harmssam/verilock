@@ -84,6 +84,7 @@ export function SupportPage() {
 
   const [status, setStatus] = useState<FormStatus>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [ticketPublicId, setTicketPublicId] = useState<string | null>(null)
 
   useEffect(() => {
     formStartedAtRef.current = Date.now()
@@ -186,7 +187,7 @@ export function SupportPage() {
 
     setStatus('submitting')
     try {
-      await api.submitSupportContact({
+      const result = await api.submitSupportContact({
         name: name.trim(),
         email: email.trim(),
         subject: subject.trim(),
@@ -195,6 +196,7 @@ export function SupportPage() {
         formStartedAt: formStartedAtRef.current,
         turnstileToken: turnstileToken ?? undefined,
       })
+      setTicketPublicId(result.ticketPublicId?.trim() || null)
       setStatus('success')
       setName('')
       setEmail('')
@@ -222,10 +224,19 @@ export function SupportPage() {
             Thanks - we received your note. If a reply is needed, we&apos;ll use the email address you
             provided.
           </p>
+          {ticketPublicId ? (
+            <p className="muted" style={{ marginTop: '0.65rem' }}>
+              Reference:{' '}
+              <strong style={{ color: 'var(--lr-text, #0f172a)', fontVariantNumeric: 'tabular-nums' }}>
+                {ticketPublicId}
+              </strong>
+            </p>
+          ) : null}
           <button
             type="button"
             className="btn btn-primary support-again-btn"
             onClick={() => {
+              setTicketPublicId(null)
               setStatus('idle')
               setError(null)
               formStartedAtRef.current = Date.now()
