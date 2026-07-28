@@ -47,7 +47,8 @@ export const FRAME_HEADER = 5 + ASSOC_LEN // 13
 export const FRAME_BODY = FRAME_SIZE - FRAME_HEADER // 51
 export const FRAME_HEADER_LEGACY = 9
 export const ASSOC_LEN_LEGACY = 4
-export const MAX_STREAM_FRAMES = 128
+/** Keep in sync with server MAX_STREAM_FRAMES (1-byte total → max 255). */
+export const MAX_STREAM_FRAMES = 255
 
 export const FRAME_HEAD = 1
 export const FRAME_DATA = 2

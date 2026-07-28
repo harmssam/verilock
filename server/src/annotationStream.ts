@@ -47,11 +47,11 @@ export const FRAME_DATA = 2
 export const FRAME_END = 3
 
 /**
- * Experiment cap (frames = HEAD + DATA* + END).
- * ~51 B payload per DATA frame with 8-byte assoc id; free fees make 128 practical.
- * Abuse still limited by rate limit + service-wallet balance.
+ * Per-stream frame cap (HEAD + DATA* + END).
+ * Wire layout stores `total` in a single byte (`frame[4]`), so 255 is the hard max.
+ * Abuse still limited by rate limit + service-wallet balance + credits.
  */
-export const MAX_STREAM_FRAMES = 128
+export const MAX_STREAM_FRAMES = 255
 /** Match credit seal dust value so sinks/network treat frames like paid proofs. */
 export const STREAM_FRAME_VALUE_LUNA = 1
 const STREAM_FEE_BUFFER_LUNA = 10
@@ -314,7 +314,7 @@ export function packAnnotationStream(pdfSha256: string, annotations: unknown[]):
   const total = 2 + dataChunks.length
   if (total > MAX_STREAM_FRAMES) {
     throw new Error(
-      `Annotation stream too large (${total} frames; max ${MAX_STREAM_FRAMES} for experiment)`,
+      `Annotation stream too large (${total} frames; max ${MAX_STREAM_FRAMES})`,
     )
   }
 

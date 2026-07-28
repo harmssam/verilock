@@ -612,7 +612,7 @@ export function assembleArchiveStreamsFromPool(
     if (usedTx.has(head.txHash)) continue
     const total = head.buf[4]!
     const version = head.buf[1]!
-    if (total < 2 || total > 128) continue
+    if (total < 2 || total > MAX_STREAM_FRAMES) continue
     const { assocLen } = detectFrameLayout(head.buf, hash)
     const allowLegacyForStream = assocLen === 4
 

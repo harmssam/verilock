@@ -30,7 +30,7 @@ const FRAME_BODY = 64 - FRAME_HEADER // 51
 const FRAME_HEAD = 1
 const FRAME_DATA = 2
 const FRAME_END = 3
-const MAX_STREAM_FRAMES = 128
+const MAX_STREAM_FRAMES = 255
 
 function q(n, digits = 4) {
   if (!Number.isFinite(n)) return 0
@@ -506,7 +506,7 @@ async function main() {
   }
   assert(threw, 'tampered prevRoot rejected')
 
-  assert(frames0.length <= 128 && frames1.length <= 128, 'under frame cap')
+  assert(frames0.length <= 255 && frames1.length <= 255, 'under frame cap')
 
   // --- placement box scale (editor UX; chain stores absolute w/h only) ---
   const SCALE_MIN = 40

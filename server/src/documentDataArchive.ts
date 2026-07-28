@@ -33,6 +33,7 @@ import {
 import {
   broadcastStreamFrames,
   isAnnotationStreamBroadcastEnabled,
+  MAX_STREAM_FRAMES,
   packAnnotationStream,
   STREAM_MAGIC,
 } from './annotationStream.js'
@@ -61,7 +62,8 @@ import { sanitizeAnnotations } from './security.js'
 import { getSealFeeNim } from './sealPricing.js'
 import { getServiceWalletAddress, isServiceWalletConfigured } from './serviceWallet.js'
 
-const MAX_ARCHIVE_FRAMES = 128
+/** Total frames across all streams in one archive job (matches 1-byte wire max). */
+const MAX_ARCHIVE_FRAMES = MAX_STREAM_FRAMES
 
 function assertCreator(documentId: string, requesterAddress: string) {
   const doc = getDocumentById(documentId)

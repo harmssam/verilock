@@ -1,7 +1,7 @@
 import { Eraser } from 'lucide-react'
 import { useEffect, useRef, type CSSProperties } from 'react'
 import { usePrimarilyTouch } from '../useViewport'
-import { simplifyStroke, type StrokePoint } from './signatureCodec'
+import { thinStroke, type StrokePoint } from './signatureCodec'
 import { SIGNATURE_RDP_EPSILON_PX } from './annotationLimits'
 import type { SignaturePathData } from './annotations'
 
@@ -38,6 +38,12 @@ interface SignatureStrokePadProps {
 /** CSS-pixel stroke weight at a 160px reference min-side (stable across resize). */
 const LINE_WIDTH_CSS = 2.25
 const LINE_WIDTH_REF_MIN = 160
+/**
+ * Min movement (CSS px) before recording another sample while drawing.
+ * Below this, the stylus is effectively still — no shape, no need to store.
+ * Kept well under SIGNATURE_RDP_EPSILON_PX so curves still get dense enough samples.
+ */
+const MIN_SAMPLE_PX = 0.5
 
 type UnitStroke = { points: Array<{ x: number; y: number }> }
 
@@ -238,11 +244,13 @@ export function SignatureStrokePad({
       onChangeRef.current(null)
       return
     }
+    // Unit-space ε: same 1.5 CSS-px budget after normalize. thinStroke drops
+    // near-dupes then RDP-collapses collinear runs to segment endpoints.
+    const unitEps = epsilon / Math.max(1, Math.min(padCssSize().w, padCssSize().h))
     const simplified = unitStrokesRef.current.map(s => ({
-      points: simplifyStroke(
+      points: thinStroke(
         s.points.map(p => ({ x: p.x, y: p.y })),
-        // Epsilon is in unit space: map pad px epsilon into [0,1]
-        epsilon / Math.max(1, Math.min(padCssSize().w, padCssSize().h)),
+        unitEps,
       ).map(p => ({ x: p.x, y: p.y })),
     }))
     const simplifiedPoints = simplified.reduce((n, s) => n + s.points.length, 0)
@@ -330,6 +338,14 @@ export function SignatureStrokePad({
     if (!drawing.current || disabled) return
     e.preventDefault()
     const p = pointCss(e)
+    const prevKept = currentStroke.current[currentStroke.current.length - 1]
+    // Skip near-stationary samples: collinear density is useless until RDP.
+    if (
+      prevKept &&
+      Math.hypot(p.x - prevKept.x, p.y - prevKept.y) < MIN_SAMPLE_PX
+    ) {
+      return
+    }
     currentStroke.current.push(p)
     // Incremental draw for responsiveness
     const canvas = canvasRef.current

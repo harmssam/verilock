@@ -1591,8 +1591,13 @@ app.post(
         res.status(400).json({ error: 'framesHex required (64-byte hex frames)' })
         return
       }
-      if (framesHex.length > 128) {
-        res.status(400).json({ error: 'Too many frames (max 128)' })
+      const {
+        isAnnotationStreamBroadcastEnabled,
+        broadcastStreamFrames,
+        MAX_STREAM_FRAMES,
+      } = await import('./annotationStream.js')
+      if (framesHex.length > MAX_STREAM_FRAMES) {
+        res.status(400).json({ error: `Too many frames (max ${MAX_STREAM_FRAMES})` })
         return
       }
 
@@ -1605,11 +1610,6 @@ app.post(
         })
         return
       }
-
-      const {
-        isAnnotationStreamBroadcastEnabled,
-        broadcastStreamFrames,
-      } = await import('./annotationStream.js')
       const { getServiceWalletAddress, isServiceWalletConfigured } = await import(
         './serviceWallet.js'
       )
