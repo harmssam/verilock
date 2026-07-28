@@ -844,3 +844,48 @@
 .admin-check input {
   accent-color: var(--lr-accent, #0d9488);
 }
+
+.admin-thread-msg--emailed {
+  border-color: rgba(13, 148, 136, 0.35);
+}
+
+.admin-msg-pill {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--lr-muted, #4b5c6b);
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
+}
+
+.admin-msg-pill--emailed {
+  background: rgba(13, 148, 136, 0.12);
+  color: #0f766e;
+  border-color: rgba(13, 148, 136, 0.3);
+}
+
+.admin-templates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.admin-templates-label {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lr-muted, #4b5c6b);
+}
+
+.admin-templates-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}

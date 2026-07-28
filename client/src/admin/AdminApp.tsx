@@ -7,6 +7,7 @@ import {
   adminApi,
   type AdminFeatures,
   type AdminStats,
+  type SupportReplyTemplate,
   type SupportTicket,
   type SupportTicketListItem,
   type SupportTicketMessage,
@@ -126,7 +127,7 @@ export function AdminApp() {
     setStatsError(null)
     try {
       const s = await adminApi.stats()
-      setStats(s)
+      setStats(normalizeAdminStats(s))
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not load stats'
       setStatsError(message)
@@ -137,6 +138,52 @@ export function AdminApp() {
     } finally {
       setStatsLoading(false)
     }
+  }, [])
+
+  /** Keep Support open badge/card in sync when the ticket queue loads or mutates. */
+  const applySupportCounts = useCallback((counts: { open: number; total: number }) => {
+    setStats(prev => {
+      if (!prev) {
+        return {
+          generatedAt: Date.now(),
+          documents: {
+            total: 0,
+            byStatus: {},
+            locked: 0,
+            withLockedAt: 0,
+            createdLast24h: 0,
+            createdLast7d: 0,
+          },
+          wallets: {
+            uniqueCreators: 0,
+            uniqueSigners: 0,
+            uniquePartyWallets: 0,
+            uniqueAll: 0,
+          },
+          signatures: { total: 0 },
+          parties: { total: 0, withWallet: 0 },
+          attestations: { total: 0, byStatus: {} },
+          dataArchives: { total: 0, onChain: 0 },
+          sessions: { verifiedActive: 0 },
+          credits: { accountsWithBalance: 0, totalBalance: 0 },
+          recentDocuments: [],
+          support: {
+            open: counts.open,
+            total: counts.total,
+            byStatus: {},
+          },
+        }
+      }
+      return {
+        ...prev,
+        support: {
+          open: counts.open,
+          total: counts.total,
+          // Clear byStatus so the live `open` from the tickets API wins over a stale breakdown.
+          byStatus: {},
+        },
+      }
+    })
   }, [])
 
   // Boot: features + session
@@ -173,11 +220,11 @@ export function AdminApp() {
     }
   }, [])
 
-  // Prefetch stats for open-ticket badge; full refresh on Stats tab
+  // Load full stats when authed; refresh again whenever Stats tab is selected
   useEffect(() => {
     if (auth.kind !== 'authed') return
     void loadStats()
-  }, [auth, loadStats])
+  }, [auth, tab, loadStats])
 
   // Page title
   useEffect(() => {
@@ -418,8 +465,8 @@ export function AdminApp() {
                 onClick={() => setTab('support')}
               >
                 Support
-                {stats?.support?.open != null && stats.support.open > 0 ? (
-                  <span className="admin-tab-badge">{stats.support.open}</span>
+                {supportOpenCount(stats) > 0 ? (
+                  <span className="admin-tab-badge">{supportOpenCount(stats)}</span>
                 ) : null}
               </button>
               <button
@@ -437,6 +484,7 @@ export function AdminApp() {
                   setAuth({ kind: 'login' })
                   setStats(null)
                 }}
+                onCountsChange={applySupportCounts}
               />
             )}
             {tab === 'stats' && (
@@ -563,8 +611,8 @@ function Dashboard({
         <StatCard label="Active sessions" value={stats.sessions.verifiedActive} />
         <StatCard
           label="Support open"
-          value={stats.support?.open ?? 0}
-          hint={`${stats.support?.total ?? 0} total tickets`}
+          value={supportOpenCount(stats)}
+          hint={`${supportTotalCount(stats)} total · open / in progress / waiting`}
           accent
         />
       </div>
@@ -677,7 +725,71 @@ function StatCard({
   )
 }
 
-function SupportQueue({ onAuthLost }: { onAuthLost: () => void }) {
+function renderTemplateBody(
+  body: string,
+  vars: { name?: string; publicId?: string; subject?: string },
+): string {
+  const map: Record<string, string> = {
+    name: vars.name?.trim() || 'there',
+    publicId: vars.publicId?.trim() || '—',
+    subject: vars.subject?.trim() || 'your request',
+    site: typeof window !== 'undefined' ? window.location.origin : 'https://verilock.online',
+  }
+  return body.replace(/\{\{\s*(name|publicId|subject|site)\s*\}\}/g, (_, key: string) => {
+    return map[key] ?? ''
+  })
+}
+
+/** Active tickets: open + in_progress + waiting_customer (matches list filter "Active"). */
+function supportOpenCount(stats: AdminStats | null | undefined): number {
+  if (!stats?.support) return 0
+  const by = stats.support.byStatus
+  if (by && Object.keys(by).length > 0) {
+    return (
+      Number(by.open || 0) +
+      Number(by.in_progress || 0) +
+      Number(by.waiting_customer || 0)
+    )
+  }
+  const n = Number(stats.support.open)
+  return Number.isFinite(n) && n >= 0 ? n : 0
+}
+
+function supportTotalCount(stats: AdminStats | null | undefined): number {
+  if (!stats?.support) return 0
+  const by = stats.support.byStatus
+  if (by && Object.keys(by).length > 0) {
+    return Object.values(by).reduce((sum, n) => sum + Number(n || 0), 0)
+  }
+  const n = Number(stats.support.total)
+  return Number.isFinite(n) && n >= 0 ? n : 0
+}
+
+function normalizeAdminStats(s: AdminStats): AdminStats {
+  const by = s.support?.byStatus ?? {}
+  const hasBy = Object.keys(by).length > 0
+  const openFromBy =
+    Number(by.open || 0) +
+    Number(by.in_progress || 0) +
+    Number(by.waiting_customer || 0)
+  const totalFromBy = Object.values(by).reduce((sum, n) => sum + Number(n || 0), 0)
+  return {
+    ...s,
+    support: {
+      byStatus: by,
+      open: hasBy ? openFromBy : Number(s.support?.open ?? 0) || 0,
+      total: hasBy ? totalFromBy : Number(s.support?.total ?? 0) || 0,
+    },
+  }
+}
+
+function SupportQueue({
+  onAuthLost,
+  onCountsChange,
+}: {
+  onAuthLost: () => void
+  onCountsChange?: (counts: { open: number; total: number }) => void
+}) {
   const [filter, setFilter] = useState<'active' | 'all' | SupportTicketStatus>('active')
   const [query, setQuery] = useState('')
   const [qInput, setQInput] = useState('')
@@ -697,6 +809,7 @@ function SupportQueue({ onAuthLost }: { onAuthLost: () => void }) {
   const [replyError, setReplyError] = useState<string | null>(null)
   const [internalOnly, setInternalOnly] = useState(false)
   const [statusBusy, setStatusBusy] = useState(false)
+  const [templates, setTemplates] = useState<SupportReplyTemplate[]>([])
 
   const handleAuthError = useCallback(
     (err: unknown) => {
@@ -716,13 +829,19 @@ function SupportQueue({ onAuthLost }: { onAuthLost: () => void }) {
       })
       setTickets(result.tickets)
       setTotal(result.total)
+      if (result.counts) {
+        onCountsChange?.(result.counts)
+      } else if (filter === 'active' && !query) {
+        // Fallback when server has no counts field yet
+        onCountsChange?.({ open: result.total, total: result.total })
+      }
     } catch (err) {
       handleAuthError(err)
       setListError(err instanceof Error ? err.message : 'Could not load tickets')
     } finally {
       setListLoading(false)
     }
-  }, [filter, query, handleAuthError])
+  }, [filter, query, handleAuthError, onCountsChange])
 
   const loadDetail = useCallback(
     async (id: string) => {
@@ -749,6 +868,21 @@ function SupportQueue({ onAuthLost }: { onAuthLost: () => void }) {
   }, [loadList])
 
   useEffect(() => {
+    let cancelled = false
+    void adminApi
+      .supportTemplates()
+      .then(r => {
+        if (!cancelled) setTemplates(r.templates)
+      })
+      .catch(err => {
+        handleAuthError(err)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [handleAuthError])
+
+  useEffect(() => {
     if (!selectedId) {
       setDetailTicket(null)
       setMessages([])
@@ -756,6 +890,21 @@ function SupportQueue({ onAuthLost }: { onAuthLost: () => void }) {
     }
     void loadDetail(selectedId)
   }, [selectedId, loadDetail])
+
+  function applyTemplate(tpl: SupportReplyTemplate) {
+    if (!detailTicket) return
+    const rendered = renderTemplateBody(tpl.body, {
+      name: detailTicket.name,
+      publicId: detailTicket.publicId,
+      subject: detailTicket.subject,
+    })
+    setReplyBody(prev => {
+      const cur = prev.trim()
+      return cur ? `${cur}\n\n${rendered}` : rendered
+    })
+    setInternalOnly(false)
+    setReplyError(null)
+  }
 
   async function onStatusChange(status: SupportTicketStatus) {
     if (!detailTicket) return
@@ -970,39 +1119,66 @@ function SupportQueue({ onAuthLost }: { onAuthLost: () => void }) {
               )}
 
               <div className="admin-thread">
-                {messages.map(m => (
-                  <article
-                    key={m.id}
-                    className={`admin-thread-msg admin-thread-msg--${m.authorKind}`}
-                  >
-                    <header>
-                      <strong>
-                        {m.authorKind === 'customer'
-                          ? m.authorName || 'Customer'
-                          : m.authorKind === 'operator'
-                            ? m.authorName || 'Operator'
-                            : 'Internal note'}
-                      </strong>
-                      <span>{formatWhen(m.createdAt)}</span>
-                    </header>
-                    <div className="admin-thread-body">{m.body}</div>
-                  </article>
-                ))}
+                {messages.map(m => {
+                  const emailed = Boolean(m.resendMessageId) || m.body.startsWith('[Emailed to customer]')
+                  return (
+                    <article
+                      key={m.id}
+                      className={`admin-thread-msg admin-thread-msg--${m.authorKind}${emailed ? ' admin-thread-msg--emailed' : ''}`}
+                    >
+                      <header>
+                        <strong>
+                          {m.authorKind === 'customer'
+                            ? m.authorName || 'Customer'
+                            : m.authorKind === 'operator'
+                              ? m.authorName || 'Operator'
+                              : m.authorName || 'Internal note'}
+                          {emailed ? (
+                            <span className="admin-msg-pill admin-msg-pill--emailed">Emailed</span>
+                          ) : m.authorKind === 'system' ? (
+                            <span className="admin-msg-pill">Internal</span>
+                          ) : null}
+                        </strong>
+                        <span>{formatWhen(m.createdAt)}</span>
+                      </header>
+                      <div className="admin-thread-body">{m.body}</div>
+                    </article>
+                  )
+                })}
               </div>
 
               <form className="admin-reply-form" onSubmit={e => void onReply(e)}>
                 <label htmlFor="admin-reply-body">
                   {internalOnly ? 'Internal note' : 'Reply to customer'}
                 </label>
+                {templates.length > 0 && !internalOnly ? (
+                  <div className="admin-templates" role="group" aria-label="Reply templates">
+                    <span className="admin-templates-label">Templates</span>
+                    <div className="admin-templates-list">
+                      {templates.map(tpl => (
+                        <button
+                          key={tpl.id}
+                          type="button"
+                          className="admin-chip"
+                          title={tpl.category}
+                          disabled={replyBusy}
+                          onClick={() => applyTemplate(tpl)}
+                        >
+                          {tpl.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <textarea
                   id="admin-reply-body"
-                  rows={5}
+                  rows={7}
                   value={replyBody}
                   onChange={e => setReplyBody(e.target.value)}
                   placeholder={
                     internalOnly
                       ? 'Note for operators only (not emailed)…'
-                      : 'Write a reply — emailed to the customer via Resend…'
+                      : 'Write a reply — emailed to the customer and saved on this ticket…'
                   }
                   disabled={replyBusy}
                 />
