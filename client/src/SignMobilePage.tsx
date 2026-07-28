@@ -174,6 +174,30 @@ export function SignMobilePage() {
     }
   }, [sessionId])
 
+  /**
+   * After a successful send, briefly show confirmation then try to close this tab.
+   * Browsers only allow window.close() for script-opened windows — QR tabs often
+   * refuse, so we keep a short fallback message if the page is still open.
+   */
+  useEffect(() => {
+    if (phase !== 'sent') return
+    const closeTimer = window.setTimeout(() => {
+      try {
+        window.close()
+      } catch {
+        /* ignore */
+      }
+      // Some mobile WebViews only close after a self-open noop.
+      try {
+        window.open('', '_self')
+        window.close()
+      } catch {
+        /* ignore */
+      }
+    }, 900)
+    return () => window.clearTimeout(closeTimer)
+  }, [phase])
+
   const drawing =
     phase === 'ready' || phase === 'connecting' || phase === 'connected'
 
@@ -258,8 +282,8 @@ export function SignMobilePage() {
           <Check size={28} strokeWidth={2.5} aria-hidden />
           <h2>Sent to your computer</h2>
           <p className="muted">
-            Keep the computer window open until the signature appears. You can close this
-            tab.
+            Closing this tab… If it stays open, you can close it yourself. Keep the computer
+            window open until the signature appears.
           </p>
         </div>
       )}

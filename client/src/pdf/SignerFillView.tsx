@@ -119,8 +119,6 @@ export function SignerFillView({
   /** Shared initials ink (reused across initial slots only). */
   const [sharedInitials, setSharedInitials] = useState<SignatureStrokeResult | null>(null)
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null)
-  /** reuse = show saved stroke; draw = stroke pad */
-  const [sigModalMode, setSigModalMode] = useState<'reuse' | 'draw'>('draw')
   const [modalDraftInk, setModalDraftInk] = useState<SignatureStrokeResult | null>(null)
   const [modalDraftText, setModalDraftText] = useState('')
   const [sigPadKey, setSigPadKey] = useState(0)
@@ -320,15 +318,9 @@ export function SignerFillView({
     }
 
     if (isInkPlacementKind(slot.kind)) {
-      const existing = resolveExistingInk(slot)
-      if (existing) {
-        setSigModalMode('reuse')
-        setModalDraftInk(existing)
-      } else {
-        setSigModalMode('draw')
-        setModalDraftInk(null)
-        setSigPadKey(k => k + 1)
-      }
+      // Always open the draw pad. Saved ink (if any) is offered below as “Use existing”.
+      setModalDraftInk(null)
+      setSigPadKey(k => k + 1)
       setModalDraftText('')
     } else {
       const existingText =
@@ -373,7 +365,6 @@ export function SignerFillView({
       const slot = slotOverride ?? activeSlot
       if (!slot || !isInkPlacementKind(slot.kind)) {
         setModalDraftInk(result)
-        setSigModalMode('reuse')
         return
       }
       if (!result.path?.strokes?.length) {
@@ -588,6 +579,11 @@ export function SignerFillView({
   const initCount = myInitialSlots.filter(s => !isServerFilled(s.id)).length
   const activeIsInitial = activeSlot?.kind === 'initial'
   const activeInkPeerCount = activeIsInitial ? initCount : sigCount
+  /** Saved signature/initials for this person (shared pool or this field’s draft). */
+  const existingInkForActive =
+    activeSlot && isInkPlacementKind(activeSlot.kind)
+      ? resolveExistingInk(activeSlot)
+      : null
   /**
    * Phone already on VeriLock: open shared full-screen ink sheet (QR path uses the same).
    * Desktop keeps the card modal for ink draw.
@@ -598,7 +594,6 @@ export function SignerFillView({
     activeSlot.personSlotIndex === personSlotIndex &&
     !isServerFilled(activeSlot.id) &&
     isInkPlacementKind(activeSlot.kind) &&
-    sigModalMode === 'draw' &&
     // Full-screen sheet on phones (Safari/Chrome) and Nimiq Pay — same ink path.
     (isMobileViewport || isNimiqPayMiniAppHost())
 
@@ -789,6 +784,19 @@ export function SignerFillView({
             disabled={disabled || busy || submitting}
             onClose={closeModal}
             titleId="signer-fill-modal-title"
+            existingInk={
+              existingInkForActive
+                ? {
+                    imageDataUrl: existingInkForActive.imageDataUrl,
+                    path: existingInkForActive.path,
+                  }
+                : null
+            }
+            onUseExisting={
+              existingInkForActive
+                ? () => applyInkStroke(existingInkForActive, activeSlot)
+                : undefined
+            }
           />,
           document.body,
         )}
@@ -825,13 +833,9 @@ export function SignerFillView({
                   </p>
                   <h4 id="signer-fill-modal-title">
                     {isInkPlacementKind(activeSlot.kind)
-                      ? sigModalMode === 'reuse'
-                        ? activeIsInitial
-                          ? 'Use your initials'
-                          : 'Use your signature'
-                        : activeIsInitial
-                          ? 'Draw your initials'
-                          : 'Draw your signature'
+                      ? activeIsInitial
+                        ? 'Draw your initials'
+                        : 'Draw your signature'
                       : activeSlot.kind === 'name'
                         ? 'Type your name'
                         : activeSlot.lockedContent?.text?.trim() || 'Enter text'}
@@ -851,81 +855,80 @@ export function SignerFillView({
                 className={`signer-fill-modal-body${activeIsInitial ? ' is-initial' : ''}`}
               >
                 {isInkPlacementKind(activeSlot.kind) ? (
-                  sigModalMode === 'reuse' && modalDraftInk?.path?.strokes?.length ? (
-                    <div className="signer-fill-reuse">
+                  <>
+                    <SignatureStrokePad
+                      key={sigPadKey}
+                      productMode
+                      label={
+                        activeIsInitial
+                          ? 'Initials in the box below'
+                          : 'Sign in the box below'
+                      }
+                      padAspect={
+                        activeSlot
+                          ? activeSlot.width / Math.max(1e-6, activeSlot.height)
+                          : undefined
+                      }
+                      onChange={result => setModalDraftInk(result)}
+                      disabled={disabled || busy || submitting}
+                    />
+                    {existingInkForActive?.path?.strokes?.length ? (
                       <div
-                        className={`signer-fill-reuse-preview${activeIsInitial ? ' is-initial' : ''}`}
+                        className="signer-fill-existing"
+                        role="group"
+                        aria-label={
+                          activeIsInitial ? 'Saved initials' : 'Saved signature'
+                        }
                       >
-                        {modalDraftInk.imageDataUrl ? (
-                          <img
-                            src={modalDraftInk.imageDataUrl}
-                            alt={activeIsInitial ? 'Your initials' : 'Your signature'}
-                            className="signer-fill-reuse-img"
-                          />
-                        ) : (
-                          <InkPreview
-                            path={modalDraftInk.path}
-                            width={activeIsInitial ? 140 : 280}
-                            height={activeIsInitial ? 80 : 100}
-                          />
-                        )}
+                        <div
+                          className={`signer-fill-existing-preview${
+                            activeIsInitial ? ' is-initial' : ''
+                          }`}
+                        >
+                          {existingInkForActive.imageDataUrl ? (
+                            <img
+                              src={existingInkForActive.imageDataUrl}
+                              alt={
+                                activeIsInitial
+                                  ? 'Your saved initials'
+                                  : 'Your saved signature'
+                              }
+                              className="signer-fill-existing-img"
+                            />
+                          ) : (
+                            <InkPreview
+                              path={existingInkForActive.path}
+                              width={activeIsInitial ? 120 : 200}
+                              height={activeIsInitial ? 56 : 64}
+                            />
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-secondary signer-fill-existing-btn"
+                          disabled={disabled || busy || submitting}
+                          onClick={() =>
+                            applyInkStroke(existingInkForActive, activeSlot)
+                          }
+                        >
+                          Use existing
+                        </button>
                       </div>
-                      <p className="muted signer-fill-reuse-note">
-                        {activeInkPeerCount > 1
-                          ? activeIsInitial
-                            ? 'These initials are applied to every initial box assigned to you.'
-                            : 'This signature is applied to every signature line assigned to you.'
-                          : activeIsInitial
-                            ? 'Apply to place your initials on the document.'
-                            : 'Apply to place this signature on the document.'}
-                      </p>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => {
-                          setSigModalMode('draw')
-                          setModalDraftInk(null)
-                          setSigPadKey(k => k + 1)
-                        }}
-                      >
-                        {activeIsInitial
-                          ? 'Draw different initials'
-                          : 'Draw a different signature'}
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <SignatureStrokePad
-                        key={sigPadKey}
-                        productMode
-                        label={
-                          activeIsInitial
-                            ? 'Initials in the box below'
-                            : 'Sign in the box below'
-                        }
-                        padAspect={
-                          activeSlot
-                            ? activeSlot.width / Math.max(1e-6, activeSlot.height)
-                            : undefined
-                        }
-                        onChange={result => setModalDraftInk(result)}
-                        disabled={disabled || busy || submitting}
-                      />
-                      {FEATURES.signOnMobile &&
-                        authToken &&
-                        !isLikelyMobileViewport() && (
-                          <button
-                            type="button"
-                            className="btn btn-secondary signer-fill-mobile-btn"
-                            disabled={disabled || busy || submitting}
-                            onClick={() => setSignOnMobileOpen(true)}
-                          >
-                            <Smartphone size={16} strokeWidth={2.25} aria-hidden />
-                            {activeIsInitial ? 'Initials on mobile' : 'Sign on mobile'}
-                          </button>
-                        )}
-                    </>
-                  )
+                    ) : null}
+                    {FEATURES.signOnMobile &&
+                      authToken &&
+                      !isLikelyMobileViewport() && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary signer-fill-mobile-btn"
+                          disabled={disabled || busy || submitting}
+                          onClick={() => setSignOnMobileOpen(true)}
+                        >
+                          <Smartphone size={16} strokeWidth={2.25} aria-hidden />
+                          {activeIsInitial ? 'Initials on mobile' : 'Sign on mobile'}
+                        </button>
+                      )}
+                  </>
                 ) : activeIsDateField ? (
                   <div className="signer-fill-date-field">
                     <p className="muted signer-fill-date-hint">
@@ -973,7 +976,7 @@ export function SignerFillView({
                   onClick={confirmModal}
                 >
                   {isInkPlacementKind(activeSlot.kind)
-                    ? activeInkPeerCount > 1 && sigModalMode === 'draw'
+                    ? activeInkPeerCount > 1
                       ? activeIsInitial
                         ? 'Apply to all initial boxes'
                         : 'Apply to all signature lines'

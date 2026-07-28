@@ -11,10 +11,12 @@ import { X } from 'lucide-react'
 import {
   useEffect,
   useLayoutEffect,
+  useRef,
   useState,
   type CSSProperties,
 } from 'react'
 import { useIsLandscape, useIsRealPortrait } from '../useViewport'
+import { paintSignaturePath, type SignaturePathData } from './annotations'
 import {
   SignatureStrokePad,
   type SignatureStrokeResult,
@@ -65,18 +67,16 @@ function IPhoneOutlineIcon({ className }: { className?: string }) {
 }
 
 /**
- * Pixel-perfect forced landscape frame for portrait-locked hosts (Nimiq Pay).
+ * Forced landscape frame for portrait-locked hosts (Nimiq Pay / mobile browsers).
  *
  * Layout box is landscape-sized (long = physical height, short = physical width),
  * centered, then rotated 90° so it fills the portrait viewport. Hold phone on its side.
  *
- * Also computes pad pixel size to fill the long edge while keeping field aspect
- * (so the draw band is full-width when viewed landscape, not a narrow strip).
+ * Pad size is NOT computed here — head + pad stage + Done dock are in-flow flex
+ * children; the stage uses container queries so the canvas fills remaining space
+ * at the field aspect without overlapping the green button.
  */
-function useForcedLandscapeFrame(
-  enabled: boolean,
-  fieldAspect: number,
-): CSSProperties | undefined {
+function useForcedLandscapeFrame(enabled: boolean): CSSProperties | undefined {
   const [style, setStyle] = useState<CSSProperties | undefined>(undefined)
 
   useLayoutEffect(() => {
@@ -92,25 +92,6 @@ function useForcedLandscapeFrame(
       // Landscape logical size: width = long edge, height = short edge
       const frameW = vh
       const frameH = vw
-      const aspect =
-        Number.isFinite(fieldAspect) && fieldAspect > 0.05 && fieldAspect < 20
-          ? fieldAspect
-          : 2.5
-
-      // Room for head + Apply dock + gaps (logical landscape coords)
-      const padX = 20
-      const padTop = 52
-      const padBottom = 58
-      const availW = Math.max(120, frameW - padX * 2)
-      const availH = Math.max(80, frameH - padTop - padBottom)
-
-      // Fit field aspect inside avail box — prefer using full long edge (width)
-      let padW = availW
-      let padH = padW / aspect
-      if (padH > availH) {
-        padH = availH
-        padW = padH * aspect
-      }
 
       setStyle({
         position: 'fixed',
@@ -127,8 +108,6 @@ function useForcedLandscapeFrame(
         boxSizing: 'border-box',
         ['--ink-force-short' as string]: `${frameH}px`,
         ['--ink-force-long' as string]: `${frameW}px`,
-        ['--ink-pad-w' as string]: `${Math.round(padW)}px`,
-        ['--ink-pad-h' as string]: `${Math.round(padH)}px`,
       })
     }
 
@@ -144,9 +123,14 @@ function useForcedLandscapeFrame(
       vv?.removeEventListener('resize', apply)
       vv?.removeEventListener('scroll', apply)
     }
-  }, [enabled, fieldAspect])
+  }, [enabled])
 
   return style
+}
+
+export interface InkCaptureExistingInk {
+  imageDataUrl?: string
+  path?: SignaturePathData | null
 }
 
 export interface InkCaptureSheetProps {
@@ -172,6 +156,55 @@ export interface InkCaptureSheetProps {
   variant?: 'page' | 'overlay'
   className?: string
   titleId?: string
+  /**
+   * Prior signature/initials for this person. Shown under the pad with
+   * “Use existing” so the user can re-apply without redrawing.
+   */
+  existingInk?: InkCaptureExistingInk | null
+  onUseExisting?: () => void
+}
+
+function ExistingInkThumb({
+  ink,
+  isInitial,
+}: {
+  ink: InkCaptureExistingInk
+  isInitial: boolean
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const w = isInitial ? 88 : 140
+  const h = isInitial ? 44 : 48
+
+  useEffect(() => {
+    if (ink.imageDataUrl || !ink.path?.strokes?.length || !canvasRef.current) return
+    const c = canvasRef.current
+    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    c.width = Math.round(w * dpr)
+    c.height = Math.round(h * dpr)
+    c.style.width = `${w}px`
+    c.style.height = `${h}px`
+    const ctx = c.getContext('2d')
+    if (!ctx) return
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, w, h)
+    paintSignaturePath(ctx, ink.path, { left: 4, top: 4, width: w - 8, height: h - 8 })
+  }, [ink.imageDataUrl, ink.path, w, h])
+
+  if (ink.imageDataUrl) {
+    return (
+      <img
+        className="ink-capture-existing-img"
+        src={ink.imageDataUrl}
+        alt=""
+        width={w}
+        height={h}
+      />
+    )
+  }
+  if (ink.path?.strokes?.length) {
+    return <canvas ref={canvasRef} className="ink-capture-existing-img" aria-hidden />
+  }
+  return null
 }
 
 export function InkCaptureSheet({
@@ -189,6 +222,8 @@ export function InkCaptureSheet({
   variant = 'page',
   className,
   titleId = 'ink-capture-title',
+  existingInk = null,
+  onUseExisting,
 }: InkCaptureSheetProps) {
   const isLandscape = useIsLandscape()
   const isRealPortrait = useIsRealPortrait()
@@ -205,7 +240,7 @@ export function InkCaptureSheet({
       : isInitial
         ? 1.4
         : 2.8
-  const forceFrame = useForcedLandscapeFrame(isPortraitHost, aspect)
+  const forceFrame = useForcedLandscapeFrame(isPortraitHost)
 
   /**
    * One-shot guide: iPhone SVG turns 2s, holds, fades — tip the phone to match the frame.
@@ -350,6 +385,25 @@ export function InkCaptureSheet({
             onChange={onChange}
           />
         </div>
+
+        {existingInk &&
+          onUseExisting &&
+          (existingInk.imageDataUrl || existingInk.path?.strokes?.length) &&
+          !needsLandscape && (
+            <div className="ink-capture-existing" role="group" aria-label="Saved ink">
+              <div className="ink-capture-existing-preview">
+                <ExistingInkThumb ink={existingInk} isInitial={isInitial} />
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary ink-capture-existing-btn"
+                disabled={disabled || primaryDisabled || !canDraw}
+                onClick={onUseExisting}
+              >
+                Use existing
+              </button>
+            </div>
+          )}
 
         <div
           className="ink-capture-float-dock"

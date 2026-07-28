@@ -320,7 +320,7 @@ export function SignOnMobileModal({
           : phase === 'connected'
             ? 'Connected - draw and confirm on your phone'
             : phase === 'received'
-              ? 'Signature received (vector ink) - review below'
+              ? 'Signature received'
               : phase === 'error'
                 ? error ?? 'Something went wrong'
                 : ''
