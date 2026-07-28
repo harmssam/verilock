@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Express } from 'express'
 import express from 'express'
@@ -33,6 +33,55 @@ function isKnownAppPath(path: string): boolean {
 }
 
 const SEO_STATIC_FILES = ['sitemap.xml', 'robots.txt'] as const
+
+// --- Server-side canonical injection ---------------------------------------
+// The SPA serves index.html for every route. Without server-side canonical
+// injection, every page gets the same <link rel="canonical"> (or none at all),
+// and Google Search Console flags them as "Alternate page with proper canonical
+// tag" — meaning they exist but their canonical says they're duplicates of /.
+
+const SITE_ORIGIN = 'https://verilock.online'
+
+let cachedIndexHtml: string | null = null
+
+function getIndexHtml(): string {
+  if (!cachedIndexHtml) {
+    cachedIndexHtml = readFileSync(join(getClientDistDir(), 'index.html'), 'utf-8')
+  }
+  return cachedIndexHtml
+}
+
+/** Map request path → canonical URL for Google. Unrecognized paths default to /. */
+function canonicalForPath(path: string): string {
+  const clean = path.replace(/\/+$/, '') || '/'
+
+  // Static pages with unique content — indexed.
+  const known: Record<string, string> = {
+    '/': '/',
+    '/pricing': '/pricing',
+    '/privacy': '/privacy',
+    '/security': '/security',
+    '/support': '/support',
+    '/faq': '/faq',
+    '/esignature-pricing': '/esignature-pricing',
+    '/blog': '/blog',
+  }
+  if (known[clean]) return `${SITE_ORIGIN}${known[clean]}`
+
+  // Blog post slugs.
+  const blogMatch = clean.match(/^\/blog\/([a-zA-Z0-9_-]+)$/)
+  if (blogMatch) return `${SITE_ORIGIN}/blog/${blogMatch[1]}`
+
+  // Deep-link, agreement, verify, mobile, admin — default to home canonical.
+  return `${SITE_ORIGIN}/`
+}
+
+function injectCanonical(html: string, path: string): string {
+  const canonicalUrl = canonicalForPath(path)
+  const tag = `<link rel="canonical" href="${canonicalUrl}" />`
+  return html.replace('</head>', `  ${tag}\n  </head>`)
+}
+// ---------------------------------------------------------------------------
 
 export function attachClientStatic(app: Express): boolean {
   const distDir = getClientDistDir()
@@ -99,7 +148,9 @@ export function attachClientStatic(app: Express): boolean {
       res.status(404).sendFile(notFoundPage)
       return
     }
-    res.sendFile(join(distDir, 'index.html'))
+    const html = injectCanonical(getIndexHtml(), req.path)
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    res.send(html)
   })
 
   console.log(`Serving client from ${distDir}`)
