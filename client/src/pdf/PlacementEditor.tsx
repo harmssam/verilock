@@ -216,10 +216,10 @@ export function PlacementEditor({
   /** Finger/mouse movement above this = pan/scroll, not a place tap. */
   const PLACE_TAP_SLOP_PX = 12
   /**
-   * Drag vs click for slots. Must be larger than typical trackpad/mouse jitter
-   * (~4–8px) or a normal click is treated as a drag and check/X never toggles.
+   * Drag vs click for slots. Slightly above tiny trackpad jitter so a plain
+   * click still toggles; real drags start after this distance.
    */
-  const SLOT_DRAG_SLOP_PX = 10
+  const SLOT_DRAG_SLOP_PX = 6
   const [dragTick, setDragTick] = useState(0)
   /** Last pointer position during a slot drag (for continuous edge auto-scroll). */
   const lastDragPointerRef = useRef<{ x: number; y: number } | null>(null)
@@ -1022,7 +1022,7 @@ export function PlacementEditor({
         (slot.kind === 'checkmark' || slot.kind === 'cross')
       ) {
         setPlaceError(
-          'Layout is locked. Use “Back to edit placements” to toggle checkboxes.',
+          'Empty check/X boxes are for signers on the Sign step. To pre-check one as the organizer, unlock layout first (Back to edit placements).',
         )
       }
       return
