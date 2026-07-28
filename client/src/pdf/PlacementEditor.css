@@ -1112,22 +1112,34 @@
   outline-offset: 2px;
 }
 
-/* Check / X slots: light field chrome; glyph is the square (avoid double-frame stretch) */
-.placement-slot:has(.placement-mark-preview) {
-  border-style: solid !important;
-  border-color: color-mix(in srgb, var(--person-color, #0f766e) 45%, #e2e8f0) !important;
-  padding: 0;
-  background: #fff !important;
+/*
+ * Check / X: the canvas draws the only square frame.
+ * No outer CSS rectangle — that caused a tall box around a square glyph.
+ * Override .placement-slot and .pdf-annotator-item borders (both use !important / hover).
+ */
+.placement-slot.is-mark,
+.placement-slot.is-mark:hover,
+.placement-slot.is-mark.is-selected,
+.placement-slot.is-mark.is-dragging,
+.pdf-annotator-item.placement-slot.is-mark:hover,
+.pdf-annotator-item.placement-slot.is-mark.is-selected {
+  border: none !important;
+  border-color: transparent !important;
+  padding: 0 !important;
+  background: transparent !important;
   cursor: pointer;
-  overflow: hidden;
+  overflow: visible;
+  box-shadow: none !important;
 }
 
-.placement-slot:has(.placement-mark-preview.is-empty):hover {
-  background: color-mix(in srgb, var(--person-color, #0f766e) 8%, #fff) !important;
+.placement-slot.is-mark.is-selected {
+  /* Soft ring outside the square only when selected */
+  outline: 2px solid color-mix(in srgb, var(--person-color, #0f766e) 55%, transparent);
+  outline-offset: 2px;
 }
 
-.placement-slot:has(.placement-mark-preview.is-checked) {
-  background: color-mix(in srgb, var(--person-color, #0f766e) 6%, #fff) !important;
+.placement-slot.is-mark:hover:not(.is-locked) {
+  filter: brightness(0.97);
 }
 
 .placement-slot.is-selected {

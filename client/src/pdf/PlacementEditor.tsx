@@ -993,7 +993,9 @@ export function PlacementEditor({
   }
 
   const startItemDrag = (e: React.PointerEvent, id: string) => {
-    if (editDisabled || tool !== 'select') return
+    // Existing slots are always interactive (move / check-toggle) even when a place
+    // tool is still active — otherwise check/X clicks do nothing after placing.
+    if (editDisabled) return
     e.stopPropagation()
     e.preventDefault()
     const slot = slots.find(s => s.id === id)
@@ -1769,7 +1771,22 @@ export function PlacementEditor({
                     <canvas ref={canvasRef} />
                     <div className="pdf-annotator-layer">
                       {pageSlots.map(slot => {
-                        const r = normalizedToCanvasRect(slot, cssSize.width, cssSize.height)
+                        const raw = normalizedToCanvasRect(slot, cssSize.width, cssSize.height)
+                        // Check/X: force a perfect CSS square (legacy equal-norm slots
+                        // become tall rectangles on portrait pages).
+                        const isMark =
+                          slot.kind === 'checkmark' || slot.kind === 'cross'
+                        const r = isMark
+                          ? (() => {
+                              const side = Math.min(raw.width, raw.height)
+                              return {
+                                left: raw.left + (raw.width - side) / 2,
+                                top: raw.top + (raw.height - side) / 2,
+                                width: side,
+                                height: side,
+                              }
+                            })()
+                          : raw
                         const selected = selectedId === slot.id
                         const color = personColor(slot.personSlotIndex)
                         const person =
@@ -1780,7 +1797,7 @@ export function PlacementEditor({
                             key={slot.id}
                             className={`placement-slot pdf-annotator-item${selected ? ' is-selected' : ''}${
                               dragRef.current?.id === slot.id ? ' is-dragging' : ''
-                            }${locked ? ' is-locked' : ''}`}
+                            }${locked ? ' is-locked' : ''}${isMark ? ' is-mark' : ''}`}
                             style={{
                               left: r.left,
                               top: r.top,
@@ -1815,7 +1832,7 @@ export function PlacementEditor({
                                 <X size={10} strokeWidth={3} aria-hidden />
                               </button>
                             )}
-                            {slot.kind === 'checkmark' || slot.kind === 'cross' ? (
+                            {isMark ? (
                               <MarkFieldCanvas
                                 kind={slot.kind}
                                 checked={slot.lockedContent?.mark === slot.kind}
