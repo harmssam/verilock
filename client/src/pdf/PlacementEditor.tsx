@@ -55,7 +55,6 @@ import {
   normalizedToCanvasRect,
 } from './annotations'
 import { loadDocumentSurface, type DocumentSurface } from './documentSurface'
-import { MarkFieldCanvas } from './MarkFieldCanvas'
 import './PdfAnnotator.css'
 import './PlacementEditor.css'
 
@@ -1826,66 +1825,43 @@ export function PlacementEditor({
                                 <X size={10} strokeWidth={3} aria-hidden />
                               </button>
                             )}
-                            {slot.kind === 'checkmark' || slot.kind === 'cross' ? (
-                              <MarkFieldCanvas
-                                kind={slot.kind}
-                                checked={false}
-                                color={color}
-                                width={r.width}
-                                height={r.height}
-                                className="placement-mark-preview"
-                              />
-                            ) : (
-                              <div className="placement-slot-label">
-                                <span className="placement-slot-person">{person}</span>
-                                <span className="placement-slot-kind">
-                                  ·{' '}
-                                  {slot.kind === 'text' && slot.lockedContent?.text
-                                    ? slot.lockedContent.text
-                                    : kindLabel(slot.kind)}
-                                </span>
-                              </div>
-                            )}
+                            <div className="placement-slot-label">
+                              <span className="placement-slot-person">{person}</span>
+                              <span className="placement-slot-kind">
+                                ·{' '}
+                                {slot.kind === 'text' && slot.lockedContent?.text
+                                  ? slot.lockedContent.text
+                                  : kindLabel(slot.kind)}
+                              </span>
+                            </div>
                           </div>
                         )
                       })}
                       {placing && tool !== 'select' && activePerson != null && (
                         <div className="pdf-annotator-ghost placement-ghost" style={ghostStyle()}>
-                          {tool === 'checkmark' || tool === 'cross' ? (
-                            (() => {
-                              const markBox = markCssPixelSize(cssSize)
-                              return (
-                                <MarkFieldCanvas
-                                  kind={tool}
-                                  checked={false}
-                                  color={personColor(activePerson)}
-                                  width={markBox.width}
-                                  height={markBox.height}
-                                  className="placement-mark-preview"
-                                />
-                              )
-                            })()
-                          ) : (
-                            <div className="placement-slot-label">
-                              <span className="placement-slot-person">{activeName}</span>
-                              <span className="placement-slot-kind">
-                                ·{' '}
-                                {tool === 'date'
-                                  ? 'Date'
-                                  : tool === 'text' && textFieldLabel.trim()
-                                    ? textFieldLabel.trim()
-                                    : kindLabel(
-                                        tool === 'signature'
-                                          ? 'signature'
-                                          : tool === 'initial'
-                                            ? 'initial'
-                                            : tool === 'name'
-                                              ? 'name'
-                                              : 'text',
-                                      )}
-                              </span>
-                            </div>
-                          )}
+                          <div className="placement-slot-label">
+                            <span className="placement-slot-person">{activeName}</span>
+                            <span className="placement-slot-kind">
+                              ·{' '}
+                              {tool === 'date'
+                                ? 'Date'
+                                : tool === 'checkmark'
+                                  ? 'check'
+                                  : tool === 'cross'
+                                    ? 'X'
+                                    : tool === 'text' && textFieldLabel.trim()
+                                      ? textFieldLabel.trim()
+                                      : kindLabel(
+                                          tool === 'signature'
+                                            ? 'signature'
+                                            : tool === 'initial'
+                                              ? 'initial'
+                                              : tool === 'name'
+                                                ? 'name'
+                                                : 'text',
+                                        )}
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
