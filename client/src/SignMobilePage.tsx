@@ -49,6 +49,38 @@ function kindFromHash(): 'signature' | 'initial' {
 }
 
 /**
+ * Best-effort close for a QR-opened sign tab.
+ * Browsers usually block window.close() unless the tab was script-opened;
+ * a user-gesture click succeeds more often than a timer. If close is denied,
+ * fall back to about:blank so the user is not stuck on a full VeriLock page.
+ */
+function tryCloseThisTab(options?: { blankFallback?: boolean }): void {
+  const blankFallback = options?.blankFallback !== false
+  try {
+    window.close()
+  } catch {
+    /* ignore */
+  }
+  try {
+    // Some mobile WebViews only close after a self-target open.
+    window.open('', '_self')
+    window.close()
+  } catch {
+    /* ignore */
+  }
+  if (!blankFallback) return
+  window.setTimeout(() => {
+    try {
+      if (!window.closed) {
+        window.location.replace('about:blank')
+      }
+    } catch {
+      /* ignore */
+    }
+  }, 120)
+}
+
+/**
  * Full-screen mobile signature capture - no wallet, no PDF, no preview step.
  * Draw → Done sends vectors (E2E encrypted) to the desktop host.
  * Capture UI is shared with in-app mobile field signing (`InkCaptureSheet`).
@@ -59,6 +91,8 @@ export function SignMobilePage() {
   const [error, setError] = useState<string | null>(null)
   const [stroke, setStroke] = useState<SignatureStrokeResult | null>(null)
   const [padKey, setPadKey] = useState(0)
+  /** True after auto-close failed and we still show the done screen. */
+  const [closeBlocked, setCloseBlocked] = useState(false)
   const padAspect = aspectFromHash()
   const fieldKind = kindFromHash()
 
@@ -175,26 +209,25 @@ export function SignMobilePage() {
   }, [sessionId])
 
   /**
-   * After a successful send, briefly show confirmation then try to close this tab.
-   * Browsers only allow window.close() for script-opened windows — QR tabs often
-   * refuse, so we keep a short fallback message if the page is still open.
+   * After a successful send, briefly show confirmation then try to close
+   * (no blank fallback — that needs a user gesture). If the tab is still open,
+   * highlight the Close button (user tap has a better chance / blanks the page).
    */
   useEffect(() => {
-    if (phase !== 'sent') return
+    if (phase !== 'sent') {
+      setCloseBlocked(false)
+      return
+    }
     const closeTimer = window.setTimeout(() => {
-      try {
-        window.close()
-      } catch {
-        /* ignore */
-      }
-      // Some mobile WebViews only close after a self-open noop.
-      try {
-        window.open('', '_self')
-        window.close()
-      } catch {
-        /* ignore */
-      }
-    }, 900)
+      tryCloseThisTab({ blankFallback: false })
+      window.setTimeout(() => {
+        try {
+          if (!window.closed) setCloseBlocked(true)
+        } catch {
+          setCloseBlocked(true)
+        }
+      }, 200)
+    }, 700)
     return () => window.clearTimeout(closeTimer)
   }, [phase])
 
@@ -253,9 +286,15 @@ export function SignMobilePage() {
         <div className="sign-mobile-done" role="status">
           <h2>Signature cancelled</h2>
           <p className="muted">
-            You can close this tab. On your computer, open a new QR if you still want to
-            sign.
+            On your computer, open a new QR if you still want to sign.
           </p>
+          <button
+            type="button"
+            className="btn btn-primary btn-lg sign-mobile-close-btn"
+            onClick={() => tryCloseThisTab()}
+          >
+            Close this tab
+          </button>
           <button
             type="button"
             className="btn btn-secondary"
@@ -282,9 +321,23 @@ export function SignMobilePage() {
           <Check size={28} strokeWidth={2.5} aria-hidden />
           <h2>Sent to your computer</h2>
           <p className="muted">
-            Closing this tab… If it stays open, you can close it yourself. Keep the computer
-            window open until the signature appears.
+            {closeBlocked
+              ? 'Keep the computer window open until the signature appears. Tap below to close this tab.'
+              : 'Keep the computer window open until the signature appears. Closing this tab…'}
           </p>
+          <button
+            type="button"
+            className="btn btn-primary btn-lg sign-mobile-close-btn"
+            onClick={() => tryCloseThisTab()}
+          >
+            Close this tab
+          </button>
+          {closeBlocked ? (
+            <p className="muted sign-mobile-close-hint">
+              If the browser blocks closing, this button clears the page so you can swipe the
+              tab away easily.
+            </p>
+          ) : null}
         </div>
       )}
     </div>

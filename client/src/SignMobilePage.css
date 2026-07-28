@@ -61,3 +61,16 @@
   max-width: 22rem;
   line-height: 1.45;
 }
+
+.sign-mobile-close-btn {
+  width: 100%;
+  max-width: 20rem;
+  min-height: 3rem;
+  margin-top: 0.35rem;
+  font-weight: 700;
+}
+
+.sign-mobile-close-hint {
+  font-size: 0.82rem;
+  max-width: 20rem;
+}

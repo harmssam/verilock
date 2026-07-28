@@ -44,6 +44,8 @@ import {
   defaultPeople,
   defaultSizeForKind,
   fontSizeRatioAtScale,
+  isMarkPlacementKind,
+  markCssPixelSize,
   newSlotId,
   personColor,
   scalePercentFromSlot,
@@ -51,9 +53,9 @@ import {
 import {
   canvasRectToNormalized,
   normalizedToCanvasRect,
-  paintMark,
 } from './annotations'
 import { loadDocumentSurface, type DocumentSurface } from './documentSurface'
+import { MarkFieldCanvas } from './MarkFieldCanvas'
 import './PdfAnnotator.css'
 import './PlacementEditor.css'
 
@@ -720,12 +722,18 @@ export function PlacementEditor({
     autoScrollRafRef.current = requestAnimationFrame(tickDragAutoScroll)
   }, [tickDragAutoScroll])
 
+  const pageCssAspect =
+    cssSize.height > 0 ? cssSize.width / cssSize.height : 1
+
   const setSelectedScalePercent = useCallback(
     (pct: number) => {
       if (!selectedSlot || locked) return
-      updateSlot(selectedSlot.id, applyPlacementScale(selectedSlot, pct))
+      updateSlot(
+        selectedSlot.id,
+        applyPlacementScale(selectedSlot, pct, pageCssAspect),
+      )
     },
-    [selectedSlot, locked, updateSlot],
+    [selectedSlot, locked, updateSlot, pageCssAspect],
   )
 
   const pointerToLocal = (e: React.PointerEvent) => {
@@ -810,12 +818,19 @@ export function PlacementEditor({
 
     setPlaceError(null)
     const size = defaultSizeForKind(kind)
+    // Check / X: perfect CSS square (equal norm fractions stretch on tall pages).
+    const box = isMarkPlacementKind(kind)
+      ? markCssPixelSize(cssSize, PLACEMENT_SCALE_DEFAULT_PCT)
+      : {
+          width: size.width * cssSize.width,
+          height: size.height * cssSize.height,
+        }
     const geo = canvasRectToNormalized(
       {
-        left: cssX - (size.width * cssSize.width) / 2,
-        top: cssY - (size.height * cssSize.height) / 2,
-        width: size.width * cssSize.width,
-        height: size.height * cssSize.height,
+        left: cssX - box.width / 2,
+        top: cssY - box.height / 2,
+        width: box.width,
+        height: box.height,
       },
       cssSize.width,
       cssSize.height,
@@ -1018,14 +1033,18 @@ export function PlacementEditor({
                 ? 'checkmark'
                 : 'cross'
     const size = defaultSizeForKind(kind)
-    const w = size.width * cssSize.width
-    const h = size.height * cssSize.height
+    const box = isMarkPlacementKind(kind)
+      ? markCssPixelSize(cssSize, PLACEMENT_SCALE_DEFAULT_PCT)
+      : {
+          width: size.width * cssSize.width,
+          height: size.height * cssSize.height,
+        }
     const color = personColor(activePerson)
     return {
-      left: placing.x - w / 2,
-      top: placing.y - h / 2,
-      width: w,
-      height: h,
+      left: placing.x - box.width / 2,
+      top: placing.y - box.height / 2,
+      width: box.width,
+      height: box.height,
       borderColor: color,
       background: `${color}18`,
     }
@@ -1769,7 +1788,12 @@ export function PlacementEditor({
                               height: r.height,
                               ['--person-color' as string]: color,
                             }}
-                            onPointerDown={e => startItemDrag(e, slot.id)}
+                            onPointerDown={e => {
+                              // Don't let place tools also drop a new box when clicking an
+                              // existing slot (especially check/X toggle).
+                              e.stopPropagation()
+                              startItemDrag(e, slot.id)
+                            }}
                             onPointerUp={endDrag}
                             onPointerCancel={endDrag}
                           >
@@ -1792,12 +1816,13 @@ export function PlacementEditor({
                               </button>
                             )}
                             {slot.kind === 'checkmark' || slot.kind === 'cross' ? (
-                              <MarkPreview
+                              <MarkFieldCanvas
                                 kind={slot.kind}
                                 checked={slot.lockedContent?.mark === slot.kind}
                                 color={slot.lockedContent?.color ?? color}
                                 width={r.width}
                                 height={r.height}
+                                className="placement-mark-preview"
                               />
                             ) : (
                               <div className="placement-slot-label">
@@ -1816,13 +1841,19 @@ export function PlacementEditor({
                       {placing && tool !== 'select' && activePerson != null && (
                         <div className="pdf-annotator-ghost placement-ghost" style={ghostStyle()}>
                           {tool === 'checkmark' || tool === 'cross' ? (
-                            <MarkPreview
-                              kind={tool}
-                              checked={false}
-                              color={personColor(activePerson)}
-                              width={defaultSizeForKind(tool).width * cssSize.width}
-                              height={defaultSizeForKind(tool).height * cssSize.height}
-                            />
+                            (() => {
+                              const markBox = markCssPixelSize(cssSize)
+                              return (
+                                <MarkFieldCanvas
+                                  kind={tool}
+                                  checked={false}
+                                  color={personColor(activePerson)}
+                                  width={markBox.width}
+                                  height={markBox.height}
+                                  className="placement-mark-preview"
+                                />
+                              )
+                            })()
                           ) : (
                             <div className="placement-slot-label">
                               <span className="placement-slot-person">{activeName}</span>
@@ -1861,54 +1892,5 @@ export function PlacementEditor({
       })()}
 
     </div>
-  )
-}
-
-function MarkPreview({
-  kind,
-  checked,
-  color,
-  width,
-  height,
-}: {
-  kind: 'checkmark' | 'cross'
-  /** When false, draws an empty square the user can click to fill. */
-  checked: boolean
-  color: string
-  width: number
-  height: number
-}) {
-  const ref = useRef<HTMLCanvasElement>(null)
-  useEffect(() => {
-    const c = ref.current
-    if (!c) return
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
-    c.width = Math.max(1, Math.round(width * dpr))
-    c.height = Math.max(1, Math.round(height * dpr))
-    c.style.width = `${width}px`
-    c.style.height = `${height}px`
-    const ctx = c.getContext('2d')
-    if (!ctx) return
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, width, height)
-    // Empty checkbox frame (always)
-    const inset = Math.max(1, Math.min(width, height) * 0.08)
-    const lw = Math.max(1.5, Math.min(width, height) * 0.08)
-    ctx.save()
-    ctx.strokeStyle = color
-    ctx.lineWidth = lw
-    ctx.lineJoin = 'miter'
-    ctx.strokeRect(inset, inset, width - inset * 2, height - inset * 2)
-    ctx.restore()
-    if (checked) {
-      paintMark(ctx, kind, { left: 0, top: 0, width, height }, color)
-    }
-  }, [kind, checked, color, width, height])
-  return (
-    <canvas
-      ref={ref}
-      className={`placement-mark-preview${checked ? ' is-checked' : ' is-empty'}`}
-      aria-hidden
-    />
   )
 }
