@@ -189,6 +189,10 @@ export function SignMobilePage() {
         hasInk={Boolean(stroke?.path?.strokes?.length)}
         primaryLabel="Done"
         onPrimary={() => void send()}
+        onClose={() => {
+          setStroke(null)
+          setPhase('aborted')
+        }}
       />
     )
   }
@@ -217,6 +221,27 @@ export function SignMobilePage() {
             }}
           >
             Try again
+          </button>
+        </div>
+      )}
+
+      {phase === 'aborted' && (
+        <div className="sign-mobile-done" role="status">
+          <h2>Signature cancelled</h2>
+          <p className="muted">
+            You can close this tab. On your computer, open a new QR if you still want to
+            sign.
+          </p>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              setStroke(null)
+              setPadKey(k => k + 1)
+              setPhase(channelOpenRef.current ? 'connected' : 'ready')
+            }}
+          >
+            Draw again
           </button>
         </div>
       )}
