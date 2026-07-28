@@ -1832,7 +1832,7 @@ export function PlacementEditor({
                                 <X size={10} strokeWidth={3} aria-hidden />
                               </button>
                             )}
-                            {isMark ? (
+                            {slot.kind === 'checkmark' || slot.kind === 'cross' ? (
                               <MarkFieldCanvas
                                 kind={slot.kind}
                                 checked={slot.lockedContent?.mark === slot.kind}

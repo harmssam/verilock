@@ -725,7 +725,7 @@ export function SignerFillView({
                         : `Reserved for person ${slot.personSlotIndex}`
                     }
                   >
-                    {isMark ? (
+                    {slot.kind === 'checkmark' || slot.kind === 'cross' ? (
                       <MarkFieldCanvas
                         kind={slot.kind}
                         checked={slot.lockedContent?.mark === slot.kind}
