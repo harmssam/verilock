@@ -22,6 +22,8 @@ import {
   kindToWire,
   normalizeHex32,
   normalizeHex64,
+  isMarkFillOn,
+  personColor,
   planLockBatch,
   q,
   clamp01,
@@ -599,6 +601,20 @@ export function expandMergedToAnnotations(state: MergedPlacementState): PdfAnnot
     if (blobId) {
       const payload = state.blobs.get(blobId)
       if (!payload) continue // missing blob - caller can warn via missingBlobIds
+      // Signer-activated check/X (stored as a small text blob).
+      if (
+        (slot.kind === 'checkmark' || slot.kind === 'cross') &&
+        payload.kind === 'text' &&
+        isMarkFillOn(payload.text)
+      ) {
+        out.push({
+          id: slot.id,
+          type: slot.kind,
+          ...geo,
+          color: slot.lockedContent?.color ?? personColor(slot.personSlotIndex),
+        })
+        continue
+      }
       if (payload.kind === 'ink') {
         out.push({
           id: slot.id,

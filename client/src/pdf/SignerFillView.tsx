@@ -24,8 +24,11 @@ import {
   type BlobPayload,
   type ConstructionPlan,
   type PlacementSlot,
+  MARK_FILL_ON,
   fillFontSizeRatioForSlot,
   isInkPlacementKind,
+  isMarkPlacementKind,
+  isMarkPreChecked,
   personColor,
 } from './placements'
 import {
@@ -89,6 +92,8 @@ export interface SignerFillViewProps {
 type LocalFill =
   | { kind: 'ink'; path: SignaturePathData; imageDataUrl?: string }
   | { kind: 'text'; text: string }
+  /** Signer activated a check/X box (submitted as a text blob). */
+  | { kind: 'mark'; on: boolean }
 
 export function SignerFillView({
   file,
@@ -137,14 +142,21 @@ export function SignerFillView({
 
   const myFillable = useMemo(
     () =>
-      plan.slots.filter(
-        s =>
-          s.personSlotIndex === personSlotIndex &&
-          (s.kind === 'signature' ||
-            s.kind === 'initial' ||
-            s.kind === 'name' ||
-            s.kind === 'text'),
-      ),
+      plan.slots.filter(s => {
+        if (s.personSlotIndex !== personSlotIndex) return false
+        if (
+          s.kind === 'signature' ||
+          s.kind === 'initial' ||
+          s.kind === 'name' ||
+          s.kind === 'text'
+        ) {
+          return true
+        }
+        // Empty check/X for this person — signer clicks to activate.
+        // Creator pre-checked boxes are already locked into the plan.
+        if (isMarkPlacementKind(s.kind)) return !isMarkPreChecked(s)
+        return false
+      }),
     [plan.slots, personSlotIndex],
   )
 
@@ -166,9 +178,12 @@ export function SignerFillView({
   const isLocallyFilled = useCallback(
     (slot: PlacementSlot) => {
       if (isServerFilled(slot.id)) return true
+      // Creator pre-checked at design time — nothing for the signer to do.
+      if (isMarkPreChecked(slot)) return true
       const f = localFills[slot.id]
       if (!f) return false
       if (f.kind === 'ink') return Boolean(f.path.strokes?.length)
+      if (f.kind === 'mark') return f.on
       return f.text.trim().length > 0
     },
     [localFills, isServerFilled],
@@ -304,10 +319,32 @@ export function SignerFillView({
     setModalDraftText('')
   }
 
+  /** Toggle a check/X on the page (sign-time). No modal. */
+  const toggleMarkFill = (slot: PlacementSlot) => {
+    if (disabled || busy || submitting) return
+    if (slot.personSlotIndex !== personSlotIndex) return
+    if (!isMarkPlacementKind(slot.kind)) return
+    if (isMarkPreChecked(slot) || isServerFilled(slot.id)) return
+    setLocalError(null)
+    setLocalFills(prev => {
+      const cur = prev[slot.id]
+      const on = !(cur?.kind === 'mark' && cur.on)
+      if (!on) {
+        const next = { ...prev }
+        delete next[slot.id]
+        return next
+      }
+      return { ...prev, [slot.id]: { kind: 'mark', on: true } }
+    })
+  }
+
   const openSlot = (slot: PlacementSlot) => {
     if (disabled || busy || submitting) return
     if (slot.personSlotIndex !== personSlotIndex) return
-    if (slot.kind === 'checkmark' || slot.kind === 'cross') return
+    if (isMarkPlacementKind(slot.kind)) {
+      toggleMarkFill(slot)
+      return
+    }
     if (isServerFilled(slot.id)) return
     setLocalError(null)
     if (slot.pageIndex !== pageNumber - 1) {
@@ -466,6 +503,16 @@ export function SignerFillView({
             if (draft.imageDataUrl) initialImageDataUrl = draft.imageDataUrl
           }
         }
+      } else if (draft.kind === 'mark') {
+        if (!draft.on) {
+          setLocalError('Tap every check or X box assigned to you.')
+          return
+        }
+        fills.push({
+          slotId: slot.id,
+          personSlotIndex,
+          payload: { kind: 'text', text: MARK_FILL_ON },
+        })
       } else {
         const t = draft.text.trim()
         if (!t) {
@@ -610,15 +657,16 @@ export function SignerFillView({
         <p className="muted signer-fill-help">
           {solo ? (
             <>
-              Tap each <strong>highlighted</strong> box on the document
+              Tap each <strong>highlighted</strong> box on the document. Check and X boxes
+              toggle with a tap
               {sigCount > 1 || initCount > 1
                 ? ' — after the first signature or initials, other boxes offer Use existing.'
                 : '.'}
             </>
           ) : (
             <>
-              Tap each <strong>highlighted</strong> box on the document. Signing opens in a
-              panel so you stay with the document
+              Tap each <strong>highlighted</strong> box on the document. Check and X boxes
+              toggle with a tap; signatures open in a panel
               {sigCount > 1 || initCount > 1
                 ? ' — after you sign once, Use existing can place the same ink on another box.'
                 : '.'}{' '}
@@ -687,14 +735,21 @@ export function SignerFillView({
                     })()
                   : raw
                 const slotColor = personColor(slot.personSlotIndex)
+                const markOn =
+                  isMark &&
+                  (isMarkPreChecked(slot) ||
+                    serverDone ||
+                    (draft?.kind === 'mark' && draft.on))
                 const clickable =
                   mine &&
                   !serverDone &&
                   !disabled &&
+                  !isMarkPreChecked(slot) &&
                   (slot.kind === 'signature' ||
                     slot.kind === 'initial' ||
                     slot.kind === 'name' ||
-                    slot.kind === 'text')
+                    slot.kind === 'text' ||
+                    isMark)
 
                 return (
                   <button
@@ -703,10 +758,15 @@ export function SignerFillView({
                     className={[
                       'signer-fill-field',
                       mine ? 'is-mine' : 'is-theirs',
-                      serverDone || draft ? 'is-complete' : '',
+                      serverDone ||
+                      (draft && (draft.kind !== 'mark' || draft.on)) ||
+                      isMarkPreChecked(slot)
+                        ? 'is-complete'
+                        : '',
                       isActive ? 'is-active' : '',
                       clickable ? 'is-clickable' : '',
                       isMark ? 'is-mark' : '',
+                      markOn ? 'is-mark-on' : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}
@@ -719,16 +779,21 @@ export function SignerFillView({
                     }}
                     disabled={!clickable}
                     onClick={() => openSlot(slot)}
+                    aria-pressed={isMark ? markOn : undefined}
                     aria-label={
                       mine
-                        ? `${slot.kind} field${serverDone || draft ? ' (filled - tap to edit)' : ' (tap to fill)'}`
+                        ? isMark
+                          ? `${slot.kind === 'cross' ? 'X mark' : 'Checkbox'}${
+                              markOn ? ' (checked — tap to clear)' : ' (tap to check)'
+                            }`
+                          : `${slot.kind} field${serverDone || draft ? ' (filled - tap to edit)' : ' (tap to fill)'}`
                         : `Reserved for person ${slot.personSlotIndex}`
                     }
                   >
                     {slot.kind === 'checkmark' || slot.kind === 'cross' ? (
                       <MarkFieldCanvas
                         kind={slot.kind}
-                        checked={slot.lockedContent?.mark === slot.kind}
+                        checked={Boolean(markOn)}
                         color={slot.lockedContent?.color ?? slotColor}
                         width={r.width}
                         height={r.height}

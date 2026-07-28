@@ -211,6 +211,26 @@ export function isMarkPlacementKind(kind: PlacementKind | string): boolean {
   return kind === 'checkmark' || kind === 'cross'
 }
 
+/**
+ * Text blob value written when a signer activates a check/X box.
+ * (Wire format only supports ink|text blobs; marks reuse text.)
+ */
+export const MARK_FILL_ON = '1'
+
+/** True when a fill text payload means the check/X is on. */
+export function isMarkFillOn(text: string | null | undefined): boolean {
+  if (text == null) return false
+  const t = text.trim()
+  return t === MARK_FILL_ON || t === 'true' || t === '✓' || t === '✔' || t === 'x' || t === 'X'
+}
+
+/** Creator pre-checked this box at design time (baked into locked plan). */
+export function isMarkPreChecked(slot: Pick<PlacementSlot, 'kind' | 'lockedContent'>): boolean {
+  return (
+    isMarkPlacementKind(slot.kind) && slot.lockedContent?.mark === slot.kind
+  )
+}
+
 /** CSS pixel size for a check/X placement (perfect square on the rendered page). */
 export function markCssPixelSize(
   cssPage: { width: number; height: number },

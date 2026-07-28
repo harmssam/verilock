@@ -3371,14 +3371,25 @@ export function DocumentJourney({
                                 const personSlot = personSlotForParty(pendingParty.id)
                                 const myFillableSlots =
                                   constructionPlan?.status === 'locked'
-                                    ? constructionPlan.slots.filter(
-                                        s =>
-                                          s.personSlotIndex === personSlot &&
-                                          (s.kind === 'signature' ||
-                                            s.kind === 'initial' ||
-                                            s.kind === 'name' ||
-                                            s.kind === 'text'),
-                                      )
+                                    ? constructionPlan.slots.filter(s => {
+                                        if (s.personSlotIndex !== personSlot) return false
+                                        if (
+                                          s.kind === 'signature' ||
+                                          s.kind === 'initial' ||
+                                          s.kind === 'name' ||
+                                          s.kind === 'text'
+                                        ) {
+                                          return true
+                                        }
+                                        // Empty check/X for this person (not creator pre-checked)
+                                        if (
+                                          s.kind === 'checkmark' ||
+                                          s.kind === 'cross'
+                                        ) {
+                                          return s.lockedContent?.mark !== s.kind
+                                        }
+                                        return false
+                                      })
                                     : []
                                 const pageFieldsRequired =
                                   FEATURES.pdfAnnotationUi &&
