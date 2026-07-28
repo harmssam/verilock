@@ -15,6 +15,7 @@ import {
 } from '../DateField'
 import { FEATURES } from '../features'
 import { SignOnMobileModal } from '../journey/SignOnMobileModal'
+import { isPlaceholderPartyName, looksLikeAddressLabel } from '../signing'
 import {
   isLikelyMobileViewport,
   isNimiqPayMiniAppHost,
@@ -207,6 +208,50 @@ export function SignerFillView({
     setPageNumber(first.pageIndex + 1)
   }, [personSlotIndex]) // only on person change
 
+  /**
+   * Prefill name (from plan display name when not “Person N”) and date (today)
+   * so the signer has fewer empty fields to open. They can still edit by tapping.
+   */
+  useEffect(() => {
+    const rawName = person.displayName?.trim() ?? ''
+    const realName =
+      rawName &&
+      !isPlaceholderPartyName(rawName) &&
+      !looksLikeAddressLabel(rawName)
+        ? rawName
+        : null
+    const todayLabel = formatDisplayDate(todayIsoDate()) || todayIsoDate()
+
+    setLocalFills(prev => {
+      let next: typeof prev | null = null
+      for (const slot of plan.slots) {
+        if (slot.personSlotIndex !== personSlotIndex) continue
+        if (filledSlotIds?.has(slot.id)) continue
+        if (prev[slot.id]) continue
+
+        if (slot.kind === 'name' && realName) {
+          next ??= { ...prev }
+          next[slot.id] = { kind: 'text', text: realName }
+          continue
+        }
+        if (
+          slot.kind === 'text' &&
+          isDateFieldLabel(slot.lockedContent?.text) &&
+          todayLabel
+        ) {
+          next ??= { ...prev }
+          next[slot.id] = { kind: 'text', text: todayLabel }
+        }
+      }
+      return next ?? prev
+    })
+  }, [
+    person.displayName,
+    personSlotIndex,
+    plan.slots,
+    filledSlotIds,
+  ])
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -365,6 +410,15 @@ export function SignerFillView({
         // Date fields store ISO in the modal; default to today when empty.
         const fromExisting = existingText ? parseFlexibleDateToIso(existingText) : null
         setModalDraftText(fromExisting ?? todayIsoDate())
+      } else if (slot.kind === 'name' && !existingText) {
+        const rawName = person.displayName?.trim() ?? ''
+        const realName =
+          rawName &&
+          !isPlaceholderPartyName(rawName) &&
+          !looksLikeAddressLabel(rawName)
+            ? rawName
+            : ''
+        setModalDraftText(realName)
       } else {
         setModalDraftText(existingText)
       }

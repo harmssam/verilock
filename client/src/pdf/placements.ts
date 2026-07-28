@@ -625,6 +625,43 @@ export function peopleWithoutSlotsMessage(
   return `${labels.slice(0, -1).join(', ')}, and ${last} have no fields yet — place at least one field for each person.`
 }
 
+/** Default construction labels like “Person 1” — not a real name for name-field prefill. */
+export function isDefaultConstructionPersonName(name: string | null | undefined): boolean {
+  const t = (name ?? '').trim()
+  return !t || /^Person\s+\d+$/i.test(t)
+}
+
+/**
+ * People who have a name field but still use the default “Person N” label.
+ * Rename them so signers get a prefilled name box.
+ */
+export function peopleNeedingRealNameForNameFields(
+  plan: Pick<ConstructionPlan, 'people' | 'slots'>,
+): ConstructionPerson[] {
+  return plan.people.filter(p => {
+    const hasNameSlot = plan.slots.some(
+      s => s.personSlotIndex === p.slotIndex && s.kind === 'name',
+    )
+    return hasNameSlot && isDefaultConstructionPersonName(p.displayName)
+  })
+}
+
+export function peopleNeedingRealNameMessage(
+  plan: Pick<ConstructionPlan, 'people' | 'slots'>,
+): string | null {
+  const need = peopleNeedingRealNameForNameFields(plan)
+  if (need.length === 0) return null
+  if (need.length === 1) {
+    return `Rename Person ${need[0]!.slotIndex} to their real name — it pre-fills their name field when they sign.`
+  }
+  const labels = need.map(p => `Person ${p.slotIndex}`)
+  if (labels.length === 2) {
+    return `Rename ${labels[0]} and ${labels[1]} to real names — they pre-fill name fields when signing.`
+  }
+  const last = labels[labels.length - 1]
+  return `Rename ${labels.slice(0, -1).join(', ')}, and ${last} to real names — they pre-fill name fields when signing.`
+}
+
 export function lockPlan(
   plan: ConstructionPlan,
   planRoot: string,
