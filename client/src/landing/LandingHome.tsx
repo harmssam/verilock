@@ -15,6 +15,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent,
 } from 'react'
 import { formatBlogDate, getAllPosts } from '../blog'
 import type { PathRole } from '../journey/types'
@@ -27,6 +28,29 @@ import {
   PATH_STILLS,
   placementImageStyle,
 } from './pathMedia'
+
+/** Path picker section - hero “Sign or verify” and `/#lr-paths` deep links. */
+const PATHS_SECTION_ID = 'lr-paths'
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+}
+
+/**
+ * Chrome (production) often attempts fragment scroll before React mounts the
+ * target, then never retries. Brave/localhost often win on timing. Explicit
+ * scrollIntoView matches Security/Pricing deep-link handling.
+ */
+function scrollToPathsSection(behavior?: ScrollBehavior): void {
+  if (typeof window === 'undefined') return
+  const el = document.getElementById(PATHS_SECTION_ID)
+  if (!el) return
+  const b = behavior ?? (prefersReducedMotion() ? 'auto' : 'smooth')
+  el.scrollIntoView({ behavior: b, block: 'start' })
+}
 
 /** Fade-up once the block enters the viewport (IntersectionObserver, no scroll listener). */
 function useRevealInView<T extends HTMLElement = HTMLElement>() {
@@ -195,6 +219,28 @@ export function LandingHome({
     return () => ro.disconnect()
   }, [claim.status])
 
+  // Honor /#lr-paths after SPA paint (native fragment scroll runs too early on cold load).
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return
+    if (window.location.hash.replace(/^#/, '') !== PATHS_SECTION_ID) return
+    const behavior = prefersReducedMotion() ? 'auto' : 'smooth'
+    scrollToPathsSection(behavior)
+    // Second pass after hero image / font layout (production is slower than Vite).
+    const t = window.setTimeout(() => scrollToPathsSection(behavior), 120)
+    return () => window.clearTimeout(t)
+  }, [])
+
+  const onSignOrVerifyClick = (e: MouseEvent<HTMLAnchorElement>) => {
+    // Let modified clicks open / use native browser behavior.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+    e.preventDefault()
+    scrollToPathsSection()
+    // replaceState keeps one history entry; re-click still scrolls when hash is already set.
+    if (window.location.hash !== `#${PATHS_SECTION_ID}`) {
+      window.history.replaceState(window.history.state, '', `#${PATHS_SECTION_ID}`)
+    }
+  }
+
   return (
     <div className="lr-home">
       {/* Hero: copy sizes the frame; still covers and may crop top/bottom */}
@@ -230,7 +276,11 @@ export function LandingHome({
                 Create &amp; sign free
                 <ArrowRight size={16} strokeWidth={2.25} aria-hidden />
               </AppLink>
-              <a className="lr-cta lr-cta--ghost" href="#lr-paths">
+              <a
+                className="lr-cta lr-cta--ghost"
+                href={`#${PATHS_SECTION_ID}`}
+                onClick={onSignOrVerifyClick}
+              >
                 Sign or verify
               </a>
             </div>
@@ -302,7 +352,7 @@ export function LandingHome({
 
       <section
         ref={pathsReveal.ref}
-        id="lr-paths"
+        id={PATHS_SECTION_ID}
         className={revealClass(pathsReveal.inView, 'lr-paths-section')}
         style={{ ['--lr-reveal-delay' as string]: '60ms' }}
         aria-labelledby="lr-paths-title"
