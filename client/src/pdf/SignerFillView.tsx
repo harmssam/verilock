@@ -1,6 +1,7 @@
 /**
  * DocuSign-style signing: the document (PDF or image) is the surface.
- * Click your highlighted fields to open a modal; ink is reused across signature boxes.
+ * Click your highlighted fields to open a modal. Ink applies per field; saved
+ * signature/initials can be re-used on another box via “Use existing”.
  */
 import { Check, ChevronLeft, ChevronRight, PenLine, Smartphone, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -29,12 +30,12 @@ import {
 } from './placements'
 import {
   normalizedToCanvasRect,
-  paintMark,
   paintSignaturePath,
   type SignaturePathData,
 } from './annotations'
 import { loadDocumentSurface, type DocumentSurface } from './documentSurface'
 import { InkCaptureSheet } from './InkCaptureSheet'
+import { MarkFieldCanvas } from './MarkFieldCanvas'
 import {
   SignatureStrokePad,
   type SignatureStrokeResult,
@@ -166,15 +167,11 @@ export function SignerFillView({
     (slot: PlacementSlot) => {
       if (isServerFilled(slot.id)) return true
       const f = localFills[slot.id]
-      if (!f) {
-        if (slot.kind === 'signature' && sharedInk?.path?.strokes?.length) return true
-        if (slot.kind === 'initial' && sharedInitials?.path?.strokes?.length) return true
-        return false
-      }
+      if (!f) return false
       if (f.kind === 'ink') return Boolean(f.path.strokes?.length)
       return f.text.trim().length > 0
     },
-    [localFills, sharedInk, sharedInitials, isServerFilled],
+    [localFills, isServerFilled],
   )
 
   const pendingSlots = useMemo(
@@ -340,26 +337,15 @@ export function SignerFillView({
     setActiveSlotId(slot.id)
   }
 
+  /** On-document preview: only fields the user actually applied to (no auto-stamp). */
   const previewForSlot = (slot: PlacementSlot): LocalFill | null => {
-    if (localFills[slot.id]) return localFills[slot.id]!
-    if (slot.kind === 'signature' && sharedInk?.path) {
-      return {
-        kind: 'ink',
-        path: sharedInk.path,
-        imageDataUrl: sharedInk.imageDataUrl,
-      }
-    }
-    if (slot.kind === 'initial' && sharedInitials?.path) {
-      return {
-        kind: 'ink',
-        path: sharedInitials.path,
-        imageDataUrl: sharedInitials.imageDataUrl,
-      }
-    }
-    return null
+    return localFills[slot.id] ?? null
   }
 
-  /** Stamp ink onto all matching signature/initial slots, then return to the PDF (no auto-advance). */
+  /**
+   * Apply ink to this field only. Also remember it as the shared signature/initials
+   * so other boxes can offer “Use existing” — they are not auto-filled.
+   */
   const applyInkStroke = useCallback(
     (result: SignatureStrokeResult, slotOverride?: PlacementSlot | null) => {
       const slot = slotOverride ?? activeSlot
@@ -375,26 +361,23 @@ export function SignerFillView({
         )
         return
       }
+      if (isServerFilled(slot.id)) return
       const isInitial = slot.kind === 'initial'
-      const targets = isInitial ? myInitialSlots : mySignatureSlots
-      const nextFills = { ...localFills }
-      for (const s of targets) {
-        if (!isServerFilled(s.id)) {
-          nextFills[s.id] = {
-            kind: 'ink',
-            path: result.path,
-            imageDataUrl: result.imageDataUrl,
-          }
-        }
-      }
+      setLocalFills(prev => ({
+        ...prev,
+        [slot.id]: {
+          kind: 'ink',
+          path: result.path,
+          imageDataUrl: result.imageDataUrl,
+        },
+      }))
       if (isInitial) setSharedInitials(result)
       else setSharedInk(result)
-      setLocalFills(nextFills)
       setLocalError(null)
       // Back to the document view - user picks the next field deliberately.
       closeModal()
     },
-    [activeSlot, localFills, myInitialSlots, mySignatureSlots, isServerFilled, closeModal],
+    [activeSlot, isServerFilled, closeModal],
   )
 
   const confirmModal = () => {
@@ -578,8 +561,10 @@ export function SignerFillView({
   const sigCount = mySignatureSlots.filter(s => !isServerFilled(s.id)).length
   const initCount = myInitialSlots.filter(s => !isServerFilled(s.id)).length
   const activeIsInitial = activeSlot?.kind === 'initial'
-  const activeInkPeerCount = activeIsInitial ? initCount : sigCount
-  /** Saved signature/initials for this person (shared pool or this field’s draft). */
+  /**
+   * Saved ink for “Use existing”: this field’s fill first, else the last drawn
+   * signature/initials for this person (other boxes stay empty until applied).
+   */
   const existingInkForActive =
     activeSlot && isInkPlacementKind(activeSlot.kind)
       ? resolveExistingInk(activeSlot)
@@ -597,12 +582,7 @@ export function SignerFillView({
     // Full-screen sheet on phones (Safari/Chrome) and Nimiq Pay — same ink path.
     (isMobileViewport || isNimiqPayMiniAppHost())
 
-  const inkApplyLabel =
-    activeInkPeerCount > 1
-      ? 'Apply to all'
-      : activeIsInitial
-        ? 'Apply initials'
-        : 'Apply signature'
+  const inkApplyLabel = activeIsInitial ? 'Apply initials' : 'Apply signature'
 
   return (
     <div className={`signer-fill-view${disabled ? ' is-disabled' : ''}`}>
@@ -632,7 +612,7 @@ export function SignerFillView({
             <>
               Tap each <strong>highlighted</strong> box on the document
               {sigCount > 1 || initCount > 1
-                ? ' — your signature and initials reuse across matching boxes.'
+                ? ' — after the first signature or initials, other boxes offer Use existing.'
                 : '.'}
             </>
           ) : (
@@ -640,7 +620,7 @@ export function SignerFillView({
               Tap each <strong>highlighted</strong> box on the document. Signing opens in a
               panel so you stay with the document
               {sigCount > 1 || initCount > 1
-                ? ' - each signature and each initial is reused on every matching box after the first.'
+                ? ' — after you sign once, Use existing can place the same ink on another box.'
                 : '.'}{' '}
               Other people&apos;s fields stay locked.
             </>
@@ -732,11 +712,13 @@ export function SignerFillView({
                     }
                   >
                     {slot.kind === 'checkmark' || slot.kind === 'cross' ? (
-                      <MarkCanvas
-                        kind={slot.lockedContent?.mark ?? slot.kind}
+                      <MarkFieldCanvas
+                        kind={slot.kind}
+                        checked={slot.lockedContent?.mark === slot.kind}
                         color={slot.lockedContent?.color ?? slotColor}
                         width={r.width}
                         height={r.height}
+                        className="signer-fill-mark"
                       />
                     ) : draft?.kind === 'ink' ? (
                       <InkPreview path={draft.path} width={r.width} height={r.height} />
@@ -976,13 +958,9 @@ export function SignerFillView({
                   onClick={confirmModal}
                 >
                   {isInkPlacementKind(activeSlot.kind)
-                    ? activeInkPeerCount > 1
-                      ? activeIsInitial
-                        ? 'Apply to all initial boxes'
-                        : 'Apply to all signature lines'
-                      : activeIsInitial
-                        ? 'Apply initials'
-                        : 'Apply signature'
+                    ? activeIsInitial
+                      ? 'Apply initials'
+                      : 'Apply signature'
                     : 'Save'}
                 </button>
               </div>
@@ -1060,34 +1038,6 @@ export function SignerFillView({
       </div>
     </div>
   )
-}
-
-function MarkCanvas({
-  kind,
-  color,
-  width,
-  height,
-}: {
-  kind: 'checkmark' | 'cross'
-  color: string
-  width: number
-  height: number
-}) {
-  const ref = useRef<HTMLCanvasElement>(null)
-  useEffect(() => {
-    const c = ref.current
-    if (!c) return
-    const dpr = window.devicePixelRatio || 1
-    c.width = Math.max(1, Math.round(width * dpr))
-    c.height = Math.max(1, Math.round(height * dpr))
-    c.style.width = `${width}px`
-    c.style.height = `${height}px`
-    const ctx = c.getContext('2d')
-    if (!ctx) return
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    paintMark(ctx, kind, { left: 0, top: 0, width, height }, color)
-  }, [kind, color, width, height])
-  return <canvas ref={ref} className="signer-fill-mark" aria-hidden />
 }
 
 function InkPreview({

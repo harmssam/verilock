@@ -217,18 +217,34 @@ export async function paintAnnotation(
   ctx.restore()
 }
 
+/** Largest square “contain” box inside `rect` (keeps check/X from stretching). */
+export function markSquareInRect(rect: CanvasRect): CanvasRect {
+  const side = Math.max(1, Math.min(rect.width, rect.height))
+  return {
+    left: rect.left + (rect.width - side) / 2,
+    top: rect.top + (rect.height - side) / 2,
+    width: side,
+    height: side,
+  }
+}
+
+/**
+ * Draw a check or X inside `rect`. Always paints in a centered square “contain”
+ * so non-square field boxes never stretch the glyph.
+ */
 export function paintMark(
   ctx: CanvasRenderingContext2D,
   kind: 'checkmark' | 'cross',
   rect: CanvasRect,
   color: string,
 ): void {
-  const pad = Math.min(rect.width, rect.height) * 0.15
-  const x0 = rect.left + pad
-  const y0 = rect.top + pad
-  const x1 = rect.left + rect.width - pad
-  const y1 = rect.top + rect.height - pad
-  const lw = Math.max(2, Math.min(rect.width, rect.height) * 0.12)
+  const box = markSquareInRect(rect)
+  const pad = box.width * 0.18
+  const x0 = box.left + pad
+  const y0 = box.top + pad
+  const x1 = box.left + box.width - pad
+  const y1 = box.top + box.height - pad
+  const lw = Math.max(1.75, box.width * 0.11)
   ctx.save()
   ctx.strokeStyle = color
   ctx.lineWidth = lw
@@ -248,6 +264,23 @@ export function paintMark(
     ctx.lineTo(x0, y1)
   }
   ctx.stroke()
+  ctx.restore()
+}
+
+/** Empty checkbox frame (square, centered in rect). */
+export function paintMarkBox(
+  ctx: CanvasRenderingContext2D,
+  rect: CanvasRect,
+  color: string,
+): void {
+  const box = markSquareInRect(rect)
+  const inset = Math.max(1, box.width * 0.08)
+  const lw = Math.max(1.5, box.width * 0.08)
+  ctx.save()
+  ctx.strokeStyle = color
+  ctx.lineWidth = lw
+  ctx.lineJoin = 'miter'
+  ctx.strokeRect(box.left + inset, box.top + inset, box.width - inset * 2, box.height - inset * 2)
   ctx.restore()
 }
 

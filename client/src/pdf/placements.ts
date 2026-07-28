@@ -180,7 +180,48 @@ export function defaultSizeForKind(kind: PlacementKind): { width: number; height
   if (kind === 'initial') return { width: 0.1, height: 0.055 }
   if (kind === 'name') return { width: 0.28, height: 0.045 }
   if (kind === 'text') return { width: 0.28, height: 0.045 }
+  // Check / X: equal fractions are NOT square on-screen (page height ≠ width).
+  // Use {@link markNormalizedSize} when placing so the CSS box is a perfect square.
   return { width: 0.045, height: 0.045 }
+}
+
+/**
+ * Normalized w/h for a check or X box that is square in CSS pixels.
+ * `pageCssAspect` = rendered page width ÷ height (e.g. cssSize.width / cssSize.height).
+ */
+export function markNormalizedSize(
+  scalePercent: number,
+  pageCssAspect: number,
+): { width: number; height: number } {
+  const pct = snapPlacementScalePercent(scalePercent)
+  const scale = pct / PLACEMENT_SCALE_DEFAULT_PCT
+  const base = defaultSizeForKind('checkmark')
+  const width = clamp01(base.width * scale)
+  const aspect =
+    Number.isFinite(pageCssAspect) && pageCssAspect > 0.05 && pageCssAspect < 20
+      ? pageCssAspect
+      : 1
+  // CSS square: side = width_norm * cssW = height_norm * cssH
+  // → height_norm = width_norm * (cssW / cssH) = width_norm * pageCssAspect
+  const height = clamp01(width * aspect)
+  return { width, height }
+}
+
+export function isMarkPlacementKind(kind: PlacementKind | string): boolean {
+  return kind === 'checkmark' || kind === 'cross'
+}
+
+/** CSS pixel size for a check/X placement (perfect square on the rendered page). */
+export function markCssPixelSize(
+  cssPage: { width: number; height: number },
+  scalePercent: number = PLACEMENT_SCALE_DEFAULT_PCT,
+): { width: number; height: number } {
+  const aspect = cssPage.height > 0 ? cssPage.width / cssPage.height : 1
+  const norm = markNormalizedSize(scalePercent, aspect)
+  return {
+    width: norm.width * cssPage.width,
+    height: norm.height * cssPage.height,
+  }
 }
 
 /** Snap to an allowed scale percent (40–140, step 10). Accepts percent or ratio (≤ 2). */
@@ -202,6 +243,10 @@ export function snapPlacementScalePercent(value: number): number {
 /** Infer slider percent from stored geometry vs kind defaults. */
 export function scalePercentFromSlot(slot: Pick<PlacementSlot, 'kind' | 'width' | 'height'>): number {
   const d = defaultSizeForKind(slot.kind)
+  // Marks keep a CSS square via unequal norm w/h — scale from width only.
+  if (isMarkPlacementKind(slot.kind)) {
+    return snapPlacementScalePercent(slot.width / Math.max(EPS, d.width))
+  }
   const sx = slot.width / Math.max(EPS, d.width)
   const sy = slot.height / Math.max(EPS, d.height)
   return snapPlacementScalePercent((sx + sy) / 2)
@@ -233,12 +278,21 @@ export function fillFontSizeRatioForSlot(
 export function applyPlacementScale(
   slot: PlacementSlot,
   scalePercent: number,
+  /**
+   * Rendered page width÷height. Required for check/X so the box stays a
+   * perfect square on screen; ignored for other kinds.
+   */
+  pageCssAspect?: number,
 ): Partial<PlacementSlot> {
   const pct = snapPlacementScalePercent(scalePercent)
   const scale = pct / PLACEMENT_SCALE_DEFAULT_PCT
   const d = defaultSizeForKind(slot.kind)
-  const width = clamp01(d.width * scale)
-  const height = clamp01(d.height * scale)
+  const sized =
+    isMarkPlacementKind(slot.kind) && pageCssAspect != null
+      ? markNormalizedSize(pct, pageCssAspect)
+      : { width: clamp01(d.width * scale), height: clamp01(d.height * scale) }
+  const width = sized.width
+  const height = sized.height
   const cx = slot.x + slot.width / 2
   const cy = slot.y + slot.height / 2
   let x = cx - width / 2
