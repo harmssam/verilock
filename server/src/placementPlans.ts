@@ -13,6 +13,7 @@ import {
   type PlacementFillBatchRecord,
   type PlacementPlanRecord,
 } from './db.js'
+import { MAX_STREAM_FRAMES } from './annotationStream.js'
 import { canRevealParticipantDetails } from './documents.js'
 
 /** Require a real agreement id - plans are document-scoped (same PDF may have many). */
@@ -610,7 +611,7 @@ export function lockPlan(input: {
     ? input.batch0FramesHex
         .filter(h => typeof h === 'string' && /^[a-f0-9]{128}$/i.test(h))
         .map(h => h.toLowerCase())
-        .slice(0, 128)
+        .slice(0, MAX_STREAM_FRAMES)
     : []
 
   const batch0Root =
@@ -806,7 +807,7 @@ export function appendFillBatch(input: {
     ? input.framesHex
         .filter(h => typeof h === 'string' && /^[a-f0-9]{128}$/i.test(h))
         .map(h => h.toLowerCase())
-        .slice(0, 128)
+        .slice(0, MAX_STREAM_FRAMES)
     : []
 
   // When wire frames are provided, recompute batchRoot from payload (hashes-only integrity).

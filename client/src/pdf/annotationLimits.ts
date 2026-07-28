@@ -3,7 +3,12 @@
  * Keep in sync with server/src/security.ts.
  */
 
-/** RDP simplification that looked good in SignatureLab. */
+/**
+ * RDP max error (pad CSS px). Validated in SignatureLab / product testing.
+ * Collinear or near-collinear samples within this band collapse to the
+ * segment endpoints — intermediate “points in a row” are not stored.
+ * Do not raise without a visual QA pass; do not lower without size need.
+ */
 export const SIGNATURE_RDP_EPSILON_PX = 1.5
 
 /**

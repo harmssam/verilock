@@ -59,7 +59,45 @@ function distToSegment(p: StrokePoint, a: StrokePoint, b: StrokePoint): number {
   return Math.hypot(p.x - projX, p.y - projY)
 }
 
-/** Ramer–Douglas–Peucker polyline simplification (pixel epsilon). */
+/**
+ * Drop consecutive samples closer than `minDist` (same units as points).
+ * Removes stationary / micro-jitter samples that add no shape.
+ * Always keeps first and last.
+ */
+export function dedupeStrokePoints(
+  points: StrokePoint[],
+  minDist: number,
+): StrokePoint[] {
+  if (points.length <= 2 || minDist <= 0) return points.slice()
+  const out: StrokePoint[] = [points[0]!]
+  const lastIdx = points.length - 1
+  for (let i = 1; i < lastIdx; i++) {
+    const p = points[i]!
+    const prev = out[out.length - 1]!
+    if (Math.hypot(p.x - prev.x, p.y - prev.y) >= minDist) {
+      out.push(p)
+    }
+  }
+  const end = points[lastIdx]!
+  const prev = out[out.length - 1]!
+  if (Math.hypot(end.x - prev.x, end.y - prev.y) < minDist && out.length > 1) {
+    // Replace last intermediate with the true endpoint (preserve stroke end).
+    out[out.length - 1] = end
+  } else if (end.x !== prev.x || end.y !== prev.y) {
+    out.push(end)
+  }
+  return out
+}
+
+/**
+ * Ramer–Douglas–Peucker polyline simplification.
+ *
+ * Epsilon is the max allowed perpendicular error (pad CSS px, or unit-space
+ * after scaling). Any run of samples that stay within ε of the chord between
+ * their endpoints collapses to those two endpoints — including perfect
+ * straight lines and near-collinear “points in a row” from slow drawing.
+ * Corners and curves that exceed ε keep intermediate vertices.
+ */
 export function simplifyStroke(points: StrokePoint[], epsilon: number): StrokePoint[] {
   if (points.length <= 2 || epsilon <= 0) return points.slice()
 
@@ -80,14 +118,35 @@ export function simplifyStroke(points: StrokePoint[], epsilon: number): StrokePo
     const right = simplifyStroke(points.slice(maxIdx), epsilon)
     return left.slice(0, -1).concat(right)
   }
+  // Collinear (or within ε): no need to store/draw intermediates.
   return [first, last]
+}
+
+/**
+ * Storage pipeline: near-dupe drop, then RDP collinear collapse.
+ * `minDist` defaults to ε/3 so sub-epsilon stationary jitter is removed first.
+ */
+export function thinStroke(
+  points: StrokePoint[],
+  epsilon: number,
+  minDist?: number,
+): StrokePoint[] {
+  if (points.length <= 2) return points.slice()
+  const dupeDist =
+    minDist != null && Number.isFinite(minDist) && minDist > 0
+      ? minDist
+      : epsilon > 0
+        ? epsilon / 3
+        : 0
+  const cleaned = dupeDist > 0 ? dedupeStrokePoints(points, dupeDist) : points
+  return simplifyStroke(cleaned, epsilon)
 }
 
 export function simplifyInk(ink: SignatureInk, epsilon: number): SignatureInk {
   return {
     ...ink,
     strokes: ink.strokes.map(s => ({
-      points: simplifyStroke(s.points, epsilon),
+      points: thinStroke(s.points, epsilon),
     })),
   }
 }

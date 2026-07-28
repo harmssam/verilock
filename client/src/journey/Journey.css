@@ -3156,8 +3156,9 @@ a.hash-chip.text-link:focus-visible {
   padding: 0.65rem 0.8rem;
   border-radius: 10px;
   border: 1px solid rgba(180, 120, 20, 0.28);
-  background: rgba(245, 180, 40, 0.1);
-  color: var(--lr-ink, #0f172a);
+  background: rgba(245, 180, 40, 0.12);
+  /* Do not use --lr-ink here: that token is a near-white surface tint (#fafdfc). */
+  color: #78350f;
   font-size: 0.8rem;
   line-height: 1.45;
 }
