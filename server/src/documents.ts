@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto'
 import { v4 as uuid } from 'uuid'
 import {
   deleteDocumentById,
@@ -29,7 +30,11 @@ import {
   updateDocumentStatus,
   updateDocumentRequiredSignatures,
   deletePartyById,
+  getActiveInviteForParty,
+  getPartyInviteByTokenHash,
+  markPartyInviteRedeemed,
   type DocumentRecord,
+  type PartyInviteRecord,
   type PartyRecord,
 } from './db.js'
 import { buildNimiqExplorerUrl } from './explorer.js'
@@ -260,7 +265,7 @@ export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOpti
     /** Whether names + signature images are included for this viewer. */
     participantDetailsRevealed: revealPrivate,
     parties: parties.map(party => {
-      const base = publicParty(party)
+      const base = publicParty(party, revealPrivate)
       const hasSignature = signatures.some(sig => sig.partyId === party.id)
       return {
         ...base,
@@ -283,6 +288,7 @@ export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOpti
           ? signatureImageUrl(doc.id, sig.id)
           : null,
       hasImage: signatureImageIds.has(sig.id),
+      invitedAsEmail: revealPrivate ? sig.invitedAsEmail : null,
     })),
     signingProgress: {
       signed: signedRequired,
@@ -336,7 +342,7 @@ function reconcileDocumentParties(documentId: string): void {
   }
 }
 
-function publicParty(party: PartyRecord) {
+function publicParty(party: PartyRecord, revealPrivate: boolean) {
   return {
     id: party.id,
     role: party.role,
@@ -345,6 +351,9 @@ function publicParty(party: PartyRecord) {
     required: party.required,
     status: party.status,
     signedAt: party.signedAt,
+    // Invite recipient is PII - only for creator / participants.
+    inviteEmail: revealPrivate ? party.inviteEmail : null,
+    inviteSentAt: revealPrivate ? party.inviteSentAt : null,
   }
 }
 
@@ -418,6 +427,8 @@ export function createDocument(input: {
       required: true,
       status: 'pending',
       signedAt: null,
+      inviteEmail: null,
+      inviteSentAt: null,
     }
     insertParty(creatorParty)
   }
@@ -448,6 +459,8 @@ export function createDocument(input: {
         required: true,
         status: 'pending',
         signedAt: null,
+        inviteEmail: null,
+        inviteSentAt: null,
       })
     }
   }
@@ -557,6 +570,8 @@ export function configureSigningRoster(
         required: true,
         status: 'pending',
         signedAt: null,
+        inviteEmail: null,
+        inviteSentAt: null,
       })
     }
 
@@ -677,6 +692,8 @@ export function configureDocumentCosigners(
         required: true,
         status: 'pending',
         signedAt: null,
+        inviteEmail: null,
+        inviteSentAt: null,
       })
     }
 
@@ -700,16 +717,40 @@ export function configureDocumentCosigners(
   })
 }
 
+/** SHA-256 hex of raw invite token (never store the raw token). */
+export function hashInviteToken(rawToken: string): string {
+  return createHash('sha256').update(rawToken, 'utf8').digest('hex')
+}
+
+/** URL-safe opaque token (≥128 bits entropy). */
+export function mintInviteTokenRaw(): string {
+  return randomBytes(32).toString('base64url')
+}
+
+const INVITE_LINK_REQUIRED =
+  'Open the personal invite link from your email to sign as this person.'
+
 /**
  * Resolve which party this wallet should sign as, claiming an open slot atomically
  * when needed. If the client preferred a slot that was just taken, fall through to
  * the next free open party so concurrent co-signers don't both stick to "party 1".
+ *
+ * Parties with an active email invite can only be claimed when `invitePartyId`
+ * matches that party (token already validated by caller).
  */
 function resolveAndClaimParty(
   documentId: string,
   preferredPartyId: string,
   signer: string,
+  options?: { invitePartyId?: string | null },
 ): PartyRecord {
+  const invitePartyId = options?.invitePartyId ?? null
+  const canAccessParty = (partyId: string): boolean => {
+    const active = getActiveInviteForParty(partyId)
+    if (!active) return true
+    return invitePartyId === partyId
+  }
+
   const signatures = getSignaturesForDocument(documentId)
   if (signatures.some(sig => normalizeAddress(sig.signerAddress) === signer)) {
     throw new Error('You already signed this agreement')
@@ -729,10 +770,14 @@ function resolveAndClaimParty(
       markPartySigned(alreadyMine.id)
       throw new Error('You already signed this agreement')
     }
+    if (!canAccessParty(alreadyMine.id)) {
+      throw new Error(INVITE_LINK_REQUIRED)
+    }
     return alreadyMine
   }
 
   const tryClaim = (partyId: string): PartyRecord | null => {
+    if (!canAccessParty(partyId)) return null
     if (!claimPartyWalletIfOpen(partyId, signer)) return null
     const claimed = getPartyById(partyId)
     if (!claimed || claimed.status !== 'pending') return null
@@ -748,6 +793,9 @@ function resolveAndClaimParty(
       throw new Error('Party not found')
     }
     if (preferred.status === 'pending') {
+      if (!canAccessParty(preferred.id)) {
+        throw new Error(INVITE_LINK_REQUIRED)
+      }
       if (preferred.walletAddress) {
         if (normalizeAddress(preferred.walletAddress) === signer) {
           return preferred
@@ -761,9 +809,9 @@ function resolveAndClaimParty(
     }
   }
 
-  // Prefer lowest sort_order among currently open pending parties.
+  // Prefer lowest sort_order among currently open pending parties (skip email-gated).
   const openParties = getPartiesForDocument(documentId).filter(
-    p => p.status === 'pending' && !p.walletAddress,
+    p => p.status === 'pending' && !p.walletAddress && canAccessParty(p.id),
   )
   for (const open of openParties) {
     const claimed = tryClaim(open.id)
@@ -779,11 +827,21 @@ function resolveAndClaimParty(
       p.walletAddress &&
       normalizeAddress(p.walletAddress) === signer,
   )
-  if (bound) return bound
+  if (bound) {
+    if (!canAccessParty(bound.id)) {
+      throw new Error(INVITE_LINK_REQUIRED)
+    }
+    return bound
+  }
 
   const pending = refreshed.filter(p => p.required && p.status === 'pending')
   if (pending.length === 0) {
     throw new Error('No signatures are pending on this document.')
+  }
+
+  // Prefer a clear invite error when the preferred slot is email-gated.
+  if (preferred && getActiveInviteForParty(preferred.id) && invitePartyId !== preferred.id) {
+    throw new Error(INVITE_LINK_REQUIRED)
   }
 
   const waitingOn = pending
@@ -807,6 +865,8 @@ export function addSignature(input: {
   displayName?: string
   signatureImage?: Buffer
   signatureImageSha256?: string
+  /** Raw personal invite token from email deep link (`?invite=`). */
+  inviteToken?: string | null
 }) {
   try {
     let becameReadyToLock = false
@@ -822,7 +882,29 @@ export function addSignature(input: {
       }
 
       const signer = normalizeAddress(input.signerAddress)
-      const party = resolveAndClaimParty(input.documentId, input.partyId, signer)
+
+      let inviteForSign: PartyInviteRecord | null = null
+      const rawToken = input.inviteToken?.trim() || ''
+      if (rawToken) {
+        inviteForSign = getPartyInviteByTokenHash(hashInviteToken(rawToken))
+        if (!inviteForSign || inviteForSign.documentId !== input.documentId) {
+          throw new Error(
+            'This invite link is invalid or has expired. Ask the organizer to resend the invite.',
+          )
+        }
+      }
+
+      // Token wins over client partyId so a forwarded email always maps to its slot.
+      const preferredPartyId = inviteForSign?.partyId ?? input.partyId
+      const party = resolveAndClaimParty(input.documentId, preferredPartyId, signer, {
+        invitePartyId: inviteForSign?.partyId ?? null,
+      })
+
+      // Defense in depth: never sign an email-gated party without the matching invite.
+      const activeOnParty = getActiveInviteForParty(party.id)
+      if (activeOnParty && (!inviteForSign || inviteForSign.id !== activeOnParty.id)) {
+        throw new Error(INVITE_LINK_REQUIRED)
+      }
 
       const existingForParty = getSignaturesForDocument(input.documentId).find(
         sig => sig.partyId === party.id,
@@ -844,6 +926,8 @@ export function addSignature(input: {
       }
 
       const sigId = uuid()
+      const invitedAsEmail = inviteForSign?.email ?? null
+      const inviteId = inviteForSign?.id ?? null
       insertSignature({
         id: sigId,
         documentId: input.documentId,
@@ -852,7 +936,13 @@ export function addSignature(input: {
         signatureType: input.signatureType,
         clientSha256: input.clientSha256.toLowerCase(),
         signedAt: Date.now(),
+        invitedAsEmail,
+        inviteId,
       })
+
+      if (inviteForSign) {
+        markPartyInviteRedeemed(inviteForSign.id, signer)
+      }
 
       if (input.signatureImage) {
         if (input.signatureType !== 'drawn') {

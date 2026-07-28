@@ -273,12 +273,22 @@
   animation: exp-pop 0.18s ease;
 }
 
+/* Hub + Pay side-by-side needs a bit more width than a single CTA */
+.login-sheet--popover.login-sheet--choice {
+  width: min(28rem, 100%);
+}
+
 .login-sheet--inline {
   width: 100%;
   background:
     linear-gradient(145deg, rgba(94, 234, 212, 0.08), rgba(59, 130, 246, 0.05)),
     #ffffff;
-  box-shadow: none;
+  /* Strong accent so the gate reads as the next required step */
+  border: 2px solid var(--lr-accent, #0d9488);
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 0 0 3px rgba(13, 148, 136, 0.12),
+    0 8px 24px rgba(13, 148, 136, 0.08);
 }
 
 .login-sheet-head {
@@ -365,7 +375,7 @@
   color: var(--sky);
 }
 
-/* Mobile dual choice: Pay app vs Hub in browser */
+/* Dual choice: default stack (mobile); desktop uses --side */
 .login-sheet-choices {
   display: flex;
   flex-direction: column;
@@ -376,6 +386,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .login-sheet-choice-hint {
@@ -402,6 +413,74 @@
   flex: 1;
   height: 1px;
   background: var(--border);
+}
+
+/* Desktop: Hub | or | Pay — both visible without scrolling */
+.login-sheet-choices--side {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.55rem 0.65rem;
+  align-items: stretch;
+}
+
+.login-sheet-choices--side .login-sheet-choice {
+  height: 100%;
+}
+
+.login-sheet-choices--side .login-sheet-proceed {
+  flex: 1;
+  min-height: 2.85rem;
+  padding-inline: 0.65rem;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.login-sheet-choices--side .login-sheet-choice-hint {
+  text-align: center;
+  font-size: 0.72rem;
+}
+
+.login-sheet-choices--side .login-sheet-choice-divider {
+  flex-direction: column;
+  align-self: stretch;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0;
+  min-height: 2.85rem;
+}
+
+.login-sheet-choices--side .login-sheet-choice-divider::before,
+.login-sheet-choices--side .login-sheet-choice-divider::after {
+  width: 1px;
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 0.75rem;
+}
+
+/* Very narrow viewports: stack again so buttons stay tappable */
+@media (max-width: 22rem) {
+  .login-sheet-choices--side {
+    grid-template-columns: 1fr;
+  }
+
+  .login-sheet-choices--side .login-sheet-choice-divider {
+    flex-direction: row;
+    min-height: 0;
+    margin: 0.05rem 0;
+  }
+
+  .login-sheet-choices--side .login-sheet-choice-divider::before,
+  .login-sheet-choices--side .login-sheet-choice-divider::after {
+    width: auto;
+    height: 1px;
+    min-height: 0;
+  }
+
+  .login-sheet-choices--side .login-sheet-choice-hint {
+    text-align: left;
+  }
 }
 
 .login-sheet-store-row {
@@ -6474,12 +6553,14 @@ a.hash-chip.text-link:focus-visible {
   color: var(--lr-accent);
 }
 
-/* Nested login sheet inside dock: no second grey slab. */
+/* Nested login sheet inside dock: keep white surface + mint emphasis border. */
 .action-dock .login-sheet,
 .action-dock .login-sheet--inline {
   background: #ffffff;
-  border-color: rgba(13, 148, 136, 0.18);
-  box-shadow: none;
+  border-color: var(--lr-accent, #0d9488);
+  box-shadow:
+    0 0 0 3px rgba(13, 148, 136, 0.12),
+    0 8px 24px rgba(13, 148, 136, 0.08);
 }
 
 .login-sheet-about {

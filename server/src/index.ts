@@ -17,6 +17,8 @@ import { normalizeAddress } from './addresses.js'
 import {
   createSession,
   findDocumentsByHash,
+  getDocumentById,
+  getPartyInviteByTokenHash,
   getSession,
   getSignatureForDocument,
   getSignatureImage,
@@ -30,6 +32,7 @@ import {
   deleteDocument,
   getDocumentPublic,
   getMyDocuments,
+  hashInviteToken,
   setCreatorNotifyEmail,
   setMyDocumentListArchived,
   viewerMayAccessSignatureImage,
@@ -1215,8 +1218,35 @@ app.patch(
 )
 
 /**
- * Creator-only: email one party a branded invite with their personal ?party= link.
- * Never attaches the PDF.
+ * Public lookup for email deep links (`?invite=`). Returns slug + partyId only —
+ * never the token, never invite email. Rate-limited.
+ */
+app.get('/api/invites/lookup', publicReadLimit, (req, res) => {
+  const raw = typeof req.query.token === 'string' ? req.query.token.trim() : ''
+  if (!raw || raw.length > 200) {
+    res.status(400).json({ error: 'token required' })
+    return
+  }
+  const invite = getPartyInviteByTokenHash(hashInviteToken(raw))
+  if (!invite) {
+    res.status(404).json({ error: 'Invite not found or expired' })
+    return
+  }
+  const doc = getDocumentById(invite.documentId)
+  if (!doc) {
+    res.status(404).json({ error: 'Document not found' })
+    return
+  }
+  res.json({
+    documentId: doc.id,
+    slug: doc.slug,
+    partyId: invite.partyId,
+  })
+})
+
+/**
+ * Creator-only: email one party a branded invite with opaque personal link.
+ * Never attaches the PDF. Never returns the raw invite token.
  */
 app.post(
   '/api/documents/:id/invite-email',
@@ -1245,6 +1275,7 @@ app.post(
       id: result.id,
       to: result.to,
       partyId: result.partyId,
+      inviteSentAt: result.inviteSentAt,
     })
   },
 )
@@ -1309,13 +1340,16 @@ app.put(
 )
 
 app.post('/api/documents/:id/signatures', docLimit, authMiddleware, requireVerifiedWallet, (req, res) => {
-  const { partyId, signatureType, clientSha256, displayName, signatureImage } = req.body as {
-    partyId?: string
-    signatureType?: string
-    clientSha256?: string
-    displayName?: string
-    signatureImage?: string
-  }
+  const { partyId, signatureType, clientSha256, displayName, signatureImage, inviteToken } =
+    req.body as {
+      partyId?: string
+      signatureType?: string
+      clientSha256?: string
+      displayName?: string
+      signatureImage?: string
+      /** Raw personal invite token from email deep link (`?invite=`). */
+      inviteToken?: string
+    }
 
   if (!partyId || !signatureType || !clientSha256) {
     res.status(400).json({ error: 'partyId, signatureType, and clientSha256 required' })
@@ -1342,10 +1376,16 @@ app.post('/api/documents/:id/signatures', docLimit, authMiddleware, requireVerif
       displayName,
       signatureImage: imageBuffer,
       signatureImageSha256: imageSha256,
+      inviteToken: typeof inviteToken === 'string' ? inviteToken : null,
     })
     res.json({ document })
   } catch (err) {
-    res.status(400).json({ error: err instanceof Error ? err.message : 'Sign failed' })
+    const message = err instanceof Error ? err.message : 'Sign failed'
+    const status =
+      message.includes('personal invite link') || message.includes('invite link is invalid')
+        ? 403
+        : 400
+    res.status(status).json({ error: message })
   }
 })
 

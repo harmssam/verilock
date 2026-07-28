@@ -721,77 +721,160 @@ export function DocumentJourney({
     return () => window.clearInterval(id)
   }, [role, doc, step, token, setActiveFromSeal])
 
-  // Restore “invite emailed” badges for this agreement (session-scoped).
+  /**
+   * Hydrate “invite emailed” from server party fields (durable), then session cache.
+   * Server is source of truth across devices; session helps before next reload.
+   */
   useEffect(() => {
-    if (!doc?.id || typeof sessionStorage === 'undefined') {
+    if (!doc?.id) {
       setInviteEmailSent({})
       return
     }
-    try {
-      const raw = sessionStorage.getItem(`verilock-invite-sent:${doc.id}`)
-      if (!raw) {
-        setInviteEmailSent({})
-        return
-      }
-      const parsed = JSON.parse(raw) as Record<string, { email?: string; sentAt?: number }>
-      const next: Record<string, { email: string; sentAt: number }> = {}
-      for (const [partyId, row] of Object.entries(parsed)) {
-        if (row?.email && typeof row.email === 'string') {
-          next[partyId] = {
-            email: row.email,
-            sentAt: typeof row.sentAt === 'number' ? row.sentAt : Date.now(),
-          }
+    const next: Record<string, { email: string; sentAt: number }> = {}
+    for (const party of doc.parties) {
+      const email = party.inviteEmail?.trim()
+      if (email) {
+        next[party.id] = {
+          email,
+          sentAt: party.inviteSentAt ?? Date.now(),
         }
       }
-      setInviteEmailSent(next)
-      // Prefill email fields for resend when we restored session badges.
-      if (doc && Object.keys(next).length > 0) {
-        const unsigned = doc.parties.filter(x => x.required && !x.signed)
-        setPartyInviteEmails(prev => {
-          const merged = { ...prev }
-          let changed = false
-          for (const party of unsigned) {
-            const sent = next[party.id]
-            if (!sent || merged[party.id]?.trim()) continue
-            merged[party.id] = sent.email
-            changed = true
-          }
-          return changed ? merged : prev
-        })
-        setCoSignerEmails(prev => {
-          const emails = [...prev]
-          let changed = false
-          unsigned.forEach((party, i) => {
-            const sent = next[party.id]
-            if (!sent) return
-            while (emails.length <= i) emails.push('')
-            if (!emails[i]?.trim()) {
-              emails[i] = sent.email
-              changed = true
-            }
-          })
-          return changed ? emails : prev
-        })
-      }
-    } catch {
-      setInviteEmailSent({})
     }
-  }, [doc?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- hydrate once per agreement
-
-  /** Record a successful invite email and persist for this agreement’s session. */
-  const markInviteEmailSent = useCallback((docId: string, partyId: string, email: string) => {
-    setInviteEmailSent(prev => {
-      const next = { ...prev, [partyId]: { email, sentAt: Date.now() } }
+    if (Object.keys(next).length === 0 && typeof sessionStorage !== 'undefined') {
       try {
-        if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.setItem(`verilock-invite-sent:${docId}`, JSON.stringify(next))
+        const raw = sessionStorage.getItem(`verilock-invite-sent:${doc.id}`)
+        if (raw) {
+          const parsed = JSON.parse(raw) as Record<string, { email?: string; sentAt?: number }>
+          for (const [partyId, row] of Object.entries(parsed)) {
+            if (row?.email && typeof row.email === 'string') {
+              next[partyId] = {
+                email: row.email,
+                sentAt: typeof row.sentAt === 'number' ? row.sentAt : Date.now(),
+              }
+            }
+          }
         }
       } catch {
-        /* private mode / quota */
+        /* ignore */
       }
-      return next
-    })
-  }, [])
+    }
+    setInviteEmailSent(next)
+    if (Object.keys(next).length > 0) {
+      const unsigned = doc.parties.filter(x => x.required && !x.signed)
+      setPartyInviteEmails(prev => {
+        const merged = { ...prev }
+        let changed = false
+        for (const party of unsigned) {
+          const sent = next[party.id]
+          if (!sent || merged[party.id]?.trim()) continue
+          merged[party.id] = sent.email
+          changed = true
+        }
+        return changed ? merged : prev
+      })
+      setCoSignerEmails(prev => {
+        const emails = [...prev]
+        let changed = false
+        unsigned.forEach((party, i) => {
+          const sent = next[party.id]
+          if (!sent) return
+          while (emails.length <= i) emails.push('')
+          if (!emails[i]?.trim()) {
+            emails[i] = sent.email
+            changed = true
+          }
+        })
+        return changed ? emails : prev
+      })
+    }
+  }, [
+    doc?.id,
+    // Stable fingerprint of server invite fields (avoid re-running on new party array refs).
+    doc?.parties.map(p => `${p.id}:${p.inviteEmail ?? ''}:${p.inviteSentAt ?? ''}`).join('|'),
+  ])
+
+  /** Record a successful invite email and persist for this agreement’s session. */
+  const markInviteEmailSent = useCallback(
+    (docId: string, partyId: string, email: string, sentAt = Date.now()) => {
+      setInviteEmailSent(prev => {
+        const next = { ...prev, [partyId]: { email, sentAt } }
+        try {
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem(`verilock-invite-sent:${docId}`, JSON.stringify(next))
+          }
+        } catch {
+          /* private mode / quota */
+        }
+        return next
+      })
+    },
+    [],
+  )
+
+  /** Opaque invite token from email deep link (`?invite=`) — never shown in creator UI. */
+  const [stashedInviteToken, setStashedInviteToken] = useState<string | null>(null)
+  const [invitePartyFromToken, setInvitePartyFromToken] = useState<string | null>(null)
+
+  // Capture ?invite= into sessionStorage and strip from the address bar.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const fromUrl = params.get('invite')?.trim() || null
+      const slug =
+        doc?.slug ||
+        window.location.pathname.match(/^\/d\/([^/]+)/)?.[1] ||
+        null
+      const storageKey = slug ? `verilock-invite-token:${slug}` : null
+
+      let token = fromUrl
+      if (!token && storageKey) {
+        try {
+          token = sessionStorage.getItem(storageKey)
+        } catch {
+          token = null
+        }
+      }
+      if (!token) {
+        setStashedInviteToken(null)
+        setInvitePartyFromToken(null)
+        return
+      }
+
+      setStashedInviteToken(token)
+      if (storageKey) {
+        try {
+          sessionStorage.setItem(storageKey, token)
+        } catch {
+          /* private mode */
+        }
+      }
+
+      // Drop raw token from visible URL (keep other query flags like openPay).
+      if (fromUrl) {
+        params.delete('invite')
+        const qs = params.toString()
+        const next = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`
+        window.history.replaceState(window.history.state, '', next)
+      }
+
+      let cancelled = false
+      void api
+        .lookupInviteToken(token)
+        .then(res => {
+          if (!cancelled) setInvitePartyFromToken(res.partyId)
+        })
+        .catch(() => {
+          if (!cancelled) setInvitePartyFromToken(null)
+        })
+      return () => {
+        cancelled = true
+      }
+    } catch {
+      setStashedInviteToken(null)
+      setInvitePartyFromToken(null)
+    }
+  }, [doc?.slug, navEpoch])
 
   // Seed share-step cosigner draft from the live document once per agreement.
   useEffect(() => {
@@ -929,7 +1012,7 @@ export function DocumentJourney({
       !creatorInviteDock,
   )
 
-  /** Per-person invite: /d/:slug?party=<partyId> */
+  /** Legacy soft prefer: /d/:slug?party=<partyId> (open slots only; email-gated needs ?invite=). */
   const preferredPartyFromUrl = useMemo(() => {
     if (typeof window === 'undefined') return null
     try {
@@ -940,7 +1023,9 @@ export function DocumentJourney({
     }
   }, [doc?.id, navEpoch])
 
-  const effectivePreferredPartyId = pickedPartyId || preferredPartyFromUrl
+  // Email invite party wins over legacy ?party= and manual pick when token is valid.
+  const effectivePreferredPartyId =
+    invitePartyFromToken || pickedPartyId || preferredPartyFromUrl
 
   /** Prefer typed name, then create-time name, then a real party label (not placeholders). */
   const resolveSignDisplayName = useCallback(
@@ -1789,8 +1874,19 @@ export function DocumentJourney({
             ? clampField(nameForSign, MAX_DISPLAY_NAME_LENGTH)
             : undefined,
           signatureImage,
+          inviteToken: stashedInviteToken || undefined,
         })
         setActiveFromSeal(signedDoc, doc.fileSize)
+        // Invite token is one-time for this signature path.
+        setStashedInviteToken(null)
+        setInvitePartyFromToken(null)
+        try {
+          if (doc.slug && typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem(`verilock-invite-token:${doc.slug}`)
+          }
+        } catch {
+          /* ignore */
+        }
         // Keep the matched file in this session for share / any return to sign.
         // Re-selecting the local file is only needed after a full leave (reload) drops File state.
         setSignerName('')
@@ -1856,6 +1952,7 @@ export function DocumentJourney({
       pdfHash,
       constructionPlan,
       effectivePreferredPartyId,
+      stashedInviteToken,
       signerName,
       creatorName,
       sigBlob,
@@ -2802,45 +2899,7 @@ export function DocumentJourney({
                       </span>
                     </label>
                   )}
-                  <button
-                    type="button"
-                    className={`btn btn-primary btn-lg${busy || connecting ? ' btn--busy' : ''}`}
-                    disabled={
-                      !pdfFile || !pdfHash || busy || (!account && connecting)
-                    }
-                    onClick={() => {
-                      if (!account) {
-                        requestLogin()
-                        return
-                      }
-                      void createDoc()
-                    }}
-                  >
-                    {busy ? (
-                      <>
-                        <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                        Creating…
-                      </>
-                    ) : !account ? (
-                      connecting ? (
-                        <>
-                          <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                          {journeyLoginEntryLabels().busy}
-                        </>
-                      ) : (
-                        <>
-                          <NimiqHexagonIcon size={18} />
-                          {journeyLoginEntryLabels().idle} to continue
-                        </>
-                      )
-                    ) : (
-                      <>
-                        <Fingerprint size={18} strokeWidth={2.25} />
-                        Continue
-                      </>
-                    )}
-                  </button>
-                  {!account && loginNeedsSheet && loginSheetOpen && (
+                  {!account && loginNeedsSheet && loginSheetOpen ? (
                     <LoginSheet
                       open
                       connectMode={connectMode}
@@ -2852,6 +2911,45 @@ export function DocumentJourney({
                       onSession={applySession}
                       placement="inline"
                     />
+                  ) : (
+                    <button
+                      type="button"
+                      className={`btn btn-primary btn-lg${busy || connecting ? ' btn--busy' : ''}`}
+                      disabled={
+                        !pdfFile || !pdfHash || busy || (!account && connecting)
+                      }
+                      onClick={() => {
+                        if (!account) {
+                          requestLogin()
+                          return
+                        }
+                        void createDoc()
+                      }}
+                    >
+                      {busy ? (
+                        <>
+                          <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
+                          Creating…
+                        </>
+                      ) : !account ? (
+                        connecting ? (
+                          <>
+                            <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
+                            {journeyLoginEntryLabels().busy}
+                          </>
+                        ) : (
+                          <>
+                            <NimiqHexagonIcon size={18} />
+                            {journeyLoginEntryLabels().idle} to continue
+                          </>
+                        )
+                      ) : (
+                        <>
+                          <Fingerprint size={18} strokeWidth={2.25} />
+                          Continue
+                        </>
+                      )}
+                    </button>
                   )}
                   {!account && (
                     <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
@@ -3137,8 +3235,20 @@ export function DocumentJourney({
                         </div>
                       ) : (
                         <>
-                          {!account && (
-                            <>
+                          {!account &&
+                            (loginNeedsSheet && loginSheetOpen ? (
+                              <LoginSheet
+                                open
+                                connectMode={connectMode}
+                                connecting={connecting}
+                                walletStatus={walletStatus}
+                                showOpenInPay={showOpenInPay}
+                                onClose={() => setLoginSheetOpen(false)}
+                                onProceed={connectFromPath}
+                                onSession={applySession}
+                                placement="inline"
+                              />
+                            ) : (
                               <button
                                 type="button"
                                 className={`btn btn-primary${connecting ? ' btn--busy' : ''}`}
@@ -3157,21 +3267,7 @@ export function DocumentJourney({
                                   </>
                                 )}
                               </button>
-                              {loginNeedsSheet && loginSheetOpen && (
-                                <LoginSheet
-                                  open
-                                  connectMode={connectMode}
-                                  connecting={connecting}
-                                  walletStatus={walletStatus}
-                                  showOpenInPay={showOpenInPay}
-                                  onClose={() => setLoginSheetOpen(false)}
-                                  onProceed={connectFromPath}
-                                  onSession={applySession}
-                                  placement="inline"
-                                />
-                              )}
-                            </>
-                          )}
+                            ))}
 
                           {account &&
                             signingResolution &&
@@ -3717,16 +3813,62 @@ export function DocumentJourney({
                           <div className="field-stack">
                             <span className="field-label">Invite each person</span>
                             <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                              Enter their email and send, or copy their personal invite link.
-                              Hand off the same document file separately - VeriLock never hosts it.
+                              Send email for a private personal link (only in the message — not
+                              shown here). Or share the open document link below for slots that
+                              are not email-invited. Hand off the PDF file separately — VeriLock
+                              never hosts it.
                             </p>
+                            {(() => {
+                              const base = doc.shareUrl.startsWith('http')
+                                ? doc.shareUrl
+                                : `${typeof window !== 'undefined' ? window.location.origin : ''}${doc.shareUrl.startsWith('/') ? '' : '/'}${doc.shareUrl}`
+                              return (
+                                <div className="field-stack share-cosigner-fields">
+                                  <div className="share-cosigner-head">
+                                    <div className="share-cosigner-title">Document link</div>
+                                  </div>
+                                  <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
+                                    Open agreement link (no personal secret). After you email a
+                                    person, their slot requires the link from that email.
+                                  </p>
+                                  <code className="share-cosigner-link mono">{base}</code>
+                                  <div className="share-cosigner-actions">
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary"
+                                      disabled={busy}
+                                      onClick={() =>
+                                        void copyText(base, undefined, 'your co-signer')
+                                      }
+                                    >
+                                      <Copy size={16} strokeWidth={2.25} aria-hidden />
+                                      Copy document link
+                                    </button>
+                                    {typeof navigator !== 'undefined' &&
+                                      typeof navigator.share === 'function' && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-secondary"
+                                          disabled={busy}
+                                          onClick={() =>
+                                            void sharePersonInvite({
+                                              partyId: '_doc',
+                                              personName: 'co-signer',
+                                              personLink: base,
+                                            })
+                                          }
+                                        >
+                                          <Share2 size={16} strokeWidth={2.25} aria-hidden />
+                                          Share
+                                        </button>
+                                      )}
+                                  </div>
+                                </div>
+                              )
+                            })()}
                             {doc.parties
                               .filter(p => p.required && !p.signed)
                               .map((p, index) => {
-                                const base = doc.shareUrl.startsWith('http')
-                                  ? doc.shareUrl
-                                  : `${typeof window !== 'undefined' ? window.location.origin : ''}${doc.shareUrl.startsWith('/') ? '' : '/'}${doc.shareUrl}`
-                                const personLink = `${base}${base.includes('?') ? '&' : '?'}party=${encodeURIComponent(p.id)}`
                                 const label =
                                   p.displayName?.trim() ||
                                   p.roleLabel ||
@@ -3736,6 +3878,7 @@ export function DocumentJourney({
                                   partyInviteEmails[p.id] ??
                                   coSignerEmails[index] ??
                                   emailed?.email ??
+                                  p.inviteEmail ??
                                   ''
                                 const sending = inviteSendBusyId === p.id
                                 const note = inviteSendNote[p.id]
@@ -3785,7 +3928,8 @@ export function DocumentJourney({
                                         {note && !note.startsWith('Invite sent')
                                           ? ` · ${note}`
                                           : null}
-                                        . You can resend if they need another link.
+                                        . Their personal signing link is only in that email.
+                                        You can resend if they need another link.
                                       </p>
                                     ) : null}
                                     {p.walletAddress && (
@@ -3848,13 +3992,27 @@ export function DocumentJourney({
                                               partyId: p.id,
                                               to,
                                             })
-                                            .then(() => {
-                                              markInviteEmailSent(doc.id, p.id, to)
+                                            .then(res => {
+                                              markInviteEmailSent(
+                                                doc.id,
+                                                p.id,
+                                                res.to || to,
+                                                res.inviteSentAt,
+                                              )
                                               setInviteSendNote(prev => ({
                                                 ...prev,
-                                                [p.id]: `Invite sent to ${to}`,
+                                                [p.id]: `Invite sent to ${res.to || to}`,
                                               }))
                                               showInviteHandoffHelp(label, 'email')
+                                              // Refresh so party.inviteEmail is server-backed.
+                                              void api
+                                                .getDocument(doc.slug, token)
+                                                .then(({ document }) =>
+                                                  setActiveFromSeal(document, doc.fileSize),
+                                                )
+                                                .catch(() => {
+                                                  /* keep local badge */
+                                                })
                                             })
                                             .catch(err => {
                                               setLocalError(
@@ -3881,39 +4039,11 @@ export function DocumentJourney({
                                           'Send email'
                                         )}
                                       </button>
-                                      <button
-                                        type="button"
-                                        className="btn btn-secondary"
-                                        disabled={busy || p.signed}
-                                        onClick={() => void copyText(personLink, p.id, label)}
-                                      >
-                                        <Copy size={16} strokeWidth={2.25} aria-hidden />
-                                        Copy invite link
-                                      </button>
-                                      {/* Mobile: OS share sheet (iMessage, WhatsApp, …) + PDF when allowed */}
-                                      {typeof navigator !== 'undefined' &&
-                                        typeof navigator.share === 'function' && (
-                                          <button
-                                            type="button"
-                                            className="btn btn-secondary"
-                                            disabled={busy || p.signed}
-                                            onClick={() =>
-                                              void sharePersonInvite({
-                                                partyId: p.id,
-                                                personName: label,
-                                                personLink,
-                                              })
-                                            }
-                                          >
-                                            <Share2 size={16} strokeWidth={2.25} aria-hidden />
-                                            Share
-                                          </button>
-                                        )}
                                     </div>
                                     {!emailSendEnabled && (
                                       <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>
                                         Email send is disabled until Resend is configured on the
-                                        server. You can still copy the invite link.
+                                        server. You can still copy the open document link above.
                                       </p>
                                     )}
                                     {note && !emailed ? (
@@ -3921,9 +4051,6 @@ export function DocumentJourney({
                                         {note}
                                       </p>
                                     ) : null}
-                                    <code className="share-cosigner-link mono">
-                                      {personLink}
-                                    </code>
                                   </div>
                                 )
                               })}

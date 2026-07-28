@@ -118,13 +118,12 @@ export function journeyDesktopChoiceLabels(): {
   hubHint: string
 } {
   return {
-    hubIdle: 'Continue with Nimiq Hub',
+    hubIdle: 'Nimiq Hub',
     hubBusy: 'Opening Hub…',
-    hubHint: 'Recommended - sign in on this computer in one step',
-    payIdle: 'Sign in with Nimiq Pay on your phone',
+    hubHint: 'Recommended · this computer',
+    payIdle: 'Nimiq Pay',
     payBusy: 'Waiting for phone…',
-    /** Shown only while the QR is visible. */
-    payHint: 'Scan a QR, approve on your phone, and this computer finishes login.',
+    payHint: 'Scan QR · approve on your phone',
   }
 }
 
