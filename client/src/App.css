@@ -595,12 +595,13 @@
 /* Hero: copy defines height; still covers the box and may crop top/bottom */
 .lr-hero-band {
   display: block;
-  padding: 0.25rem 0 0.25rem;
+  /* Breathing room around the hero plate */
+  padding: 0.65rem 0 0.85rem;
 }
 
 @media (min-width: 860px) {
   .lr-hero-band {
-    padding: 0.5rem 0 0.5rem;
+    padding: 1rem 0 1.25rem;
   }
 }
 
@@ -614,14 +615,31 @@ html {
   }
 }
 
+/*
+ * Hero plate: CSS wash lives BEHIND the still.
+ * Still is white-bg lock art; multiply lets the gradient show through whites.
+ * Tune --lr-hero-wash-* without regenerating the asset.
+ */
 .lr-hero-frame {
+  --lr-hero-wash-a: #fafdfc;
+  --lr-hero-wash-b: #f0fdfa;
+  --lr-hero-wash-c: #ecfdf5;
   position: relative;
   isolation: isolate;
+  /* Stack: copy → status → visual on narrow; desktop repositions status */
+  display: flex;
+  flex-direction: column;
   border-radius: 18px;
   overflow: hidden;
   border: 1px solid var(--lr-line);
-  /* Flat plate matching hero still (no multi-stop gradient chrome) */
-  background: #f0f5f3;
+  background:
+    radial-gradient(ellipse 55% 70% at 88% 45%, rgba(13, 148, 136, 0.1), transparent 62%),
+    linear-gradient(
+      125deg,
+      var(--lr-hero-wash-a) 0%,
+      var(--lr-hero-wash-b) 48%,
+      var(--lr-hero-wash-c) 100%
+    );
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.7) inset,
     0 16px 40px rgba(15, 23, 42, 0.06);
@@ -629,27 +647,33 @@ html {
 
 .lr-hero-copy {
   position: relative;
-  z-index: 1;
+  z-index: 2;
+  order: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 1.25rem;
   min-width: 0;
-  /* Extra vertical padding so type has air and the image band matches */
-  padding: 1.85rem 1.25rem 2rem;
-  /* Solid wash for legibility on mobile (image sits below) */
-  background: rgba(255, 255, 255, 0.92);
+  /* Status sits in flow below promo on mobile — no need for huge bottom pad */
+  padding: 2.5rem 1.4rem 0.85rem;
+  /* Soft plate over the wash on mobile (image sits below) */
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.94) 0%,
+    rgba(255, 255, 255, 0.88) 100%
+  );
 }
 
 /*
- * Mobile: still sits under the copy. Height tracks copy but is capped at 200px
+ * Mobile: still sits under the copy. Height tracks copy but is capped
  * so the band stays short; object-fit:cover trims top/bottom.
  */
 .lr-hero-visual {
   position: relative;
-  z-index: 0;
+  z-index: 1;
+  order: 3;
   width: 100%;
-  height: min(var(--lr-hero-copy-h, 12rem), 200px);
-  max-height: 200px;
+  height: min(var(--lr-hero-copy-h, 12rem), 260px);
+  max-height: 260px;
   overflow: hidden;
   flex-shrink: 0;
   line-height: 0;
@@ -658,8 +682,8 @@ html {
 /* Narrow phones: shorter image band under the copy */
 @media (max-width: 449px) {
   .lr-hero-visual {
-    height: min(var(--lr-hero-copy-h, 10rem), 130px);
-    max-height: 130px;
+    height: min(var(--lr-hero-copy-h, 10rem), 180px);
+    max-height: 180px;
   }
 }
 
@@ -668,8 +692,10 @@ html {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* Lock on the right; crop top/bottom of the tall still freely */
+  /* Lock on the right; open left for type */
   object-position: right center;
+  /* White studio field becomes the CSS gradient wash underneath */
+  mix-blend-mode: multiply;
   filter: none;
   -webkit-user-select: none;
   user-select: none;
@@ -677,26 +703,37 @@ html {
 
 /*
  * Desktop: copy overlays the open left; image fills the frame.
- * Frame height = copy height (image is out of flow).
+ * Frame grows with copy height + extra breathing room so the lock isn't cramped.
  */
 @media (min-width: 860px) {
+  .lr-hero-frame {
+    display: block;
+    /* Taller plate — more air above/below type and around the lock */
+    min-height: 26rem;
+  }
+
   .lr-hero-copy {
+    order: unset;
     width: 56%;
-    max-width: 34rem;
-    padding: 2.25rem 1.5rem 2.5rem 1.75rem;
-    /* Soft edge so type stays crisp on the pale left of the still */
+    max-width: 36rem;
+    box-sizing: border-box;
+    /* Room above the frame-centered status chip at the plate foot */
+    padding: 3.15rem 1.85rem 4.5rem 2.15rem;
+    gap: 1.35rem;
+    /* Fade into the wash; no hard white slab */
     background: linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.88) 0%,
-      rgba(255, 255, 255, 0.55) 72%,
+      rgba(255, 255, 255, 0.82) 0%,
+      rgba(255, 255, 255, 0.45) 68%,
       rgba(255, 255, 255, 0) 100%
     );
   }
 
   .lr-hero-visual {
+    order: unset;
     position: absolute;
     inset: 0;
-    z-index: 0;
+    z-index: 1;
     width: auto;
     height: auto;
     max-height: none;
@@ -718,26 +755,139 @@ html {
   display: inline;
 }
 
-.lr-hero-headline-em {
-  display: inline;
-  color: var(--lr-accent);
-  font-weight: 700;
+/*
+ * Load entrance: words rise + unblur in a cascade; “Free.” lands a beat later
+ * with a soft mint underline draw. Once only (CSS animation, not a loop).
+ */
+.lr-hero-headline--enter .lr-hero-word {
+  display: inline-block;
+  opacity: 0;
+  filter: blur(8px);
+  transform: translateY(0.55em);
+  animation: lr-hero-word-in 0.78s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1)) both;
+  animation-delay: calc(0.1s + 0.09s * var(--lr-hw-i, 0));
 }
 
-.lr-hero-sub {
+.lr-hero-headline-em {
+  display: inline-block;
+  position: relative;
+  color: var(--lr-accent);
+  font-weight: 700;
+  vertical-align: baseline;
+}
+
+.lr-hero-headline--enter .lr-hero-headline-em {
+  opacity: 0;
+  filter: blur(10px);
+  transform: translateY(0.4em) scale(0.92);
+  /* 0.48s base + 0.2s + 0.2s extra after word cascade */
+  animation: lr-hero-free-in 0.9s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1)) 0.88s both;
+}
+
+.lr-hero-headline-em-text {
+  position: relative;
+  z-index: 1;
+}
+
+/* Solid mint hairline under Free. — more gap, lighter stroke, draws after Free lands */
+.lr-hero-headline--enter .lr-hero-headline-em::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.12em;
+  height: 0.14em;
+  border-radius: 999px;
+  /* Same color/opacity as Free. text (var(--lr-accent)) */
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: lr-hero-free-underline 0.55s cubic-bezier(0.22, 1, 0.36, 1) 1.35s both;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes lr-hero-word-in {
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+@keyframes lr-hero-free-in {
+  0% {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateY(0.4em) scale(0.92);
+  }
+  70% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(-0.04em) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes lr-hero-free-underline {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lr-hero-headline--enter .lr-hero-word,
+  .lr-hero-headline--enter .lr-hero-headline-em,
+  .lr-hero-headline--enter .lr-hero-headline-em::after {
+    animation: none;
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
+
+/* Hero beats as bullets — scannable vs one dense paragraph */
+.lr-hero-points {
   margin: 0;
+  padding: 0;
   max-width: 32rem;
-  font-size: 1rem;
-  line-height: 1.55;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.lr-hero-points li {
+  position: relative;
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.98rem;
+  line-height: 1.5;
   color: var(--lr-muted);
   text-wrap: pretty;
+}
+
+.lr-hero-points li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: var(--lr-accent, #0d9488);
+  opacity: 0.85;
 }
 
 .lr-hero-ctas {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 0.65rem;
-  margin-top: 0.15rem;
+  gap: 0.55rem 0.75rem;
+  margin-top: 0.2rem;
 }
 
 /* Freemium pitch under CTAs - quiet, not a gradient banner */
@@ -746,16 +896,24 @@ html {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem 0.5rem;
-  margin: 0.05rem 0 0;
+  margin: 0.15rem 0 0.35rem;
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.4;
   color: var(--lr-muted);
 }
 
+/*
+ * Emphasis without link teal or chip chrome — weight only. Mint stays on real CTAs.
+ */
 .lr-promo-free {
-  color: var(--lr-accent);
-  font-weight: 600;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--lr-text, #0f172a);
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .lr-promo-sep {
@@ -831,32 +989,92 @@ a.lr-cta {
   outline-offset: 3px;
 }
 
+/*
+ * Status chip
+ * <860px: in flow between promo and image (order 2), centered under copy.
+ * ≥860px: absolute, centered on full .lr-hero-frame at the plate foot.
+ * Swap = blur + vertical swipe. Hold time is in JS.
+ */
+.lr-status-slot {
+  position: relative;
+  z-index: 3;
+  order: 2;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  /* Continue the copy plate so the frame’s teal wash never shows behind the chip */
+  margin: 0;
+  padding: 0.45rem 1.4rem 1.15rem;
+  box-sizing: border-box;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.88) 0%,
+    rgba(255, 255, 255, 0.94) 100%
+  );
+  pointer-events: none;
+}
+
+@media (min-width: 860px) {
+  .lr-status-slot {
+    order: unset;
+    position: absolute;
+    left: 50%;
+    bottom: 1.25rem;
+    transform: translateX(-50%);
+    width: min(92%, 30rem);
+    margin: 0;
+    padding: 0;
+    /* Absolute on the plate — no full-width white bar */
+    background: transparent;
+  }
+}
+
 .lr-status {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.45rem;
   min-height: 1.35em;
-  margin: 0.2rem 0 0;
-  padding: 0.4rem 0.75rem 0.4rem 0.55rem;
+  margin: 0;
+  padding: 0.45rem 0.85rem 0.45rem 0.6rem;
   border-radius: 999px;
-  border: 1px solid rgba(13, 148, 136, 0.18);
-  background: rgba(13, 148, 136, 0.07);
+  border: 1px solid rgba(13, 148, 136, 0.2);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(10px) saturate(1.1);
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
   color: #0f766e;
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.35;
-  opacity: 0;
-  transition: opacity 0.35s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1));
+  text-align: center;
   max-width: 100%;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  /* Exit / enter rest: blurred + nudged down */
+  opacity: 0;
+  filter: blur(7px);
+  transform: translateY(0.55rem);
+  transition:
+    opacity 0.58s cubic-bezier(0.32, 0.72, 0, 1),
+    filter 0.58s cubic-bezier(0.32, 0.72, 0, 1),
+    transform 0.58s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: opacity, filter, transform;
 }
 
 .lr-status--in {
   opacity: 1;
+  filter: blur(0);
+  transform: translateY(0);
+}
+
+.lr-status svg {
+  flex-shrink: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .lr-status {
     opacity: 1;
+    filter: none;
+    transform: none;
     transition: none;
   }
 
@@ -904,14 +1122,17 @@ a.lr-cta {
   text-wrap: pretty;
 }
 
-/* Trust: shell transparent until hover / focus / expand - text only */
+/*
+ * Trust shell: same resting border as How; shared hover/open lift shadow.
+ * (Previously transparent-until-hover; How had the always-on border.)
+ */
 .lr-trust {
   border-radius: 14px;
-  border: 1px solid transparent;
-  background: transparent;
+  border: 1px solid var(--lr-line);
+  background: var(--lr-surface);
   overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
   transition:
-    background 0.45s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1)),
     border-color 0.45s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1)),
     box-shadow 0.45s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1));
 }
@@ -920,7 +1141,6 @@ a.lr-cta {
 .lr-trust:focus-within,
 .lr-trust--open {
   border-color: var(--lr-line);
-  background: var(--lr-surface);
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
 }
 
@@ -1005,253 +1225,265 @@ a.lr-cta {
   padding: 0.15rem 0 0.25rem;
 }
 
-/* Path cards - still fills card; translucent white label strip overlays the image */
-
-.lr-paths {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.85rem;
-  width: 100%;
-}
-
-.lr-path-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  min-width: 0;
-  /* Stagger path cards slightly after section reveal */
-  transition: transform 0.7s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1));
-  transition-delay: calc(0.06s * var(--lr-path-i, 0));
-}
-
-@media (min-width: 720px) {
-  /* Asymmetric: Create path leads; invite + verify follow */
-  .lr-paths {
-    grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr) minmax(0, 1fr);
-    gap: 1rem;
-    align-items: stretch;
-  }
-
-  .lr-path-wrap--primary .lr-path {
-    min-height: 18.5rem;
-  }
-}
-
-.lr-path {
+/*
+ * Path stage — one full-bleed still, three paths listed at the bottom.
+ * Hover/focus a list item crossfades the image; Create & sign is default.
+ */
+.lr-path-stage {
+  --lr-path-ease: var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1));
   position: relative;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  /* Room for still above the label strip */
-  aspect-ratio: 4 / 5;
-  min-height: 15.5rem;
-  padding: 0;
-  border-radius: 12px;
-  /*
-   * Photo cards: white rim only - no slate drop-shadow / inset ring
-   * (those read as gray arcs at the bottom corners).
-   * Hover: colored border + soft outer ring + slight lift.
-   */
-  border: 2px solid rgba(255, 255, 255, 0.55);
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
+  min-height: min(62vh, 28rem);
+  height: clamp(22rem, 58vw, 34rem);
+  border-radius: 16px;
+  border: 1px solid var(--lr-line);
   overflow: hidden;
   isolation: isolate;
-  box-shadow: 0 0 0 0 transparent;
-  transition:
-    border-color 0.45s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1)),
-    box-shadow 0.45s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1)),
-    transform 0.45s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1));
+  background: #e8eef0;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset;
 }
 
-@media (min-width: 720px) {
-  .lr-path {
-    aspect-ratio: 3 / 4;
-    min-height: 17rem;
-  }
-}
-
-.lr-path:hover {
-  border-color: rgba(13, 148, 136, 0.6);
-  box-shadow:
-    0 0 0 3px rgba(13, 148, 136, 0.22),
-    0 16px 32px rgba(15, 23, 42, 0.08);
-  transform: translateY(-3px);
-}
-
-.lr-path:active {
-  transform: translateY(-1px) scale(0.995);
-}
-
-.lr-path:focus-visible {
-  outline: none;
-  border-color: rgba(13, 148, 136, 0.65);
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.35);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lr-path,
-  .lr-path:hover,
-  .lr-path:active {
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    transform: none;
-  }
-}
-
-/* Full-bleed still - covers entire card including under the frosted label strip */
-.lr-path-thumb {
+.lr-path-stage-media {
   position: absolute;
-  /* Slight overscan so cover image seals rounded corners under the border */
-  inset: -1px;
+  inset: 0;
   z-index: 0;
-  display: block;
-  width: auto;
-  height: auto;
-  overflow: hidden;
-  background: transparent;
-  border-radius: inherit;
   pointer-events: none;
 }
 
-.lr-path-img {
+.lr-path-stage-img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center;
-  display: block;
-  /* Keep role metaphors readable; label strip frosts the bottom for text */
-  filter: saturate(1.06) contrast(1.08) brightness(0.98);
-  --lr-path-zoom: 1;
-  /* Tiny scale past 1 so object-fit cover never leaves anti-aliased gaps at the radius */
-  transform: scale(calc(var(--lr-path-zoom) * 1.02));
-  transform-origin: center center;
-  pointer-events: none;
+  opacity: 0;
+  /* Slight zoom on the active still so swaps feel alive (not a hard cut) */
+  transform: scale(1.04);
+  filter: saturate(1.04) contrast(1.04);
+  transition:
+    opacity 0.55s var(--lr-path-ease),
+    transform 1.1s var(--lr-path-ease);
+  will-change: opacity, transform;
 }
 
-/*
- * Label strip sits over the full-bleed still (thumb is absolute inset 0).
- * Frosted glass: lower white opacity + stronger blur so color bleeds through
- * while title/detail stay readable.
- */
-.lr-path-main {
-  position: relative;
+.lr-path-stage-img--active {
+  opacity: 1;
+  transform: scale(1);
   z-index: 1;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 0.65rem;
-  margin-top: auto;
-  padding: 1rem 1.05rem 1.1rem;
-  /* Nested radius: outer 12px − ~2px border ≈ 10px */
-  border-radius: 0 0 10px 10px;
-  /* Soft top: more image bleed at the edge, slightly denser under text */
+}
+
+/* Legibility wash under the dock — dense bottom, clear sky above */
+.lr-path-stage-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.48) 0%,
-    rgba(255, 255, 255, 0.74) 40%,
-    rgba(255, 255, 255, 0.86) 100%
+    rgba(15, 23, 42, 0.06) 0%,
+    rgba(15, 23, 42, 0.02) 38%,
+    rgba(15, 23, 42, 0.35) 68%,
+    rgba(15, 23, 42, 0.72) 100%
   );
-  /* Lighter frost so more of the still shows through */
-  backdrop-filter: blur(10px) saturate(1.1);
-  -webkit-backdrop-filter: blur(10px) saturate(1.1);
-  /* No hairline, no slate upward shadow (read as gray at bottom corners) */
-  border: none;
-  box-shadow: none;
 }
 
-/* No backdrop-filter: keep strip denser so text contrast still holds */
-@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .lr-path-main {
-    background: rgba(255, 255, 255, 0.92);
+.lr-path-stage-footer {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1.15rem 1rem 1rem;
+}
+
+.lr-path-stage-caption {
+  margin: 0;
+  max-width: 28rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
+  animation: lr-path-caption-in 0.4s var(--lr-path-ease) both;
+}
+
+@keyframes lr-path-caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-.lr-path-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-top: 0.06rem;
-  /* Bare Lucide mark - no chip / card chrome */
-  width: auto;
-  height: auto;
+.lr-path-stage-dock {
+  margin: 0;
+}
+
+.lr-path-stage-list {
+  list-style: none;
+  margin: 0;
   padding: 0;
-  border: none;
-  border-radius: 0;
-  background: none;
-  color: var(--lr-accent);
-}
-
-.lr-path-icon svg {
-  width: 1.75rem;
-  height: 1.75rem;
-  display: block;
-}
-
-.lr-path--signer .lr-path-icon {
-  color: var(--lr-warn);
-}
-
-.lr-path--verifier .lr-path-icon {
-  color: var(--lr-verify);
-}
-
-.lr-path-body {
   display: flex;
   flex-direction: column;
-  gap: 0.28rem;
+  gap: 0.35rem;
+}
+
+.lr-path-stage-list > li {
+  margin: 0;
   min-width: 0;
 }
 
-.lr-path-title {
+.lr-path-stage-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.3s var(--lr-path-ease),
+    border-color 0.3s var(--lr-path-ease),
+    box-shadow 0.3s var(--lr-path-ease),
+    transform 0.3s var(--lr-path-ease);
+}
+
+.lr-path-stage-item:hover,
+.lr-path-stage-item:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.28);
+  outline: none;
+}
+
+.lr-path-stage-item:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+
+.lr-path-stage-item--active {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.95);
+  color: var(--lr-text, #0f172a);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+}
+
+.lr-path-stage-item--active:hover,
+.lr-path-stage-item--active:focus-visible {
+  background: #fff;
+  border-color: #fff;
+  color: var(--lr-text, #0f172a);
+}
+
+.lr-path-stage-item-icon {
+  display: inline-flex;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.lr-path-stage-item--active .lr-path-stage-item-icon {
+  color: var(--lr-accent, #0d9488);
+}
+
+.lr-path-stage-item--signer.lr-path-stage-item--active .lr-path-stage-item-icon {
+  color: var(--lr-warn, #ca8a04);
+}
+
+.lr-path-stage-item--verifier.lr-path-stage-item--active .lr-path-stage-item-icon {
+  color: var(--lr-verify, #65a30d);
+}
+
+.lr-path-stage-item-label {
   font-family: var(--font-display);
-  font-size: 1.0625rem;
+  font-size: 0.98rem;
   font-weight: 700;
-  letter-spacing: -0.025em;
-  color: #0f172a;
+  letter-spacing: -0.02em;
   line-height: 1.2;
 }
 
-.lr-path-detail {
-  font-size: 0.875rem;
-  line-height: 1.45;
-  color: #3d4f5f;
-}
-
-.lr-path-go {
-  align-self: center;
-  color: var(--lr-dim);
+.lr-path-stage-item-go {
+  color: rgba(255, 255, 255, 0.55);
   transition:
-    color 0.35s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1)),
-    transform 0.35s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1));
+    color 0.3s var(--lr-path-ease),
+    transform 0.3s var(--lr-path-ease);
 }
 
-.lr-path:hover .lr-path-go {
-  color: var(--lr-accent);
+.lr-path-stage-item:hover .lr-path-stage-item-go,
+.lr-path-stage-item:focus-visible .lr-path-stage-item-go {
+  color: rgba(255, 255, 255, 0.95);
   transform: translateX(2px);
 }
 
-.lr-path--signer:hover {
-  border-color: rgba(202, 138, 4, 0.7);
-  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.35);
+.lr-path-stage-item--active .lr-path-stage-item-go {
+  color: var(--lr-dim, #64748b);
 }
 
-.lr-path--signer:hover .lr-path-go {
-  color: var(--lr-warn);
+.lr-path-stage-item--active:hover .lr-path-stage-item-go,
+.lr-path-stage-item--active:focus-visible .lr-path-stage-item-go {
+  color: var(--lr-accent, #0d9488);
 }
 
-.lr-path--verifier:hover {
-  border-color: rgba(101, 163, 13, 0.6);
-  box-shadow: 0 0 0 3px rgba(101, 163, 13, 0.28);
+/* Desktop: horizontal path rail on the still */
+@media (min-width: 720px) {
+  .lr-path-stage {
+    min-height: min(68vh, 32rem);
+    height: clamp(26rem, 42vw, 36rem);
+  }
+
+  .lr-path-stage-footer {
+    padding: 1.35rem 1.25rem 1.2rem;
+    gap: 0.75rem;
+  }
+
+  .lr-path-stage-caption {
+    font-size: 0.9375rem;
+  }
+
+  .lr-path-stage-list {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .lr-path-stage-list > li {
+    flex: 1 1 0;
+  }
+
+  .lr-path-stage-item {
+    padding: 0.8rem 0.9rem;
+  }
+
+  .lr-path-stage-item-label {
+    font-size: 1.02rem;
+  }
 }
 
-.lr-path--verifier:hover .lr-path-go {
-  color: var(--lr-verify);
+@media (prefers-reduced-motion: reduce) {
+  .lr-path-stage-img {
+    transition: opacity 0.15s ease;
+    transform: none;
+  }
+
+  .lr-path-stage-img--active {
+    transform: none;
+  }
+
+  .lr-path-stage-caption {
+    animation: none;
+  }
+
+  .lr-path-stage-item,
+  .lr-path-stage-item-go {
+    transition: none;
+  }
 }
 
 .lr-how-wrap {
@@ -1996,11 +2228,6 @@ a.lr-cta {
   .lr-header .exp-connect-btn.btn-primary {
     font-size: 0.74rem !important;
     padding: 0.45rem 0.7rem !important;
-  }
-
-  .lr-path-main {
-    gap: 0.55rem;
-    padding: 0.85rem 0.9rem 0.95rem;
   }
 }
 

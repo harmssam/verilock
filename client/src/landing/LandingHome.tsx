@@ -3,7 +3,7 @@ import {
   ChevronRight,
   Fingerprint,
   Lock,
-  ScanSearch,
+  BookSearch,
   ShieldCheck,
   Users,
   type LucideIcon,
@@ -22,11 +22,11 @@ import type { PathRole } from '../journey/types'
 import { AppLink } from '../AppLink'
 import { LandingHowItWorks } from './LandingHowItWorks'
 import {
+  formatObjectPosition,
   HERO_STILL,
   HERO_STILL_SIZE,
   PATH_PLACEMENTS,
   PATH_STILLS,
-  placementImageStyle,
 } from './pathMedia'
 
 /** Path picker section - hero “Sign or verify” and `/#lr-paths` deep links. */
@@ -109,7 +109,7 @@ function buildHeroClaims(): HeroClaim[] {
     },
     {
       icon: Users,
-      status: 'Your document stays on this device. Always.',
+      status: 'Your document stays on your device. Always.',
     },
     {
       icon: Lock,
@@ -122,10 +122,12 @@ function buildHeroClaims(): HeroClaim[] {
   ]
 }
 
-const ROTATE_MS = 4800
-const FADE_MS = 220
+/** Hold each claim; longer than the blur/swipe so it reads as calm, not a ticker. */
+const ROTATE_MS = 7800
+/** Exit/enter duration — keep in sync with `.lr-status` transition in App.css. */
+const SWAP_MS = 580
 
-/** Path card icons: thin stroke, no chip chrome. ScanSearch on verify. */
+/** Path icons: thin stroke, no chip chrome. BookSearch on verify. */
 const PATH_ICON_STROKE = 1.35
 const PATH_ICON_SIZE = 28
 
@@ -154,7 +156,7 @@ const PATHS: {
     role: 'verifier',
     title: 'Verify a file',
     detail: 'Drop a file to check it still matches a locked proof',
-    icon: ScanSearch,
+    icon: BookSearch,
     imageAlt: '',
   },
 ]
@@ -175,7 +177,7 @@ function useHeroClaims() {
       window.setTimeout(() => {
         setIndex(i => (i + 1) % claims.length)
         setVisible(true)
-      }, FADE_MS)
+      }, SWAP_MS)
     }, ROTATE_MS)
     return () => window.clearInterval(id)
   }, [claims.length])
@@ -190,6 +192,8 @@ export function LandingHome({
 }: LandingHomeProps) {
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [howOpen, setHowOpen] = useState(false)
+  /** Path stage preview — Create & sign default; hover/focus swaps the still. */
+  const [previewRole, setPreviewRole] = useState<PathRole>('creator')
   /** Featured + up to two more for a stronger home teaser. */
   const blogTeaser = useMemo(() => {
     const all = getAllPosts()
@@ -199,6 +203,10 @@ export function LandingHome({
     }
   }, [])
   const latestPost = blogTeaser.latest
+  const previewPath = useMemo(
+    () => PATHS.find(p => p.role === previewRole) ?? PATHS[0]!,
+    [previewRole],
+  )
   const { claim, visible: claimVisible } = useHeroClaims()
   const ClaimIcon = claim.icon
   const heroCopyRef = useRef<HTMLDivElement>(null)
@@ -254,15 +262,29 @@ export function LandingHome({
           }
         >
           <div className="lr-hero-copy" ref={heroCopyRef}>
-            <h1 id="lr-hero-headline" className="lr-hero-headline">
-              <span className="lr-hero-headline-line">Multi-party document signing.</span>{' '}
-              <span className="lr-hero-headline-em">Free.</span>
+            <h1 id="lr-hero-headline" className="lr-hero-headline lr-hero-headline--enter">
+              <span className="lr-hero-headline-line">
+                {(['Multi-party', 'document', 'signing.'] as const).map((word, i) => (
+                  <span
+                    key={word}
+                    className="lr-hero-word"
+                    style={{ ['--lr-hw-i' as string]: i }}
+                  >
+                    {word}
+                    {i < 2 ? '\u00a0' : ''}
+                  </span>
+                ))}
+              </span>{' '}
+              <span className="lr-hero-headline-em">
+                <span className="lr-hero-headline-em-text">Free.</span>
+              </span>
             </h1>
-            <p className="lr-hero-sub">
-              Co-sign with your Nimiq wallet at no cost. Your document stays on this device. Print when
-              everyone has signed. When you need permanence, lock a proof on the blockchain for 1
-              credit.
-            </p>
+            <ul className="lr-hero-points">
+              <li>Co-sign with your Nimiq wallet at no cost</li>
+              <li>Your document stays on your device</li>
+              <li>Print when everyone has signed</li>
+              <li>Lock a document on the blockchain for 1 credit when you need proof</li>
+            </ul>
             {/*
               One primary CTA only. Paths below cover Create / Invited / Verify.
               Secondary jumps to path picker for co-signers and verifiers.
@@ -291,13 +313,6 @@ export function LandingHome({
               </span>
               <span>Lock on chain for 1 credit</span>
             </p>
-            <p
-              className={`lr-status${claimVisible ? ' lr-status--in' : ''}`}
-              aria-live="polite"
-            >
-              <ClaimIcon size={15} strokeWidth={2.25} aria-hidden />
-              <span>{claim.status}</span>
-            </p>
           </div>
           <div className="lr-hero-visual" aria-hidden>
             <img
@@ -308,6 +323,16 @@ export function LandingHome({
               height={HERO_STILL_SIZE.height}
               decoding="async"
             />
+          </div>
+          {/* Centered on the full hero frame (not just the copy column width). */}
+          <div className="lr-status-slot">
+            <p
+              className={`lr-status${claimVisible ? ' lr-status--in' : ''}`}
+              aria-live="polite"
+            >
+              <ClaimIcon size={15} strokeWidth={2.25} aria-hidden />
+              <span>{claim.status}</span>
+            </p>
           </div>
         </div>
       </section>
@@ -329,7 +354,7 @@ export function LandingHome({
         >
           <Fingerprint className="lr-trust-icon" size={18} strokeWidth={2.25} aria-hidden />
           <span className="lr-trust-copy">
-            <strong>Your file never leaves this device.</strong>
+            <strong>Your file never leaves your device.</strong>
             <span className="lr-trust-sub">
               We store a short integrity proof, not your document.
             </span>
@@ -366,49 +391,79 @@ export function LandingHome({
           </p>
         </div>
 
-        <div className="lr-paths" role="list">
-          {PATHS.map((path, i) => {
-            const Icon = path.icon
-            const place = PATH_PLACEMENTS.card[path.role]
-            return (
-              <div
-                key={path.role}
-                className={`lr-path-wrap${path.role === 'creator' ? ' lr-path-wrap--primary' : ''}`}
-                role="listitem"
-                style={{ ['--lr-path-i' as string]: i }}
-              >
-                <AppLink
-                  to={`/?intent=${path.role}`}
-                  className={`lr-path lr-path--${path.role}`}
-                  onClick={() => onPickRole(path.role)}
-                >
-                  <span className="lr-path-thumb" aria-hidden>
-                    <img
-                      className="lr-path-img"
-                      src={PATH_STILLS[path.role]}
-                      alt={path.imageAlt}
-                      width={640}
-                      height={360}
-                      loading="lazy"
-                      decoding="async"
-                      draggable={false}
-                      style={placementImageStyle(place)}
-                    />
-                  </span>
-                  <span className="lr-path-main">
-                    <span className="lr-path-icon" aria-hidden>
-                      <Icon size={PATH_ICON_SIZE} strokeWidth={PATH_ICON_STROKE} />
-                    </span>
-                    <span className="lr-path-body">
-                      <strong className="lr-path-title">{path.title}</strong>
-                      <span className="lr-path-detail">{path.detail}</span>
-                    </span>
-                    <ChevronRight className="lr-path-go" size={20} strokeWidth={1.5} aria-hidden />
-                  </span>
-                </AppLink>
-              </div>
-            )
-          })}
+        {/*
+          One stage, three stills. Hover/focus the list at the bottom to crossfade
+          the image; click navigates. Create & sign is the default still.
+        */}
+        <div
+          className={`lr-path-stage lr-path-stage--${previewRole}`}
+          onMouseLeave={() => setPreviewRole('creator')}
+        >
+          <div className="lr-path-stage-media" aria-hidden>
+            {PATHS.map(path => {
+              const place = PATH_PLACEMENTS.track[path.role]
+              const active = path.role === previewRole
+              return (
+                <img
+                  key={path.role}
+                  className={`lr-path-stage-img${active ? ' lr-path-stage-img--active' : ''}`}
+                  src={PATH_STILLS[path.role]}
+                  alt=""
+                  width={1280}
+                  height={720}
+                  loading={path.role === 'creator' ? 'eager' : 'lazy'}
+                  decoding="async"
+                  draggable={false}
+                  /* object-position only — transform is owned by CSS crossfade/zoom */
+                  style={{ objectPosition: formatObjectPosition(place) }}
+                />
+              )
+            })}
+            <div className="lr-path-stage-veil" />
+          </div>
+
+          <div className="lr-path-stage-footer">
+            <p className="lr-path-stage-caption" key={previewPath.role}>
+              {previewPath.detail}
+            </p>
+            <nav className="lr-path-stage-dock" aria-label="Choose a path">
+              <ul className="lr-path-stage-list">
+                {PATHS.map(path => {
+                  const Icon = path.icon
+                  const active = path.role === previewRole
+                  return (
+                    <li key={path.role}>
+                      <AppLink
+                        to={`/?intent=${path.role}`}
+                        className={[
+                          'lr-path-stage-item',
+                          `lr-path-stage-item--${path.role}`,
+                          active ? 'lr-path-stage-item--active' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        onClick={() => onPickRole(path.role)}
+                        aria-current={active ? 'true' : undefined}
+                        onMouseEnter={() => setPreviewRole(path.role)}
+                        onFocus={() => setPreviewRole(path.role)}
+                      >
+                        <span className="lr-path-stage-item-icon" aria-hidden>
+                          <Icon size={PATH_ICON_SIZE} strokeWidth={PATH_ICON_STROKE} />
+                        </span>
+                        <span className="lr-path-stage-item-label">{path.title}</span>
+                        <ChevronRight
+                          className="lr-path-stage-item-go"
+                          size={18}
+                          strokeWidth={1.75}
+                          aria-hidden
+                        />
+                      </AppLink>
+                    </li>
+                  )
+                })}
+              </ul>
+            </nav>
+          </div>
         </div>
       </section>
 
