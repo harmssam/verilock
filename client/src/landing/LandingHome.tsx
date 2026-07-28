@@ -105,7 +105,7 @@ function buildHeroClaims(): HeroClaim[] {
   return [
     {
       icon: ShieldCheck,
-      status: 'Sign documents free - multi-party, wallet-backed.',
+      status: 'Sign free — multi-party, wallet-backed.',
     },
     {
       icon: Users,
