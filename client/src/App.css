@@ -1197,12 +1197,47 @@ a.lr-cta {
   border-right: 1.5px solid var(--lr-dim);
   border-bottom: 1.5px solid var(--lr-dim);
   transform: rotate(45deg);
-  transition: transform 0.35s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1));
+  transition: transform 0.4s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1));
 }
 
 .lr-chevron--open {
   transform: rotate(225deg);
   margin-top: 0.55rem;
+}
+
+/*
+ * Smooth accordion open/close (trust + how).
+ * grid 0fr → 1fr animates height without a fixed max-height.
+ */
+.lr-expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.45s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.lr-trust--open > .lr-expand,
+.lr-how--open > .lr-expand {
+  grid-template-rows: 1fr;
+}
+
+.lr-expand-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.lr-expand-inner > * {
+  opacity: 0;
+  transform: translateY(-0.4rem);
+  transition:
+    opacity 0.35s cubic-bezier(0.32, 0.72, 0, 1),
+    transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.lr-trust--open > .lr-expand > .lr-expand-inner > *,
+.lr-how--open > .lr-expand > .lr-expand-inner > * {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.06s;
 }
 
 .lr-trust-detail {
@@ -1219,6 +1254,18 @@ a.lr-cta {
 
 .lr-trust-detail li {
   margin-bottom: 0.3rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lr-expand,
+  .lr-expand-inner > * {
+    transition: none;
+  }
+
+  .lr-expand-inner > * {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .lr-hero {
@@ -1940,6 +1987,7 @@ a.lr-cta {
 }
 
 .lr-blog-latest-thumb {
+  position: relative;
   display: block;
   min-height: 11.5rem;
   aspect-ratio: 16 / 10;
@@ -1966,6 +2014,24 @@ a.lr-cta {
   transform: scale(1.04);
 }
 
+/* “Latest” sits on the cover — top-left — so the meta row matches other cards */
+.lr-blog-latest-badge {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  z-index: 1;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--lr-accent);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+  pointer-events: none;
+}
+
 .lr-blog-latest-body {
   display: flex;
   flex-direction: column;
@@ -1982,17 +2048,6 @@ a.lr-cta {
   font-size: 0.75rem;
   color: var(--lr-dim);
   font-variant-numeric: tabular-nums;
-}
-
-.lr-blog-latest-badge {
-  padding: 0.12rem 0.45rem;
-  border-radius: 999px;
-  background: var(--lr-accent);
-  color: #fff;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .lr-blog-latest-tag {

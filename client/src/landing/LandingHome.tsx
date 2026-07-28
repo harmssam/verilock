@@ -361,18 +361,28 @@ export function LandingHome({
           </span>
           <span className={`lr-chevron${privacyOpen ? ' lr-chevron--open' : ''}`} aria-hidden />
         </button>
-        {privacyOpen && (
-          <div className="lr-trust-detail">
-            <ul>
-              <li>The math that identifies your file runs in the browser. The file stays local.</li>
-              <li>
-                Servers keep agreement metadata and that short proof string, never the file bytes.
-              </li>
-              <li>A permanent on-chain lock records only the proof on the Nimiq blockchain.</li>
-              <li>Verification re-checks a local copy. No wallet required to verify.</li>
-            </ul>
+        <div
+          className="lr-expand"
+          aria-hidden={!privacyOpen}
+        >
+          <div className="lr-expand-inner">
+            <div className="lr-trust-detail">
+              <ul>
+                <li>
+                  The math that identifies your file runs in the browser. The file stays local.
+                </li>
+                <li>
+                  Servers keep agreement metadata and that short proof string, never the file
+                  bytes.
+                </li>
+                <li>
+                  A permanent on-chain lock records only the proof on the Nimiq blockchain.
+                </li>
+                <li>Verification re-checks a local copy. No wallet required to verify.</li>
+              </ul>
+            </div>
           </div>
-        )}
+        </div>
       </section>
 
       <section
@@ -505,7 +515,7 @@ export function LandingHome({
             className="lr-blog-latest-card lr-blog-latest-card--featured"
             onClick={() => onOpenBlogPost(latestPost.slug)}
           >
-            <span className="lr-blog-latest-thumb" aria-hidden>
+            <span className="lr-blog-latest-thumb">
               <img
                 src={latestPost.coverImage}
                 alt=""
@@ -514,10 +524,10 @@ export function LandingHome({
                 loading="lazy"
                 decoding="async"
               />
+              <span className="lr-blog-latest-badge">Latest</span>
             </span>
             <span className="lr-blog-latest-body">
               <span className="lr-blog-latest-meta">
-                <span className="lr-blog-latest-badge">Latest</span>
                 <time dateTime={latestPost.date}>{formatBlogDate(latestPost.date)}</time>
                 {latestPost.tags[0] && (
                   <span className="lr-blog-latest-tag">{latestPost.tags[0]}</span>
