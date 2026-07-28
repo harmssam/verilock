@@ -32,7 +32,8 @@ function isStepDone(
     // Sign is complete once we advance past it (step === done) or the agreement is finished.
     // (step === 'done' already returns true for every stage via the early return above.)
     if (stageId === 'sign') {
-      return Boolean(doc && (allSigned(doc) || doc.sealed || step === 'done'))
+      // `step === 'done'` already returned true above; do not re-compare (narrowed away).
+      return Boolean(doc && (allSigned(doc) || doc.sealed))
     }
     // Done stage is only "finished" after lock; while unsigned-complete it stays current.
     if (stageId === 'done') return Boolean(doc?.sealed)

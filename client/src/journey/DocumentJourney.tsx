@@ -2719,7 +2719,7 @@ export function DocumentJourney({
                     : step === 'done' && role === 'signer'
                       ? doc?.sealed
                         ? 'Agreement locked - your part is done'
-                        : allSigned(doc)
+                        : doc && allSigned(doc)
                           ? 'Signing complete'
                           : (activeStage?.verb ?? 'Your signature is recorded')
                       : step === 'done' && role === 'creator'
@@ -2746,7 +2746,7 @@ export function DocumentJourney({
                     : step === 'done' && role === 'signer'
                       ? doc?.sealed
                         ? 'Your signature is on this agreement. Review parties and recorded ink below. Drop the same file you signed to see the field layout (the PDF never left anyone’s device).'
-                        : allSigned(doc)
+                        : doc && allSigned(doc)
                           ? 'Everyone has signed. Review the record below, then print a signed copy with the same local file. Locking on the blockchain is optional and does not block print.'
                           : 'Your fields and wallet signature are recorded. Review them below while other parties finish.'
                       : step === 'done' && role === 'creator'

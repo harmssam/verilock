@@ -706,8 +706,13 @@ export function App() {
   }
 
   // Desktop→phone Pay QR login - no shell chrome.
+  // Key by path so a new QR id remounts cleanly if the mini-app navigates in-place.
   if (screen === 'pay-login') {
-    return <PayLoginMobilePage />
+    const payLoginKey =
+      typeof window !== 'undefined'
+        ? `${window.location.pathname}${window.location.search}`
+        : 'pay-login'
+    return <PayLoginMobilePage key={payLoginKey} />
   }
 
   return (
