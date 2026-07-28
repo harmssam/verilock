@@ -99,8 +99,10 @@ import {
   computePlanRoot,
   emptyPlan,
   lockPlan as lockConstructionPlanLocal,
+  peopleNeedingRealNameMessage,
   peopleWithoutSlotsMessage,
   planHasSlotPerPerson,
+  peopleNeedingRealNameForNameFields,
   unlockPlanLocal,
   type ConstructionPlan,
   type PlacementSlot,
@@ -2148,6 +2150,11 @@ export function DocumentJourney({
       setLocalError(missingFields)
       return
     }
+    const needNames = peopleNeedingRealNameMessage(constructionPlan)
+    if (needNames) {
+      setLocalError(needNames)
+      return
+    }
     for (const p of constructionPlan.people) {
       if (p.walletAddress && !isValidNimiqAddress(p.walletAddress)) {
         setLocalError(
@@ -3044,7 +3051,8 @@ export function DocumentJourney({
                               busy ||
                               !token ||
                               placementLockBusy ||
-                              !planHasSlotPerPerson(constructionPlan)
+                              !planHasSlotPerPerson(constructionPlan) ||
+                              peopleNeedingRealNameForNameFields(constructionPlan).length > 0
                             }
                             onClick={() => void lockPlacements()}
                           >

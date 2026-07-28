@@ -31,7 +31,9 @@ export function isPlaceholderPartyName(name: string | null | undefined): boolean
   return (
     !trimmed ||
     PLACEHOLDER_PARTY_NAMES.has(trimmed) ||
-    PLACEHOLDER_PARTY_NAME_RE.test(trimmed)
+    PLACEHOLDER_PARTY_NAME_RE.test(trimmed) ||
+    // Construction default labels ("Person 1") — not a real name for prefill / parties.
+    /^person\s+\d+$/i.test(trimmed)
   )
 }
 
