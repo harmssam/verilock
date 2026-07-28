@@ -34,7 +34,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'After login, open Agreements from the header, or from the account menu. You land on a full page of documents for that wallet: reopen a draft, continue signing, jump toward locking when the agreement is ready, or start Create & lock if the list is empty.',
+      text: 'After login, open Agreements from the header, or from the account menu. You land on a full page of documents for that wallet: reopen a draft, continue signing, jump toward locking when the agreement is ready, or start Create & invite if the list is empty.',
     },
     {
       type: 'h2',
@@ -67,7 +67,7 @@ export const post: BlogPost = {
     },
     {
       type: 'p',
-      text: 'No rows yet usually means this wallet has not created or signed anything in VeriLock. Start Create & lock from Agreements or from the home path picker. If you expected a document, confirm you are on the same wallet that signed or created it, and that the agreement was not cancelled by the creator before the first signature.',
+      text: 'No rows yet usually means this wallet has not created or signed anything in VeriLock. Start Create & invite from Agreements or from the home path picker. If you expected a document, confirm you are on the same wallet that signed or created it, and that the agreement was not cancelled by the creator before the first signature.',
     },
     {
       type: 'p',

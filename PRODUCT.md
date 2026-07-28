@@ -85,7 +85,7 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 
 ### Acceptance checklist (redesign done only if all true)
 
-- [ ] Path picker still offers exactly: **Create & sign**, **I was invited**, **Verify a file**
+- [ ] Path picker still offers exactly: **Create & invite**, **I was invited**, **Verify a file**
 - [ ] Creator stages still: Fingerprint → Setup → Sign → Seal → Verify (wallet login is a gate, not a rail step)
 - [ ] After multi-party all-signed: free complete (print primary, lock secondary) still available; seal payment path intact
 - [ ] Signer stages still: Sign → Done (wallet login is a gate on submit, not a rail step)
@@ -151,7 +151,7 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 | Feature | Notes |
 |---------|--------|
 | Hero status claims | Rotating trust / fee lines under CTAs |
-| Path: Create & sign | Role `creator` - free multi-party; optional lock |
+| Path: Create & invite | Role `creator` - free multi-party; optional lock |
 | Path: I was invited | Role `signer` |
 | Path: Verify a file | Role `verifier` |
 | How VeriLock works | Collapsible multi-beat story, role-aware |
