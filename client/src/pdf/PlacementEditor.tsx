@@ -215,6 +215,11 @@ export function PlacementEditor({
   } | null>(null)
   /** Finger/mouse movement above this = pan/scroll, not a place tap. */
   const PLACE_TAP_SLOP_PX = 12
+  /**
+   * After dragging a check/X, suppress the synthetic click so we don't toggle.
+   * Mark toggle is click-driven (not drag-end) — click is more reliable.
+   */
+  const suppressMarkClickRef = useRef(false)
   const [dragTick, setDragTick] = useState(0)
   /** Last pointer position during a slot drag (for continuous edge auto-scroll). */
   const lastDragPointerRef = useRef<{ x: number; y: number } | null>(null)
@@ -882,25 +887,32 @@ export function PlacementEditor({
     setPlacing(null)
   }
 
-  /** Toggle empty check/X square ↔ filled mark (select mode, click without drag). */
+  /** Toggle empty check/X square ↔ filled mark (click on the slot). */
   const toggleMarkSlot = useCallback(
     (id: string) => {
-      if (locked) return
-      const slot = slots.find(s => s.id === id)
-      if (!slot || (slot.kind !== 'checkmark' && slot.kind !== 'cross')) return
-      const isOn = slot.lockedContent?.mark === slot.kind
-      if (isOn) {
-        updateSlot(id, { lockedContent: undefined })
-      } else {
-        updateSlot(id, {
-          lockedContent: {
-            mark: slot.kind,
-            color: personColor(slot.personSlotIndex),
-          },
-        })
-      }
+      if (locked || editDisabled) return
+      patchPlan(p => ({
+        ...p,
+        slots: p.slots.map(s => {
+          if (s.id !== id) return s
+          if (s.kind !== 'checkmark' && s.kind !== 'cross') return s
+          const isOn = s.lockedContent?.mark === s.kind
+          if (isOn) {
+            // Drop lockedContent entirely (undefined spread is easy to miss in state).
+            const { lockedContent: _drop, ...rest } = s
+            return rest
+          }
+          return {
+            ...s,
+            lockedContent: {
+              mark: s.kind,
+              color: personColor(s.personSlotIndex),
+            },
+          }
+        }),
+      }))
     },
-    [locked, slots, updateSlot],
+    [locked, editDisabled, patchPlan],
   )
 
   const onStagePointerDown = (e: React.PointerEvent) => {
@@ -959,11 +971,8 @@ export function PlacementEditor({
     const drag = dragRef.current
     dragRef.current = null
     stopDragAutoScroll()
-    if (!drag || drag.moved || editDisabled) return
-    const slot = slots.find(s => s.id === drag.id)
-    if (slot && (slot.kind === 'checkmark' || slot.kind === 'cross')) {
-      toggleMarkSlot(drag.id)
-    }
+    // Mark toggle is onClick only. If we dragged, suppress the trailing click.
+    if (drag?.moved) suppressMarkClickRef.current = true
   }
 
   const onStagePointerUp = (e: React.PointerEvent) => {
@@ -993,14 +1002,19 @@ export function PlacementEditor({
   }
 
   const startItemDrag = (e: React.PointerEvent, id: string) => {
-    // Existing slots are always interactive (move / check-toggle) even when a place
-    // tool is still active — otherwise check/X clicks do nothing after placing.
+    // Existing slots stay interactive even when a place tool is active
+    // (clicking a check/X must not no-op just because the place tool is selected).
     if (editDisabled) return
     e.stopPropagation()
-    e.preventDefault()
     const slot = slots.find(s => s.id === id)
     if (!slot) return
+    const isMark = slot.kind === 'checkmark' || slot.kind === 'cross'
+    // preventDefault suppresses the following click on some browsers — never do
+    // that for marks (toggle is click-driven). Still prevent for other fields so
+    // drag doesn't select page text.
+    if (!isMark) e.preventDefault()
     setSelectedId(id)
+    suppressMarkClickRef.current = false
     const stage = stageRef.current
     dragRef.current = {
       id,
@@ -1016,6 +1030,16 @@ export function PlacementEditor({
     }
     lastDragPointerRef.current = { x: e.clientX, y: e.clientY }
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }
+
+  const onMarkClick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    e.preventDefault()
+    if (suppressMarkClickRef.current) {
+      suppressMarkClickRef.current = false
+      return
+    }
+    toggleMarkSlot(id)
   }
 
   void dragTick
@@ -1811,8 +1835,37 @@ export function PlacementEditor({
                               e.stopPropagation()
                               startItemDrag(e, slot.id)
                             }}
-                            onPointerUp={endDrag}
+                            onPointerUp={e => {
+                              if (isMark) e.stopPropagation()
+                              endDrag()
+                            }}
                             onPointerCancel={endDrag}
+                            onClick={
+                              isMark ? e => onMarkClick(e, slot.id) : undefined
+                            }
+                            onKeyDown={
+                              isMark
+                                ? e => {
+                                    if (e.key === ' ' || e.key === 'Enter') {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      toggleMarkSlot(slot.id)
+                                    }
+                                  }
+                                : undefined
+                            }
+                            role={isMark ? 'checkbox' : undefined}
+                            tabIndex={isMark && !editDisabled ? 0 : undefined}
+                            aria-checked={
+                              isMark
+                                ? slot.lockedContent?.mark === slot.kind
+                                : undefined
+                            }
+                            aria-label={
+                              isMark
+                                ? `${slot.kind === 'cross' ? 'X mark' : 'Checkbox'} for ${person}`
+                                : undefined
+                            }
                           >
                             {!locked && (
                               <button
