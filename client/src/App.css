@@ -874,6 +874,8 @@ a.lr-cta {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  /* Sticky shell header - same idea as journey / pricing hash targets */
+  scroll-margin-top: calc(4.75rem + env(safe-area-inset-top, 0px));
 }
 
 .lr-paths-head {
