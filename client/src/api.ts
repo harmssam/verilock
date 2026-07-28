@@ -407,8 +407,11 @@ export const api = {
   submitSupportContact: (body: {
     name: string
     email: string
-    subject: string
+    /** Issue category id (e.g. wallet_connect, other). */
+    issue: string
     message: string
+    /** Optional signed-in wallet - ops only, not shown on form. */
+    walletAddress?: string | null
     /** Honeypot - leave empty. */
     website?: string
     formStartedAt: number

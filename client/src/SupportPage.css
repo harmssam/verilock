@@ -68,11 +68,39 @@
 }
 
 .support-page .field input,
-.support-page .field textarea {
+.support-page .field textarea,
+.support-page .field select {
   transition:
     border-color 0.25s cubic-bezier(0.32, 0.72, 0, 1),
     box-shadow 0.25s cubic-bezier(0.32, 0.72, 0, 1),
     background 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.support-page .field select {
+  appearance: none;
+  width: 100%;
+  border: 1px solid var(--lr-line-strong, rgba(15, 23, 42, 0.13));
+  border-radius: 10px;
+  padding: 0.65rem 2.1rem 0.65rem 0.75rem;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--lr-text, #0f172a);
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%234b5c6b' d='M1.4.6 6 5.2 10.6.6 12 2 6 8 0 2z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  cursor: pointer;
+}
+
+.support-page .field select:focus {
+  outline: none;
+  border-color: rgba(13, 148, 136, 0.55);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+}
+
+.support-page .field select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .support-char-hint {

@@ -4,26 +4,26 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { Express, NextFunction, Request, Response } from 'express'
-import {
-  SUPPORT_TICKET_STATUSES,
-  addSupportTicketMessage,
-  getAdminStats,
-  getSupportTicketById,
-  listSupportTicketMessages,
-  listSupportTickets,
-  updateSupportTicketDocumentSlug,
-  updateSupportTicketStatus,
-  type SupportTicketStatus,
-} from './db.js'
-import { appPublicUrl, isResendSendEnabled } from './email/config.js'
-import { sendTransactionalEmail } from './email/resend.js'
+import { getAdminStats } from './db.js'
 import { rateLimit } from './rate-limit.js'
 import {
   clientIpFromRequest,
   isTurnstileRequired,
   verifyTurnstileToken,
 } from './supportContact.js'
+import { sendCustomerTicketEmail } from './supportOutbound.js'
 import { listSupportReplyTemplates } from './supportTemplates.js'
+import {
+  SUPPORT_TICKET_STATUSES,
+  addSupportTicketMessage,
+  getSupportTicketById,
+  getSupportTicketCounts,
+  listSupportTicketMessages,
+  listSupportTickets,
+  updateSupportTicketDocumentSlug,
+  updateSupportTicketStatus,
+  type SupportTicketStatus,
+} from './supportTickets.js'
 
 const COOKIE_NAME = 'verilock_admin'
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -219,66 +219,6 @@ function paramId(value: string | string[] | undefined): string {
   return value ?? ''
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
-async function sendOperatorSupportReply(input: {
-  to: string
-  name: string
-  publicId: string
-  subject: string
-  body: string
-  operatorName: string
-}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  if (!isResendSendEnabled()) {
-    return { ok: false, error: 'Outbound email is not enabled on this server.' }
-  }
-  const site = appPublicUrl()
-  const mailSubject = `Re: [${input.publicId}] ${input.subject}`
-  const greeting = input.name ? `Hi ${input.name},` : 'Hi,'
-  const text = [
-    greeting,
-    '',
-    input.body,
-    '',
-    '—',
-    `${input.operatorName} · VeriLock Support`,
-    `Ticket ${input.publicId}`,
-    site,
-  ].join('\n')
-  const html = `
-    <div style="font-family:system-ui,sans-serif;line-height:1.55;color:#0f172a;max-width:560px">
-      <p style="margin:0 0 1rem">${escapeHtml(greeting)}</p>
-      <div style="white-space:pre-wrap;margin:0 0 1.25rem">${escapeHtml(input.body)}</div>
-      <p style="margin:0;font-size:13px;color:#64748b">
-        ${escapeHtml(input.operatorName)} · VeriLock Support<br/>
-        Ticket <strong>${escapeHtml(input.publicId)}</strong> ·
-        <a href="${escapeHtml(site)}">${escapeHtml(site)}</a>
-      </p>
-    </div>
-  `.trim()
-
-  const result = await sendTransactionalEmail({
-    to: input.to,
-    subject: mailSubject,
-    text,
-    html,
-  })
-  if (result.ok) return { ok: true, id: result.id }
-  if ('skipped' in result && result.skipped) {
-    return { ok: false, error: result.reason }
-  }
-  return {
-    ok: false,
-    error: 'error' in result ? result.error : 'Could not send email',
-  }
-}
-
 export function attachAdminRoutes(app: Express): void {
   app.get('/api/admin/features', (_req, res) => {
     res.json(adminPublicFeatures())
@@ -403,16 +343,13 @@ export function attachAdminRoutes(app: Express): void {
         limit: Number.isFinite(limit) ? limit : undefined,
         offset: Number.isFinite(offset) ? offset : undefined,
       })
-      // Always include global open/total so the stats card / badge stay accurate
-      // regardless of the list filter (filter only affects `tickets` + `total`).
-      const allForCounts = listSupportTickets({ status: 'all', limit: 1, offset: 0 })
-      const activeForCounts = listSupportTickets({ status: 'active', limit: 1, offset: 0 })
+      const counts = getSupportTicketCounts()
       res.json({
         ...result,
         statuses: SUPPORT_TICKET_STATUSES,
         counts: {
-          total: allForCounts.total,
-          open: activeForCounts.total,
+          total: counts.total,
+          open: counts.open,
         },
       })
     } catch (err) {
@@ -530,17 +467,27 @@ export function attachAdminRoutes(app: Express): void {
             ? res.locals.adminUser
             : adminUsername()
 
-        let resendMessageId: string | null = null
-        let threadBody = replyBody
-        if (!internalOnly) {
-          const mailSubject = `Re: [${ticket.publicId}] ${ticket.subject}`
-          const sent = await sendOperatorSupportReply({
-            to: ticket.email,
-            name: ticket.name,
-            publicId: ticket.publicId,
-            subject: ticket.subject,
+        if (internalOnly) {
+          const message = addSupportTicketMessage({
+            ticketId: ticket.id,
+            messageKind: 'internal',
+            authorName: operatorName,
             body: replyBody,
-            operatorName,
+            bumpStatus: false,
+          })
+          if (!message) {
+            res.status(500).json({ error: 'Could not save note.' })
+            return
+          }
+        } else {
+          const mailSubject = `Re: [${ticket.publicId}] ${ticket.subject}`
+          const sent = await sendCustomerTicketEmail({
+            ticket,
+            subject: mailSubject,
+            body: replyBody,
+            messageKind: 'human_reply',
+            authorName: operatorName,
+            bumpStatus: body.status === undefined,
           })
           if (!sent.ok) {
             res.status(502).json({
@@ -548,22 +495,6 @@ export function attachAdminRoutes(app: Express): void {
             })
             return
           }
-          resendMessageId = sent.id
-          // Store what the customer received so the thread is a full audit of outbound mail.
-          threadBody = `[Emailed to customer]\nSubject: ${mailSubject}\n\n${replyBody}`
-        }
-
-        const message = addSupportTicketMessage({
-          ticketId: ticket.id,
-          authorKind: internalOnly ? 'system' : 'operator',
-          authorName: operatorName,
-          body: threadBody,
-          resendMessageId,
-          bumpStatus: !internalOnly && body.status === undefined,
-        })
-        if (!message) {
-          res.status(500).json({ error: 'Could not save reply.' })
-          return
         }
 
         if (body.status !== undefined && isTicketStatus(body.status)) {

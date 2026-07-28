@@ -7,12 +7,19 @@ import {
   resendFromAddress,
 } from './email/config.js'
 import { sendTransactionalEmail } from './email/resend.js'
+import { normalizeAddress } from './addresses.js'
+import {
+  isSupportIssueId,
+  supportIssueLabel,
+  type SupportIssueId,
+} from './supportIssues.js'
+import { sendCustomerTicketEmail } from './supportOutbound.js'
+import { buildSupportAutoReplyBody } from './supportTemplates.js'
 import {
   addSupportTicketMessage,
   createSupportTicket,
   type SupportTicketRecord,
-} from './db.js'
-import { buildSupportAutoReplyBody } from './supportTemplates.js'
+} from './supportTickets.js'
 
 export const MAX_SUPPORT_NAME_LENGTH = 80
 export const MAX_SUPPORT_SUBJECT_LENGTH = 120
@@ -68,8 +75,13 @@ export function supportContactPublicFeatures() {
 export interface SupportContactBody {
   name?: unknown
   email?: unknown
+  /** @deprecated Prefer `issue` category id. Still accepted for older clients. */
   subject?: unknown
+  /** Issue category id from SUPPORT_ISSUE_OPTIONS. */
+  issue?: unknown
   message?: unknown
+  /** Optional signed-in wallet (not shown on form). */
+  walletAddress?: unknown
   /** Honeypot - must be empty. */
   website?: unknown
   /** Client clock when form mounted (ms since epoch). */
@@ -83,8 +95,10 @@ export type SupportSanitizeResult =
       ok: true
       name: string
       email: string
+      issue: SupportIssueId
       subject: string
       message: string
+      walletAddress: string | null
       formStartedAt: number
       turnstileToken: string | null
     }
@@ -136,12 +150,22 @@ export function sanitizeSupportContact(body: SupportContactBody): SupportSanitiz
     return { ok: false, error: 'Please enter a valid email address.', status: 400 }
   }
 
-  const subject = stripControlChars(String(body.subject ?? ''))
-    .trim()
-    .slice(0, MAX_SUPPORT_SUBJECT_LENGTH)
-  if (!subject || subject.length < 3) {
-    return { ok: false, error: 'Please enter a short subject.', status: 400 }
+  const issueRaw =
+    typeof body.issue === 'string'
+      ? body.issue.trim()
+      : typeof body.subject === 'string'
+        ? body.subject.trim()
+        : ''
+  let issue: SupportIssueId
+  if (isSupportIssueId(issueRaw)) {
+    issue = issueRaw
+  } else if (issueRaw.length >= 3) {
+    // Legacy free-text subject → treat as other
+    issue = 'other'
+  } else {
+    return { ok: false, error: 'Please select an issue.', status: 400 }
   }
+  const subject = supportIssueLabel(issue).slice(0, MAX_SUPPORT_SUBJECT_LENGTH)
 
   const message = stripControlChars(String(body.message ?? ''))
     .trim()
@@ -150,12 +174,31 @@ export function sanitizeSupportContact(body: SupportContactBody): SupportSanitiz
     return { ok: false, error: 'Please enter a message (at least 10 characters).', status: 400 }
   }
 
+  let walletAddress: string | null = null
+  if (typeof body.walletAddress === 'string' && body.walletAddress.trim()) {
+    const normalized = normalizeAddress(body.walletAddress.trim())
+    // Nimiq addresses are long hex-ish; reject junk / injection noise.
+    if (normalized.length >= 20 && normalized.length <= 128 && /^[0-9A-Z]+$/.test(normalized)) {
+      walletAddress = normalized
+    }
+  }
+
   const turnstileToken =
     typeof body.turnstileToken === 'string' && body.turnstileToken.trim()
       ? body.turnstileToken.trim()
       : null
 
-  return { ok: true, name, email, subject, message, formStartedAt, turnstileToken }
+  return {
+    ok: true,
+    name,
+    email,
+    issue,
+    subject,
+    message,
+    walletAddress,
+    formStartedAt,
+    turnstileToken,
+  }
 }
 
 interface TurnstileVerifyResponse {
@@ -226,13 +269,14 @@ export type DeliverSupportResult =
 /**
  * Create a support ticket (system of record), notify ops, auto-reply to the customer.
  * Ticket creation always succeeds when validation passed; emails are best-effort.
- * Any email we send to the customer is also stored on the ticket thread.
  */
 export async function deliverSupportContact(input: {
   name: string
   email: string
   subject: string
   message: string
+  issue?: string | null
+  walletAddress?: string | null
 }): Promise<DeliverSupportResult> {
   let ticket: SupportTicketRecord
   try {
@@ -241,6 +285,8 @@ export async function deliverSupportContact(input: {
       email: input.email,
       subject: input.subject,
       message: input.message,
+      issue: input.issue,
+      walletAddress: input.walletAddress,
     })
   } catch (err) {
     console.error('[support] ticket create failed', err)
@@ -267,18 +313,20 @@ export async function deliverSupportContact(input: {
       email: input.email,
       subject: input.subject,
       message: input.message,
+      issue: input.issue ?? ticket.issue,
+      walletAddress: input.walletAddress ?? ticket.walletAddress,
       site,
     })
-    await sendAndLogCustomerAutoReply({ ticket, site })
+    await sendCustomerAutoAck(ticket)
   } else {
     console.log('[support] emails skipped (send disabled)', {
       publicId: ticket.publicId,
     })
     addSupportTicketMessage({
       ticketId: ticket.id,
-      authorKind: 'system',
+      messageKind: 'internal',
       authorName: 'System',
-      body: 'Outbound email disabled on server — customer auto-reply was not sent. Ticket is still open in the admin queue.',
+      body: 'Outbound email disabled on server - customer auto-reply was not sent. Ticket is still open in the admin queue.',
       bumpStatus: false,
     })
   }
@@ -292,6 +340,8 @@ async function notifyOpsInbox(input: {
   email: string
   subject: string
   message: string
+  issue?: string | null
+  walletAddress?: string | null
   site: string
 }): Promise<string | null> {
   const to = supportInboxAddress()
@@ -300,13 +350,16 @@ async function notifyOpsInbox(input: {
   const slugLine = ticket.documentSlug
     ? `Agreement: ${input.site}/d/${ticket.documentSlug}`
     : null
+  const issueLine = input.issue ? `Issue: ${input.issue} (${input.subject})` : `Issue: ${input.subject}`
+  const walletLine = input.walletAddress ? `Wallet: ${input.walletAddress}` : null
   const text = [
     `New support ticket from ${input.site}`,
     '',
     `Ticket: ${ticket.publicId}`,
     `Name: ${input.name}`,
     `Email: ${input.email}`,
-    `Subject: ${input.subject}`,
+    issueLine,
+    ...(walletLine ? [walletLine] : []),
     ...(slugLine ? [slugLine] : []),
     '',
     input.message,
@@ -322,7 +375,12 @@ async function notifyOpsInbox(input: {
       <p style="margin:0 0 0.35rem"><strong>Ticket:</strong> ${escapeHtml(ticket.publicId)}</p>
       <p style="margin:0 0 0.35rem"><strong>Name:</strong> ${escapeHtml(input.name)}</p>
       <p style="margin:0 0 0.35rem"><strong>Email:</strong> <a href="mailto:${escapeHtml(input.email)}">${escapeHtml(input.email)}</a></p>
-      <p style="margin:0 0 0.35rem"><strong>Subject:</strong> ${escapeHtml(input.subject)}</p>
+      <p style="margin:0 0 0.35rem"><strong>Issue:</strong> ${escapeHtml(input.subject)}${input.issue ? ` <span style="color:#64748b">(${escapeHtml(input.issue)})</span>` : ''}</p>
+      ${
+        input.walletAddress
+          ? `<p style="margin:0 0 0.35rem"><strong>Wallet:</strong> <code style="font-size:12px">${escapeHtml(input.walletAddress)}</code></p>`
+          : ''
+      }
       ${
         ticket.documentSlug
           ? `<p style="margin:0 0 1rem"><strong>Agreement:</strong> <a href="${escapeHtml(input.site)}/d/${escapeHtml(ticket.documentSlug)}">/d/${escapeHtml(ticket.documentSlug)}</a></p>`
@@ -364,15 +422,8 @@ async function notifyOpsInbox(input: {
   return null
 }
 
-/**
- * Email the customer a receipt and log the exact outbound text on the ticket thread
- * so operators can see what the user received.
- */
-async function sendAndLogCustomerAutoReply(input: {
-  ticket: SupportTicketRecord
-  site: string
-}): Promise<void> {
-  const { ticket, site } = input
+async function sendCustomerAutoAck(ticket: SupportTicketRecord): Promise<void> {
+  const site = appPublicUrl()
   const body = buildSupportAutoReplyBody({
     name: ticket.name,
     publicId: ticket.publicId,
@@ -380,57 +431,26 @@ async function sendAndLogCustomerAutoReply(input: {
     site,
   })
   const mailSubject = `We received your message [${ticket.publicId}]`
-  const html = `
-    <div style="font-family:system-ui,sans-serif;line-height:1.55;color:#0f172a;max-width:560px">
-      <div style="white-space:pre-wrap;margin:0 0 1.25rem">${escapeHtml(body)}</div>
-      <p style="margin:0;font-size:13px;color:#64748b">
-        Ticket <strong>${escapeHtml(ticket.publicId)}</strong> ·
-        <a href="${escapeHtml(site)}">${escapeHtml(site)}</a>
-      </p>
-    </div>
-  `.trim()
-
-  const result = await sendTransactionalEmail({
-    to: ticket.email,
+  const result = await sendCustomerTicketEmail({
+    ticket,
     subject: mailSubject,
-    text: body,
-    html,
+    body,
+    messageKind: 'auto_ack',
+    authorName: 'VeriLock Support (auto-reply)',
+    bumpStatus: false,
   })
-
   if (result.ok) {
     console.log('[support] customer auto-reply emailed', {
-      id: result.id,
+      id: result.resendId,
       to: ticket.email,
       publicId: ticket.publicId,
     })
-    addSupportTicketMessage({
-      ticketId: ticket.id,
-      authorKind: 'operator',
-      authorName: 'VeriLock Support (auto-reply)',
-      body: `[Emailed to customer]\nSubject: ${mailSubject}\n\n${body}`,
-      resendMessageId: result.id,
-      bumpStatus: false,
+  } else {
+    console.error('[support] customer auto-reply failed', {
+      error: result.error,
+      publicId: ticket.publicId,
     })
-    return
   }
-
-  const reason =
-    'skipped' in result && result.skipped
-      ? result.reason
-      : 'error' in result
-        ? result.error
-        : 'unknown'
-  console.error('[support] customer auto-reply failed', {
-    reason,
-    publicId: ticket.publicId,
-  })
-  addSupportTicketMessage({
-    ticketId: ticket.id,
-    authorKind: 'system',
-    authorName: 'System',
-    body: `Customer auto-reply failed to send (${reason}). Draft that would have been emailed:\n\nSubject: ${mailSubject}\n\n${body}`,
-    bumpStatus: false,
-  })
 }
 
 export function clientIpFromRequest(req: {
