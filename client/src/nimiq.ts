@@ -494,15 +494,15 @@ function registerHubEventHandlers(
   registerTxWork?: (work: Promise<void>) => void,
 ): void {
   /**
-   * Legacy two-trip login (chooseAddress → signMessage). Still handled so an
-   * in-flight redirect from an older client can finish after deploy.
-   * New logins only emit SIGN_MESSAGE (single trip).
+   * Hub login trip 1 → 2: chooseAddress returns an address (and auto-opens
+   * onboard when the user has no wallet). Then challenge + signMessage.
+   * Single-trip signMessage-without-signer skips Hub’s empty-wallet onboard.
    */
   hub.on(RequestType.CHOOSE_ADDRESS, async chosen => {
     try {
       const { address } = chosen as ChooseAddressResult
       const { token, nonce } = await getChallenge(address)
-      const behavior = hubRedirectBehavior({ token })
+      const behavior = hubRedirectBehavior({ token, flow: 'login' })
       await hub.signMessage(
         { appName: APP_NAME, message: nonce, signer: address },
         behavior as Parameters<typeof hub.signMessage>[1],
@@ -662,14 +662,15 @@ export async function setupHubRedirectHandlers(
 }
 
 /**
- * Hub login in **one** Hub trip.
+ * Hub login via chooseAddress → signMessage (two Hub trips on redirect).
  *
- * Previously: chooseAddress → return → challenge → signMessage → return (two full
- * redirects / two popups). Hub's signMessage without `signer` shows the address
- * picker and signs in a single Keyguard flow - the pattern we want on verilock.online.
+ * Why not signMessage alone? Hub’s Sign Message view does **not** auto-open
+ * onboard when the user has zero wallets. Choose Address does
+ * (`processedWallets.length === 0` → ONBOARD). New users stuck on “Sign Message”
+ * with no account is the production bug this restores.
  *
- * Flow: server challenge (no address) → signMessage(nonce) → verify binds address
- * from the public key.
+ * Redirect: chooseAddress → (onboard if needed) → return → challenge → signMessage.
+ * Popup: chooseAddress → challenge → signMessage (same window chain).
  */
 export async function connectViaHub(
   getChallenge: (address?: string | null) => Promise<{ token: string; nonce: string }>,
@@ -685,27 +686,30 @@ export async function connectViaHub(
   const preferRedirect = options?.preferRedirect ?? true
 
   clearStaleHubRpcStateIfIdle()
-  // Challenge without address - Hub will let the user pick a wallet when signing.
-  const { token, nonce } = await getChallenge(null)
 
   if (preferRedirect) {
     saveHubReturnPath()
-    sealLog('hub:redirectSignMessageLogin', { returnUrl: getHubReturnUrl() })
-    const behavior = hubRedirectBehavior({ token, flow: 'login' })
-    // No `signer` → Hub shows address selection + sign in one UI.
-    await hub.signMessage(
-      { appName: APP_NAME, message: nonce },
-      behavior as Parameters<typeof hub.signMessage>[1],
+    sealLog('hub:redirectChooseAddress', { returnUrl: getHubReturnUrl() })
+    // No pre-challenge: address is unknown until chooseAddress returns.
+    // CHOOSE_ADDRESS handler issues the challenge, then signMessage.
+    const behavior = hubRedirectBehavior({ flow: 'login' })
+    await hub.chooseAddress(
+      { appName: APP_NAME },
+      behavior as Parameters<typeof hub.chooseAddress>[1],
     )
     throw new Error(HUB_REDIRECT_MESSAGE)
   }
 
   try {
-    sealLog('hub:popupSignMessageLogin')
+    sealLog('hub:popupChooseAddress')
+    const chosen = await hub.chooseAddress({ appName: APP_NAME })
+    const address = chosen.address
+    const { token, nonce } = await getChallenge(address)
+    sealLog('hub:popupSignMessageLogin', { address })
     const signed = await hub.signMessage({
       appName: APP_NAME,
       message: nonce,
-      // omit signer → single popup: pick address + sign
+      signer: address,
     })
     return {
       token,

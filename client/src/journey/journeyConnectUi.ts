@@ -103,7 +103,7 @@ export function journeyMobileChoiceLabels(): {
     payHint: 'Requires the Nimiq Pay app',
     hubIdle: 'Continue in browser',
     hubBusy: 'Opening Hub…',
-    hubHint: 'Nimiq Hub - one step, no app install',
+    hubHint: 'Nimiq Hub: create or unlock a wallet, no app install',
     storesLabel: 'Get Nimiq Pay',
   }
 }
