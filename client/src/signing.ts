@@ -86,8 +86,8 @@ export function resolveSigningParty(
       message: waiting
         ? `You already signed as ${signedParty?.displayName ?? 'a party'}. Waiting for other signatures.`
         : isCreator
-          ? 'You already signed. Print anytime, or lock on the blockchain for permanent proof.'
-          : 'Thanks, your part is recorded. The creator can print anytime or lock on the blockchain.',
+          ? 'You already signed. Print a signed copy anytime, or lock on the blockchain for permanent proof.'
+          : 'You already signed. When everyone has finished, print a signed copy with the same local file.',
     }
   }
 
@@ -101,8 +101,8 @@ export function resolveSigningParty(
       message:
         doc.signingProgress.readyToLock || doc.status === 'ready_to_lock'
           ? isCreator
-            ? 'All signatures are in. Print anytime, or lock on the blockchain for permanent proof.'
-            : 'All signatures are in. Thanks. The creator can print anytime or lock on the blockchain.'
+            ? 'All signatures are in. Print a signed copy anytime, or lock on the blockchain for permanent proof.'
+            : 'All signatures are in. Print a signed copy with the same local file you used to sign.'
           : 'No signatures are pending on this document.',
     }
   }

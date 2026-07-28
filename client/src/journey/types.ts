@@ -71,14 +71,15 @@ export const CREATOR_STAGES: JourneyStage[] = [
 
 /**
  * Invited signer path. Login is required to submit a signature, not a rail step.
+ * Rail: Sign → Done (after this wallet has signed).
  */
 export const SIGNER_STAGES: JourneyStage[] = [
   {
     id: 'sign',
-    label: 'Complete',
+    label: 'Sign',
     verb: 'Match document & complete your fields',
     blurb:
-      'Drop the document the creator sent you, confirm it matches, fill your fields on the document, then bind with your wallet.',
+      'Drop the document the organizer shared with you, confirm it matches, fill your fields on the document, then bind with your wallet.',
     privacyNote: 'We never see your file. It stays on your device.',
   },
   {
@@ -86,7 +87,7 @@ export const SIGNER_STAGES: JourneyStage[] = [
     label: 'Done',
     verb: 'Your signature is recorded',
     blurb:
-      'Review who signed and your recorded signature below. To see the field layout on the document, drop the same file you signed (VeriLock never stores the PDF). When everyone is finished, the creator can print anytime or lock on the blockchain for permanent proof.',
+      'Review who signed and your recorded signature below. With the same local file, you can print a signed copy when everyone has finished. VeriLock never stores the PDF.',
     privacyNote: 'Keep your document. Anyone can re-check the fingerprint later.',
   },
 ]

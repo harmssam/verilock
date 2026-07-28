@@ -509,9 +509,12 @@ export function DocumentJourney({
     // Wallet login is a gate on actions - not a numbered rail step.
     if (role === 'signer') {
       if (!doc) return 'sign'
-      // After this wallet has signed (or everyone has), show the short "done" step.
-      // Never route invitees to seal - only the document creator seals.
-      if (doc.sealed || walletHasSignedJourneyDoc(doc, address)) return 'done'
+      // After this wallet has signed, or everyone has finished, show Done.
+      // Never route invitees to seal - only the document creator locks.
+      if (doc.sealed) return 'done'
+      if (walletHasSignedJourneyDoc(doc, address)) return 'done'
+      // All slots filled even if this session has no wallet bound yet (reopen / refresh).
+      if (allSigned(doc)) return 'done'
       return 'sign'
     }
     // Creator path: add PDF → setup → sign (if organizer is a party) → invite co-signers → seal
@@ -2716,7 +2719,9 @@ export function DocumentJourney({
                     : step === 'done' && role === 'signer'
                       ? doc?.sealed
                         ? 'Agreement locked - your part is done'
-                        : (activeStage?.verb ?? 'Your signature is recorded')
+                        : allSigned(doc)
+                          ? 'Signing complete'
+                          : (activeStage?.verb ?? 'Your signature is recorded')
                       : step === 'done' && role === 'creator'
                         ? 'Agreement locked'
                         : role === 'verifier' && verifyMatched
@@ -2740,9 +2745,10 @@ export function DocumentJourney({
                     ? 'All signatures are in. Print a signed copy anytime, or lock on the blockchain for permanent proof.'
                     : step === 'done' && role === 'signer'
                       ? doc?.sealed
-                        ? 'Your signature is on this agreement. Review parties and recorded ink below. Drop the same file you signed to see the organizer’s field layout (the PDF never left anyone’s device).'
-                        : (activeStage?.blurb ??
-                          'Your fields and wallet signature are recorded. Review them below; the creator locks when everyone has finished.')
+                        ? 'Your signature is on this agreement. Review parties and recorded ink below. Drop the same file you signed to see the field layout (the PDF never left anyone’s device).'
+                        : allSigned(doc)
+                          ? 'Everyone has signed. Review the record below, then print a signed copy with the same local file. Locking on the blockchain is optional and does not block print.'
+                          : 'Your fields and wallet signature are recorded. Review them below while other parties finish.'
                       : step === 'done' && role === 'creator'
                         ? 'Keep your file. Drop a copy below anytime to verify the fingerprint.'
                         : role === 'verifier' && verifyMatched
@@ -3229,9 +3235,9 @@ export function DocumentJourney({
                           <Check size={18} strokeWidth={2.5} />
                           {role === 'creator'
                             ? requiredCount(doc) <= 1
-                              ? 'Document complete. Print anytime, or lock on the blockchain for permanent proof.'
-                              : 'Document complete - all signatures are in. Print anytime, or lock on the blockchain for permanent proof.'
-                            : 'Thanks, your part is complete. The creator can print anytime or lock on the blockchain.'}
+                              ? 'Document complete. Print a signed copy anytime, or lock on the blockchain for permanent proof.'
+                              : 'Document complete - all signatures are in. Print a signed copy anytime, or lock on the blockchain for permanent proof.'
+                            : 'Everyone has signed. You can print a signed copy with the same local file you used.'}
                         </div>
                       ) : (
                         <>
@@ -4413,7 +4419,9 @@ export function DocumentJourney({
                           <strong>
                             {doc.sealed
                               ? 'Locked on-chain - you already signed.'
-                              : 'Thanks, you are done signing.'}
+                              : allSigned(doc)
+                                ? 'Everyone has signed.'
+                                : 'You are done signing.'}
                           </strong>
                           <p className="muted">
                             {doc.sealed ? (
@@ -4439,13 +4447,13 @@ export function DocumentJourney({
                               </>
                             ) : allSigned(doc) || doc.readyToLock ? (
                               <>
-                                Your fields and wallet signature are recorded. The creator can print
-                                free or lock the fingerprint on Nimiq when ready.
+                                Your fields and wallet signature are on the record. Print a signed
+                                copy anytime with the same local file - no lock required.
                               </>
                             ) : (
                               <>
                                 Your fields and wallet signature are recorded. Other parties still
-                                need to finish before the creator can lock on the blockchain.
+                                need to finish.
                               </>
                             )}{' '}
                             Keep your copy of <em>{doc.fileName}</em>.
@@ -4483,13 +4491,24 @@ export function DocumentJourney({
                         >
                           {/*
                             Local drop only when returning later without a matched file. After
-                            signing in this session the file is already verified — hide the stage
-                            and the duplicate “Signed document” heading (preview has its own).
+                            signing in this session the file is already verified — go straight to
+                            the signed preview (Print lives on SignedDocumentView).
                           */}
                           {!hasVerifiedLocalPdf && (
                             <>
                               <header className="signatures-config-head">
-                                <h3 id="signer-review-layout-title">Signed document</h3>
+                                <h3 id="signer-review-layout-title">
+                                  {allSigned(doc) || doc.sealed
+                                    ? 'Print signed document'
+                                    : 'Signed document'}
+                                </h3>
+                                {(allSigned(doc) || doc.sealed) && (
+                                  <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+                                    Drop the same file you signed to paint signatures on the page,
+                                    then print. Anyone who signed can print - the file stays on
+                                    this device.
+                                  </p>
+                                )}
                               </header>
                               <DocumentStage
                                 step={step}
@@ -4519,21 +4538,32 @@ export function DocumentJourney({
                             signHash !== doc.fingerprint && (
                               <div className="result-banner result-banner--bad">
                                 That file does not match this agreement fingerprint. Use the same
-                                document the creator shared (<strong>{doc.fileName}</strong>).
+                                document the organizer shared (<strong>{doc.fileName}</strong>).
                               </div>
                             )}
                           {hasVerifiedLocalPdf && (signFile || pdfFile) && (
-                            <SignedDocumentView
-                              className="signed-document-view signed-document-view--primary"
-                              file={(signFile ?? pdfFile)!}
-                              fingerprint={doc.fingerprint}
-                              documentId={doc.id}
-                              authToken={token}
-                              revealPrivate={revealParticipantPrivate}
-                              documentAnnotations={doc.source.annotations}
-                              signatures={doc.source.signatures}
-                              parties={doc.source.parties}
-                            />
+                            <>
+                              {(allSigned(doc) || doc.sealed) && (
+                                <header className="signatures-config-head">
+                                  <h3 id="signer-print-ready-title">Print signed document</h3>
+                                  <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+                                    Use <strong>Print</strong> on the preview. Any party with the
+                                    matched file can print - locking is optional and separate.
+                                  </p>
+                                </header>
+                              )}
+                              <SignedDocumentView
+                                className="signed-document-view signed-document-view--primary"
+                                file={(signFile ?? pdfFile)!}
+                                fingerprint={doc.fingerprint}
+                                documentId={doc.id}
+                                authToken={token}
+                                revealPrivate={revealParticipantPrivate}
+                                documentAnnotations={doc.source.annotations}
+                                signatures={doc.source.signatures}
+                                parties={doc.source.parties}
+                              />
+                            </>
                           )}
                         </section>
                       )}
