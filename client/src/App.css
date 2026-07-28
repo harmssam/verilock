@@ -783,7 +783,7 @@ html {
 
 /*
  * Load entrance: words rise + unblur in a cascade; “Free.” lands a beat later
- * with a soft mint underline draw. Once only (CSS animation, not a loop).
+ * with a hand-drawn double underline (two pen strokes). Once only (CSS, no loop).
  */
 .lr-hero-headline--enter .lr-hero-word {
   display: inline-block;
@@ -800,6 +800,9 @@ html {
   color: var(--lr-accent);
   font-weight: 700;
   vertical-align: baseline;
+  /* Room for the hand-drawn underline sitting just under the baseline */
+  padding-bottom: 0.22em;
+  overflow: visible;
 }
 
 .lr-hero-headline--enter .lr-hero-headline-em {
@@ -815,22 +818,36 @@ html {
   z-index: 1;
 }
 
-/* Solid mint hairline under Free. — more gap, lighter stroke, draws after Free lands */
-.lr-hero-headline--enter .lr-hero-headline-em::after {
-  content: '';
+/*
+ * Free. underline: filled brush ribbons (Cuputo / Noun Project).
+ * Two strokes draw L→R via clip-path (SVG masks fail under the Free. blur/transform).
+ */
+.lr-hero-free-underline {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: -0.14em;
+  right: 0.02em;
   bottom: -0.12em;
-  height: 0.14em;
-  border-radius: 999px;
-  /* Same color/opacity as Free. text (var(--lr-accent)) */
-  background: currentColor;
-  transform: scaleX(0);
-  transform-origin: left center;
-  animation: lr-hero-free-underline 0.55s cubic-bezier(0.22, 1, 0.36, 1) 1.35s both;
+  width: auto;
+  height: 0.42em;
+  color: inherit;
+  overflow: visible;
   pointer-events: none;
   z-index: 0;
+}
+
+.lr-hero-free-underline-stroke {
+  clip-path: inset(0 0 0 0);
+}
+
+.lr-hero-headline--enter .lr-hero-free-underline-stroke--1 {
+  clip-path: inset(0 100% 0 0);
+  animation: lr-hero-free-stroke 0.52s cubic-bezier(0.33, 0.1, 0.2, 1) 1.35s both;
+}
+
+.lr-hero-headline--enter .lr-hero-free-underline-stroke--2 {
+  clip-path: inset(0 100% 0 0);
+  /* Second stroke after a short pen lift */
+  animation: lr-hero-free-stroke 0.4s cubic-bezier(0.33, 0.1, 0.2, 1) 1.84s both;
 }
 
 @keyframes lr-hero-word-in {
@@ -859,26 +876,35 @@ html {
   }
 }
 
-@keyframes lr-hero-free-underline {
+@keyframes lr-hero-free-stroke {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
   to {
-    transform: scaleX(1);
+    clip-path: inset(0 0 0 0);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .lr-hero-headline--enter .lr-hero-word,
-  .lr-hero-headline--enter .lr-hero-headline-em,
-  .lr-hero-headline--enter .lr-hero-headline-em::after {
+  .lr-hero-headline--enter .lr-hero-headline-em {
     animation: none;
     opacity: 1;
     filter: none;
     transform: none;
   }
+
+  .lr-hero-headline--enter .lr-hero-free-underline-stroke--1,
+  .lr-hero-headline--enter .lr-hero-free-underline-stroke--2 {
+    animation: none;
+    clip-path: inset(0 0 0 0);
+  }
 }
 
 /* Hero beats as bullets — scannable vs one dense paragraph */
 .lr-hero-points {
-  margin: 0;
+  /* Teeny extra air under the title (on top of .lr-hero-copy gap) */
+  margin: 0.2rem 0 0;
   padding: 0;
   max-width: 32rem;
   list-style: none;
@@ -913,7 +939,8 @@ html {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem 0.75rem;
-  margin-top: 0.2rem;
+  /* Teeny extra air under the bullet list */
+  margin-top: 0.4rem;
 }
 
 /* Freemium pitch under CTAs - quiet, not a gradient banner */
