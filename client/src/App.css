@@ -1308,8 +1308,9 @@ a.lr-cta {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  min-height: min(62vh, 28rem);
-  height: clamp(22rem, 58vw, 34rem);
+  /* Phone-first: taller still so the dock doesn’t dominate the card */
+  min-height: min(72vh, 34rem);
+  height: clamp(26rem, 78vw, 36rem);
   border-radius: 16px;
   border: 1px solid var(--lr-line);
   overflow: hidden;
