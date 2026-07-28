@@ -215,7 +215,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
       // in-Pay auto-login never runs (Pay mobile sign-in depends on bootReady).
       try {
         await setupHubRedirectHandlers(
-          // Hub single-trip: no address. Legacy chooseAddress path may still pass one.
+          // chooseAddress → challenge(address) → signMessage; address optional for edge cases.
           async addr => api.challenge(addr ?? undefined),
           async result => {
             try {
@@ -446,8 +446,9 @@ export function useJourneyWallet(): UseJourneyWalletResult {
 
           hubConnectInFlightRef.current = true
           const preferRedirect = shouldUseHubRedirect(options)
-          // One Hub trip: signMessage without pre-picked address (pick + sign together).
-          // Redirect throws HUB_REDIRECT_MESSAGE; popup path returns signed result here.
+          // chooseAddress first so Hub onboard runs for users with no wallet;
+          // then challenge + signMessage. Redirect throws HUB_REDIRECT_MESSAGE;
+          // popup path returns the signed result here.
           const hubResult = await connectViaHub(
             async addr => api.challenge(addr ?? undefined),
             { preferRedirect },
