@@ -803,10 +803,16 @@ export function isLoopbackAppOrigin(origin = getPublicAppOrigin()): boolean {
   }
 }
 
-/** Absolute https/http URL for Pay QR login on the phone (`/m/login/:id`). */
+/**
+ * Absolute https/http URL for Pay QR login on the phone (`/m/login/:id`).
+ * Includes a short-lived `n` nonce so each QR is a unique URL - Nimiq Pay is
+ * more likely to reload the mini-app WebView instead of reusing a finished tab.
+ */
 export function payLoginWebUrl(loginId: string, origin = getPublicAppOrigin()): string {
   const base = origin.replace(/\/$/, '')
-  return `${base}/m/login/${encodeURIComponent(loginId)}`
+  // Decimal epoch ms — also used to reject stale localStorage return paths.
+  const n = String(Date.now())
+  return `${base}/m/login/${encodeURIComponent(loginId)}?n=${encodeURIComponent(n)}`
 }
 
 /**

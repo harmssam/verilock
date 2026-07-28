@@ -123,14 +123,44 @@ export function restorePayReturnPathIfNeeded(): string | null {
     return null
   }
 
+  // Already on a one-shot mobile path (Pay QR login / sign capture).
+  // Never overwrite with a stashed older /m/login/:id - that blocks the next scan.
+  if (isPayLoginPath(current) || isSignMobilePath(current)) {
+    clearPayReturnPath()
+    return null
+  }
+
   // Home (or unknown) after Pay open: re-apply invite path.
   if (current === '/' || current === '') {
     clearPayReturnPath()
+    // One-shot login rooms expire quickly; never restore a stale QR path after
+    // the user already finished (or abandoned) an earlier login in this WebView.
+    if (isPayLoginPath(pathOnly) && isStalePayLoginReturnPath(path)) {
+      return null
+    }
     window.history.replaceState(window.history.state, '', path)
     return path
   }
 
   return null
+}
+
+/**
+ * Pay QR login return paths are only useful for the brief browser→Pay handoff.
+ * After ~4 min (room TTL is 3 min) treat them as stale so a later home open
+ * cannot resurrect a consumed /m/login/:id page.
+ */
+function isStalePayLoginReturnPath(path: string): boolean {
+  try {
+    const q = path.includes('?') ? path.slice(path.indexOf('?') + 1) : ''
+    const n = new URLSearchParams(q).get('n')
+    if (!n) return true // legacy stashes without nonce → do not restore
+    const started = Number(n)
+    if (!Number.isFinite(started) || started <= 0) return true
+    return Date.now() - started > 4 * 60 * 1000
+  } catch {
+    return true
+  }
 }
 
 export function documentSlugFromPath(path: string): string | null {

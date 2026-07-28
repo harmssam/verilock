@@ -77,6 +77,13 @@
   font-weight: 500;
 }
 
+.pay-login-mobile-close-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  max-width: 22rem;
+}
+
 .pay-login-mobile-addr {
   margin: 0;
   font-size: 0.8rem;
