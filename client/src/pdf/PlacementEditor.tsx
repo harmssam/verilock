@@ -1496,14 +1496,16 @@ export function PlacementEditor({
                     }
                   }}
                 >
-                  {active && (
-                    <span className="placement-person-active-tag" aria-hidden>
-                      Active
-                    </span>
-                  )}
                   <span className="placement-person-swatch" aria-hidden />
                   <span className="placement-person-meta">
-                    <span className="placement-person-label">Person {p.slotIndex}</span>
+                    <span className="placement-person-label-row">
+                      <span className="placement-person-label">Person {p.slotIndex}</span>
+                      {active && (
+                        <span className="placement-person-active-tag" aria-hidden>
+                          Active
+                        </span>
+                      )}
+                    </span>
                     {!locked ? (
                       <>
                         <label
