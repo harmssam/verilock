@@ -108,11 +108,14 @@ export interface SupportTicket {
   name: string
   email: string
   subject: string
+  issue?: string | null
+  walletAddress?: string | null
   status: SupportTicketStatus
   documentSlug: string | null
   createdAt: number
   updatedAt: number
   resolvedAt: number | null
+  volumeNoticeSentAt?: number | null
 }
 
 export interface SupportTicketListItem extends SupportTicket {
@@ -122,6 +125,13 @@ export interface SupportTicketListItem extends SupportTicket {
   lastAuthorKind: 'customer' | 'operator' | 'system' | null
 }
 
+export type SupportMessageKind =
+  | 'customer'
+  | 'human_reply'
+  | 'auto_ack'
+  | 'volume_notice'
+  | 'internal'
+
 export interface SupportTicketMessage {
   id: string
   ticketId: string
@@ -130,6 +140,7 @@ export interface SupportTicketMessage {
   body: string
   resendMessageId: string | null
   createdAt: number
+  messageKind?: SupportMessageKind
 }
 
 export interface SupportReplyTemplate {

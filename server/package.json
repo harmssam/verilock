@@ -9,6 +9,7 @@
     "build": "tsc",
     "test:concurrent-sign": "node --import tsx scripts/test-concurrent-sign.mjs",
     "test:redeem": "node --import tsx scripts/test-redeem-codes.mjs",
+    "test:support": "node --import tsx scripts/test-support-tickets.mjs",
     "codes:generate": "node --import tsx scripts/generate-appsumo-codes.mjs",
     "codes:import": "node --import tsx scripts/import-redemption-codes.mjs"
   },

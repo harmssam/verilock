@@ -12,6 +12,35 @@ export interface SupportReplyTemplate {
   body: string
 }
 
+/** Used for automatic email on contact-form submit (not listed as a manual insert). */
+export const SUPPORT_AUTO_ACK_TEMPLATE: SupportReplyTemplate = {
+  id: 'auto-ack',
+  label: 'Auto acknowledgment',
+  category: 'general',
+  body: `Hi {{name}},
+
+Thanks for contacting VeriLock. We received your message (ticket {{publicId}}) and will respond within about 3 days.
+
+- VeriLock Support`,
+}
+
+/**
+ * Sent once near end of day when a ticket still has no human reply after ~3 days
+ * (wall-clock, same clock as the auto-ack promise).
+ */
+export const SUPPORT_VOLUME_NOTICE_TEMPLATE: SupportReplyTemplate = {
+  id: 'volume-notice',
+  label: 'High volume follow-up',
+  category: 'general',
+  body: `Hi {{name}},
+
+We are still working through a higher volume of requests than usual and have not been able to reply to your message yet (ticket {{publicId}}).
+
+We have not forgotten about you. A member of the team will follow up as soon as we can. Thank you for your patience.
+
+- VeriLock Support`,
+}
+
 export const SUPPORT_REPLY_TEMPLATES: SupportReplyTemplate[] = [
   {
     id: 'ack-received',
@@ -19,11 +48,9 @@ export const SUPPORT_REPLY_TEMPLATES: SupportReplyTemplate[] = [
     category: 'general',
     body: `Hi {{name}},
 
-Thanks for writing in. We received your message (ticket {{publicId}}) and will follow up here by email.
+Thanks for contacting VeriLock. We received your message (ticket {{publicId}}) and will respond within about 3 days.
 
-If you have an agreement link handy (verilock.online/d/…), include it in a reply — that helps us look up the record faster. We never need the PDF itself.
-
-— VeriLock Support`,
+- VeriLock Support`,
   },
   {
     id: 'nimiq-wallet',
@@ -31,7 +58,7 @@ If you have an agreement link handy (verilock.online/d/…), include it in a rep
     category: 'wallet',
     body: `Hi {{name}},
 
-VeriLock uses a Nimiq wallet (via Nimiq Hub) as the signer identity — there is no VeriLock password for signing.
+VeriLock uses a Nimiq wallet (via Nimiq Hub) as the signer identity - there is no VeriLock password for signing.
 
 Quick checks:
 1. Open the agreement link on the same device where you can complete Hub login.
@@ -41,7 +68,7 @@ Quick checks:
 
 If it still fails, reply with: browser (or app), whether you created or were invited, and the agreement link (/d/…). Ticket: {{publicId}}.
 
-— VeriLock Support`,
+- VeriLock Support`,
   },
   {
     id: 'wallet-mismatch',
@@ -60,7 +87,7 @@ What to do:
 
 Ticket: {{publicId}}. Reply if you need help identifying which address is expected.
 
-— VeriLock Support`,
+- VeriLock Support`,
   },
   {
     id: 'how-lock-works',
@@ -70,15 +97,15 @@ Ticket: {{publicId}}. Reply if you need help identifying which address is expect
 
 Here is how VeriLock separates free signing from permanent proof:
 
-• Free multi-party signing — parties connect wallets and sign. Progress lives on the agreement record; we never upload your PDF.
-• Optional permanent lock — when everyone required has signed, the creator can lock a hash-based proof on-chain (credits / NIM). That step is permanent by design.
-• The file stays local — only hashes, signatures, placements, and chain pointers are stored with us.
+• Free multi-party signing - parties connect wallets and sign. Progress lives on the agreement record; we never upload your PDF.
+• Optional permanent lock - when everyone required has signed, the creator can lock a hash-based proof on-chain (credits / NIM). That step is permanent by design.
+• The file stays local - only hashes, signatures, placements, and chain pointers are stored with us.
 
 To lock: open the agreement as creator → complete signatures → use the lock / seal step. If lock is unavailable, check that all required parties signed and that your credit or NIM balance covers the lock.
 
 Ticket: {{publicId}}.
 
-— VeriLock Support`,
+- VeriLock Support`,
   },
   {
     id: 'lock-failed',
@@ -93,11 +120,11 @@ Sorry the lock did not complete. Common causes:
 3. Network / wallet confirmation was cancelled or timed out.
 4. The agreement was cancelled or already locked.
 
-What to try: refresh the agreement, confirm every party shows signed, check balance (credits or NIM), then run lock again. Keep the same file you fingerprinted when creating the agreement — a different PDF will not match.
+What to try: refresh the agreement, confirm every party shows signed, check balance (credits or NIM), then run lock again. Keep the same file you fingerprinted when creating the agreement - a different PDF will not match.
 
 Reply with the agreement link (/d/…) and roughly when you tried to lock (ticket {{publicId}}) and we will dig in.
 
-— VeriLock Support`,
+- VeriLock Support`,
   },
   {
     id: 'credits',
@@ -109,12 +136,12 @@ Credits are used for permanent on-chain locks (optional after free signing). Fre
 
 To add credits:
 • In the product, open the credits / top-up flow (Stripe card or NIM where enabled).
-• After payment confirms, balance updates on your wallet session — refresh if it still shows zero.
+• After payment confirms, balance updates on your wallet session - refresh if it still shows zero.
 • AppSumo or promo codes: redeem from the product redeem flow if you have a code.
 
 If you were charged but credits did not appear, reply with the approximate time, payment method (card / NIM), and the wallet address you used. Ticket: {{publicId}}.
 
-— VeriLock Support`,
+- VeriLock Support`,
   },
   {
     id: 'invite-email',
@@ -124,14 +151,14 @@ If you were charged but credits did not appear, reply with the approximate time,
 
 Co-signers can join in two ways:
 
-• Personal email invite — use the link in the email (best: matches the intended party).
-• Open share link — anyone with the link can open the agreement; the creator still controls the roster.
+• Personal email invite - use the link in the email (best: matches the intended party).
+• Open share link - anyone with the link can open the agreement; the creator still controls the roster.
 
 We never email the PDF. The file is shared out-of-band; VeriLock only stores the fingerprint and signing state.
 
 If an invite looks expired or the wrong person opened the link, the creator can send a fresh invite or share link from the agreement. Ticket: {{publicId}}.
 
-— VeriLock Support`,
+- VeriLock Support`,
   },
   {
     id: 're-verify',
@@ -147,7 +174,7 @@ To verify a sealed agreement:
 
 We never need you to upload the PDF to support. If verify does not match, the file may differ by even one byte (export, edit, or a different revision). Ticket: {{publicId}}.
 
-— VeriLock Support`,
+- VeriLock Support`,
   },
 ]
 
@@ -165,7 +192,7 @@ export function renderSupportTemplate(
 ): string {
   const map: Record<string, string> = {
     name: (vars.name ?? '').trim() || 'there',
-    publicId: (vars.publicId ?? '').trim() || '—',
+    publicId: (vars.publicId ?? '').trim() || '-',
     subject: (vars.subject ?? '').trim() || 'your request',
     site: (vars.site ?? '').trim() || 'https://verilock.online',
   }
@@ -181,7 +208,15 @@ export function buildSupportAutoReplyBody(vars: {
   subject: string
   site: string
 }): string {
-  const tpl = getSupportReplyTemplate('ack-received')
-  const base = tpl?.body ?? `Hi {{name}},\n\nThanks for writing in. We received your message (ticket {{publicId}}).\n\n— VeriLock Support`
-  return renderSupportTemplate(base, vars)
+  return renderSupportTemplate(SUPPORT_AUTO_ACK_TEMPLATE.body, vars)
+}
+
+/** Customer-facing 3-day high-volume follow-up. */
+export function buildSupportVolumeNoticeBody(vars: {
+  name: string
+  publicId: string
+  subject: string
+  site: string
+}): string {
+  return renderSupportTemplate(SUPPORT_VOLUME_NOTICE_TEMPLATE.body, vars)
 }

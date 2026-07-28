@@ -89,6 +89,9 @@ import { applySecurityHeaders } from './http-headers.js'
 import { getNimPrices, warmNimPricesCache } from './nimPrices.js'
 import { getSealPricing } from './sealPricing.js'
 import { startSessionCleanup } from './session-cleanup.js'
+// Ensure support schema is migrated before any route handles tickets/stats.
+import './supportTickets.js'
+import { startSupportVolumeNoticeWorker } from './supportVolumeNotice.js'
 import { attachLocalStudios } from './localStudios.js'
 import * as sigHandoff from './sigHandoff.js'
 
@@ -1015,6 +1018,8 @@ app.post('/api/support/contact', supportContactLimit, async (req, res) => {
     email: sanitized.email,
     subject: sanitized.subject,
     message: sanitized.message,
+    issue: sanitized.issue,
+    walletAddress: sanitized.walletAddress,
   })
 
   if (!delivered.ok) {
@@ -2094,6 +2099,7 @@ app.delete(
 
 startAttestationPoller()
 startSessionCleanup()
+startSupportVolumeNoticeWorker()
 
 if (IS_PRODUCTION) {
   attachClientStatic(app)

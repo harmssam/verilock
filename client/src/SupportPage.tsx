@@ -8,8 +8,9 @@ import {
   MAX_SUPPORT_EMAIL_LENGTH,
   MAX_SUPPORT_MESSAGE_LENGTH,
   MAX_SUPPORT_NAME_LENGTH,
-  MAX_SUPPORT_SUBJECT_LENGTH,
 } from './fieldLimits'
+import { loadSession } from './session'
+import { SUPPORT_ISSUE_OPTIONS, type SupportIssueId } from './supportIssues'
 import './SupportPage.css'
 
 declare global {
@@ -73,7 +74,7 @@ export function SupportPage() {
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [subject, setSubject] = useState('')
+  const [issue, setIssue] = useState<SupportIssueId | ''>('')
   const [message, setMessage] = useState('')
   /** Honeypot - must stay empty. */
   const [website, setWebsite] = useState('')
@@ -81,6 +82,8 @@ export function SupportPage() {
   const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null)
   const [turnstileRequired, setTurnstileRequired] = useState(false)
   const [turnstileReady, setTurnstileReady] = useState(false)
+  /** Signed-in wallet if present - sent for ops context only, never shown. */
+  const walletAddressRef = useRef<string | null>(null)
 
   const [status, setStatus] = useState<FormStatus>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -88,6 +91,8 @@ export function SupportPage() {
 
   useEffect(() => {
     formStartedAtRef.current = Date.now()
+    const session = loadSession()
+    walletAddressRef.current = session?.address?.trim() || null
   }, [])
 
   useEffect(() => {
@@ -185,13 +190,25 @@ export function SupportPage() {
       return
     }
 
+    if (!issue) {
+      setError('Please select an issue.')
+      setStatus('error')
+      return
+    }
+
     setStatus('submitting')
     try {
+      // Refresh session wallet at submit in case they signed in after opening the form.
+      const session = loadSession()
+      const walletAddress = session?.address?.trim() || walletAddressRef.current || null
+      walletAddressRef.current = walletAddress
+
       const result = await api.submitSupportContact({
         name: name.trim(),
         email: email.trim(),
-        subject: subject.trim(),
+        issue,
         message: message.trim(),
+        walletAddress: walletAddress || undefined,
         website,
         formStartedAt: formStartedAtRef.current,
         turnstileToken: turnstileToken ?? undefined,
@@ -200,7 +217,7 @@ export function SupportPage() {
       setStatus('success')
       setName('')
       setEmail('')
-      setSubject('')
+      setIssue('')
       setMessage('')
       setWebsite('')
       formStartedAtRef.current = Date.now()
@@ -311,21 +328,26 @@ export function SupportPage() {
           </div>
 
           <div className="field">
-            <label className="field-label" htmlFor={`${formId}-subject`}>
-              Subject
+            <label className="field-label" htmlFor={`${formId}-issue`}>
+              Issue
             </label>
-            <input
-              id={`${formId}-subject`}
-              name="subject"
-              type="text"
-              autoComplete="off"
+            <select
+              id={`${formId}-issue`}
+              name="issue"
               required
-              maxLength={MAX_SUPPORT_SUBJECT_LENGTH}
-              value={subject}
-              onChange={e => setSubject(e.target.value.slice(0, MAX_SUPPORT_SUBJECT_LENGTH))}
+              value={issue}
+              onChange={e => setIssue(e.target.value as SupportIssueId | '')}
               disabled={status === 'submitting'}
-              placeholder="e.g. Lock fee, invite link, verification"
-            />
+            >
+              <option value="" disabled>
+                Select an issue…
+              </option>
+              {SUPPORT_ISSUE_OPTIONS.map(opt => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="field">
