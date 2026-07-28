@@ -2,7 +2,7 @@
  * Production shell - light landing home + journey product flow.
  * DocumentJourney owns path stages after path pick / deep links.
  */
-import { Fingerprint, ScanSearch, Users, type LucideIcon } from 'lucide-react'
+import { BookSearch, Fingerprint, Users, type LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   isAgreementsPath,
@@ -100,7 +100,7 @@ const TRACK_META: Record<
   verifier: {
     title: 'Verify a file',
     detail: 'Drop a file to check it still matches a locked proof',
-    icon: ScanSearch,
+    icon: BookSearch,
     accent: 'verifier',
   },
 }

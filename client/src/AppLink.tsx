@@ -1,4 +1,4 @@
-import type { MouseEvent, ReactNode } from 'react'
+import type { FocusEventHandler, MouseEvent, MouseEventHandler, ReactNode } from 'react'
 
 interface AppLinkProps {
   children: ReactNode
@@ -6,6 +6,8 @@ interface AppLinkProps {
   onClick: () => void
   className?: string
   title?: string
+  onMouseEnter?: MouseEventHandler<HTMLAnchorElement>
+  onFocus?: FocusEventHandler<HTMLAnchorElement>
   'aria-label'?: string
   'aria-current'?: 'page' | 'step' | 'location' | 'date' | 'time' | 'true' | 'false'
 }
@@ -22,6 +24,8 @@ export function AppLink({
   onClick,
   className,
   title,
+  onMouseEnter,
+  onFocus,
   ...ariaProps
 }: AppLinkProps) {
   const handleClick = (e: MouseEvent<HTMLAnchorElement>) => {
@@ -37,6 +41,8 @@ export function AppLink({
       className={className}
       title={title}
       onClick={handleClick}
+      onMouseEnter={onMouseEnter}
+      onFocus={onFocus}
       {...ariaProps}
     >
       {children}
