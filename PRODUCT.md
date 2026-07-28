@@ -96,7 +96,7 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 - [ ] Footer: tagline, Security, Privacy Policy, Support
 - [ ] How it works + privacy notes still present
 - [ ] Document stage metaphor still present (fingerprint / signatures / seal feedback)
-- [ ] Share invite (copy link, email package patterns) still present where creator can invite
+- [ ] Share invite still present: email personal invite (opaque token, not shown in UI) + open document link for non-gated slots
 - [ ] Seal payment paths still: NIM fee / credits / progress UI as today
 - [ ] Signature pad + optional signature image still available on sign
 - [ ] **Sign on mobile** (desktop, when enabled): QR → `/m/sign/:id` ink handoff → wallet sign unchanged
@@ -135,6 +135,7 @@ Production UI: `client/src/App.tsx` (light shell) · `client/src/landing/` (home
 | `/` | Journey home (path picker) |
 | `/?intent=creator\|signer\|verifier` | Sticky path intent |
 | `/d/:slug` | Open agreement in journey |
+| `/d/:slug?invite=` | Personal email invite token (opaque; not reconstructible from party id) |
 | `/d/:slug?preferSeal=1` | Jump toward seal when allowed |
 | `/v/:slug` | Verify deep link |
 | `/pricing` | Seal fee + buy credits (card default; NIM half price) |
