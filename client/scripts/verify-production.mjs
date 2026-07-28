@@ -83,11 +83,28 @@ check('index.html boots production App + surface markers + indexable SEO', () =>
   assert.match(html, /data-verilock-surface="journey"/)
   assert.match(html, /verilock-app" content="journey"/)
   assert.match(html, /content="index,\s*follow"/)
-  assert.match(html, /canonical/)
+  // Canonical is injected per-route by the Express static handler (server/src/static.ts).
+  // A hardcoded <link rel="canonical" href="…/"> here made every SPA URL look like a
+  // duplicate of home to Google ("Alternate page with proper canonical tag").
+  assert.ok(
+    !/<link\s+rel=["']canonical["']/i.test(html),
+    'index.html must not hardcode rel=canonical; server injects per path',
+  )
   assert.ok(!html.includes('noindex'), 'production HTML must not noindex')
   assert.ok(!existsSync(join(clientDir, 'journey.html')), 'journey.html should be removed')
   assert.ok(!existsSync(join(clientDir, 'landing-redesign.html')), 'landing-redesign.html should be removed')
   assert.ok(!existsSync(join(clientDir, 'experiment.html')), 'experiment.html should be removed')
+})
+
+check('server injects per-route canonical for SPA HTML', () => {
+  const staticTs = readFileSync(join(rootDir, 'server/src/static.ts'), 'utf8')
+  assert.match(staticTs, /function injectCanonical/)
+  assert.match(staticTs, /function canonicalForPath/)
+  assert.match(staticTs, /rel="canonical"/)
+  assert.match(staticTs, /\/pricing/)
+  assert.match(staticTs, /\/blog/)
+  assert.match(staticTs, /\/support/)
+  assert.match(staticTs, /injectCanonical\(getIndexHtml\(\),\s*req\.path\)/)
 })
 
 check('production React entry mounts App (light shell)', () => {
