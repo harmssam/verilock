@@ -29,8 +29,12 @@ function isStepDone(
   if (step === 'done') return true
 
   if (role === 'signer') {
-    // When step is 'done', early return above marks all stages complete
-    if (stageId === 'sign') return Boolean(doc && (allSigned(doc) || doc.sealed))
+    // Sign is complete once we advance past it (step === done) or the agreement is finished.
+    // (step === 'done' already returns true for every stage via the early return above.)
+    if (stageId === 'sign') {
+      return Boolean(doc && (allSigned(doc) || doc.sealed || step === 'done'))
+    }
+    // Done stage is only "finished" after lock; while unsigned-complete it stays current.
     if (stageId === 'done') return Boolean(doc?.sealed)
     return false
   }
@@ -81,7 +85,11 @@ export function StageRail({
   const [pill, setPill] = useState({ left: 0, width: 0, ready: false })
 
   const currentIndex = (() => {
-    if (role === 'signer' && (step === 'done' || doc?.sealed)) {
+    // Invitee Done step: after they sign, all parties done, or locked.
+    if (
+      role === 'signer' &&
+      (step === 'done' || doc?.sealed || (doc && allSigned(doc)))
+    ) {
       return Math.max(0, stages.findIndex(s => s.id === 'done'))
     }
     if ((role === 'creator' || role === 'verifier') && step === 'done') {
