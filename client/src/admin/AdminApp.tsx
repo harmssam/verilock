@@ -174,6 +174,14 @@ export function AdminApp() {
           },
         }
       }
+      // Skip no-op updates so SupportQueue effects do not re-fire in a loop.
+      if (
+        prev.support?.open === counts.open &&
+        prev.support?.total === counts.total &&
+        Object.keys(prev.support?.byStatus ?? {}).length === 0
+      ) {
+        return prev
+      }
       return {
         ...prev,
         support: {
@@ -184,6 +192,11 @@ export function AdminApp() {
         },
       }
     })
+  }, [])
+
+  const handleAuthLost = useCallback(() => {
+    setAuth({ kind: 'login' })
+    setStats(null)
   }, [])
 
   // Boot: features + session
@@ -480,10 +493,7 @@ export function AdminApp() {
 
             {tab === 'support' && (
               <SupportQueue
-                onAuthLost={() => {
-                  setAuth({ kind: 'login' })
-                  setStats(null)
-                }}
+                onAuthLost={handleAuthLost}
                 onCountsChange={applySupportCounts}
               />
             )}
@@ -811,12 +821,20 @@ function SupportQueue({
   const [statusBusy, setStatusBusy] = useState(false)
   const [templates, setTemplates] = useState<SupportReplyTemplate[]>([])
 
-  const handleAuthError = useCallback(
-    (err: unknown) => {
-      if ((err as { status?: number }).status === 401) onAuthLost()
-    },
-    [onAuthLost],
-  )
+  // Keep parent callbacks in refs so list/detail effects only re-run on filter/query/id —
+  // not when the parent re-renders after counts/badge updates (that was an infinite 429 loop).
+  const onAuthLostRef = useRef(onAuthLost)
+  const onCountsChangeRef = useRef(onCountsChange)
+  useEffect(() => {
+    onAuthLostRef.current = onAuthLost
+  }, [onAuthLost])
+  useEffect(() => {
+    onCountsChangeRef.current = onCountsChange
+  }, [onCountsChange])
+
+  const handleAuthError = useCallback((err: unknown) => {
+    if ((err as { status?: number }).status === 401) onAuthLostRef.current()
+  }, [])
 
   const loadList = useCallback(async () => {
     setListLoading(true)
@@ -830,10 +848,10 @@ function SupportQueue({
       setTickets(result.tickets)
       setTotal(result.total)
       if (result.counts) {
-        onCountsChange?.(result.counts)
+        onCountsChangeRef.current?.(result.counts)
       } else if (filter === 'active' && !query) {
         // Fallback when server has no counts field yet
-        onCountsChange?.({ open: result.total, total: result.total })
+        onCountsChangeRef.current?.({ open: result.total, total: result.total })
       }
     } catch (err) {
       handleAuthError(err)
@@ -841,7 +859,7 @@ function SupportQueue({
     } finally {
       setListLoading(false)
     }
-  }, [filter, query, handleAuthError, onCountsChange])
+  }, [filter, query, handleAuthError])
 
   const loadDetail = useCallback(
     async (id: string) => {
