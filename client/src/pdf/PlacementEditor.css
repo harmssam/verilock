@@ -578,14 +578,11 @@
   border-color: var(--person-color, #0f766e);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--person-color, #0f766e) 35%, transparent);
   background: color-mix(in srgb, var(--person-color, #0f766e) 8%, #fff);
-  /* Room for absolute Active badge so inputs keep full width */
-  padding-right: 3.25rem;
 }
 
+/* Lives in the Person N row only — must not shrink name / wallet / counts. */
 .placement-person-active-tag {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.45rem;
+  flex-shrink: 0;
   margin: 0;
   padding: 0.12rem 0.35rem;
   border-radius: 999px;
@@ -598,7 +595,6 @@
   background: color-mix(in srgb, var(--person-color, var(--mint, #0d9488)) 12%, #fff);
   border: 1px solid color-mix(in srgb, var(--person-color, var(--mint, #0d9488)) 28%, transparent);
   pointer-events: none;
-  z-index: 1;
 }
 
 .placement-text-label-field input {
@@ -624,7 +620,17 @@
   flex-direction: column;
   gap: 0.15rem;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+.placement-person-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .placement-person-label {
@@ -633,6 +639,7 @@
   letter-spacing: 0.04em;
   color: var(--muted, #64748b);
   font-weight: 600;
+  min-width: 0;
 }
 
 .placement-person-name-wrap {
@@ -640,8 +647,11 @@
   flex-direction: column;
   gap: 0.2rem;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin-top: 0.1rem;
   cursor: text;
+  box-sizing: border-box;
 }
 
 .placement-person-name-hint {
@@ -706,7 +716,9 @@
   flex-direction: column;
   gap: 0.15rem;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
+  box-sizing: border-box;
 }
 
 .placement-person-wallet-row {
@@ -789,7 +801,16 @@
 }
 
 .placement-person-counts {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   font-size: 0.72rem;
+  line-height: 1.35;
+  /* Let multi-field summaries wrap instead of looking artificially clipped */
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 /* Blocking requirement: every person needs ≥1 field before Continue. */

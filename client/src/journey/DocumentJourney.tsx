@@ -3180,40 +3180,11 @@ export function DocumentJourney({
                   {doc && (
                     <>
                       {/**
-                       * Solo (1 of 1): skip roster + signature progress — they already know
-                       * they’re the only signer; the PDF + field count carry the work.
-                       * Multi still shows Signatures n/m and the party list.
-                       * Quiet waiting view also skips this chrome.
+                       * No empty party roster / 0-of-N progress on Sign before anyone has signed.
+                       * Creator multi-party progress lives in the invite/waiting dock after
+                       * their own signature; Lock / Done steps already list parties + ink.
+                       * Solo still gets a quiet doc title above the pad.
                        */}
-                      {!inviteWaitingView && requiredCount(doc) > 1 && (
-                        <>
-                          <div className="progress-bar-wrap">
-                            <div className="progress-bar-meta">
-                              <span>
-                                Signatures {signedCount(doc)}/{requiredCount(doc)}
-                              </span>
-                              <span className="muted">{doc.title}</span>
-                            </div>
-                            <div className="progress-bar-track">
-                              <div
-                                className="progress-bar-fill"
-                                style={{
-                                  width: `${requiredCount(doc) ? (signedCount(doc) / requiredCount(doc)) * 100 : 0}%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-
-                          <PartyList
-                            doc={doc}
-                            revealNames={revealParticipantPrivate}
-                            inviteEmailByPartyId={
-                              role === 'creator' ? inviteEmailSent : undefined
-                            }
-                          />
-                        </>
-                      )}
-
                       {!inviteWaitingView && requiredCount(doc) <= 1 && !allSigned(doc) && (
                         <p className="solo-sign-doc-title muted">{doc.title}</p>
                       )}
@@ -3725,8 +3696,8 @@ export function DocumentJourney({
                       </p>
                     </header>
 
-                    {/* Setup-only: roster not already shown in the Sign stack. */}
-                    {step === 'share' ? (
+                    {/* Progress + who still needs to sign (after creator signed, or organizer-only). */}
+                    {(requiredCount(doc) > 1 || inviteeSlotCount > 0) && (
                       <>
                         <div className="progress-bar-wrap">
                           <div className="progress-bar-meta">
@@ -3750,7 +3721,7 @@ export function DocumentJourney({
                           inviteEmailByPartyId={inviteEmailSent}
                         />
                       </>
-                    ) : null}
+                    )}
 
                     {role === 'creator' && !doc.sealed && (
                       <div className="signatures-config-form">
