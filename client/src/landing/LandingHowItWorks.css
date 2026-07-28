@@ -71,7 +71,7 @@
   border-right: 1.5px solid var(--lr-dim, #5c7094);
   border-bottom: 1.5px solid var(--lr-dim, #5c7094);
   transform: rotate(45deg);
-  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .lr-how-chevron--open {
@@ -79,6 +79,7 @@
   margin-top: 0.55rem;
 }
 
+/* Expand panel lives on .lr-expand (App.css) — story only needs content padding */
 .lr-how-story {
   padding: 0 0.95rem 1.15rem;
 }

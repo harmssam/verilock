@@ -381,25 +381,27 @@ export function LandingHowItWorks({ role, open, onToggle }: LandingHowItWorksPro
         <span className={`lr-how-chevron${open ? ' lr-how-chevron--open' : ''}`} aria-hidden />
       </button>
 
-      {open && (
-        <div className="lr-how-story">
-          <p className="lr-how-lead">
-            Your file never leaves this device. Only its SHA-256 fingerprint is written to the Nimiq
-            blockchain when you lock the proof.
-          </p>
-          <ol className="lr-how-list">
-            {stages.map((stage, i) => (
-              <StoryBeat
-                key={stage.id}
-                stage={stage}
-                index={i}
-                total={stages.length}
-                open={open}
-              />
-            ))}
-          </ol>
+      <div className="lr-expand" aria-hidden={!open}>
+        <div className="lr-expand-inner">
+          <div className="lr-how-story">
+            <p className="lr-how-lead">
+              Your file never leaves this device. Only its SHA-256 fingerprint is written to the
+              Nimiq blockchain when you lock the proof.
+            </p>
+            <ol className="lr-how-list">
+              {stages.map((stage, i) => (
+                <StoryBeat
+                  key={stage.id}
+                  stage={stage}
+                  index={i}
+                  total={stages.length}
+                  open={open}
+                />
+              ))}
+            </ol>
+          </div>
         </div>
-      )}
+      </div>
     </section>
   )
 }
