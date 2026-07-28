@@ -46,7 +46,7 @@ Because VeriLock never holds the file:
 
 ```text
 Now          Stabilize for presentation — no risky cutovers
-Next         Support portal v1 (tickets + operator queue)
+Next         Support portal v1 remainder (customer ticket list + FAQ)
 Then         Decline + reason (schema half-done — high ROI)
              Void with reason + expiration
              Access code + password-bound fingerprint
@@ -62,6 +62,47 @@ Postponed    Domain move → verilockdocs.com (after presentation;
              only when we can soak dual-domain + full redirect QA)
 Always       Placement/print polish, email reliability, offline companion
 ```
+
+---
+
+## Stabilize for presentation (current focus)
+
+**Goal:** Demo-safe production on `verilock.online`. No domain cutover, no large new features, no half-migrated systems.
+
+### Already landed (demo-critical)
+
+| Fix | Commit / area |
+|-----|----------------|
+| Admin support queue infinite refetch → 429 / timeouts | `692a22e` — callback refs + no-op count updates |
+| Support tickets + ops queue + auto-reply + templates | `3f1256f`, `dc50f10` |
+| Hub `chooseAddress` so new wallets can onboard | `2350a9c` |
+| `#lr-paths` scroll after SPA mount (Chrome) | `eef203e` |
+| Desktop Pay QR login reuse / dual login harden | `8e28747`, `ddae50f` |
+| Check/X, name/date prefill, mobile ink, Done step | signing UX series |
+| Server per-route canonical injection (no hardcode on `/`) | `ca3de46`; verify script aligned 2026-07-28 |
+| Landing hero still + plate width | `fdf8de7`, `a072831` |
+
+### Presentation gate checklist
+
+Run before any live demo:
+
+- [ ] `npm run test:production --prefix client` green
+- [ ] `npm run test:document-kinds --prefix client` + `test:placement` green
+- [ ] Client + server `tsc --noEmit` clean
+- [ ] Fresh wallet can log in (Hub chooseAddress path)
+- [ ] Create → place fields → invite link → second wallet signs → free complete / print
+- [ ] Mobile sign QR handoff (if demoing mobile)
+- [ ] Credits chip / pricing path (if demoing lock)
+- [ ] `/support` submit shows `VL-…` reference; `/admin` Support tab loads without 429 loop
+- [ ] Home path cards + `#lr-paths` scroll; `/pricing`, `/blog` deep links
+- [ ] Production deploy matches `main` (no stale admin/support bundle)
+
+### Out of scope until after presentation
+
+- Domain move to `verilockdocs.com`
+- Customer magic-link ticket portal
+- Decline / void / access codes / templates product work
+- Public API, bulk send, teams
 
 ---
 
@@ -449,3 +490,4 @@ Lock these before implementing the related phase:
 | 2026-07-28 | Initial roadmap from product discussion. Domain postponed; Support Portal as first likely ship after presentation. |
 | 2026-07-28 | Support portal operator slice: tickets on contact form + `/admin` queue (list/filter/reply). User-facing ticket list still open. |
 | 2026-07-28 | Support: customer auto-reply logged on ticket; canned reply templates (wallet / lock / credits). |
+| 2026-07-28 | Stabilize focus: admin queue 429 loop fixed; production verify aligned with server canonical injection; presentation gate checklist added. |
