@@ -1033,7 +1033,7 @@ export function DocumentJourney({
       ? placementLockBusy
         ? null
         : !token
-          ? 'Log in to save the layout and continue.'
+          ? 'Log in to save the layout.'
           : busy
             ? null
             : setupContinueLayoutBlocked
@@ -2716,24 +2716,48 @@ export function DocumentJourney({
           <section className="action-dock" aria-live="polite">
             <header className="action-dock-head">
               <div className="journey-toolbar">
-                <button
-                  type="button"
-                  className="btn btn-ghost journey-reset"
-                  onClick={resetAll}
-                  title="Back to home"
-                >
-                  <ArrowLeft size={14} strokeWidth={2.25} aria-hidden />
-                  Back home
-                </button>
-                {account && role === 'creator' && (
-                  <span className="journey-role-pill">Creating as {account.shortAddress}</span>
+                <div className="journey-toolbar-start">
+                  <button
+                    type="button"
+                    className="btn btn-ghost journey-reset"
+                    onClick={resetAll}
+                    title="Back to home"
+                  >
+                    <ArrowLeft size={14} strokeWidth={2.25} aria-hidden />
+                    Back home
+                  </button>
+                  {account && role === 'creator' && (
+                    <span className="journey-role-pill">Creating as {account.shortAddress}</span>
+                  )}
+                  {role === 'signer' && (
+                    <span className="journey-role-pill">
+                      {account ? `Signing as ${account.shortAddress}` : 'Signing'}
+                    </span>
+                  )}
+                  {role === 'verifier' && (
+                    <span className="journey-role-pill">Verifier mode</span>
+                  )}
+                </div>
+                {canCancelCurrent && (
+                  <button
+                    type="button"
+                    className={`btn btn-ghost journey-toolbar-cancel${busy || cancelBusy ? ' btn--busy' : ''}`}
+                    disabled={busy || cancelBusy}
+                    onClick={requestCancelCurrentAgreement}
+                  >
+                    {cancelBusy ? (
+                      <>
+                        <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
+                        Cancelling…
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 size={16} strokeWidth={2.25} aria-hidden />
+                        Cancel agreement
+                      </>
+                    )}
+                  </button>
                 )}
-                {role === 'signer' && (
-                  <span className="journey-role-pill">
-                    {account ? `Signing as ${account.shortAddress}` : 'Signing'}
-                  </span>
-                )}
-                {role === 'verifier' && <span className="journey-role-pill">Verifier mode</span>}
               </div>
               <div>
                 <p className="action-kicker">
@@ -3203,27 +3227,6 @@ export function DocumentJourney({
                   {!FEATURES.pdfAnnotationUi && (
                     <DocumentStage step={step} doc={doc} file={pdfFile} accepting={false} />
                   )}
-
-                  {canCancelCurrent && (
-                    <button
-                      type="button"
-                      className={`btn btn-ghost${busy || cancelBusy ? ' btn--busy' : ''}`}
-                      disabled={busy || cancelBusy}
-                      onClick={requestCancelCurrentAgreement}
-                    >
-                      {cancelBusy ? (
-                        <>
-                          <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
-                          Cancelling…
-                        </>
-                      ) : (
-                        <>
-                          <Trash2 size={16} strokeWidth={2.25} aria-hidden />
-                          Cancel agreement
-                        </>
-                      )}
-                    </button>
-                  )}
                 </div>
               )}
 
@@ -3262,19 +3265,6 @@ export function DocumentJourney({
                        */}
                       {!inviteWaitingView && requiredCount(doc) <= 1 && !allSigned(doc) && (
                         <p className="solo-sign-doc-title muted">{doc.title}</p>
-                      )}
-
-                      {/* Creator invites on the share step (after they sign). Never on invited path. */}
-                      {canCancelCurrent && role === 'creator' && !inviteWaitingView && (
-                        <button
-                          type="button"
-                          className={`btn btn-ghost${busy || cancelBusy ? ' btn--busy' : ''}`}
-                          disabled={busy || cancelBusy}
-                          onClick={requestCancelCurrentAgreement}
-                        >
-                          <Trash2 size={16} strokeWidth={2.25} aria-hidden />
-                          Cancel agreement
-                        </button>
                       )}
 
                       {allSigned(doc) ? (
