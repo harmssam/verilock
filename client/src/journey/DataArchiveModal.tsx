@@ -53,20 +53,23 @@ export function DataArchiveModal({
   const titleId = useId()
   const descId = useId()
   const emailId = useId()
+  const acknowledgeId = useId()
   const confirmRef = useRef<HTMLButtonElement>(null)
   const [wantEmail, setWantEmail] = useState(false)
   const [email, setEmail] = useState('')
   const [emailError, setEmailError] = useState<string | null>(null)
+  const [acknowledgedPublic, setAcknowledgedPublic] = useState(false)
 
   const showProgress = busy || done
   const showEmailUi = FEATURES.emailNotifyUi && emailNotifyAvailable
 
   useEffect(() => {
     if (!doc) return
-    // Reset email UI when opening a new document
+    // Reset confirm UI when opening a new document
     setWantEmail(false)
     setEmail('')
     setEmailError(null)
+    setAcknowledgedPublic(false)
   }, [doc?.id])
 
   useEffect(() => {
@@ -102,6 +105,7 @@ export function DataArchiveModal({
   const creditLabel = formatDataArchiveCredits(credits)
 
   const handleConfirm = () => {
+    if (!acknowledgedPublic) return
     setEmailError(null)
     if (wantEmail && showEmailUi) {
       const cleaned = email.trim().toLowerCase()
@@ -233,15 +237,12 @@ export function DataArchiveModal({
                 )}
               </ul>
 
-              <p className="data-archive-public-notice" role="note">
-                <strong>Public by design.</strong> Nimiq is a public ledger. Anyone
-                with the PDF or its fingerprint can reconstruct this overlay—not only
-                VeriLock. This is permanent disclosure, not private storage.
-              </p>
-
-              <p className="muted data-archive-note">
-                The PDF never leaves your devices. A recovery file is optional if you
-                later purge VeriLock&apos;s index.
+              <p className="muted data-archive-note" role="note">
+                <strong>Your document never leaves your device.</strong> Only the
+                overlay—signatures, initials, dates, text, and wallets—is written to
+                Nimiq. Anyone with the PDF or its fingerprint can reconstruct that
+                overlay later. A recovery file is optional if you purge VeriLock&apos;s
+                index.
               </p>
 
               {showEmailUi && (
@@ -295,28 +296,45 @@ export function DataArchiveModal({
               )}
             </div>
 
-            <footer className="data-archive-actions">
-              <button type="button" className="btn btn-secondary" onClick={onClose}>
-                Not now
-              </button>
-              {shortOnCredits && onGetCredits ? (
-                <button type="button" className="btn btn-primary" onClick={onGetCredits}>
-                  Get credits
+            <footer className="data-archive-footer">
+              <label className="data-archive-ack" htmlFor={acknowledgeId}>
+                <input
+                  id={acknowledgeId}
+                  type="checkbox"
+                  checked={acknowledgedPublic}
+                  onChange={e => setAcknowledgedPublic(e.target.checked)}
+                />
+                <span>
+                  I acknowledge that this will make all elements added to my
+                  document—such as signatures, initials, dates, and text—public on
+                  the ledger. This is permanent storage. Data cannot be deleted once
+                  it is moved to the blockchain.
+                </span>
+              </label>
+              <div className="data-archive-actions">
+                <button type="button" className="btn btn-secondary" onClick={onClose}>
+                  Not now
                 </button>
-              ) : (
-                <button
-                  ref={confirmRef}
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={shortOnCredits}
-                  onClick={handleConfirm}
-                >
-                  <Database size={16} strokeWidth={2.25} aria-hidden />
-                  {credits <= 0
-                    ? 'Resume storage (free)'
-                    : `Store forever · ${creditLabel}`}
-                </button>
-              )}
+                {shortOnCredits && onGetCredits ? (
+                  <button type="button" className="btn btn-primary" onClick={onGetCredits}>
+                    Get credits
+                  </button>
+                ) : (
+                  <button
+                    ref={confirmRef}
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={shortOnCredits || !acknowledgedPublic}
+                    onClick={handleConfirm}
+                    aria-disabled={shortOnCredits || !acknowledgedPublic}
+                  >
+                    <Database size={16} strokeWidth={2.25} aria-hidden />
+                    {credits <= 0
+                      ? 'Resume storage (free)'
+                      : `Store forever · ${creditLabel}`}
+                  </button>
+                )}
+              </div>
             </footer>
           </>
         )}

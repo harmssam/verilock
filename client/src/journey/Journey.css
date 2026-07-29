@@ -3264,27 +3264,15 @@ a.hash-chip.text-link:focus-visible {
   color: var(--mint-deep, #0f766e);
 }
 
-.data-archive-public-notice {
+.data-archive-note {
   margin: 0;
-  padding: 0.65rem 0.8rem;
-  border-radius: 10px;
-  border: 1px solid rgba(180, 120, 20, 0.28);
-  background: rgba(245, 180, 40, 0.12);
-  /* Do not use --lr-ink here: that token is a near-white surface tint (#fafdfc). */
-  color: #78350f;
   font-size: 0.8rem;
   line-height: 1.45;
 }
 
-.data-archive-public-notice strong {
-  font-weight: 700;
-  color: #92400e;
-}
-
-.data-archive-note {
-  margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.4;
+.data-archive-note strong {
+  font-weight: 650;
+  color: var(--lr-text, var(--text, #0f172a));
 }
 
 .data-archive-error {
@@ -3298,13 +3286,45 @@ a.hash-chip.text-link:focus-visible {
   line-height: 1.4;
 }
 
+.data-archive-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.1rem;
+}
+
+.data-archive-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(180, 120, 20, 0.28);
+  background: rgba(245, 180, 40, 0.08);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #78350f;
+  cursor: pointer;
+}
+
+.data-archive-ack input {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  accent-color: #b45309;
+}
+
+.data-archive-ack span {
+  flex: 1;
+  min-width: 0;
+}
+
 .data-archive-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
-  margin-top: 0.1rem;
 }
 
 .data-archive-actions .btn {
