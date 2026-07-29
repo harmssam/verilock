@@ -174,6 +174,16 @@ export interface SupportReplyTemplate {
   body: string
 }
 
+/** Editable initial-contact auto-reply (contact form submit). */
+export interface SupportAutoAckSettings {
+  body: string
+  isCustom: boolean
+  updatedAt: number | null
+  defaultBody: string
+  maxLength: number
+  placeholders: string[]
+}
+
 export const adminApi = {
   features: () => adminRequest<AdminFeatures>('/api/admin/features'),
   me: () => adminRequest<AdminMe>('/api/admin/me'),
@@ -237,4 +247,16 @@ export const adminApi = {
     }),
   supportTemplates: () =>
     adminRequest<{ templates: SupportReplyTemplate[] }>('/api/admin/support/templates'),
+  supportAutoAck: () =>
+    adminRequest<SupportAutoAckSettings>('/api/admin/support/auto-ack'),
+  saveSupportAutoAck: (body: string) =>
+    adminRequest<{ ok: true } & SupportAutoAckSettings>('/api/admin/support/auto-ack', {
+      method: 'PUT',
+      body: JSON.stringify({ body }),
+    }),
+  resetSupportAutoAck: () =>
+    adminRequest<{ ok: true } & SupportAutoAckSettings>('/api/admin/support/auto-ack', {
+      method: 'PUT',
+      body: JSON.stringify({ reset: true }),
+    }),
 }
