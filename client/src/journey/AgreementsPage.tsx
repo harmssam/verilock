@@ -376,6 +376,15 @@ export function AgreementsPage({
       // alreadyPaid → show free resume in the modal (credits already held).
       setArchiveCredits(quote.alreadyPaid ? 0 : quote.credits)
       setArchiveBalance(quote.balance)
+      // Keep list "Store forever · N credits" in sync with the authoritative quote
+      // (list summary is a cheap estimate; full pack can differ by manifest frames).
+      applyArchiveQuoteToDocs(doc.id, {
+        onChain: quote.onChain,
+        eligible: quote.eligible,
+        frameCount: quote.frameCount,
+        credits: quote.credits,
+        reason: quote.reason,
+      })
       if (quote.jobStatus === 'processing') {
         // Job still running (e.g. after a prior 524) - show progress and poll.
         setPendingArchive(doc)
@@ -386,22 +395,6 @@ export function AgreementsPage({
         return
       }
       if (quote.onChain) {
-        setDocuments(prev =>
-          prev.map(d =>
-            d.id === doc.id
-              ? {
-                  ...d,
-                  dataArchive: {
-                    onChain: true,
-                    eligible: false,
-                    frameCount: quote.frameCount,
-                    credits: quote.credits,
-                    reason: quote.reason,
-                  },
-                }
-              : d,
-          ),
-        )
         // Keep modal open in "done" state so creator can download recovery file.
         setArchiveFrameCount(quote.frameCount)
         setArchiveFramesDone(quote.frameCount)
