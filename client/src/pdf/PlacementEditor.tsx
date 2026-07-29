@@ -48,7 +48,6 @@ import {
   markCssPixelSize,
   newSlotId,
   personColor,
-  placementContinueBlockedReason,
   scalePercentFromSlot,
 } from './placements'
 import {
@@ -160,8 +159,6 @@ export function PlacementEditor({
 }: PlacementEditorProps) {
   const locked = plan.status === 'locked' || reviewMode
   const editDisabled = disabled || locked || lockBusy
-  const continueBlockedHint =
-    !locked && !reviewMode ? placementContinueBlockedReason(plan) : null
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -1445,11 +1442,6 @@ export function PlacementEditor({
           <p className="placement-editor-hint placement-editor-hint--design" role="status">
             <strong>Designing, not signing.</strong> These boxes mark where people will sign later.
             Tap to place a field; drag to pan the page.
-          </p>
-        )}
-        {continueBlockedHint && (
-          <p className="placement-editor-hint placement-editor-hint--blocked" role="status">
-            <strong>Continue is disabled.</strong> {continueBlockedHint}
           </p>
         )}
 
