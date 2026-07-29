@@ -670,10 +670,10 @@ export function placementContinueBlockedReason(
   plan: Pick<ConstructionPlan, 'people' | 'slots'>,
 ): string | null {
   if (plan.people.length === 0) {
-    return 'Add at least one person before continuing.'
+    return 'Add at least one person.'
   }
   if (plan.slots.length === 0) {
-    return 'Place at least one field on the document for each person before continuing.'
+    return 'Place at least one field on the document for each person.'
   }
   const missingFields = peopleWithoutSlotsMessage(plan)
   if (missingFields) return missingFields

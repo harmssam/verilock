@@ -1864,24 +1864,36 @@ a.exp-account-menu-full:focus-visible {
 
 .journey-setup-continue .btn-lg {
   width: auto;
+  min-width: 10.5rem;
+  padding-left: 1.75rem;
+  padding-right: 1.75rem;
 }
 
 .journey-setup-continue > .muted {
-  max-width: 28rem;
+  max-width: 36rem;
 }
 
-/* Why Continue is grayed out (missing fields / rename people / login). */
+/* Why Continue is grayed out — plain text (no chip), still flashes on click. */
 .journey-setup-continue-blocked {
   margin: 0;
-  max-width: 28rem;
-  width: fit-content;
-  padding: 0.55rem 0.7rem;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, #d97706 28%, var(--border, #e2e8f0));
-  background: color-mix(in srgb, #f59e0b 10%, var(--surface, #fff));
-  color: #92400e;
+  max-width: none;
+  width: max-content;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #b45309;
   font-size: 0.82rem;
-  line-height: 1.45;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .journey-setup-continue-blocked {
+    white-space: normal;
+    max-width: 100%;
+    width: auto;
+  }
 }
 
 .journey-setup-continue-blocked.is-flash {
@@ -1891,18 +1903,24 @@ a.exp-account-menu-full:focus-visible {
 @keyframes journey-setup-blocked-flash {
   0%,
   100% {
-    transform: scale(1);
-    background: color-mix(in srgb, #f59e0b 10%, var(--surface, #fff));
-    border-color: color-mix(in srgb, #d97706 28%, var(--border, #e2e8f0));
-    box-shadow: none;
+    color: #b45309;
+    opacity: 1;
   }
-  18%,
-  52% {
-    transform: scale(1.03);
-    background: color-mix(in srgb, #f59e0b 28%, var(--surface, #fff));
-    border-color: color-mix(in srgb, #d97706 55%, var(--border, #e2e8f0));
-    box-shadow: 0 0 0 3px color-mix(in srgb, #f59e0b 35%, transparent);
-    color: #78350f;
+  15%,
+  45% {
+    color: #9a3412;
+    opacity: 1;
+    text-shadow: 0 0 0.01px currentColor;
+  }
+  25%,
+  55% {
+    color: #c2410c;
+    opacity: 0.35;
+  }
+  35%,
+  65% {
+    color: #9a3412;
+    opacity: 1;
   }
 }
 
@@ -1914,14 +1932,35 @@ a.exp-account-menu-full:focus-visible {
   @keyframes journey-setup-blocked-flash-reduced {
     0%,
     100% {
-      background: color-mix(in srgb, #f59e0b 10%, var(--surface, #fff));
-      box-shadow: none;
+      opacity: 1;
+      color: #b45309;
     }
     40% {
-      background: color-mix(in srgb, #f59e0b 32%, var(--surface, #fff));
-      box-shadow: 0 0 0 2px color-mix(in srgb, #f59e0b 40%, transparent);
+      opacity: 0.4;
+      color: #9a3412;
     }
   }
+}
+
+.journey-toolbar-start {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.journey-toolbar-cancel {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: #b45309 !important;
+  border-color: color-mix(in srgb, #b45309 28%, transparent) !important;
+}
+
+.journey-toolbar-cancel:hover:not(:disabled) {
+  background: color-mix(in srgb, #b45309 8%, transparent) !important;
+  border-color: color-mix(in srgb, #b45309 42%, transparent) !important;
+  color: #92400e !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
