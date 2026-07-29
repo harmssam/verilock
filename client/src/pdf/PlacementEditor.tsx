@@ -48,6 +48,7 @@ import {
   markCssPixelSize,
   newSlotId,
   personColor,
+  placementContinueBlockedReason,
   scalePercentFromSlot,
 } from './placements'
 import {
@@ -159,6 +160,8 @@ export function PlacementEditor({
 }: PlacementEditorProps) {
   const locked = plan.status === 'locked' || reviewMode
   const editDisabled = disabled || locked || lockBusy
+  const continueBlockedHint =
+    !locked && !reviewMode ? placementContinueBlockedReason(plan) : null
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -225,7 +228,7 @@ export function PlacementEditor({
   const autoScrollRafRef = useRef<number | null>(null)
   /** Full-viewport stage workspace (toolbar + PDF) for dense placement work. */
   const [stageFullscreen, setStageFullscreen] = useState(false)
-  /** Inner width of the stage frame — used to render a wider page in fullscreen. */
+  /** Usable stage content width (padding/gutter excluded) for fullscreen page fit. */
   const [stageInnerWidth, setStageInnerWidth] = useState(0)
   /** View zoom % applied on top of fit/base page width (placement only; not stored). */
   const [zoomPct, setZoomPct] = useState(100)
@@ -386,12 +389,13 @@ export function PlacementEditor({
   /**
    * Base page width: docked prop size, or (in fullscreen) fit to stage.
    * Zoom multiplies this so placement boxes stay in normalized coords.
+   * stageInnerWidth is already the usable content width (padding + gutter removed)
+   * so the page never slightly overflows and left-aligns.
    */
   const basePageWidth = useMemo(() => {
     if (!stageFullscreen) return pageWidth
-    const available = stageInnerWidth > 0 ? stageInnerWidth - 32 : 0
-    if (available <= 0) return Math.max(pageWidth, 720)
-    return Math.max(pageWidth, Math.min(available, 1100))
+    if (stageInnerWidth <= 0) return Math.max(pageWidth, 720)
+    return Math.max(pageWidth, Math.min(stageInnerWidth, 1100))
   }, [stageFullscreen, stageInnerWidth, pageWidth])
 
   const effectivePageWidth = useMemo(
@@ -427,13 +431,20 @@ export function PlacementEditor({
     // stageFullscreen: portal remounts the canvas; re-paint after enter/exit.
   }, [surface, pageNumber, effectivePageWidth, stageFullscreen])
 
-  // Measure stage content width for fullscreen page scaling.
+  // Measure usable stage width for fullscreen page scaling (exclude padding +
+  // scrollbar-gutter so the page stays within the content box and centers).
   useEffect(() => {
     const stage = stageRef.current
     if (!stage || typeof ResizeObserver === 'undefined') return
     const measure = () => {
-      const w = stage.clientWidth
-      if (w > 0) setStageInnerWidth(w)
+      const style = getComputedStyle(stage)
+      const padX =
+        (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0)
+      // clientWidth excludes classic scrollbars but not always stable gutter.
+      // Small slack keeps the page strictly inside so margin:auto can center it.
+      const gutterSlack = 16
+      const usable = Math.floor(stage.clientWidth - padX - gutterSlack)
+      if (usable > 0) setStageInnerWidth(usable)
     }
     measure()
     const ro = new ResizeObserver(measure)
@@ -1434,6 +1445,11 @@ export function PlacementEditor({
           <p className="placement-editor-hint placement-editor-hint--design" role="status">
             <strong>Designing, not signing.</strong> These boxes mark where people will sign later.
             Tap to place a field; drag to pan the page.
+          </p>
+        )}
+        {continueBlockedHint && (
+          <p className="placement-editor-hint placement-editor-hint--blocked" role="status">
+            <strong>Continue is disabled.</strong> {continueBlockedHint}
           </p>
         )}
 

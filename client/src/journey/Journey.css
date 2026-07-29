@@ -1850,6 +1850,18 @@ a.exp-account-menu-full:focus-visible {
   width: 100%;
 }
 
+/* Why Continue is grayed out (missing fields / rename people / login). */
+.journey-setup-continue-blocked {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, #d97706 28%, var(--border, #e2e8f0));
+  background: color-mix(in srgb, #f59e0b 10%, var(--surface, #fff));
+  color: #92400e;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .stage-rail-pill--ready {
     transition: opacity 0.15s ease;

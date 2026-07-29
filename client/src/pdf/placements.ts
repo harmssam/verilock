@@ -662,6 +662,24 @@ export function peopleNeedingRealNameMessage(
   return `Rename ${labels.slice(0, -1).join(', ')}, and ${last} to real names — they pre-fill name fields when signing.`
 }
 
+/**
+ * Why Setup “Continue” is disabled for layout reasons (null when plan is ready).
+ * Prefer this over a silent disabled button so creators know what to fix.
+ */
+export function placementContinueBlockedReason(
+  plan: Pick<ConstructionPlan, 'people' | 'slots'>,
+): string | null {
+  if (plan.people.length === 0) {
+    return 'Add at least one person before continuing.'
+  }
+  if (plan.slots.length === 0) {
+    return 'Place at least one field on the document for each person before continuing.'
+  }
+  const missingFields = peopleWithoutSlotsMessage(plan)
+  if (missingFields) return missingFields
+  return peopleNeedingRealNameMessage(plan)
+}
+
 export function lockPlan(
   plan: ConstructionPlan,
   planRoot: string,

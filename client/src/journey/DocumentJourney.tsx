@@ -101,8 +101,7 @@ import {
   lockPlan as lockConstructionPlanLocal,
   peopleNeedingRealNameMessage,
   peopleWithoutSlotsMessage,
-  planHasSlotPerPerson,
-  peopleNeedingRealNameForNameFields,
+  placementContinueBlockedReason,
   unlockPlanLocal,
   type ConstructionPlan,
   type PlacementSlot,
@@ -1017,6 +1016,30 @@ export function DocumentJourney({
       (pdfFile || signFile) &&
       constructionPlan &&
       !creatorInviteDock,
+  )
+
+  /**
+   * Setup Continue is disabled until every person has ≥1 field and name boxes
+   * have real names. Surface the reason so a grayed-out button is never silent.
+   */
+  const setupContinueLayoutBlocked =
+    constructionPlan && constructionPlan.status !== 'locked'
+      ? placementContinueBlockedReason(constructionPlan)
+      : null
+  const setupContinueBlockedHint =
+    showSetupPlacementEditor && constructionPlan?.status !== 'locked'
+      ? placementLockBusy
+        ? null
+        : !token
+          ? 'Log in to save the layout and continue.'
+          : busy
+            ? null
+            : setupContinueLayoutBlocked
+      : null
+  const setupContinueDisabled = Boolean(
+    showSetupPlacementEditor &&
+      constructionPlan?.status !== 'locked' &&
+      (busy || !token || placementLockBusy || setupContinueLayoutBlocked),
   )
 
   /** Legacy soft prefer: /d/:slug?party=<partyId> (open slots only; email-gated needs ?invite=). */
@@ -3047,12 +3070,12 @@ export function DocumentJourney({
                           <button
                             type="button"
                             className={`btn btn-primary btn-lg${placementLockBusy ? ' btn--busy' : ''}`}
-                            disabled={
-                              busy ||
-                              !token ||
-                              placementLockBusy ||
-                              !planHasSlotPerPerson(constructionPlan) ||
-                              peopleNeedingRealNameForNameFields(constructionPlan).length > 0
+                            disabled={setupContinueDisabled}
+                            title={setupContinueBlockedHint ?? undefined}
+                            aria-describedby={
+                              setupContinueBlockedHint
+                                ? 'setup-continue-blocked-hint'
+                                : undefined
                             }
                             onClick={() => void lockPlacements()}
                           >
@@ -3065,10 +3088,20 @@ export function DocumentJourney({
                               'Continue'
                             )}
                           </button>
-                          <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                            Saves the field layout and moves on - still no signatures collected
-                            here. You can come back to edit until someone signs.
-                          </p>
+                          {setupContinueBlockedHint ? (
+                            <p
+                              id="setup-continue-blocked-hint"
+                              className="journey-setup-continue-blocked"
+                              role="status"
+                            >
+                              {setupContinueBlockedHint}
+                            </p>
+                          ) : (
+                            <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                              Saves the field layout and moves on - still no signatures collected
+                              here. You can come back to edit until someone signs.
+                            </p>
+                          )}
                         </div>
                       )}
                       {placementStatus && (

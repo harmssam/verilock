@@ -844,6 +844,20 @@
   color: var(--mint-deep, #0f766e);
 }
 
+/* Matches journey Setup Continue blocker — why the primary CTA stays off. */
+.placement-editor-hint--blocked {
+  margin: 0.15rem 0 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, #d97706 28%, var(--border, #e2e8f0));
+  background: color-mix(in srgb, #f59e0b 10%, var(--surface, #fff));
+  color: #92400e;
+}
+
+.placement-editor-hint--blocked strong {
+  color: #78350f;
+}
+
 .placement-editor-error {
   margin: 0;
   color: #b91c1c;
@@ -1024,6 +1038,21 @@
   max-height: none;
   height: 100%;
   min-height: 0;
+  /* Flex so a shorter page can sit in the middle; overflow still scrolls. */
+  display: flex;
+  flex-direction: column;
+  /* stretch + page-wrap margin:auto centers on both axes without clipping a
+     zoomed-in page (align-items:center can hide the left edge when wide). */
+}
+
+/*
+ * Center the document in the fullscreen stage when it is smaller than the
+ * viewport. Auto margins resolve to 0 when the page is taller/wider than the
+ * stage so scroll starts at the natural origin (no clipped top/left edge).
+ */
+.placement-stage-panel.is-fullscreen .pdf-annotator-stage.is-fullscreen .pdf-annotator-page-wrap {
+  flex: 0 0 auto;
+  margin: auto;
 }
 
 .placement-stage-frame {
