@@ -1835,7 +1835,7 @@ a.exp-account-menu-full:focus-visible {
 .journey-setup-continue {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 0.55rem;
   margin-top: 0.85rem;
 }
@@ -1846,13 +1846,35 @@ a.exp-account-menu-full:focus-visible {
   margin-bottom: 0.75rem;
 }
 
+/* Content-sized CTA + helper — not full dock width. */
+.journey-setup-continue-cta {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.journey-setup-continue-cta--blocked {
+  cursor: not-allowed;
+}
+
+/* Let the wrap receive clicks while the button stays disabled for a11y. */
+.journey-setup-continue-cta--blocked .btn {
+  pointer-events: none;
+}
+
 .journey-setup-continue .btn-lg {
-  width: 100%;
+  width: auto;
+}
+
+.journey-setup-continue > .muted {
+  max-width: 28rem;
 }
 
 /* Why Continue is grayed out (missing fields / rename people / login). */
 .journey-setup-continue-blocked {
   margin: 0;
+  max-width: 28rem;
+  width: fit-content;
   padding: 0.55rem 0.7rem;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, #d97706 28%, var(--border, #e2e8f0));
@@ -1860,6 +1882,46 @@ a.exp-account-menu-full:focus-visible {
   color: #92400e;
   font-size: 0.82rem;
   line-height: 1.45;
+}
+
+.journey-setup-continue-blocked.is-flash {
+  animation: journey-setup-blocked-flash 0.7s ease;
+}
+
+@keyframes journey-setup-blocked-flash {
+  0%,
+  100% {
+    transform: scale(1);
+    background: color-mix(in srgb, #f59e0b 10%, var(--surface, #fff));
+    border-color: color-mix(in srgb, #d97706 28%, var(--border, #e2e8f0));
+    box-shadow: none;
+  }
+  18%,
+  52% {
+    transform: scale(1.03);
+    background: color-mix(in srgb, #f59e0b 28%, var(--surface, #fff));
+    border-color: color-mix(in srgb, #d97706 55%, var(--border, #e2e8f0));
+    box-shadow: 0 0 0 3px color-mix(in srgb, #f59e0b 35%, transparent);
+    color: #78350f;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-setup-continue-blocked.is-flash {
+    animation: journey-setup-blocked-flash-reduced 0.45s ease;
+  }
+
+  @keyframes journey-setup-blocked-flash-reduced {
+    0%,
+    100% {
+      background: color-mix(in srgb, #f59e0b 10%, var(--surface, #fff));
+      box-shadow: none;
+    }
+    40% {
+      background: color-mix(in srgb, #f59e0b 32%, var(--surface, #fff));
+      box-shadow: 0 0 0 2px color-mix(in srgb, #f59e0b 40%, transparent);
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

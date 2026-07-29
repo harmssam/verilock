@@ -844,20 +844,6 @@
   color: var(--mint-deep, #0f766e);
 }
 
-/* Matches journey Setup Continue blocker — why the primary CTA stays off. */
-.placement-editor-hint--blocked {
-  margin: 0.15rem 0 0;
-  padding: 0.5rem 0.65rem;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, #d97706 28%, var(--border, #e2e8f0));
-  background: color-mix(in srgb, #f59e0b 10%, var(--surface, #fff));
-  color: #92400e;
-}
-
-.placement-editor-hint--blocked strong {
-  color: #78350f;
-}
-
 .placement-editor-error {
   margin: 0;
   color: #b91c1c;

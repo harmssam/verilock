@@ -279,6 +279,8 @@ export function DocumentJourney({
   /** idle → loading → ready (has plan) | none (404 / no plan). Avoids draft-seed race. */
   const [planLoadState, setPlanLoadState] = useState<'idle' | 'loading' | 'ready' | 'none'>('idle')
   const [placementLockBusy, setPlacementLockBusy] = useState(false)
+  /** Bumps to re-trigger the Setup Continue blocked warning flash animation. */
+  const [setupContinueFlashToken, setSetupContinueFlashToken] = useState(0)
   const [placementStatus, setPlacementStatus] = useState<string | null>(null)
   const [filledSlotIds, setFilledSlotIds] = useState<Set<string>>(() => new Set())
   const [knownBlobIds, setKnownBlobIds] = useState<Set<string>>(() => new Set())
@@ -1041,6 +1043,12 @@ export function DocumentJourney({
       constructionPlan?.status !== 'locked' &&
       (busy || !token || placementLockBusy || setupContinueLayoutBlocked),
   )
+
+  /** Disabled buttons don't fire click — wrapper catches the attempt and flashes the hint. */
+  const flashSetupContinueBlocked = useCallback(() => {
+    if (!setupContinueBlockedHint) return
+    setSetupContinueFlashToken(t => t + 1)
+  }, [setupContinueBlockedHint])
 
   /** Legacy soft prefer: /d/:slug?party=<partyId> (open slots only; email-gated needs ?invite=). */
   const preferredPartyFromUrl = useMemo(() => {
@@ -3067,31 +3075,57 @@ export function DocumentJourney({
                       />
                       {constructionPlan.status !== 'locked' && (
                         <div className="journey-setup-continue">
-                          <button
-                            type="button"
-                            className={`btn btn-primary btn-lg${placementLockBusy ? ' btn--busy' : ''}`}
-                            disabled={setupContinueDisabled}
-                            title={setupContinueBlockedHint ?? undefined}
-                            aria-describedby={
-                              setupContinueBlockedHint
-                                ? 'setup-continue-blocked-hint'
+                          {/*
+                            Disabled <button> does not receive clicks. When blocked, pass
+                            pointer events through so the wrap can flash the warning.
+                          */}
+                          <span
+                            className={
+                              setupContinueDisabled && setupContinueBlockedHint
+                                ? 'journey-setup-continue-cta journey-setup-continue-cta--blocked'
+                                : 'journey-setup-continue-cta'
+                            }
+                            onClick={
+                              setupContinueDisabled && setupContinueBlockedHint
+                                ? () => flashSetupContinueBlocked()
                                 : undefined
                             }
-                            onClick={() => void lockPlacements()}
                           >
-                            {placementLockBusy ? (
-                              <>
-                                <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                                Saving layout…
-                              </>
-                            ) : (
-                              'Continue'
-                            )}
-                          </button>
+                            <button
+                              type="button"
+                              className={`btn btn-primary btn-lg${placementLockBusy ? ' btn--busy' : ''}`}
+                              disabled={setupContinueDisabled}
+                              title={setupContinueBlockedHint ?? undefined}
+                              aria-describedby={
+                                setupContinueBlockedHint
+                                  ? 'setup-continue-blocked-hint'
+                                  : undefined
+                              }
+                              onClick={() => void lockPlacements()}
+                            >
+                              {placementLockBusy ? (
+                                <>
+                                  <LoaderCircle
+                                    className="btn-spinner"
+                                    size={18}
+                                    strokeWidth={2.5}
+                                  />
+                                  Saving layout…
+                                </>
+                              ) : (
+                                'Continue'
+                              )}
+                            </button>
+                          </span>
                           {setupContinueBlockedHint ? (
                             <p
+                              key={setupContinueFlashToken || 'setup-continue-hint'}
                               id="setup-continue-blocked-hint"
-                              className="journey-setup-continue-blocked"
+                              className={
+                                setupContinueFlashToken > 0
+                                  ? 'journey-setup-continue-blocked is-flash'
+                                  : 'journey-setup-continue-blocked'
+                              }
                               role="status"
                             >
                               {setupContinueBlockedHint}
