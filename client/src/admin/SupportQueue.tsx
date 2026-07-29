@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   adminApi,
+  type SupportAutoAckSettings,
   type SupportReplyTemplate,
   type SupportTicket,
   type SupportTicketListItem,
@@ -76,6 +77,14 @@ export function SupportQueue({
   const [internalOnly, setInternalOnly] = useState(false)
   const [statusBusy, setStatusBusy] = useState(false)
   const [templates, setTemplates] = useState<SupportReplyTemplate[]>([])
+
+  const [autoAckOpen, setAutoAckOpen] = useState(false)
+  const [autoAckDraft, setAutoAckDraft] = useState('')
+  const [autoAckMeta, setAutoAckMeta] = useState<SupportAutoAckSettings | null>(null)
+  const [autoAckLoading, setAutoAckLoading] = useState(false)
+  const [autoAckBusy, setAutoAckBusy] = useState(false)
+  const [autoAckError, setAutoAckError] = useState<string | null>(null)
+  const [autoAckSaved, setAutoAckSaved] = useState(false)
 
   // Keep parent callbacks in refs so list/detail effects only re-run on filter/query/id —
   // not when the parent re-renders after counts/badge updates (that was an infinite 429 loop).
@@ -155,6 +164,62 @@ export function SupportQueue({
       cancelled = true
     }
   }, [handleAuthError])
+
+  const loadAutoAck = useCallback(async () => {
+    setAutoAckLoading(true)
+    setAutoAckError(null)
+    try {
+      const settings = await adminApi.supportAutoAck()
+      setAutoAckMeta(settings)
+      setAutoAckDraft(settings.body)
+      setAutoAckSaved(false)
+    } catch (err) {
+      handleAuthError(err)
+      setAutoAckError(err instanceof Error ? err.message : 'Could not load auto-reply')
+    } finally {
+      setAutoAckLoading(false)
+    }
+  }, [handleAuthError])
+
+  useEffect(() => {
+    void loadAutoAck()
+  }, [loadAutoAck])
+
+  async function saveAutoAck() {
+    if (autoAckBusy) return
+    setAutoAckBusy(true)
+    setAutoAckError(null)
+    setAutoAckSaved(false)
+    try {
+      const result = await adminApi.saveSupportAutoAck(autoAckDraft)
+      setAutoAckMeta(result)
+      setAutoAckDraft(result.body)
+      setAutoAckSaved(true)
+    } catch (err) {
+      handleAuthError(err)
+      setAutoAckError(err instanceof Error ? err.message : 'Could not save auto-reply')
+    } finally {
+      setAutoAckBusy(false)
+    }
+  }
+
+  async function resetAutoAck() {
+    if (autoAckBusy) return
+    setAutoAckBusy(true)
+    setAutoAckError(null)
+    setAutoAckSaved(false)
+    try {
+      const result = await adminApi.resetSupportAutoAck()
+      setAutoAckMeta(result)
+      setAutoAckDraft(result.body)
+      setAutoAckSaved(true)
+    } catch (err) {
+      handleAuthError(err)
+      setAutoAckError(err instanceof Error ? err.message : 'Could not reset auto-reply')
+    } finally {
+      setAutoAckBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (!selectedId) {
@@ -242,6 +307,102 @@ export function SupportQueue({
           {listLoading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
+
+      <section className="admin-auto-ack" aria-label="Initial contact auto-reply">
+        <button
+          type="button"
+          className="admin-auto-ack-toggle"
+          aria-expanded={autoAckOpen}
+          onClick={() => setAutoAckOpen(open => !open)}
+        >
+          <span>
+            Default response for initial contact
+            {autoAckMeta?.isCustom ? (
+              <span className="admin-auto-ack-badge">Custom</span>
+            ) : autoAckMeta ? (
+              <span className="admin-auto-ack-badge admin-auto-ack-badge--default">Default</span>
+            ) : null}
+          </span>
+          <span className="admin-auto-ack-chevron" aria-hidden>
+            {autoAckOpen ? '▾' : '▸'}
+          </span>
+        </button>
+        {autoAckOpen ? (
+          <div className="admin-auto-ack-panel">
+            <p className="admin-auto-ack-help">
+              Sent automatically when someone submits the contact form (when outbound email is
+              enabled). Placeholders:{' '}
+              <code>{'{{name}}'}</code>, <code>{'{{publicId}}'}</code>,{' '}
+              <code>{'{{subject}}'}</code>, <code>{'{{site}}'}</code>.
+            </p>
+            {autoAckLoading && !autoAckMeta ? (
+              <p className="admin-empty">Loading auto-reply…</p>
+            ) : (
+              <>
+                <textarea
+                  className="admin-auto-ack-textarea"
+                  value={autoAckDraft}
+                  onChange={e => {
+                    setAutoAckDraft(e.target.value)
+                    setAutoAckSaved(false)
+                  }}
+                  rows={8}
+                  maxLength={autoAckMeta?.maxLength ?? 8000}
+                  disabled={autoAckBusy || autoAckLoading}
+                  spellCheck
+                  aria-label="Initial contact auto-reply message"
+                />
+                <div className="admin-auto-ack-footer">
+                  <span className="admin-auto-ack-count">
+                    {autoAckDraft.length.toLocaleString()}
+                    {autoAckMeta?.maxLength
+                      ? ` / ${autoAckMeta.maxLength.toLocaleString()}`
+                      : ''}
+                  </span>
+                  <div className="admin-auto-ack-actions">
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn-ghost"
+                      onClick={() => void resetAutoAck()}
+                      disabled={autoAckBusy || autoAckLoading || !autoAckMeta?.isCustom}
+                      title={
+                        autoAckMeta?.isCustom
+                          ? 'Restore the built-in default message'
+                          : 'Already using the built-in default'
+                      }
+                    >
+                      Reset to default
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn-primary"
+                      onClick={() => void saveAutoAck()}
+                      disabled={
+                        autoAckBusy ||
+                        autoAckLoading ||
+                        autoAckDraft.trim().length < 8 ||
+                        (autoAckMeta != null && autoAckDraft === autoAckMeta.body)
+                      }
+                    >
+                      {autoAckBusy ? 'Saving…' : 'Save auto-reply'}
+                    </button>
+                  </div>
+                </div>
+                {autoAckError ? (
+                  <p className="admin-error" role="alert">
+                    {autoAckError}
+                  </p>
+                ) : null}
+                {autoAckSaved && !autoAckError ? (
+                  <p className="admin-auto-ack-ok" role="status">
+                    Saved. New contact submissions will use this message.
+                  </p>
+                ) : null}
+              </>
+            )}
+          </div>
+        ) : null}
+      </section>
 
       <div className="admin-support-toolbar">
         <div className="admin-support-filters" role="group" aria-label="Ticket status filter">

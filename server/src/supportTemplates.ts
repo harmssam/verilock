@@ -2,6 +2,8 @@
  * Canned support reply templates for the admin ticket queue.
  * Placeholders: {{name}}, {{publicId}}, {{subject}}, {{site}}
  */
+import { getSupportAutoAckBody } from './adminSettings.js'
+import { SUPPORT_AUTO_ACK_DEFAULT_BODY } from './supportAutoAckDefault.js'
 
 export interface SupportReplyTemplate {
   id: string
@@ -17,11 +19,7 @@ export const SUPPORT_AUTO_ACK_TEMPLATE: SupportReplyTemplate = {
   id: 'auto-ack',
   label: 'Auto acknowledgment',
   category: 'general',
-  body: `Hi {{name}},
-
-Thanks for contacting VeriLock. We received your message (ticket {{publicId}}) and will respond within about 3 days.
-
-- VeriLock Support`,
+  body: SUPPORT_AUTO_ACK_DEFAULT_BODY,
 }
 
 /**
@@ -201,14 +199,14 @@ export function renderSupportTemplate(
   })
 }
 
-/** Customer-facing auto-reply after contact form submit. */
+/** Customer-facing auto-reply after contact form submit (uses admin override when set). */
 export function buildSupportAutoReplyBody(vars: {
   name: string
   publicId: string
   subject: string
   site: string
 }): string {
-  return renderSupportTemplate(SUPPORT_AUTO_ACK_TEMPLATE.body, vars)
+  return renderSupportTemplate(getSupportAutoAckBody().body, vars)
 }
 
 /** Customer-facing 3-day high-volume follow-up. */

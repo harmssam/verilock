@@ -4,6 +4,13 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { Express, NextFunction, Request, Response } from 'express'
+import {
+  defaultSupportAutoAckBody,
+  getSupportAutoAckBody,
+  resetSupportAutoAckBody,
+  setSupportAutoAckBody,
+  SUPPORT_AUTO_ACK_MAX_LENGTH,
+} from './adminSettings.js'
 import { getAdminStats } from './adminStats.js'
 import { rateLimit } from './rate-limit.js'
 import {
@@ -320,6 +327,70 @@ export function attachAdminRoutes(app: Express): void {
     } catch (err) {
       console.error('[admin] support templates', err)
       res.status(500).json({ error: 'Could not load templates.' })
+    }
+  })
+
+  // Initial contact auto-reply (sent on /support form submit when email is enabled).
+  app.get('/api/admin/support/auto-ack', ticketsLimit, requireAdmin, (_req, res) => {
+    try {
+      res.setHeader('Cache-Control', 'no-store')
+      const current = getSupportAutoAckBody()
+      res.json({
+        body: current.body,
+        isCustom: current.isCustom,
+        updatedAt: current.updatedAt,
+        defaultBody: defaultSupportAutoAckBody(),
+        maxLength: SUPPORT_AUTO_ACK_MAX_LENGTH,
+        placeholders: ['{{name}}', '{{publicId}}', '{{subject}}', '{{site}}'],
+      })
+    } catch (err) {
+      console.error('[admin] support auto-ack get', err)
+      res.status(500).json({ error: 'Could not load auto-reply settings.' })
+    }
+  })
+
+  app.put('/api/admin/support/auto-ack', ticketMutateLimit, requireAdmin, (req, res) => {
+    try {
+      const body = (req.body ?? {}) as { body?: unknown; reset?: unknown }
+      if (body.reset === true) {
+        const current = resetSupportAutoAckBody()
+        res.json({
+          ok: true as const,
+          body: current.body,
+          isCustom: current.isCustom,
+          updatedAt: current.updatedAt,
+          defaultBody: defaultSupportAutoAckBody(),
+          maxLength: SUPPORT_AUTO_ACK_MAX_LENGTH,
+          placeholders: ['{{name}}', '{{publicId}}', '{{subject}}', '{{site}}'],
+        })
+        return
+      }
+      if (typeof body.body !== 'string') {
+        res.status(400).json({ error: 'body (string) is required, or pass reset: true.' })
+        return
+      }
+      const current = setSupportAutoAckBody(body.body)
+      res.json({
+        ok: true as const,
+        body: current.body,
+        isCustom: current.isCustom,
+        updatedAt: current.updatedAt,
+        defaultBody: defaultSupportAutoAckBody(),
+        maxLength: SUPPORT_AUTO_ACK_MAX_LENGTH,
+        placeholders: ['{{name}}', '{{publicId}}', '{{subject}}', '{{site}}'],
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not save auto-reply.'
+      if (
+        message.includes('too short') ||
+        message.includes('at most') ||
+        message.includes('required')
+      ) {
+        res.status(400).json({ error: message })
+        return
+      }
+      console.error('[admin] support auto-ack put', err)
+      res.status(500).json({ error: 'Could not save auto-reply settings.' })
     }
   })
 
