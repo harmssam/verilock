@@ -4,7 +4,7 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { Express, NextFunction, Request, Response } from 'express'
-import { getAdminStats } from './db.js'
+import { getAdminStats } from './adminStats.js'
 import { rateLimit } from './rate-limit.js'
 import {
   clientIpFromRequest,

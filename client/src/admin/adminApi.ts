@@ -41,6 +41,28 @@ export interface AdminMe {
   expiresAt?: number
 }
 
+/** Daily activity series for admin cards (always 90 UTC days, oldest → newest). */
+export interface AdminStatsTimeline {
+  dayCount: 90
+  days: string[]
+  startMs: number
+  series: {
+    documentsCreated: number[]
+    documentsLocked: number[]
+    uniqueWalletsFirstSeen: number[]
+    signatures: number[]
+    parties: number[]
+    attestations: number[]
+    dataArchives: number[]
+    creditGranted: number[]
+    creditSpent: number[]
+    sessionsCreated: number[]
+    supportTickets: number[]
+  }
+}
+
+export type AdminTimelineRange = 30 | 60 | 90
+
 export interface AdminStats {
   generatedAt: number
   documents: {
@@ -93,6 +115,8 @@ export interface AdminStats {
     open: number
     byStatus: Record<string, number>
   }
+  /** Daily activity series (90 UTC days); UI slices to 30/60/90. */
+  timeline?: AdminStatsTimeline
 }
 
 export type SupportTicketStatus =
