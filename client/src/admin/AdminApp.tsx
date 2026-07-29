@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { adminApi, type AdminFeatures, type AdminStats } from './adminApi'
 import { isAdminHost } from './adminHost'
+import { StatsDashboard } from './StatsDashboard'
 import { SupportQueue } from './SupportQueue'
 import './AdminApp.css'
 
@@ -59,28 +60,6 @@ function loadTurnstileScript(): Promise<void> {
   return turnstileScriptPromise
 }
 
-function formatWhen(ms: number): string {
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(new Date(ms))
-  } catch {
-    return new Date(ms).toISOString()
-  }
-}
-
-function shortAddress(addr: string): string {
-  const a = addr.replace(/\s+/g, '')
-  if (a.length <= 14) return a
-  return `${a.slice(0, 6)}…${a.slice(-4)}`
-}
-
-function statusLabel(status: string): string {
-  return status.replace(/_/g, ' ')
-}
-
-
 /** Active tickets: open + in_progress + waiting_customer (matches list filter "Active"). */
 function supportOpenCount(stats: AdminStats | null | undefined): number {
   if (!stats?.support) return 0
@@ -93,16 +72,6 @@ function supportOpenCount(stats: AdminStats | null | undefined): number {
     )
   }
   const n = Number(stats.support.open)
-  return Number.isFinite(n) && n >= 0 ? n : 0
-}
-
-function supportTotalCount(stats: AdminStats | null | undefined): number {
-  if (!stats?.support) return 0
-  const by = stats.support.byStatus
-  if (by && Object.keys(by).length > 0) {
-    return Object.values(by).reduce((sum, n) => sum + Number(n || 0), 0)
-  }
-  const n = Number(stats.support.total)
   return Number.isFinite(n) && n >= 0 ? n : 0
 }
 
@@ -526,7 +495,7 @@ export function AdminApp() {
               />
             )}
             {tab === 'stats' && (
-              <Dashboard
+              <StatsDashboard
                 stats={stats}
                 loading={statsLoading}
                 error={statsError}
@@ -538,227 +507,6 @@ export function AdminApp() {
       </main>
 
       <footer className="admin-footer">Operator-only · not linked from the public product</footer>
-    </div>
-  )
-}
-
-function Dashboard({
-  stats,
-  loading,
-  error,
-  onRefresh,
-}: {
-  stats: AdminStats | null
-  loading: boolean
-  error: string | null
-  onRefresh: () => void
-}) {
-  if (loading && !stats) {
-    return <p className="admin-loading">Loading statistics…</p>
-  }
-
-  if (error && !stats) {
-    return (
-      <div>
-        <p className="admin-error" role="alert">
-          {error}
-        </p>
-        <button type="button" className="admin-btn admin-btn-primary" onClick={onRefresh}>
-          Retry
-        </button>
-      </div>
-    )
-  }
-
-  if (!stats) return null
-
-  const statusEntries = Object.entries(stats.documents.byStatus).sort((a, b) => b[1] - a[1])
-  const attEntries = Object.entries(stats.attestations.byStatus).sort((a, b) => b[1] - a[1])
-
-  return (
-    <div>
-      <div className="admin-dash-head">
-        <div>
-          <h1>Database stats</h1>
-          <p className="admin-dash-meta">Updated {formatWhen(stats.generatedAt)}</p>
-        </div>
-        <button
-          type="button"
-          className="admin-btn admin-btn-ghost"
-          onClick={onRefresh}
-          disabled={loading}
-        >
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </div>
-
-      {error && (
-        <p className="admin-error" role="alert" style={{ marginBottom: '1rem' }}>
-          {error}
-        </p>
-      )}
-
-      <div className="admin-stat-grid">
-        <StatCard
-          label="Documents"
-          value={stats.documents.total}
-          hint={`${stats.documents.createdLast24h} last 24h · ${stats.documents.createdLast7d} last 7d`}
-          accent
-        />
-        <StatCard
-          label="Locked on chain"
-          value={stats.documents.locked}
-          hint={
-            stats.documents.withLockedAt !== stats.documents.locked
-              ? `${stats.documents.withLockedAt} with locked_at`
-              : 'status = locked'
-          }
-          accent
-        />
-        <StatCard
-          label="Unique wallets"
-          value={stats.wallets.uniqueAll}
-          hint={`${stats.wallets.uniqueCreators} creators · ${stats.wallets.uniqueSigners} signers`}
-          accent
-        />
-        <StatCard label="Signatures" value={stats.signatures.total} />
-        <StatCard
-          label="Parties"
-          value={stats.parties.total}
-          hint={`${stats.parties.withWallet} with wallet`}
-        />
-        <StatCard
-          label="Attestations"
-          value={stats.attestations.total}
-          hint={
-            attEntries.length
-              ? attEntries.map(([k, v]) => `${v} ${k}`).join(' · ')
-              : 'none yet'
-          }
-        />
-        <StatCard
-          label="Data archives"
-          value={stats.dataArchives.total}
-          hint={`${stats.dataArchives.onChain} on-chain`}
-        />
-        <StatCard
-          label="Credit balance"
-          value={stats.credits.totalBalance}
-          hint={`${stats.credits.accountsWithBalance} wallets with balance`}
-        />
-        <StatCard label="Active sessions" value={stats.sessions.verifiedActive} />
-        <StatCard
-          label="Support open"
-          value={supportOpenCount(stats)}
-          hint={`${supportTotalCount(stats)} total · open / in progress / waiting`}
-          accent
-        />
-      </div>
-
-      <div className="admin-panels">
-        <section className="admin-panel">
-          <h2>Documents by status</h2>
-          {statusEntries.length === 0 ? (
-            <p className="admin-empty">No documents yet.</p>
-          ) : (
-            <ul className="admin-status-list">
-              {statusEntries.map(([key, n]) => (
-                <li key={key}>
-                  <span className="key">{statusLabel(key)}</span>
-                  <span className="val">{n}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <h2 style={{ marginTop: '1.25rem' }}>Wallets breakdown</h2>
-          <ul className="admin-status-list">
-            <li>
-              <span className="key">Creators</span>
-              <span className="val">{stats.wallets.uniqueCreators}</span>
-            </li>
-            <li>
-              <span className="key">Signers (from signatures)</span>
-              <span className="val">{stats.wallets.uniqueSigners}</span>
-            </li>
-            <li>
-              <span className="key">Party wallets assigned</span>
-              <span className="val">{stats.wallets.uniquePartyWallets}</span>
-            </li>
-            <li>
-              <span className="key">Union (all distinct)</span>
-              <span className="val">{stats.wallets.uniqueAll}</span>
-            </li>
-          </ul>
-        </section>
-
-        <section className="admin-panel">
-          <h2>Recent documents</h2>
-          {stats.recentDocuments.length === 0 ? (
-            <p className="admin-empty">No documents yet.</p>
-          ) : (
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Title</th>
-                    <th>Status</th>
-                    <th>Creator</th>
-                    <th>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.recentDocuments.map(doc => (
-                    <tr key={doc.id}>
-                      <td>
-                        <div>{doc.title || 'Untitled'}</div>
-                        <div className="mono" style={{ opacity: 0.7 }}>
-                          {doc.slug}
-                        </div>
-                      </td>
-                      <td>
-                        <span
-                          className={
-                            doc.status === 'locked'
-                              ? 'admin-badge admin-badge--locked'
-                              : 'admin-badge'
-                          }
-                        >
-                          {statusLabel(doc.status)}
-                        </span>
-                      </td>
-                      <td className="mono" title={doc.creatorAddress}>
-                        {shortAddress(doc.creatorAddress)}
-                      </td>
-                      <td>{formatWhen(doc.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      </div>
-    </div>
-  )
-}
-
-function StatCard({
-  label,
-  value,
-  hint,
-  accent,
-}: {
-  label: string
-  value: number
-  hint?: string
-  accent?: boolean
-}) {
-  return (
-    <div className={accent ? 'admin-stat-card admin-stat-card--accent' : 'admin-stat-card'}>
-      <p className="admin-stat-label">{label}</p>
-      <p className="admin-stat-value">{value.toLocaleString()}</p>
-      {hint ? <p className="admin-stat-hint">{hint}</p> : null}
     </div>
   )
 }

@@ -289,9 +289,62 @@
   color: var(--lr-muted, #4b5c6b);
 }
 
+.admin-dash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.admin-range {
+  display: inline-flex;
+  padding: 0.15rem;
+  border-radius: 10px;
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.12));
+  background: rgba(255, 255, 255, 0.9);
+  gap: 0.1rem;
+}
+
+.admin-range-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--lr-muted, #4b5c6b);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-range-btn:hover {
+  color: var(--lr-text, #0f172a);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.admin-range-btn--active {
+  color: #fff;
+  background: var(--lr-accent, #0d9488);
+}
+
+.admin-range-btn--active:hover {
+  color: #fff;
+  background: var(--lr-accent, #0d9488);
+}
+
+.admin-timeline-note {
+  margin: -0.35rem 0 1rem;
+  font-size: 0.78rem;
+  color: var(--lr-dim, #6b7c8d);
+  line-height: 1.4;
+}
+
 .admin-stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
   gap: 0.75rem;
   margin-bottom: 1.35rem;
 }
@@ -302,6 +355,9 @@
   border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
   background: #ffffff;
   box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  min-height: 8.5rem;
 }
 
 .admin-stat-card--accent {
@@ -329,10 +385,29 @@
   font-variant-numeric: tabular-nums;
 }
 
+.admin-sparkline {
+  display: block;
+  margin-top: 0.55rem;
+  width: 100%;
+  height: 28px;
+  overflow: visible;
+}
+
+.admin-stat-period {
+  margin: 0.4rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--lr-text, #0f172a);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+
 .admin-stat-hint {
   margin: 0.3rem 0 0;
   font-size: 0.75rem;
   color: var(--lr-dim, #6b7c8d);
+  margin-top: auto;
+  padding-top: 0.35rem;
 }
 
 .admin-panels {
