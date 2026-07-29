@@ -1046,8 +1046,9 @@ async function runBackgroundBroadcast(input: {
 
 /**
  * Lightweight summary for agreement list cards (creator view).
- * Avoids packing frames / scanning full placement JSON on every /api/me load -
- * expensive quote packing stays on GET/POST .../on-chain-data (modal open).
+ * Avoids re-packing placement ink / annotations on every /api/me load — that
+ * stays on GET/POST .../on-chain-data (modal open). Still packs the small v3
+ * archive manifest so list credit labels match the modal (placement + manifest).
  */
 export function dataArchiveSummaryForDocument(documentId: string): {
   onChain: boolean
@@ -1111,7 +1112,10 @@ export function dataArchiveSummaryForDocument(documentId: string): {
 
     if (doc.status !== 'locked') return null
 
-    // Cheap eligibility: any placement frames or annotations without packing.
+    // Cheap eligibility: placement plan frame counts (no full re-pack of ink).
+    // Real quote always appends a v3 archive manifest (people/wallets/sigs) via
+    // withArchiveManifest — omit that here and the My Agreements button undercounts
+    // (e.g. "8 credits" on the list, "10 credits" in the confirm modal).
     const plan = resolvePlacementPlan({
       originalSha256: doc.originalSha256,
       documentId,
@@ -1127,6 +1131,13 @@ export function dataArchiveSummaryForDocument(documentId: string): {
         ).length
       }
     }
+    if (frameHint > 0) {
+      try {
+        frameHint += packArchiveManifestFrames(documentId).length
+      } catch {
+        // Keep placement-only hint if manifest pack fails; modal quote remains source of truth.
+      }
+    }
     if (frameHint === 0 && Array.isArray(doc.annotations) && doc.annotations.length > 0) {
       // Unknown exact pack size until modal quote; show as eligible with placeholder 0
       // credits so UI still surfaces upsell - requestArchive loads the real quote.
@@ -1136,7 +1147,11 @@ export function dataArchiveSummaryForDocument(documentId: string): {
       // Signatures / wallets only (manifest stream) still worth archiving.
       const m = buildArchiveManifest(documentId)
       if (m && (m.sigs.length > 0 || m.people.some(p => p.w))) {
-        frameHint = -1
+        try {
+          frameHint = packArchiveManifestFrames(documentId).length
+        } catch {
+          frameHint = -1
+        }
       }
     }
     if (frameHint === 0) return null
