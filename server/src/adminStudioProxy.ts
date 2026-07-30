@@ -44,6 +44,7 @@ const PROXY_PREFIXES = [
   '/x-post-studio',
   '/api/blog-studio',
   '/api/x-studio',
+  '/api/studio',
 ]
 
 function matchesStudioPath(path: string): boolean {
