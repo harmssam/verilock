@@ -171,6 +171,21 @@ app.post(
   },
 )
 
+// Studio image uploads are raw binary; capture before express.json so the
+// admin proxy can forward Buffer bytes (not an empty/JSON-mangled body).
+app.use(
+  '/api/blog-studio/upload-image',
+  express.raw({ type: ['image/*', 'application/octet-stream', '*/*'], limit: '12mb' }),
+)
+app.use(
+  '/api/studio/images/catalog/upload',
+  express.raw({ type: ['image/*', 'application/octet-stream', '*/*'], limit: '12mb' }),
+)
+app.use(
+  '/api/x-studio/upload-image',
+  express.raw({ type: ['image/*', 'application/octet-stream', '*/*'], limit: '12mb' }),
+)
+
 app.use(express.json({ limit: '2mb' }))
 
 const authChallengeLimit = rateLimit(12, 60_000)

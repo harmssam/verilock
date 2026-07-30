@@ -186,28 +186,65 @@ async function proxyRequest(
     }
   })
 
-  // When express.json already parsed the body, re-serialize for upstream.
-  if (req.readable && !req.readableEnded && !(req as Request & { body?: unknown }).body) {
-    req.pipe(upstream)
-    return
+  // Binary studio uploads (images) must stream raw bytes — never JSON.stringify.
+  const contentType = String(req.headers['content-type'] || '').toLowerCase()
+  const isBinaryUpload =
+    contentType.startsWith('image/') ||
+    contentType.includes('application/octet-stream') ||
+    contentType.includes('multipart/')
+
+  const reqBody = (req as Request & { body?: unknown }).body
+
+  // Prefer streaming when the body has not been fully buffered as a JS value.
+  if (
+    isBinaryUpload ||
+    (req.readable && !req.readableEnded && (reqBody === undefined || reqBody === null))
+  ) {
+    if (!req.readableEnded && req.readable) {
+      req.pipe(upstream)
+      return
+    }
   }
 
-  const body = (req as Request & { body?: unknown }).body
-  if (body == null || body === undefined) {
+  if (reqBody == null || reqBody === undefined) {
     upstream.end()
     return
   }
 
-  if (Buffer.isBuffer(body)) {
-    upstream.end(body)
+  if (Buffer.isBuffer(reqBody)) {
+    upstream.end(reqBody)
     return
   }
-  if (typeof body === 'string') {
-    upstream.end(body)
+  // Node sometimes exposes Buffer-like { type: 'Buffer', data: number[] }
+  if (
+    typeof reqBody === 'object' &&
+    reqBody !== null &&
+    (reqBody as { type?: string }).type === 'Buffer' &&
+    Array.isArray((reqBody as { data?: unknown }).data)
+  ) {
+    upstream.end(Buffer.from((reqBody as { data: number[] }).data))
+    return
+  }
+  if (typeof reqBody === 'string') {
+    upstream.end(reqBody)
+    return
+  }
+  if (isBinaryUpload) {
+    // Do not corrupt image bytes as JSON
+    console.error(
+      '[admin-studio-proxy] binary upload body was not a Buffer; refusing JSON re-encode',
+      contentType,
+    )
+    if (!res.headersSent) {
+      res.status(400).json({
+        error: 'Binary upload body was consumed incorrectly by the proxy',
+      })
+    }
+    upstream.destroy()
     return
   }
   // JSON parsed by express.json middleware
-  const json = JSON.stringify(body)
+  const json = JSON.stringify(reqBody)
   if (!headers['content-type']) {
     upstream.setHeader('content-type', 'application/json')
   }
