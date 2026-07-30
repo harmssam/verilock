@@ -2523,11 +2523,10 @@ export function DocumentJourney({
       syncIntentToUrl(role)
     }
     saveHubReturnPath()
-    // Hub redirect remounts the SPA - commit PDF draft before navigate.
-    void (async () => {
-      if (pdfFile && !doc) await flushCreatePdfDraft()
-      await connect(options !== undefined ? options : journeyConnectOptions(connectMode))
-    })()
+    // Kick draft flush without await so Hub chooseAddress runs in the click turn.
+    // Form cache is sync; PDF blob is auto-saved while editing (IndexedDB race is rare).
+    if (pdfFile && !doc) void flushCreatePdfDraft()
+    void connect(options !== undefined ? options : journeyConnectOptions(connectMode))
   }
 
   /** Header-style Login: sheet on mobile (Pay vs Hub), direct Hub/Pay-native on desktop. */

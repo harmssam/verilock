@@ -1,6 +1,7 @@
 import HubApi from '@nimiq/hub-api'
 import type { ChooseAddressResult, SignedMessage } from '@nimiq/hub-api'
 
+import { createHubRedirectBehavior } from './hubRedirectBehavior'
 import {
   clearRpcIdSearchParam,
   consumeRedirectHash,
@@ -10,7 +11,7 @@ import {
 } from './hubRedirectParse'
 import { sealError, sealLog, sealWarn } from './sealDebug'
 
-const { RedirectRequestBehavior, RequestType } = HubApi
+const { RequestType } = HubApi
 
 export type HubRedirectDeps = {
   appName: string
@@ -53,8 +54,12 @@ export function processLenientHubRedirect(
   })
 
   if (!request) {
+    // Hash / ?rpcId= without rpcRequests cannot complete. Consume so Login is
+    // not stuck forever on hasPendingHubRedirect / peekHubRedirectInUrl.
     sealWarn('hub:lenientRedirectMissingRequest', { id: redirect.id })
-    return false
+    consumeRedirectHash()
+    clearRpcIdSearchParam()
+    return true
   }
 
   // Ignore leftover lock-flow redirects from older clients (locks are credit-only now).
@@ -81,7 +86,7 @@ export function processLenientHubRedirect(
         try {
           const { token, nonce } = await getChallenge(address)
           const hub = deps.getHubApi()
-          const behavior = new RedirectRequestBehavior(getHubReturnUrl(), { token })
+          const behavior = createHubRedirectBehavior(getHubReturnUrl(), { token })
           await hub.signMessage(
             { appName: deps.appName, message: nonce, signer: address },
             behavior as Parameters<typeof hub.signMessage>[1],
