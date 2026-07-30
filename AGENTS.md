@@ -13,7 +13,7 @@
 | **PRIMARY Vite config** | `client/vite.config.ts` | Default `npm run dev` / `npm run build` |
 | **PRIMARY production URL** | `https://verilock.online` | Packaged into `client/dist` as root SPA |
 | **Shared libraries** | `client/src/*.ts(x)` except archive | `nimiq.ts`, `api.ts`, seal helpers, pricing, etc. |
-| **LOCAL ONLY (gitignored)** | `client/src/archive/`, blog trees | Historical snapshots + blog content - never push |
+| **LOCAL ONLY (gitignored)** | `docs/`, `client/src/archive/`, `.grok/skills/verilock-blog-imagine/` | Internal notes, historical UI snapshots, local Grok skills - never push |
 
 ### Commands (always prefer these)
 
@@ -89,10 +89,10 @@ Interpret as **`client/src/App.tsx` + `client/src/journey/` + `client/src/landin
 **Feature parity is mandatory.** Any redesign is a restyle of the production SPA only: same routes, paths, stages, docks, shell screens, and capabilities. Do not add or remove product features unless the user explicitly asks.
 
 - Full inventory + acceptance checklist: **`PRODUCT.md`** (section *Feature parity law*)
-- **Anti-slop design checklist:** **`docs/journey-anti-slop.md`**
+- **Anti-slop design checklist:** local-only **`docs/journey-anti-slop.md`** (gitignored; keep a local copy)
   - Production chrome: light shell tokens throughout (dark journey CSS archived under `client/src/archive/dark-journey-css-2026-07-17/`)
   - Negative bans: purple SaaS gradients, glass-everywhere, generic feature cards, fake testimonials, crypto-neon gimmick
   - Pre-ship self-check + ugly-state tests + copy-paste agent prompt block
-- Impeccable skills (if installed): `.github/skills/impeccable/` - always load `PRODUCT.md` first, then `docs/journey-anti-slop.md`
+- Impeccable skills (if installed): `.github/skills/impeccable/` - always load `PRODUCT.md` first, then local `docs/journey-anti-slop.md` when present
 
 Follow these instructions exactly. When working in subdirectories not listed above, check for additional project instruction files (AGENTS.md, Claude.md, etc.).

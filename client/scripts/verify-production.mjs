@@ -157,8 +157,10 @@ check('archives stay excluded; blog is production-wired', () => {
   assert.ok(existsSync(join(clientDir, 'src/blog/posts.ts')))
 })
 
-check('production packaging docs use plain names', () => {
-  assert.ok(existsSync(join(rootDir, 'docs/production-packaging.md')))
+// docs/ is local-only (gitignored). If present, ensure legacy service-b names are gone.
+check('production packaging docs use plain names when local docs/ exists', () => {
+  const packaging = join(rootDir, 'docs/production-packaging.md')
+  if (!existsSync(packaging)) return
   assert.ok(!existsSync(join(rootDir, 'docs/service-b-journey.md')), 'service-b-journey.md should be renamed')
 })
 

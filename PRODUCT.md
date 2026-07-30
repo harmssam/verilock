@@ -50,7 +50,7 @@ Calm. Technical. Trust-first. No moon language, no legal overclaims.
 - Feature bloat that hides the three paths (Create / Invited / Verify)
 - Redesigns that invent new flows or drop existing ones (see **Feature parity law**)
 
-**Agent checklist (positive tokens, ban list, pre-ship self-check, ugly states):** [`docs/journey-anti-slop.md`](docs/journey-anti-slop.md)
+**Agent checklist (positive tokens, ban list, pre-ship self-check, ugly states):** local-only `docs/journey-anti-slop.md` (gitignored; not on GitHub)
 
 ## Accessibility
 
@@ -231,7 +231,7 @@ Agreements open via header / AccountMenu → `/agreements` (no quiet home strip)
 4. **Restrained product color** - accent for primary actions and state, not decoration soup.
 5. **Familiar controls** - selects, checkboxes, drop zones, and buttons stay recognizable.
 
-Expanded bans, token table, critique workflow, and pre-ship checklist: **`docs/journey-anti-slop.md`**.
+Expanded bans, token table, critique workflow, and pre-ship checklist: local-only **`docs/journey-anti-slop.md`** (gitignored).
 ## Conversion / proof (secondary; marketing slices only)
 
 - Primary product CTA remains path selection → create/sign/verify, not a vague “Get started” that drops features.

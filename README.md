@@ -9,7 +9,19 @@ Built for the [Mini Apps Competition](https://miniappscompetition.com/).
 **Offline verifier (open source):** [clevertech-os/verilock-offline](https://github.com/clevertech-os/verilock-offline) - hash and re-check seals on your device (web + macOS / Windows / Linux desktop) without using this site. Companion repo; product create/sign/seal stays here.
 
 > **UI source of truth:** production SPA - `client/src/App.tsx` (shell) + `client/src/landing/` + `client/src/journey/`  
-> (default `npm run dev` / `npm run build`). Historical UIs live only under `client/src/archive/`. See **`AGENTS.md`**.
+> (default `npm run dev` / `npm run build`). See **`AGENTS.md`**.
+
+## Local-only paths (gitignored)
+
+These stay on developer machines and are **not** published to GitHub. Keep your own copies if you use them; a fresh clone will not include them.
+
+| Path | Purpose |
+|------|---------|
+| `docs/` | Internal design notes, packaging notes, roadmap, anti-slop checklist |
+| `client/src/archive/` | Historical UI snapshots (never ship) |
+| `.grok/skills/verilock-blog-imagine/` | Local Grok skill for blog / marketing stills |
+| `.grok/skills/redesign-existing-projects/` | Local redesign skill |
+| `branding/`, `logo-ideas/`, `.grok/reviews/` | Local brand / agent scratch (see `.gitignore`) |
 
 ## What it does
 
@@ -122,7 +134,7 @@ docker build -t verilock .
 docker run -p 3002:3002 -v verilock-data:/data -e DATA_DIR=/data -e NODE_ENV=production verilock
 ```
 
-Production packaging details: [docs/production-packaging.md](docs/production-packaging.md).
+Production packaging notes live under local-only `docs/production-packaging.md` (gitignored; not on GitHub).
 
 ### 5. Test production locally
 

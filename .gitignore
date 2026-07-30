@@ -39,6 +39,10 @@ verilock-lock-1920x1080.jpg
 .grok/reviews/
 .grok/skills/redesign-existing-projects.md
 .grok/skills/redesign-existing-projects/
+.grok/skills/verilock-blog-imagine/
+
+# Internal design / packaging notes (local only; not on GitHub)
+docs/
 
 # Historical UI snapshots - keep locally, not in GitHub
 client/src/archive/
