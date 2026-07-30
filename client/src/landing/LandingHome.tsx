@@ -9,6 +9,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -58,14 +59,20 @@ function scrollToPathsSection(behavior?: ScrollBehavior): void {
   el.scrollIntoView({ behavior: b, block: 'start' })
 }
 
-/** Fade-up once the block enters the viewport (IntersectionObserver, no scroll listener). */
+/**
+ * Fade-up once the block enters the viewport (IntersectionObserver, no scroll listener).
+ * Uses a callback ref so late-mounted nodes (e.g. blog teaser after async fetch) still
+ * get observed — a one-shot effect on [] would miss elements that appear after mount.
+ */
 function useRevealInView<T extends HTMLElement = HTMLElement>() {
-  const ref = useRef<T | null>(null)
+  const [node, setNode] = useState<T | null>(null)
   const [inView, setInView] = useState(false)
+  const ref = useCallback((el: T | null) => {
+    setNode(el)
+  }, [])
 
   useEffect(() => {
-    const el = ref.current
-    if (!el) return
+    if (!node || inView) return
     const reduce =
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -84,9 +91,9 @@ function useRevealInView<T extends HTMLElement = HTMLElement>() {
       },
       { threshold: 0.12, rootMargin: '0px 0px -6% 0px' },
     )
-    io.observe(el)
+    io.observe(node)
     return () => io.disconnect()
-  }, [])
+  }, [node, inView])
 
   return { ref, inView }
 }
