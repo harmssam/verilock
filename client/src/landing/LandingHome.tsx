@@ -92,7 +92,9 @@ function revealClass(inView: boolean, className = '') {
 
 interface LandingHomeProps {
   onPickRole: (role: PathRole) => void
+  /** @deprecated Blog is external (blog.verilock.online); kept optional for call-site compat. */
   onOpenBlogPost?: (slug: string) => void
+  /** @deprecated unused — teaser links go to blog.verilock.online */
   onOpenBlogIndex?: () => void
 }
 
@@ -188,8 +190,7 @@ function useHeroClaims() {
 
 export function LandingHome({
   onPickRole,
-  onOpenBlogPost,
-  onOpenBlogIndex,
+
 }: LandingHomeProps) {
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [howOpen, setHowOpen] = useState(false)
@@ -509,7 +510,7 @@ export function LandingHome({
         <LandingHowItWorks role={null} open={howOpen} onToggle={() => setHowOpen(v => !v)} />
       </div>
 
-      {latestPost && onOpenBlogPost && (
+      {latestPost && (
         <section
           ref={blogReveal.ref}
           className={revealClass(blogReveal.inView, 'lr-blog-latest')}
