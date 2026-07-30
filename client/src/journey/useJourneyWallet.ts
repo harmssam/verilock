@@ -59,8 +59,9 @@ const PAY_DEEPLINK_FALLBACK_MS = 1800
  * Shown only when the page stayed foreground after launch — app missing or
  * browser has no `nimiqpay://` handler (common on desktop and phones without Pay).
  */
+/** Short alert when deeplink fails; LoginSheet also shows the full “not detected” panel. */
 const PAY_INSTALL_HINT =
-  'Nimiq Pay did not open (this browser has no app for nimiqpay:// links). Use Nimiq Hub instead, or install Nimiq Pay and try again.'
+  'Nimiq Pay was not detected on this phone. Install the app, or continue with Nimiq Hub.'
 /**
  * After the browser tab left the foreground (Pay handoff), remind that login
  * lives in the Pay WebView - this tab has a separate sessionStorage.

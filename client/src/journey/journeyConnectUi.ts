@@ -81,7 +81,7 @@ export function journeyConnectLabels(mode: JourneyConnectMode): {
     case 'in-pay':
       return { idle: 'Connect wallet', busy: 'Connecting…' }
     case 'mobile':
-      return { idle: 'Login with Nimiq Hub', busy: 'Opening Hub…' }
+      return { idle: 'Open in Nimiq Pay', busy: 'Opening…' }
     case 'desktop':
       return { idle: 'Login with Nimiq', busy: 'Logging in…' }
   }
@@ -98,13 +98,13 @@ export function journeyMobileChoiceLabels(): {
   storesLabel: string
 } {
   return {
-    // Hub first: works in any mobile browser without a custom URL scheme.
-    hubIdle: 'Nimiq Hub',
-    hubBusy: 'Opening Hub…',
-    hubHint: 'Recommended · works in this browser · create or unlock a wallet',
+    // Pay first on mobile — best experience when the app is installed.
     payIdle: 'Open in Nimiq Pay',
     payBusy: 'Opening…',
-    payHint: 'Requires the Nimiq Pay app installed on this phone',
+    payHint: 'Recommended · opens the Nimiq Pay app on this phone',
+    hubIdle: 'Continue with Nimiq Hub',
+    hubBusy: 'Opening Hub…',
+    hubHint: 'Works in this browser · no app install',
     storesLabel: 'Get Nimiq Pay',
   }
 }
@@ -150,7 +150,7 @@ export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
     return {
       title: 'Login with Nimiq',
       about:
-        'Use Nimiq Hub in this browser (recommended), or open VeriLock in the Nimiq Pay app if you have it installed.',
+        'Open VeriLock in the Nimiq Pay app for the best mobile experience, or continue with Nimiq Hub in this browser.',
       steps: [],
     }
   }
@@ -173,16 +173,16 @@ export function journeyConnectOptions(mode: JourneyConnectMode): JourneyConnectR
 }
 
 /**
- * Hub is the reliable default in any browser (desktop + mobile Safari/Chrome).
- * Nimiq Pay stays available as a secondary path when the app is installed.
- * `showOpenInPay` is retained for callers that still track a failed deeplink.
+ * Which CTA is primary in the chooser:
+ * - desktop: always Hub (Pay is QR on the side)
+ * - mobile: Pay is primary; after a failed deeplink (`showOpenInPay`), Hub becomes primary
  */
 export function journeyHubPreferred(
   mode: JourneyConnectMode,
-  _showOpenInPay = false,
+  showOpenInPay = false,
 ): boolean {
   const surface = asLoginSurface(mode)
-  if (surface === 'desktop' || surface === 'mobile') return true
-  void _showOpenInPay
+  if (surface === 'desktop') return true
+  if (surface === 'mobile') return showOpenInPay
   return false
 }
