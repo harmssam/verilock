@@ -975,22 +975,28 @@ html {
 }
 
 .lr-cta {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
+  box-sizing: border-box;
   padding: 0.75rem 1.15rem;
   border-radius: 12px;
+  border: 0 solid transparent;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   cursor: pointer;
   text-decoration: none;
   transition:
-    background 0.35s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1)),
-    border-color 0.35s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1)),
-    color 0.35s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1)),
-    box-shadow 0.35s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1)),
-    transform 0.35s var(--lr-ease, cubic-bezier(0.32, 0.72, 0, 1));
+    background-color 0.2s ease,
+    background-image 0.2s ease,
+    border-color 0.2s ease,
+    color 0.4s ease,
+    box-shadow 0.2s ease,
+    transform 0.1s ease;
 }
 
 /* Anchor secondary CTA uses same .lr-cta chrome as buttons */
@@ -998,27 +1004,88 @@ a.lr-cta {
   box-sizing: border-box;
 }
 
+/*
+ * Hero primary: Wealthsimple glass treatment (sc-140tkhf-0) + teal,
+ * but keep the landing 12px radius — not a pill.
+ */
 .lr-cta--primary {
-  border: 1px solid transparent;
-  background: var(--lr-accent);
-  color: #fff;
-  box-shadow: 0 10px 24px rgba(13, 148, 136, 0.22);
+  --cta-glass-bg: rgba(13, 148, 136, 0.96);
+  --cta-glass-fg: #ffffff;
+  --cta-glass-shadow: 0 8px 16px rgba(0, 0, 0, 0.16);
+  --cta-glass-outer: linear-gradient(
+    146.26deg,
+    var(--lr-accent, #0d9488) 8.55%,
+    var(--mint-deep, #0f766e) 57.49%,
+    var(--lr-accent, #0d9488) 86.93%
+  );
+  --cta-glass-inner: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0) 25.12%,
+    rgba(255, 255, 255, 0.2) 102.08%
+  );
+  --cta-glass-hover: linear-gradient(
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.1)
+  );
+  background-color: var(--cta-glass-bg);
+  background-image: linear-gradient(transparent, transparent);
+  color: var(--cta-glass-fg);
+  box-shadow: var(--cta-glass-shadow);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.lr-cta--primary::before,
+.lr-cta--primary::after {
+  content: '';
+  position: absolute;
+  border-radius: inherit;
+  pointer-events: none;
+  padding: 1px;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.lr-cta--primary::before {
+  inset: 0;
+  background: var(--cta-glass-outer);
+  z-index: 0;
+}
+
+.lr-cta--primary::after {
+  inset: 1px;
+  background: var(--cta-glass-inner);
+  z-index: 0;
+}
+
+.lr-cta--primary > * {
+  position: relative;
+  z-index: 1;
 }
 
 .lr-cta--primary:hover {
-  background: var(--mint-deep, #0f766e);
-  box-shadow: 0 14px 28px rgba(13, 148, 136, 0.3);
-  transform: translateY(-1px);
+  background-color: var(--cta-glass-bg);
+  background-image: var(--cta-glass-hover);
+  box-shadow: var(--cta-glass-shadow);
+  transform: none;
 }
 
 .lr-cta--primary:active {
-  transform: scale(0.98) translateY(0);
-  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.2);
+  transform: scale(0.98);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
 }
 
 .lr-cta--primary:focus-visible {
-  outline: 2px solid rgba(13, 148, 136, 0.55);
-  outline-offset: 3px;
+  outline: 2px solid var(--lr-accent, #0d9488);
+  outline-offset: 2px;
+  box-shadow: var(--cta-glass-shadow);
 }
 
 .lr-cta--ghost {
@@ -1635,41 +1702,105 @@ a.lr-cta {
   background: rgba(15, 23, 42, 0.05);
 }
 
-/* Header Login: quiet cool surface so Nimiq hex gold leads.
+/* Header Login: WS glass pill (sc-140tkhf-0) + teal, compact header size.
+   Box model is locked so hover never changes padding/border/size.
    Do not recolor .nimiq-hexagon-icon - keep official Nimiq gold fill. */
 .lr-header .exp-connect-btn.btn-primary {
-  background: var(--lr-accent) !important;
-  color: #fff !important;
-  border: 1px solid transparent !important;
-  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.22) !important;
-  font-size: 0.8rem !important;
-  border-radius: 10px !important;
+  --btn-glass-bg: rgba(13, 148, 136, 0.96) !important;
+  --btn-glass-fg: #ffffff !important;
+  --btn-glass-shadow: 0 8px 16px rgba(0, 0, 0, 0.16) !important;
+  --btn-glass-outer: linear-gradient(
+    146.26deg,
+    var(--lr-accent) 8.55%,
+    var(--mint-deep, #0f766e) 57.49%,
+    var(--lr-accent) 86.93%
+  ) !important;
+  --btn-glass-inner: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0) 25.12%,
+    rgba(255, 255, 255, 0.2) 102.08%
+  ) !important;
+  --btn-glass-focus: var(--lr-accent) !important;
+  --btn-glass-hover: linear-gradient(
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.1)
+  ) !important;
+  box-sizing: border-box !important;
+  background-color: var(--btn-glass-bg) !important;
+  /* Always reserve the hover wash layer so hover doesn't reflow paint size */
+  background-image: linear-gradient(transparent, transparent) !important;
+  background-repeat: no-repeat !important;
+  color: var(--btn-glass-fg) !important;
+  border: 0 solid transparent !important;
+  box-shadow: var(--btn-glass-shadow) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+  border-radius: 1000px !important;
+  padding: 0 16px !important;
+  min-height: 40px !important;
+  height: 40px !important;
+  min-width: 0 !important;
+  line-height: 1 !important;
+  transition:
+    box-shadow 0.2s ease,
+    background-image 0.2s ease,
+    transform 0.1s ease,
+    color 0.4s ease !important;
 }
 
 .lr-header .exp-connect-btn.btn-primary:hover:not(:disabled) {
-  background: var(--mint-deep, #0f766e) !important;
-  border-color: transparent !important;
-  box-shadow: 0 8px 20px rgba(13, 148, 136, 0.28) !important;
+  background-color: var(--btn-glass-bg) !important;
+  background-image: var(--btn-glass-hover) !important;
+  border: 0 solid transparent !important;
+  box-shadow: var(--btn-glass-shadow) !important;
   filter: none !important;
+  padding: 0 16px !important;
+  min-height: 40px !important;
+  height: 40px !important;
+  transform: none !important;
+}
+
+.lr-header .exp-connect-btn.btn-primary:active:not(:disabled) {
+  transform: scale(0.98) !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12) !important;
 }
 
 .lr-header .exp-connect-btn.btn-primary:focus-visible {
-  outline: 2px solid rgba(13, 148, 136, 0.4);
+  outline: 2px solid var(--lr-accent);
   outline-offset: 2px;
+  box-shadow: var(--btn-glass-shadow) !important;
 }
 
-/* Login sheet primary inside header login stack */
-.lr-header .exp-login .btn-primary {
+/* Login *sheet* primaries only — never the header trigger (.exp-connect-btn).
+   The old selector hit the trigger and swapped border 1px ↔ 0 on hover (shrink). */
+.lr-header .exp-login .login-sheet .btn-primary,
+.lr-header .exp-login .login-sheet-layer .btn-primary {
   background: rgba(15, 23, 42, 0.08) !important;
   color: var(--lr-text, #0f172a) !important;
   border: 1px solid var(--lr-line-strong, rgba(255, 255, 255, 0.2)) !important;
   box-shadow: none !important;
+  backdrop-filter: none !important;
+  min-width: 0 !important;
 }
 
-.lr-header .exp-login .btn-primary:hover:not(:disabled) {
+.lr-header .exp-login .login-sheet .btn-primary:hover:not(:disabled),
+.lr-header .exp-login .login-sheet-layer .btn-primary:hover:not(:disabled) {
   background: rgba(15, 23, 42, 0.12) !important;
   box-shadow: none !important;
   filter: none !important;
+}
+
+/* Kill glass rings on quiet sheet buttons */
+.lr-header .exp-login .login-sheet .btn-primary::before,
+.lr-header .exp-login .login-sheet .btn-primary::after,
+.lr-header .exp-login .login-sheet-layer .btn-primary::before,
+.lr-header .exp-login .login-sheet-layer .btn-primary::after {
+  content: none !important;
+  display: none !important;
 }
 
 /* Logged-in account pill (light shell) */
@@ -1737,46 +1868,26 @@ a.lr-cta {
 }
 
 /* Agreements page: Create & invite / New agreement - match light CTA style */
-/* Agreements page primary CTAs (header / empty / login) */
+/* Agreements page primary CTAs — inherit WS glass primary; size only */
 .lr-app .agreements-page .btn-primary {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.65rem 1.1rem;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  background: var(--lr-accent);
-  color: #ffffff;
-  font-size: 0.88rem;
-  font-weight: 700;
-  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.22);
-  filter: none;
+  padding: 0 16px;
+  min-height: 48px;
+  border-radius: 1000px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
-.lr-app .agreements-page .btn-primary:hover:not(:disabled) {
-  background: var(--mint-deep, #0f766e);
-  color: #ffffff;
-  border-color: transparent;
-  box-shadow: 0 8px 20px rgba(13, 148, 136, 0.28);
-  filter: none;
-}
-
-.lr-app .agreements-page .btn-primary:focus-visible {
-  outline: 2px solid rgba(13, 148, 136, 0.45);
-  outline-offset: 2px;
-}
-
-/* List row actions stay compact (overrides the larger page primary above) */
+/* List row actions stay compact */
 .lr-app .agreements-page-actions .btn-primary {
   gap: 0.3rem;
-  padding: 0.38rem 0.65rem;
-  border-radius: 8px;
-  font-size: 0.78rem;
-  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.18);
-}
-
-.lr-app .agreements-page-actions .btn-primary:hover:not(:disabled) {
-  box-shadow: 0 3px 10px rgba(13, 148, 136, 0.24);
+  padding: 0 12px;
+  min-height: 40px;
+  min-width: 0;
+  font-size: 13px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
 }
 
 .lr-app .agreements-page.card {
@@ -2335,8 +2446,17 @@ a.lr-cta {
   }
 
   .lr-header .exp-connect-btn.btn-primary {
-    font-size: 0.74rem !important;
-    padding: 0.45rem 0.7rem !important;
+    font-size: 13px !important;
+    padding: 0 12px !important;
+    min-height: 36px !important;
+    height: 36px !important;
+    border-radius: 1000px !important;
+  }
+
+  .lr-header .exp-connect-btn.btn-primary:hover:not(:disabled) {
+    padding: 0 12px !important;
+    min-height: 36px !important;
+    height: 36px !important;
   }
 }
 

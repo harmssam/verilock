@@ -331,27 +331,19 @@
 
   /* Pricing CTAs: card (Stripe) primary, NIM half-price secondary - same APIs as production */
 
+  /* Pricing primary inherits glass .btn-primary; only size/weight here */
   &--pricing .btn-primary {
-    background: var(--lr-accent);
-    color: #fff;
-    border: 1px solid transparent;
-    border-radius: 10px;
-    font-weight: 700;
-    box-shadow: 0 6px 16px rgba(13, 148, 136, 0.2);
-  }
-
-  &--pricing .btn-primary:hover:not(:disabled) {
-    background: var(--mint-deep, #0f766e);
-    filter: none;
-    box-shadow: 0 8px 20px rgba(13, 148, 136, 0.28);
+    border-radius: 1000px;
+    font-weight: 500;
+    min-height: 48px;
   }
 
   &--pricing .btn-secondary {
-    border: 1px solid rgba(13, 148, 136, 0.4);
+    border: 1.5px solid rgba(13, 148, 136, 0.4);
     background: #ffffff;
     color: var(--lr-accent);
-    border-radius: 10px;
-    font-weight: 700;
+    border-radius: 1000px;
+    font-weight: 500;
   }
 
   &--pricing .btn-secondary:hover:not(:disabled) {

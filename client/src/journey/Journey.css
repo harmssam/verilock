@@ -178,9 +178,9 @@
   background: var(--surface-hover);
 }
 
+/* Size is owned by .lr-header .exp-connect-btn (App.css) so hover can’t fight padding. */
 .exp-connect-btn {
   font-size: 0.82rem !important;
-  padding: 0.55rem 0.9rem !important;
 }
 
 /* Official Nimiq hexagon (design kit) - keep aspect ratio in buttons */
@@ -1047,25 +1047,36 @@ button.exp-account-menu-full:focus-visible {
   border-color: rgba(94, 234, 212, 0.45);
 }
 
-/* ── Buttons ── */
+/* ── Buttons ──
+   Primary = Wealthsimple login glass pill (sc-140tkhf-0 / sc-6gl6fi-0)
+   with VeriLock teal instead of near-black:
+   dual gradient stroke rings, backdrop blur, soft shadow, hover wash. */
 
 .btn {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  padding: 0.68rem 1.05rem;
-  border-radius: var(--radius-pill);
-  border: 1px solid transparent;
-  font-size: 0.88rem;
-  font-weight: 700;
+  padding: 0 16px;
+  min-height: 48px;
+  border-radius: 1000px;
+  border: 0;
+  font-size: 14px;
+  font-weight: 500;
   letter-spacing: -0.01em;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
   transition:
-    transform 0.12s ease,
-    background 0.15s ease,
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    opacity 0.15s ease;
+    box-shadow 0.2s ease,
+    background-image 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.1s ease,
+    color 0.4s ease,
+    opacity 0.2s ease;
 }
 
 .btn:active:not(:disabled) {
@@ -1073,48 +1084,134 @@ button.exp-account-menu-full:focus-visible {
 }
 
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .btn-lg {
-  padding: 0.85rem 1.25rem;
-  font-size: 0.95rem;
+  min-height: 54px;
+  min-width: 180px;
+  padding: 0 16px;
+  font-size: 16px;
   width: 100%;
 }
 
+/* Primary glass tokens (teal adaptation of WS dark/primary variant) */
 .btn-primary {
-  background: var(--mint, #0d9488);
-  color: #ffffff;
-  box-shadow: 0 4px 18px rgba(94, 234, 212, 0.22);
+  --btn-glass-bg: rgba(13, 148, 136, 0.96);
+  --btn-glass-fg: #ffffff;
+  --btn-glass-shadow: 0 8px 16px rgba(0, 0, 0, 0.16);
+  --btn-glass-outer: linear-gradient(
+    146.26deg,
+    #0d9488 8.55%,
+    #0f766e 57.49%,
+    #0d9488 86.93%
+  );
+  --btn-glass-inner: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0) 25.12%,
+    rgba(255, 255, 255, 0.2) 102.08%
+  );
+  --btn-glass-focus: #0d9488;
+  --btn-glass-hover: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.1));
+  min-width: 160px;
+  background: var(--btn-glass-bg);
+  color: var(--btn-glass-fg);
+  box-shadow: var(--btn-glass-shadow);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+/* Outer 1px stroke ring (::before) + inner glass highlight (::after)
+   Same mask-composite ring technique as Wealthsimple. */
+.btn-primary::before,
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  border-radius: inherit;
+  pointer-events: none;
+  padding: 1px;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.btn-primary::before {
+  inset: 0;
+  background: var(--btn-glass-outer);
+  z-index: 0;
+}
+
+.btn-primary::after {
+  inset: 1px;
+  background: var(--btn-glass-inner);
+  z-index: 0;
 }
 
 .btn-primary:hover:not(:disabled) {
-  box-shadow: 0 6px 24px rgba(94, 234, 212, 0.35);
+  background-color: var(--btn-glass-bg);
+  background-image: var(--btn-glass-hover);
+  box-shadow: var(--btn-glass-shadow);
+  filter: none;
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+  box-shadow: none;
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid var(--btn-glass-focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.btn-primary:disabled,
+.btn-primary[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .btn-secondary {
   background: #ffffff;
-  border-color: var(--border-bright);
+  border: 1.5px solid var(--border-bright, rgba(15, 23, 42, 0.14));
   color: var(--text);
+  box-shadow: none;
+  min-width: 0;
+  backdrop-filter: none;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--surface-hover);
+  background: color-mix(in srgb, var(--mint, #0d9488) 10%, #ffffff);
 }
 
 .btn-ghost {
   background: transparent;
-  border-color: transparent;
+  border: 0;
   color: var(--text-muted);
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.8rem;
   padding: 0.4rem 0.65rem;
+  min-height: 0;
+  min-width: 0;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .btn-ghost:hover:not(:disabled) {
   color: var(--text);
   background: rgba(13, 148, 136, 0.05);
+}
+
+.btn-ghost:active:not(:disabled) {
+  transform: none;
 }
 
 .btn--busy {
@@ -2983,7 +3080,7 @@ a.hash-chip.text-link:focus-visible {
 }
 
 .agreements-page-actions .btn-primary {
-  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.18);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
 }
 
 .agreements-page-cta {
@@ -5955,7 +6052,6 @@ a.hash-chip.text-link:focus-visible {
 
   .exp-connect-btn {
     font-size: 0.78rem !important;
-    padding: 0.5rem 0.75rem !important;
   }
 
   .path-cards {
@@ -6691,27 +6787,47 @@ a.hash-chip.text-link:focus-visible {
 }
 
 .btn-secondary {
-  border-color: rgba(13, 148, 136, 0.35);
-    background: #ffffff;
-    color: var(--lr-accent);
+  border: 1.5px solid rgba(13, 148, 136, 0.35);
+  background: #ffffff;
+  color: var(--lr-accent);
+  box-shadow: none;
 }
 
 .btn-secondary:hover:not(:disabled) {
   border-color: var(--lr-accent);
-    background: var(--lr-accent-soft);
-    color: var(--mint-deep, #0f766e);
+  background: color-mix(in srgb, var(--lr-accent) 10%, transparent);
+  color: var(--mint-deep, #0f766e);
 }
 
+/* Light shell: keep glass primary tokens (teal, not flat fill) */
 .btn-primary {
-  background: var(--lr-accent);
-    color: #fff;
-    border-color: transparent;
-    box-shadow: 0 6px 16px rgba(13, 148, 136, 0.2);
+  --btn-glass-bg: rgba(13, 148, 136, 0.96);
+  --btn-glass-fg: #ffffff;
+  --btn-glass-shadow: 0 8px 16px rgba(0, 0, 0, 0.16);
+  --btn-glass-outer: linear-gradient(
+    146.26deg,
+    var(--lr-accent, #0d9488) 8.55%,
+    var(--mint-deep, #0f766e) 57.49%,
+    var(--lr-accent, #0d9488) 86.93%
+  );
+  --btn-glass-inner: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0) 25.12%,
+    rgba(255, 255, 255, 0.2) 102.08%
+  );
+  --btn-glass-focus: var(--lr-accent, #0d9488);
+  background: var(--btn-glass-bg);
+  color: var(--btn-glass-fg);
+  border: 0;
+  box-shadow: var(--btn-glass-shadow);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--mint-deep, #0f766e);
-    filter: none;
+  background-color: var(--btn-glass-bg);
+  background-image: var(--btn-glass-hover, linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.1)));
+  filter: none;
+  box-shadow: var(--btn-glass-shadow);
 }
 
 /* Journey panels on light shell: solid white cards */
