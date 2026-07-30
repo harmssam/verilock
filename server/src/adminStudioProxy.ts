@@ -45,6 +45,9 @@ const PROXY_PREFIXES = [
   '/api/blog-studio',
   '/api/x-studio',
   '/api/studio',
+  // Studio image previews (store media + monorepo public blog assets)
+  '/media',
+  '/blog',
 ]
 
 function matchesStudioPath(path: string): boolean {
