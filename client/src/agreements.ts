@@ -206,8 +206,10 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
         cta: 'View & print',
       }
     }
+    // Co-signer: signing is done (lock is optional and usually creator-led).
+    // Use ready_to_seal so the list pill is "All signed", not the misleading "Waiting".
     return {
-      bucket: 'waiting',
+      bucket: 'ready_to_seal',
       headline: 'Everyone signed',
       detail: progress,
       cta: 'View',
@@ -248,7 +250,7 @@ export function getAgreementView(doc: SealDocument, address: string | null): Agr
               cta: 'View & print',
             }
         : {
-            bucket: 'waiting',
+            bucket: 'ready_to_seal',
             headline: 'Everyone signed',
             detail: progress,
             cta: 'View',
