@@ -29,3 +29,54 @@ export function blogMediaUrl(path: string): string {
   }
   return path
 }
+
+export function formatBlogDate(isoDate: string): string {
+  const d = new Date(isoDate + (isoDate.length === 10 ? 'T12:00:00Z' : ''))
+  if (Number.isNaN(d.getTime())) return isoDate
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+
+export interface PublicBlogTeaserPost {
+  slug: string
+  title: string
+  description: string
+  date: string
+  coverImage: string
+  tags?: string[]
+}
+
+/**
+ * Fetch published posts for homepage teaser.
+ * Never throws — returns [] on failure so the home page always renders.
+ */
+export async function fetchPublicBlogTeaser(limit = 3): Promise<PublicBlogTeaserPost[]> {
+  const url = `${BLOG_PUBLIC_ORIGIN}/api/blog/public/posts`
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 6_000)
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) return []
+    const data = (await res.json()) as { posts?: PublicBlogTeaserPost[] }
+    const posts = Array.isArray(data.posts) ? data.posts : []
+    return posts.slice(0, Math.max(0, limit)).map(p => ({
+      slug: p.slug,
+      title: p.title,
+      description: p.description || '',
+      date: p.date || '',
+      coverImage: blogMediaUrl(p.coverImage || ''),
+      tags: p.tags,
+    }))
+  } catch {
+    return []
+  } finally {
+    clearTimeout(timer)
+  }
+}

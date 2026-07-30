@@ -17,8 +17,13 @@ import {
   type CSSProperties,
   type MouseEvent,
 } from 'react'
-import { formatBlogDate, getAllPosts } from '../blog'
-import { blogIndexUrl, blogMediaUrl, blogPostUrl } from '../blogPublicUrl'
+import {
+  blogIndexUrl,
+  blogPostUrl,
+  fetchPublicBlogTeaser,
+  formatBlogDate,
+  type PublicBlogTeaserPost,
+} from '../blogPublicUrl'
 import type { PathRole } from '../journey/types'
 import { AppLink } from '../AppLink'
 import { LandingHowItWorks } from './LandingHowItWorks'
@@ -196,12 +201,22 @@ export function LandingHome({
   const [howOpen, setHowOpen] = useState(false)
   /** Path stage preview — Create & invite default; hover/focus swaps the still. */
   const [previewRole, setPreviewRole] = useState<PathRole>('creator')
-  /** Featured + up to two more for a stronger home teaser. */
-  const blogTeaser = useMemo(() => {
-    const all = getAllPosts()
-    return {
-      latest: all[0] ?? null,
-      more: all.slice(1, 3),
+  /** Featured + up to two more — loaded from public blog API (not in-repo posts). */
+  const [blogTeaser, setBlogTeaser] = useState<{
+    latest: PublicBlogTeaserPost | null
+    more: PublicBlogTeaserPost[]
+  }>({ latest: null, more: [] })
+  useEffect(() => {
+    let cancelled = false
+    void fetchPublicBlogTeaser(3).then(posts => {
+      if (cancelled) return
+      setBlogTeaser({
+        latest: posts[0] ?? null,
+        more: posts.slice(1, 3),
+      })
+    })
+    return () => {
+      cancelled = true
     }
   }, [])
   const latestPost = blogTeaser.latest
@@ -539,7 +554,7 @@ export function LandingHome({
           >
             <span className="lr-blog-latest-thumb">
               <img
-                src={blogMediaUrl(latestPost.coverImage)}
+                src={latestPost.coverImage}
                 alt=""
                 width={640}
                 height={360}
@@ -551,7 +566,7 @@ export function LandingHome({
             <span className="lr-blog-latest-body">
               <span className="lr-blog-latest-meta">
                 <time dateTime={latestPost.date}>{formatBlogDate(latestPost.date)}</time>
-                {latestPost.tags[0] && (
+                {latestPost.tags?.[0] && (
                   <span className="lr-blog-latest-tag">{latestPost.tags[0]}</span>
                 )}
               </span>
@@ -573,7 +588,7 @@ export function LandingHome({
                 >
                   <span className="lr-blog-latest-mini-thumb" aria-hidden>
                     <img
-                      src={blogMediaUrl(post.coverImage)}
+                      src={post.coverImage}
                       alt=""
                       width={320}
                       height={180}
@@ -584,7 +599,7 @@ export function LandingHome({
                   <span className="lr-blog-latest-mini-body">
                     <span className="lr-blog-latest-meta">
                       <time dateTime={post.date}>{formatBlogDate(post.date)}</time>
-                      {post.tags[0] && (
+                      {post.tags?.[0] && (
                         <span className="lr-blog-latest-tag">{post.tags[0]}</span>
                       )}
                     </span>
