@@ -30,6 +30,7 @@ import {
   type PageMeta,
 } from './seo'
 import { blogSlugFromPath, getPostBySlug } from './blog'
+import { blogIndexUrl, blogPostUrl } from './blogPublicUrl'
 import type { SealDocument } from './types'
 import { AppLink } from './AppLink'
 import { PricePage } from './PricePage'
@@ -382,17 +383,13 @@ export function App() {
     scrollShellTop()
   }, [rememberJourneyPath])
 
+  /** Blog is hosted on blog.verilock.online — leave the product SPA. */
   const goBlog = useCallback((slug?: string) => {
-    rememberJourneyPath()
-    setScreen('blog')
-    const next = slug ? `/blog/${slug}` : '/blog'
-    // pushState does not re-render React. When already on screen === 'blog',
-    // setScreen('blog') is a no-op - bump navEpoch so BlogPage re-reads pathname
-    // (index ↔ post and post ↔ post would otherwise stick on the old view).
-    pushShellUrl(next)
-    setNavEpoch(n => n + 1)
-    scrollShellTop()
-  }, [rememberJourneyPath])
+    const href = slug ? blogPostUrl(slug) : blogIndexUrl()
+    if (typeof window !== 'undefined') {
+      window.location.assign(href)
+    }
+  }, [])
 
   /** In-app path from blog body links (report page, pricing, etc.). */
   const goShellPath = useCallback(
@@ -778,15 +775,13 @@ export function App() {
                 Pricing
               </AppLink>
             )}
-            {/* Blog: desktop header only; footer + homepage teaser cover narrow viewports. */}
-            <AppLink
-              to="/blog"
-              onClick={() => goBlog()}
-              className={`lr-nav lr-nav--blog${screen === 'blog' ? ' lr-nav--active' : ''}`}
-              aria-current={screen === 'blog' ? 'page' : undefined}
+            {/* Blog: external host (blog.verilock.online). Desktop header; footer + home teaser cover mobile. */}
+            <a
+              href={blogIndexUrl()}
+              className="lr-nav lr-nav--blog"
             >
               Blog
-            </AppLink>
+            </a>
             {/* Security + legal stay footer-only so the header stays product + one content link. */}
             <AccountMenu
               account={wallet.account}
@@ -983,13 +978,9 @@ export function App() {
           Your wallet is your identity; the chain is the proof.
         </p>
         <div className="lr-footer-links">
-          <AppLink
-            to="/blog"
-            className={`lr-footer-link${screen === 'blog' ? ' lr-footer-link--active' : ''}`}
-            onClick={() => goBlog()}
-          >
+          <a href={blogIndexUrl()} className="lr-footer-link">
             Blog
-          </AppLink>
+          </a>
           <AppLink
             to="/security"
             className={`lr-footer-link${screen === 'security' ? ' lr-footer-link--active' : ''}`}

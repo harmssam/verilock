@@ -18,6 +18,7 @@ import {
   type MouseEvent,
 } from 'react'
 import { formatBlogDate, getAllPosts } from '../blog'
+import { blogIndexUrl, blogMediaUrl, blogPostUrl } from '../blogPublicUrl'
 import type { PathRole } from '../journey/types'
 import { AppLink } from '../AppLink'
 import { LandingHowItWorks } from './LandingHowItWorks'
@@ -526,21 +527,18 @@ export function LandingHome({
                 the subscription tax.
               </p>
             </div>
-            {onOpenBlogIndex && (
-              <AppLink to="/blog" className="lr-blog-latest-all" onClick={onOpenBlogIndex}>
-                All posts
-                <ArrowRight size={15} strokeWidth={2.25} aria-hidden />
-              </AppLink>
-            )}
+            <a href={blogIndexUrl()} className="lr-blog-latest-all">
+              All posts
+              <ArrowRight size={15} strokeWidth={2.25} aria-hidden />
+            </a>
           </div>
-          <AppLink
-            to={`/blog/${latestPost.slug}`}
+          <a
+            href={blogPostUrl(latestPost.slug)}
             className="lr-blog-latest-card lr-blog-latest-card--featured"
-            onClick={() => onOpenBlogPost(latestPost.slug)}
           >
             <span className="lr-blog-latest-thumb">
               <img
-                src={latestPost.coverImage}
+                src={blogMediaUrl(latestPost.coverImage)}
                 alt=""
                 width={640}
                 height={360}
@@ -563,19 +561,18 @@ export function LandingHome({
                 <ArrowRight size={15} strokeWidth={2.25} aria-hidden />
               </span>
             </span>
-          </AppLink>
+          </a>
           {blogTeaser.more.length > 0 && (
             <div className="lr-blog-latest-more">
               {blogTeaser.more.map(post => (
-                <AppLink
+                <a
                   key={post.slug}
-                  to={`/blog/${post.slug}`}
+                  href={blogPostUrl(post.slug)}
                   className="lr-blog-latest-mini"
-                  onClick={() => onOpenBlogPost(post.slug)}
                 >
                   <span className="lr-blog-latest-mini-thumb" aria-hidden>
                     <img
-                      src={post.coverImage}
+                      src={blogMediaUrl(post.coverImage)}
                       alt=""
                       width={320}
                       height={180}
@@ -596,7 +593,7 @@ export function LandingHome({
                       <ArrowRight size={14} strokeWidth={2.25} aria-hidden />
                     </span>
                   </span>
-                </AppLink>
+                </a>
               ))}
             </div>
           )}
