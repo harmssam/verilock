@@ -200,7 +200,7 @@ export function isStatsPricingPath(path: string): boolean {
   return /^\/esignature-pricing\/?$/.test(path)
 }
 
-/** Blog index (`/blog`) or a post (`/blog/:slug`). */
+/** Product-host /blog paths (301 to blog.verilock.online; not SPA screens). */
 export function isBlogPath(path: string): boolean {
   return /^\/blog(?:\/[^/]+)?\/?$/.test(path)
 }

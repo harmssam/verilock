@@ -23,14 +23,12 @@ import {
 } from './hubReturnPath'
 import {
   applyPageMeta,
-  blogPostMeta,
   journeyPathMeta,
   PAGE_META,
   SITE_TAGLINE,
   type PageMeta,
 } from './seo'
-import { blogSlugFromPath, getPostBySlug } from './blog'
-import { blogIndexUrl, blogPostUrl } from './blogPublicUrl'
+import { blogIndexUrl } from './blogPublicUrl'
 import type { SealDocument } from './types'
 import { AppLink } from './AppLink'
 import { PricePage } from './PricePage'
@@ -42,7 +40,6 @@ import { RedeemPage } from './RedeemPage'
 import { SupportPage } from './SupportPage'
 import { AccountMenu } from './journey/AccountMenu'
 import { AgreementsPage } from './journey/AgreementsPage'
-import { BlogPage } from './journey/BlogPage'
 import { DocumentJourney } from './journey/DocumentJourney'
 import { DocumentJourney as PdfAnnotationJourney } from './experiment/DocumentJourney'
 import { ArchiveLab } from './experiment/ArchiveLab'
@@ -120,7 +117,6 @@ type ShellScreen =
   | 'support'
   | 'redeem'
   | 'agreements'
-  | 'blog'
   | 'pdf'
   | 'pdf-lab'
   | 'pdf2'
@@ -141,7 +137,6 @@ function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotation
   if (isStatsPricingPath(pathname)) return 'stats-pricing'
   if (isFaqPath(pathname)) return 'faq'
   if (isAgreementsPath(pathname)) return 'agreements'
-  if (isBlogPath(pathname)) return 'blog'
   // PDF lab is parallel to seal - only mount when flag allows
   if (pdfLabEnabled && /^\/pdf2\/?$/.test(pathname)) return 'pdf2'
   if (pdfLabEnabled && isPdfLabPath(pathname)) return 'pdf-lab'
@@ -383,75 +378,6 @@ export function App() {
     scrollShellTop()
   }, [rememberJourneyPath])
 
-  /** Blog is hosted on blog.verilock.online — leave the product SPA. */
-  const goBlog = useCallback((slug?: string) => {
-    const href = slug ? blogPostUrl(slug) : blogIndexUrl()
-    if (typeof window !== 'undefined') {
-      window.location.assign(href)
-    }
-  }, [])
-
-  /** In-app path from blog body links (report page, pricing, etc.). */
-  const goShellPath = useCallback(
-    (path: string) => {
-      const pathname = path.split(/[?#]/)[0] || path
-      if (isStatsPricingPath(pathname)) {
-        goStatsPricing()
-        return
-      }
-      if (isPricingPath(pathname)) {
-        goPricing()
-        return
-      }
-      if (isFaqPath(pathname)) {
-        goFaq()
-        return
-      }
-      if (isSecurityPath(pathname)) {
-        goSecurity()
-        return
-      }
-      if (isPrivacyPath(pathname)) {
-        goPrivacy()
-        return
-      }
-      if (isSupportPath(pathname)) {
-        goSupport()
-        return
-      }
-      if (isRedeemPath(pathname)) {
-        goRedeem()
-        return
-      }
-      if (isAgreementsPath(pathname)) {
-        goAgreements()
-        return
-      }
-      if (isBlogPath(pathname)) {
-        const slug = blogSlugFromPath(pathname)
-        goBlog(slug || undefined)
-        return
-      }
-      rememberJourneyPath()
-      setScreen(screenFromPath(pathname, pdfLabEnabled))
-      pushShellUrl(path.startsWith('/') ? path : `/${path}`)
-      scrollShellTop()
-    },
-    [
-      goStatsPricing,
-      goPricing,
-      goFaq,
-      goSecurity,
-      goPrivacy,
-      goSupport,
-      goRedeem,
-      goAgreements,
-      goBlog,
-      rememberJourneyPath,
-      pdfLabEnabled,
-    ],
-  )
-
   const openAgreement = useCallback(
     (doc: SealDocument, preferSeal = false) => {
       setScreen('journey')
@@ -631,18 +557,6 @@ export function App() {
       applyPageMeta({ ...PAGE_META.agreements })
       return
     }
-    if (screen === 'blog') {
-      const slug = blogSlugFromPath(path)
-      if (slug) {
-        const post = getPostBySlug(slug)
-        if (post) {
-          applyPageMeta(blogPostMeta(post))
-          return
-        }
-      }
-      applyPageMeta({ ...PAGE_META.blog })
-      return
-    }
     if (screen === 'pdf' || screen === 'pdf-lab' || screen === 'pdf2') {
       applyPageMeta({
         ...PAGE_META.pdf,
@@ -690,7 +604,6 @@ export function App() {
     screen === 'stats-pricing' ||
     screen === 'support' ||
     screen === 'redeem' ||
-    screen === 'blog' ||
     screen === 'pdf' ||
     screen === 'pdf-lab' ||
     screen === 'pdf2' ||
@@ -825,25 +738,13 @@ export function App() {
         screen === 'support' ||
         screen === 'redeem' ||
         screen === 'agreements' ||
-        screen === 'blog' ||
-        screen === 'pdf' ||
+            screen === 'pdf' ||
         screen === 'pdf-lab' ||
         screen === 'pdf2' ||
         screen === 'not-found') && (
         <AppLink to="/" onClick={goJourney} className="lr-back">
           ← Back to home
         </AppLink>
-      )}
-
-      {screen === 'blog' && (
-        <BlogPage
-          key={typeof window !== 'undefined' ? window.location.pathname : '/blog'}
-          path={typeof window !== 'undefined' ? window.location.pathname : '/blog'}
-          onOpenIndex={() => goBlog()}
-          onOpenPost={slug => goBlog(slug)}
-          onPricing={goPricing}
-          onOpenPath={goShellPath}
-        />
       )}
 
       {screen === 'pricing' && (
@@ -922,8 +823,6 @@ export function App() {
           {showHome && (
             <LandingHome
               onPickRole={pickRole}
-              onOpenBlogPost={slug => goBlog(slug)}
-              onOpenBlogIndex={() => goBlog()}
             />
           )}
           {/* hidden (not unmounted) when home so DocumentJourney keep-alive works */}

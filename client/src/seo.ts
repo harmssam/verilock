@@ -55,7 +55,7 @@ export const PAGE_META = {
     title: `Blog${TITLE_SUFFIX}`,
     description:
       'Guides on what VeriLock is, how fingerprinting and on-chain locks work, private document signing, wallet-optional verification, and product updates.',
-    path: '/blog',
+    path: 'https://blog.verilock.online/',
   },
   verify: {
     title: `Verify a Document${TITLE_SUFFIX}`,
@@ -227,11 +227,4 @@ export function documentPageMeta(title: string, role: 'sign' | 'verify'): PageMe
   }
 }
 
-export function blogPostMeta(post: { title: string; description: string; slug: string }): PageMeta {
-  return {
-    title: `${post.title}${TITLE_SUFFIX}`,
-    description: post.description,
-    path: `/blog/${post.slug}`,
-  }
-}
 

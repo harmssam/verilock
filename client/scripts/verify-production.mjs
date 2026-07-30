@@ -102,7 +102,7 @@ check('server injects per-route canonical for SPA HTML', () => {
   assert.match(staticTs, /function canonicalForPath/)
   assert.match(staticTs, /rel="canonical"/)
   assert.match(staticTs, /\/pricing/)
-  assert.match(staticTs, /\/blog/)
+  // /blog is redirect-only; canonical injection need not list product blog URLs
   assert.match(staticTs, /\/support/)
   assert.match(staticTs, /injectCanonical\(getIndexHtml\(\),\s*req\.path\)/)
 })
@@ -121,7 +121,7 @@ check('product modules live under src/journey and shell under App', () => {
   assert.ok(!existsSync(join(clientDir, 'src/landing-redesign')), 'src/landing-redesign should be removed')
   const app = readFileSync(join(clientDir, 'src/App.tsx'), 'utf8')
   assert.match(app, /DocumentJourney/)
-  assert.match(app, /BlogPage/, 'production shell must mount BlogPage')
+  assert.ok(!app.includes('BlogPage'), 'production shell must not mount BlogPage (external blog)')
   assert.ok(!app.includes('lr-preview-banner'), 'preview banner must not ship')
   // PDF annotation experiment may be mounted at /pdf via App (not a parallel shell entry).
   // Forbidden: separate vite/html experiment product entrypoints.
@@ -136,25 +136,30 @@ check('product modules live under src/journey and shell under App', () => {
   }
 })
 
-check('archives stay excluded; blog is production-wired', () => {
+check('archives stay excluded; blog is external (blog.verilock.online)', () => {
   const gi = readFileSync(join(rootDir, '.gitignore'), 'utf8')
   assert.match(gi, /client\/src\/archive\//)
-  assert.ok(!/^\s*client\/src\/blog\//m.test(gi), 'client/src/blog must not be gitignored')
-  assert.ok(!/^\s*client\/public\/blog\//m.test(gi), 'client/public/blog must not be gitignored')
+  // Blog content must not ship with the public product SPA
+  assert.ok(!existsSync(join(clientDir, 'src/blog')), 'client/src/blog must be removed (external blog host)')
+  assert.ok(!existsSync(join(clientDir, 'public/blog')), 'client/public/blog must be removed (external blog host)')
+  assert.ok(!existsSync(join(clientDir, 'src/journey/BlogPage.tsx')), 'BlogPage SPA must be removed')
   const app = readFileSync(join(clientDir, 'src/App.tsx'), 'utf8')
-  assert.match(app, /from ['"]\.\/blog['"]/, 'App must import blog modules')
-  assert.match(app, /BlogPage/, 'App must mount BlogPage')
+  assert.ok(!app.includes('BlogPage'), 'App must not mount BlogPage')
+  assert.ok(!/from ['"]\.\/blog['"]/.test(app), 'App must not import in-repo blog post modules')
+  assert.match(app, /blogPublicUrl|blogIndexUrl/, 'App must link to external blog host helpers')
+  const blogUrl = readFileSync(join(clientDir, 'src/blogPublicUrl.ts'), 'utf8')
+  assert.match(blogUrl, /blog\.verilock\.online|BLOG_PUBLIC_ORIGIN/, 'blogPublicUrl must target external origin')
+  assert.match(blogUrl, /fetchPublicBlogTeaser/, 'homepage teaser must fetch public blog API')
   const hub = readFileSync(join(clientDir, 'src/hubReturnPath.ts'), 'utf8')
-  assert.match(hub, /isBlogPath/, 'blog paths must be known app routes')
-  const staticTs = readFileSync(join(rootDir, 'server/src/static.ts'), 'utf8')
-  assert.match(staticTs, /\/blog/, 'server SPA fallback must serve /blog')
+  assert.match(hub, /isBlogPath/, 'isBlogPath kept for redirect path recognition')
+  const indexTs = readFileSync(join(rootDir, 'server/src/index.ts'), 'utf8')
+  assert.match(indexTs, /blog\.verilock\.online|BLOG_PUBLIC_ORIGIN/, 'server must 301 /blog to external host')
+  assert.match(indexTs, /\/blog/, 'server must handle /blog redirects')
   const sitemap = readFileSync(join(clientDir, 'public/sitemap.xml'), 'utf8')
-  assert.match(sitemap, /\/blog/, 'sitemap must list blog URLs')
+  assert.ok(!/verilock\.online\/blog/.test(sitemap), 'product sitemap must not list blog post URLs on verilock.online')
   const css = readFileSync(join(clientDir, 'src/App.css'), 'utf8')
   assert.ok(!css.includes('lr-preview-banner'), 'preview banner CSS must be removed')
-  assert.match(css, /lr-blog-latest/, 'homepage blog-latest styles required')
-  assert.ok(existsSync(join(clientDir, 'src/journey/BlogPage.tsx')))
-  assert.ok(existsSync(join(clientDir, 'src/blog/posts.ts')))
+  assert.match(css, /lr-blog-latest/, 'homepage blog-latest teaser styles required')
 })
 
 // docs/ is local-only (gitignored). If present, ensure legacy service-b names are gone.
@@ -210,7 +215,7 @@ if (process.env.VERIFY_DIST === '1') {
     assert.match(html, /content="index,\s*follow"/)
     assert.ok(!html.includes('noindex'), 'dist must not noindex')
     assert.ok(!html.includes('Landing redesign preview'), 'dist still has preview chrome')
-    assert.ok(existsSync(join(clientDir, 'dist', 'blog')), 'dist must ship blog assets')
+    assert.ok(!existsSync(join(clientDir, 'dist', 'blog')), 'dist must not ship blog assets (external host)')
   })
 }
 

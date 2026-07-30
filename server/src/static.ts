@@ -17,8 +17,7 @@ function isKnownAppPath(path: string): boolean {
   if (/^\/faq\/?$/.test(path)) return true
   // Operator admin portal (sign-in + stats dashboard)
   if (/^\/admin(?:\/.*)?\/?$/.test(path)) return true
-  // Blog index + post slugs (SPA deep links must get index.html, not 404.html)
-  if (/^\/blog(?:\/[a-zA-Z0-9_-]+)?\/?$/.test(path)) return true
+  // /blog is server 301 to blog.verilock.online (see index.ts) — not SPA content
   // PDF lab (parallel to seal) - kill-switch via PDF_ANNOTATION_UI=false
   if (isPdfAnnotationUiEnabled()) {
     if (/^\/pdf\/?$/.test(path)) return true
@@ -64,13 +63,8 @@ function canonicalForPath(path: string): string {
     '/support': '/support',
     '/faq': '/faq',
     '/esignature-pricing': '/esignature-pricing',
-    '/blog': '/blog',
   }
   if (known[clean]) return `${SITE_ORIGIN}${known[clean]}`
-
-  // Blog post slugs.
-  const blogMatch = clean.match(/^\/blog\/([a-zA-Z0-9_-]+)$/)
-  if (blogMatch) return `${SITE_ORIGIN}/blog/${blogMatch[1]}`
 
   // Deep-link, agreement, verify, mobile, admin — default to home canonical.
   return `${SITE_ORIGIN}/`

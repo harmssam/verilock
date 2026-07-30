@@ -206,7 +206,7 @@ Wallet login (LoginSheet / Hub / Pay) is a **gate** when creating, signing, or s
 ### Explicitly out of redesign scope (do not reintroduce as primary)
 
 - Archive UI under `client/src/archive/` (local-only gitignored snapshots)
-- Product blog (`client/src/blog/`, `/blog` routes, BlogPage) - local-only, not production
+- Product blog is external: `https://blog.verilock.online` (content-studio). Product SPA only links + 301 `/blog`.
 - New email product redesign beyond existing `FEATURES.emailNotifyUi` gate
 
 ---

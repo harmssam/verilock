@@ -5,7 +5,7 @@
 - Home: https://verilock.online/ - Sign, invite co-signers, lock a permanent proof
 - Pricing: https://verilock.online/pricing - Free to sign, one-time fee to lock
 - Security: https://verilock.online/security - How VeriLock keeps documents private
-- Blog: https://verilock.online/blog - Guides, comparisons, and product updates
+- Blog: https://blog.verilock.online - Guides, comparisons, and product updates
 - Support: https://verilock.online/support - Contact and help
 - Privacy: https://verilock.online/privacy - Privacy policy
 

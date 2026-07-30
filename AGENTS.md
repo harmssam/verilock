@@ -75,10 +75,12 @@ Archive-only (do not invest product work without an explicit request):
 
 ### Blog
 
-- **In production.** Content: `client/src/blog/`, art: `client/public/blog/`, UI: `client/src/journey/BlogPage.tsx` (+ CSS).
-- Shell routes `/blog` and `/blog/:slug` in `App.tsx`; footer Blog (+ Security) links; homepage “From the blog”.
-- Server SPA deep links: `server/src/static.ts` `isKnownAppPath` must include `/blog`.
-- **Do not ship** content studios here. Blog Studio + X Post Studio live in **`clevertech-os/content-studio`** (sibling checkout; set `CONTENT_ROOT` to this monorepo).
+- **External host:** `https://blog.verilock.online` (Railway service `blog` / content-studio). Private store + public reader.
+- Product only: header/footer/home teaser links via `client/src/blogPublicUrl.ts`; server **301** `/blog` → blog host in `server/src/index.ts`.
+- Homepage teaser fetches `GET https://blog.verilock.online/api/blog/public/posts` (CORS allowed for verilock.online).
+- **Do not** add posts under `client/src/blog` or assets under `client/public/blog` — those trees are removed.
+- **Do not ship** content studios in this monorepo. Studio UI: **`clevertech-os/content-studio`**, admin tab proxies to production `blog` service.
+
 
 ### If the user says “the app” / “production” / “VeriLock UI”
 

@@ -17,6 +17,16 @@ export function blogPostUrl(slug: string): string {
   return `${BLOG_PUBLIC_ORIGIN}/${encodeURIComponent(s)}`
 }
 
+/** Product-host path `/blog/:slug` → slug, or null for index `/blog`. */
+export function blogSlugFromProductPath(pathname: string): string | null {
+  const m = pathname.match(/^\/blog\/([^/]+)\/?$/)
+  return m?.[1] ?? null
+}
+
+export function isProductBlogPath(pathname: string): boolean {
+  return /^\/blog(?:\/[^/]+)?\/?$/.test(pathname)
+}
+
 /** Map in-repo cover paths (/blog/foo.jpg) to public blog media URLs. */
 export function blogMediaUrl(path: string): string {
   if (!path) return path
