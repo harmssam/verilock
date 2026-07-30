@@ -97,10 +97,6 @@ function revealClass(inView: boolean, className = '') {
 
 interface LandingHomeProps {
   onPickRole: (role: PathRole) => void
-  /** @deprecated Blog is external (blog.verilock.online); kept optional for call-site compat. */
-  onOpenBlogPost?: (slug: string) => void
-  /** @deprecated unused — teaser links go to blog.verilock.online */
-  onOpenBlogIndex?: () => void
 }
 
 /** Hero status line under CTAs (rotating trust / fee beats). */

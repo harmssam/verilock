@@ -28,7 +28,7 @@ tmp-*.jpg
 client/tmp-home.png
 
 # Local leftover art (already shipped elsewhere / not for repo).
-# Do not ignore client/public/blog/ — production verify requires that tree tracked.
+# Blog content is external (blog.verilock.online) — do not re-add client/public/blog/.
 client/public/og-hero-new.png
 verilock-lock-1920x1080.jpg
 
