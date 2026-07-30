@@ -821,23 +821,67 @@
   margin-bottom: 0.25rem;
 }
 
+.exp-account-menu-addr-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
 .exp-account-menu-full {
+  flex: 1;
+  min-width: 0;
   display: block;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.68rem;
   color: var(--sky);
-  word-break: break-all;
-  line-height: 1.35;
-  text-decoration: none;
-  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+  /* Break only between 4-char groups (spaces), never mid-group */
+  word-break: normal;
+  overflow-wrap: normal;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.15s ease;
 }
 
-a.exp-account-menu-full:hover,
-a.exp-account-menu-full:focus-visible {
+.exp-account-addr-group {
+  white-space: nowrap;
+}
+
+.exp-account-addr-group:not(:last-child)::after {
+  content: ' ';
+  white-space: normal;
+}
+
+button.exp-account-menu-full:hover,
+button.exp-account-menu-full:focus-visible {
   color: var(--mint);
-  text-decoration: underline;
-  text-decoration-color: rgba(94, 234, 212, 0.5);
-  text-underline-offset: 0.15em;
+}
+
+.exp-account-menu-copy {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  margin: -0.15rem 0 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.exp-account-menu-copy:hover,
+.exp-account-menu-copy:focus-visible {
+  color: var(--mint);
+  background: rgba(15, 23, 42, 0.06);
 }
 
 .exp-account-item {
@@ -7335,10 +7379,19 @@ a.hash-chip.text-link:focus-visible {
   color: var(--lr-accent, #0d9488);
 }
 
-a.exp-account-menu-full:hover,
-  a.exp-account-menu-full:focus-visible {
+button.exp-account-menu-full:hover,
+button.exp-account-menu-full:focus-visible {
   color: var(--mint-deep, #0f766e);
-    text-decoration-color: rgba(13, 148, 136, 0.45);
+}
+
+.exp-account-menu-copy {
+  color: var(--lr-muted, #64748b);
+}
+
+.exp-account-menu-copy:hover,
+.exp-account-menu-copy:focus-visible {
+  color: var(--lr-accent, #0d9488);
+  background: rgba(15, 23, 42, 0.05);
 }
 
 .exp-account-item {

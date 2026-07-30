@@ -1,7 +1,6 @@
 import { Check, ChevronDown, Coins, Copy, Files, LogOut, Tag } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { formatDisplayAddress } from '../addresses'
-import { buildNimiqAddressExplorerUrl } from '../explorer'
+import { formatDisplayAddress, normalizeAddress } from '../addresses'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
 import {
   journeyLoginEntryLabels,
@@ -11,6 +10,26 @@ import {
 } from './journeyConnectUi'
 import { LoginSheet } from './LoginSheet'
 import type { JourneyAccount } from './types'
+
+/** Header pill: first 4 + last 4 of the normalized address. */
+function pillAddress(address: string): string {
+  const clean = normalizeAddress(address)
+  return `${clean.slice(0, 4)}…${clean.slice(-4)}`
+}
+
+/** Space-separated groups of 4; each group is a non-wrapping unit. */
+function AddressGroups({ address }: { address: string }) {
+  const groups = formatDisplayAddress(address).split(' ')
+  return (
+    <>
+      {groups.map((group, i) => (
+        <span key={`${group}-${i}`} className="exp-account-addr-group">
+          {group}
+        </span>
+      ))}
+    </>
+  )
+}
 
 interface AccountMenuProps {
   account: JourneyAccount | null
@@ -122,6 +141,16 @@ export function AccountMenu({
 
   const showCredits = creditBalance != null && Number.isFinite(creditBalance)
 
+  const copyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(account.address)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
+    } catch {
+      /* ignore */
+    }
+  }
+
   return (
     <div className="exp-account-cluster">
       {showCredits && (
@@ -147,7 +176,7 @@ export function AccountMenu({
           onClick={() => setOpen(v => !v)}
         >
           <span className="exp-account-dot" aria-hidden />
-          <span className="exp-account-addr">{account.shortAddress}</span>
+          <span className="exp-account-addr">{pillAddress(account.address)}</span>
           <ChevronDown size={14} strokeWidth={2.5} className="exp-account-chevron" aria-hidden />
         </button>
 
@@ -155,15 +184,30 @@ export function AccountMenu({
           <div className="exp-account-menu" role="menu">
             <div className="exp-account-menu-head">
               <span className="exp-account-menu-label">Connected</span>
-              <a
-                className="exp-account-menu-full"
-                href={buildNimiqAddressExplorerUrl(account.address)}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={`View ${formatDisplayAddress(account.address)} on Nimiq Watch`}
-              >
-                {formatDisplayAddress(account.address)}
-              </a>
+              <div className="exp-account-menu-addr-row">
+                <button
+                  type="button"
+                  className="exp-account-menu-full"
+                  onClick={copyAddress}
+                  title={copied ? 'Copied' : 'Copy address'}
+                  aria-label={copied ? 'Address copied' : 'Copy wallet address'}
+                >
+                  <AddressGroups address={account.address} />
+                </button>
+                <button
+                  type="button"
+                  className="exp-account-menu-copy"
+                  onClick={copyAddress}
+                  title={copied ? 'Copied' : 'Copy address'}
+                  aria-label={copied ? 'Address copied' : 'Copy wallet address'}
+                >
+                  {copied ? (
+                    <Check size={14} strokeWidth={2.5} aria-hidden />
+                  ) : (
+                    <Copy size={14} strokeWidth={2.25} aria-hidden />
+                  )}
+                </button>
+              </div>
             </div>
             {onCredits && (
               <button
@@ -199,23 +243,6 @@ export function AccountMenu({
                 My agreements
               </button>
             )}
-            <button
-              type="button"
-              className="exp-account-item"
-              role="menuitem"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(account.address)
-                  setCopied(true)
-                  window.setTimeout(() => setCopied(false), 1600)
-                } catch {
-                  /* ignore */
-                }
-              }}
-            >
-              {copied ? <Check size={15} strokeWidth={2.5} /> : <Copy size={15} strokeWidth={2.25} />}
-              {copied ? 'Copied' : 'Copy address'}
-            </button>
             <button
               type="button"
               className="exp-account-item exp-account-item--danger"
