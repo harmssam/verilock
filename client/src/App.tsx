@@ -59,7 +59,7 @@ import {
   journeyConnectOptions,
   resolveJourneyConnectMode,
 } from './journey/journeyConnectUi'
-import { flushCreatePdfDraftIfNeeded } from './journey/journeyPdfDraft'
+import { kickCreatePdfDraftFlush } from './journey/journeyPdfDraft'
 import { useJourneyWallet } from './journey/useJourneyWallet'
 import {
   clearStripeCheckoutReturnFromUrl,
@@ -513,13 +513,12 @@ export function App() {
       }
       saveHubReturnPath()
       // Explicit options from mobile chooser (Pay vs Hub); otherwise resolve from mode.
-      // Flush create-path PDF + form fields before Hub remount (header Login path).
-      void (async () => {
-        await flushCreatePdfDraftIfNeeded()
-        await wallet.connect(
-          options !== undefined ? options : journeyConnectOptions(connectMode),
-        )
-      })()
+      // Kick draft flush without await so Hub redirect stays in the click turn
+      // (Nimiq: no await before Hub; form cache is sync, PDF auto-saved while editing).
+      kickCreatePdfDraftFlush()
+      void wallet.connect(
+        options !== undefined ? options : journeyConnectOptions(connectMode),
+      )
     },
     [connectMode, wallet],
   )

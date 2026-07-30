@@ -93,7 +93,18 @@ export function setCreatePdfDraftFlushHandler(fn: CreatePdfDraftFlushFn | null):
   createPdfDraftFlushHandler = fn
 }
 
-/** Await before any Hub-bound connect that may remount the SPA. */
+/**
+ * Kick create-path draft flush without awaiting.
+ * Form fields write to sessionStorage synchronously at the start of flush;
+ * PDF blob is already auto-saved (debounced) while editing. Do not await this
+ * before Hub redirect — Nimiq requires Hub work in the click turn (gesture
+ * hygiene); a slow IndexedDB put must not delay `chooseAddress` / location.
+ */
+export function kickCreatePdfDraftFlush(): void {
+  void createPdfDraftFlushHandler?.()
+}
+
+/** Await full draft flush (tests / non-Hub paths). Prefer kick before Hub. */
 export async function flushCreatePdfDraftIfNeeded(): Promise<void> {
   if (createPdfDraftFlushHandler) {
     await createPdfDraftFlushHandler()

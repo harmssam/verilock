@@ -151,3 +151,28 @@ export function clearStaleHubRpcStateIfIdle(): void {
   if (hasPendingHubRedirect()) return
   clearStaleHubRpcState()
 }
+
+/**
+ * True when the URL still signals a Hub return (hash / `?rpcId=`) but
+ * sessionStorage has no matching `rpcRequests` entry (or no stored response).
+ * Those leftovers make `hasPendingHubRedirect()` forever true and block Login.
+ */
+export function isOrphanedHubRedirectReturn(): boolean {
+  if (typeof window === 'undefined') return false
+  if (!hasPendingHubRedirect()) return false
+  const redirect = readRedirectResponse()
+  if (!redirect) return true
+  return !loadStoredRpcRequest(redirect.id)
+}
+
+/**
+ * Strip orphaned Hub return URL params + RPC storage so Login can start fresh.
+ * Returns true when something was cleared.
+ */
+export function clearOrphanedHubRedirectReturn(): boolean {
+  if (!isOrphanedHubRedirectReturn()) return false
+  consumeRedirectHash()
+  clearRpcIdSearchParam()
+  clearStaleHubRpcState()
+  return true
+}

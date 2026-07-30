@@ -18,7 +18,11 @@ import {
   warmNimiqProvider,
   shouldUseHubRedirect,
 } from '../nimiq'
-import { clearStaleHubRpcStateIfIdle, hasPendingHubRedirect } from '../hubRedirectParse'
+import {
+  clearOrphanedHubRedirectReturn,
+  clearStaleHubRpcStateIfIdle,
+  hasPendingHubRedirect,
+} from '../hubRedirectParse'
 import { clearSession, loadSession, saveSession } from '../session'
 import { toJourneyAccount, type JourneyAccount } from './types'
 
@@ -161,6 +165,14 @@ export function useJourneyWallet(): UseJourneyWalletResult {
    */
   const resetAbandonedHubRedirect = useCallback(() => {
     if (typeof window === 'undefined') return
+    // Unprocessable leftover return URL (hash / rpcId without rpcRequests).
+    if (clearOrphanedHubRedirectReturn()) {
+      hubConnectInFlightRef.current = false
+      connectInFlightRef.current = false
+      setConnecting(false)
+      setWalletStatus(null)
+      return
+    }
     if (peekHubRedirectInUrl() || hasPendingHubRedirect()) return
     if (loadSession()?.token) return
 
@@ -172,6 +184,8 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     if (!midHubRedirect) return
 
     hubConnectInFlightRef.current = false
+    // Must clear both locks: leaving connectInFlight true made the next Login a silent no-op.
+    connectInFlightRef.current = false
     setConnecting(false)
     setWalletStatus(null)
     // Drop stale Hub RPC entries so the next Login is not blocked as “in flight”.
@@ -238,11 +252,13 @@ export function useJourneyWallet(): UseJourneyWalletResult {
               }
             } finally {
               hubConnectInFlightRef.current = false
+              connectInFlightRef.current = false
               setConnecting(false)
             }
           },
           err => {
             hubConnectInFlightRef.current = false
+            connectInFlightRef.current = false
             setConnecting(false)
             if (isHubCancelError(err)) {
               showLoginCanceled()
@@ -252,6 +268,8 @@ export function useJourneyWallet(): UseJourneyWalletResult {
             }
           },
         )
+        // Unprocessable leftover hash/?rpcId= must not block Login or Pay auto-connect.
+        clearOrphanedHubRedirectReturn()
       } catch (err) {
         console.warn('[wallet] Hub redirect setup failed (Pay login still available)', err)
       }
@@ -375,13 +393,30 @@ export function useJourneyWallet(): UseJourneyWalletResult {
 
   const connect = useCallback(
     async (options?: { useRedirect?: boolean }) => {
+      // Leftover Hub return URL with no stored request blocks Login forever — clear and continue.
+      clearOrphanedHubRedirectReturn()
+
       if (hubConnectInFlightRef.current || peekHubRedirectInUrl() || hasPendingHubRedirect()) {
+        // Real mid-return / mid-redirect: keep UI honest (never silent).
+        setConnecting(true)
         setWalletStatus(HUB_REDIRECT_MESSAGE)
         return
       }
       // Pay (and Hub popup) show native sheets - a second concurrent connect()
       // steals focus and can bury the Approve step under the mini-app WebView.
-      if (connectInFlightRef.current) return
+      if (connectInFlightRef.current) {
+        // Stale lock after Hub Back used to leave this true with no UI — recover.
+        if (!hubConnectInFlightRef.current && !payDeeplinkPendingRef.current) {
+          connectInFlightRef.current = false
+        } else {
+          setConnecting(true)
+          setWalletStatus(
+            walletStatusRef.current ||
+              (hubConnectInFlightRef.current ? HUB_REDIRECT_MESSAGE : 'Login already in progress…'),
+          )
+          return
+        }
+      }
 
       connectInFlightRef.current = true
       setConnecting(true)
@@ -394,37 +429,17 @@ export function useJourneyWallet(): UseJourneyWalletResult {
       try {
         const payHost = isNimiqPayHost()
         const explicitHubRedirect = options?.useRedirect === true
-        setWalletStatus(
-          payHost
-            ? 'Waiting for Nimiq Pay wallet… approve each dialog when it appears.'
-            : isMobileDevice() && !explicitHubRedirect
-              ? 'Opening Nimiq Pay…'
-              : 'Connecting via Nimiq Hub…',
-        )
+        // Sync only — do not await before Hub (Nimiq: keep Hub in the user-gesture turn).
+        const hasNimiqProvider =
+          typeof window !== 'undefined' && Boolean(window.nimiq)
+        const alreadyInPay = payHost || hasNimiqProvider
 
-        // window.nimiq may lag behind window.nimiqPay inside the Nimiq Pay WebView.
-        // Always await the provider when the host is present so we never fall through
-        // to deeplink / Hub while already inside Pay.
-        let inPay = payHost || Boolean(typeof window !== 'undefined' && window.nimiq)
-        if (payHost && !window.nimiq) {
-          const detected = await probeNimiqPay(30_000)
-          if (detected && window.nimiq) {
-            setNimiq(window.nimiq)
-            inPay = true
-          }
-        }
-        setInNimiqPay(inPay || payHost)
-
-        if (!inPay) {
-          if (payHost) {
-            throw new Error(
-              'Nimiq Pay wallet is still loading. Wait a few seconds, then try Connect again.',
-            )
-          }
-
-          // Mobile default: try Nimiq Pay deeplink first. Explicit useRedirect skips to Hub
-          // (NimiqPayOpenPanel “Continue via Hub redirect”). Note: shouldUseHubRedirect() is
-          // true by default for desktop Hub reliability - do not gate Pay on that flag.
+        /**
+         * Browser Hub path (desktop, or mobile “Login with Hub”).
+         * No probe / network awaits before chooseAddress so redirect (and future
+         * popup) start in the same turn as the click.
+         */
+        if (!alreadyInPay && !payHost) {
           if (isMobileDevice() && !explicitHubRedirect) {
             setWalletStatus('Opening Nimiq Pay…')
             // Full path+query so invite /d/:slug?party= survives Pay open (not just origin → home).
@@ -433,17 +448,16 @@ export function useJourneyWallet(): UseJourneyWalletResult {
             if (payResult === 'already-in-pay') return
             if (payResult === 'launched') {
               setWalletStatus('Opening Nimiq Pay…')
-              // Fail only if this tab never leaves the foreground (app missing).
               scheduleDeeplinkFallback()
               return
             }
-            // Deeplink unavailable - show panel, do not fall through to Hub on mobile.
             setShowOpenInPay(true)
             setWalletStatus(null)
             setError(PAY_INSTALL_HINT)
             return
           }
 
+          setWalletStatus('Connecting via Nimiq Hub…')
           hubConnectInFlightRef.current = true
           const preferRedirect = shouldUseHubRedirect(options)
           // chooseAddress first so Hub onboard runs for users with no wallet;
@@ -462,6 +476,28 @@ export function useJourneyWallet(): UseJourneyWalletResult {
           applySession(hubResult.token, verified.address)
           setWalletStatus(null)
           return
+        }
+
+        // window.nimiq may lag behind window.nimiqPay inside the Nimiq Pay WebView.
+        let inPay = alreadyInPay
+        if (payHost && !hasNimiqProvider) {
+          setWalletStatus('Waiting for Nimiq Pay wallet… approve each dialog when it appears.')
+          const detected = await probeNimiqPay(30_000)
+          if (detected && window.nimiq) {
+            setNimiq(window.nimiq)
+            inPay = true
+          }
+        }
+        setInNimiqPay(inPay || payHost)
+
+        if (!inPay) {
+          if (payHost) {
+            throw new Error(
+              'Nimiq Pay wallet is still loading. Wait a few seconds, then try Connect again.',
+            )
+          }
+          // Should not reach: non-Pay Hub handled above.
+          throw new Error('Wallet connection failed')
         }
 
         /**
@@ -531,6 +567,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
     if (token || loadSession()?.token) return
     if (skipPayAutoConnectRef.current) return
     if (payHostAutoConnectStarted) return
+    clearOrphanedHubRedirectReturn()
     if (hubConnectInFlightRef.current || peekHubRedirectInUrl() || hasPendingHubRedirect()) {
       return
     }

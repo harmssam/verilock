@@ -1,8 +1,9 @@
 import HubApi from '@nimiq/hub-api'
 import type { ChooseAddressResult, SignedMessage, SignedTransaction } from '@nimiq/hub-api'
 
-const { RedirectRequestBehavior, RequestType } = HubApi
+const { RequestType } = HubApi
 import { getHostLanguage, init } from '@nimiq/mini-app-sdk'
+import { createHubRedirectBehavior } from './hubRedirectBehavior'
 import { processLenientHubRedirect } from './hubSealRedirect'
 import { saveHubReturnPath, savePayReturnPath } from './hubReturnPath'
 import { clearStaleHubRpcStateIfIdle, getHubReturnUrl } from './hubRedirectParse'
@@ -120,8 +121,9 @@ export function popupBlockedHelp(): string {
   )
 }
 
+/** Non-deprecated CallOptions redirect (avoids hub-api callAndSaveLocalState warn). */
 function hubRedirectBehavior(localState: Record<string, unknown>) {
-  return new RedirectRequestBehavior(getHubReturnUrl(), localState)
+  return createHubRedirectBehavior(getHubReturnUrl(), localState)
 }
 
 /** Hub redirect is the supported desktop flow; popup is opt-in only. */
