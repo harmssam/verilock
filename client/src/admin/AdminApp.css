@@ -1088,3 +1088,63 @@
   flex-wrap: wrap;
   gap: 0.35rem;
 }
+
+/* ── Content Studio embed ──────────────────────────────── */
+
+.admin-studio {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: min(78dvh, 920px);
+  margin: 0 -0.25rem;
+}
+
+.admin-studio-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.admin-studio-frame {
+  flex: 1;
+  width: 100%;
+  min-height: min(72dvh, 860px);
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.1));
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.admin-studio-missing {
+  padding: 1.5rem 1.25rem;
+  border: 1px dashed var(--lr-line, rgba(15, 23, 42, 0.16));
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.admin-studio-missing h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.admin-studio-missing p {
+  margin: 0;
+  color: var(--lr-muted, #4b5c6b);
+  line-height: 1.5;
+  max-width: 40rem;
+}
+
+.admin-studio-missing code {
+  font-size: 0.85em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+/* Studio tab wants wider canvas */
+.admin-main:has(.admin-studio) {
+  max-width: min(96rem, 100%);
+}

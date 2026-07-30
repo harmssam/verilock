@@ -33,6 +33,8 @@ export interface AdminFeatures {
   adminEnabled: boolean
   turnstileRequired: boolean
   turnstileSiteKey: string | null
+  /** Content Studio reverse-proxy available (CONTENT_STUDIO_URL). */
+  studioProxyEnabled?: boolean
 }
 
 export interface AdminMe {

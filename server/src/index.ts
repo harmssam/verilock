@@ -41,7 +41,8 @@ import { emailFeaturesPublic } from './email/config.js'
 import { sendPartyInviteEmail } from './email/inviteSigner.js'
 import { verifyHubSignedMessage } from './hub-signature.js'
 import { rateLimit } from './rate-limit.js'
-import { attachAdminRoutes } from './admin.js'
+import { attachAdminRoutes, requireAdminOrRedirect } from './admin.js'
+import { attachAdminStudioProxy } from './adminStudioProxy.js'
 import {
   clientIpFromRequest,
   deliverSupportContact,
@@ -987,6 +988,9 @@ app.get('/api/features', (_req, res) => {
 
 // Operator admin portal (password + Turnstile cookie session): stats + support queue.
 attachAdminRoutes(app)
+
+// Content Studio (Blog + X) via private Railway service — admin session required.
+attachAdminStudioProxy(app, requireAdminOrRedirect)
 
 app.post('/api/support/contact', supportContactLimit, async (req, res) => {
   const body = (req.body ?? {}) as SupportContactBody

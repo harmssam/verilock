@@ -199,11 +199,39 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   next()
 }
 
+/**
+ * Admin gate for HTML studio pages (iframe / new tab) and API.
+ * Browser navigations redirect to /admin; XHR/fetch get JSON 401.
+ */
+export function requireAdminOrRedirect(req: Request, res: Response, next: NextFunction): void {
+  const session = readAdminSession(req)
+  if (!session) {
+    const accept = String(req.headers.accept || '')
+    const wantsHtml =
+      accept.includes('text/html') ||
+      req.path === '/blog-studio' ||
+      req.path === '/x-studio' ||
+      req.path.startsWith('/blog-studio') ||
+      req.path.startsWith('/x-studio') ||
+      req.path.startsWith('/x-post-studio')
+    if (wantsHtml && req.method === 'GET') {
+      res.redirect(302, '/admin')
+      return
+    }
+    res.status(401).json({ error: 'Admin sign-in required' })
+    return
+  }
+  res.locals.adminUser = session.u
+  next()
+}
+
 export function adminPublicFeatures() {
   return {
     adminEnabled: isAdminConfigured(),
     turnstileRequired: isTurnstileRequired() && isAdminConfigured(),
     turnstileSiteKey: process.env.TURNSTILE_SITE_KEY?.trim() || null,
+    /** True when CONTENT_STUDIO_URL is set (Studio tab + reverse-proxy). */
+    studioProxyEnabled: Boolean(process.env.CONTENT_STUDIO_URL?.trim()),
   }
 }
 

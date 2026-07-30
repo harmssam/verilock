@@ -98,12 +98,14 @@ type AuthState =
   | { kind: 'login' }
   | { kind: 'authed'; username: string }
 
-type AdminTab = 'stats' | 'support'
+type AdminTab = 'stats' | 'support' | 'studio'
+type StudioPane = 'blog' | 'x'
 
 export function AdminApp() {
   const [auth, setAuth] = useState<AuthState>({ kind: 'loading' })
   const [features, setFeatures] = useState<AdminFeatures | null>(null)
   const [tab, setTab] = useState<AdminTab>('support')
+  const [studioPane, setStudioPane] = useState<StudioPane>('x')
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [statsError, setStatsError] = useState<string | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
@@ -243,7 +245,11 @@ export function AdminApp() {
       return
     }
     document.title =
-      tab === 'support' ? 'Admin · Support · VeriLock' : 'Admin · Stats · VeriLock'
+      tab === 'support'
+        ? 'Admin · Support · VeriLock'
+        : tab === 'studio'
+          ? 'Admin · Studio · VeriLock'
+          : 'Admin · Stats · VeriLock'
   }, [auth.kind, tab])
 
   // Turnstile widget on login
@@ -486,6 +492,13 @@ export function AdminApp() {
               >
                 Stats
               </button>
+              <button
+                type="button"
+                className={`admin-tab${tab === 'studio' ? ' admin-tab--active' : ''}`}
+                onClick={() => setTab('studio')}
+              >
+                Studio
+              </button>
             </nav>
 
             {tab === 'support' && (
@@ -501,6 +514,56 @@ export function AdminApp() {
                 error={statsError}
                 onRefresh={() => void loadStats()}
               />
+            )}
+            {tab === 'studio' && (
+              <section className="admin-studio">
+                {!features?.studioProxyEnabled ? (
+                  <div className="admin-studio-missing">
+                    <h2>Content Studio not connected</h2>
+                    <p>
+                      Set <code>CONTENT_STUDIO_URL</code> and{' '}
+                      <code>CONTENT_STUDIO_TOKEN</code> on the VeriLock Railway service
+                      (private URL of the <code>content-studio</code> service). Redeploy
+                      after saving variables.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="admin-studio-toolbar">
+                      <div className="admin-range" role="group" aria-label="Studio type">
+                        <button
+                          type="button"
+                          className={`admin-range-btn${studioPane === 'x' ? ' admin-range-btn--active' : ''}`}
+                          onClick={() => setStudioPane('x')}
+                        >
+                          X Post Studio
+                        </button>
+                        <button
+                          type="button"
+                          className={`admin-range-btn${studioPane === 'blog' ? ' admin-range-btn--active' : ''}`}
+                          onClick={() => setStudioPane('blog')}
+                        >
+                          Blog Studio
+                        </button>
+                      </div>
+                      <a
+                        className="admin-btn admin-btn-ghost"
+                        href={studioPane === 'blog' ? '/blog-studio' : '/x-studio'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Open in new tab
+                      </a>
+                    </div>
+                    <iframe
+                      key={studioPane}
+                      className="admin-studio-frame"
+                      title={studioPane === 'blog' ? 'Blog Studio' : 'X Post Studio'}
+                      src={studioPane === 'blog' ? '/blog-studio' : '/x-studio'}
+                    />
+                  </>
+                )}
+              </section>
             )}
           </>
         )}
