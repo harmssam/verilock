@@ -107,6 +107,26 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
 const app = express()
 applySecurityHeaders(app)
+
+// Blog moved to blog.verilock.online (private store / content-studio).
+// Permanent redirects keep SEO and bookmarks. Disable with BLOG_REDIRECT=false.
+const BLOG_PUBLIC_ORIGIN = (
+  process.env.BLOG_PUBLIC_ORIGIN?.trim() || 'https://blog.verilock.online'
+).replace(/\/+$/, '')
+if (process.env.BLOG_REDIRECT !== 'false') {
+  app.get(['/blog', '/blog/'], (_req, res) => {
+    res.redirect(301, `${BLOG_PUBLIC_ORIGIN}/`)
+  })
+  app.get('/blog/:slug', (req, res) => {
+    const slug = String(req.params.slug || '').replace(/\/+$/, '')
+    if (!slug || slug.includes('..')) {
+      res.redirect(301, `${BLOG_PUBLIC_ORIGIN}/`)
+      return
+    }
+    res.redirect(301, `${BLOG_PUBLIC_ORIGIN}/${encodeURIComponent(slug)}`)
+  })
+}
+
 // Global CORS is restricted to product origins. Offline-companion routes are open
 // so VeriLock Offline (desktop + GitHub Pages) can look up hashes, load agreement
 // metadata/layouts, complete Nimiq Hub login (challenge/verify), and fetch ink when
