@@ -375,6 +375,15 @@
   color: var(--sky);
 }
 
+.login-sheet-status--error {
+  color: var(--danger, #b91c1c);
+  background: color-mix(in srgb, var(--danger, #b91c1c) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger, #b91c1c) 22%, transparent);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  font-weight: 550;
+}
+
 /* Dual choice: default stack (mobile); desktop uses --side */
 .login-sheet-choices {
   display: flex;

@@ -81,7 +81,7 @@ export function journeyConnectLabels(mode: JourneyConnectMode): {
     case 'in-pay':
       return { idle: 'Connect wallet', busy: 'Connecting…' }
     case 'mobile':
-      return { idle: 'Open in Nimiq Pay', busy: 'Opening…' }
+      return { idle: 'Login with Nimiq Hub', busy: 'Opening Hub…' }
     case 'desktop':
       return { idle: 'Login with Nimiq', busy: 'Logging in…' }
   }
@@ -98,12 +98,13 @@ export function journeyMobileChoiceLabels(): {
   storesLabel: string
 } {
   return {
+    // Hub first: works in any mobile browser without a custom URL scheme.
+    hubIdle: 'Nimiq Hub',
+    hubBusy: 'Opening Hub…',
+    hubHint: 'Recommended · works in this browser · create or unlock a wallet',
     payIdle: 'Open in Nimiq Pay',
     payBusy: 'Opening…',
-    payHint: 'Requires the Nimiq Pay app',
-    hubIdle: 'Continue in browser',
-    hubBusy: 'Opening Hub…',
-    hubHint: 'Nimiq Hub: create or unlock a wallet, no app install',
+    payHint: 'Requires the Nimiq Pay app installed on this phone',
     storesLabel: 'Get Nimiq Pay',
   }
 }
@@ -148,13 +149,14 @@ export function journeyLoginSheetCopy(mode: JourneyConnectMode): {
   if (surface === 'mobile') {
     return {
       title: 'Login with Nimiq',
-      about: 'Connect via browser Hub or the Nimiq Pay app.',
+      about:
+        'Use Nimiq Hub in this browser (recommended), or open VeriLock in the Nimiq Pay app if you have it installed.',
       steps: [],
     }
   }
   return {
     title: 'Login with Nimiq',
-    about: 'Connect via browser Hub or the Nimiq Pay app.',
+    about: 'Connect with Nimiq Hub in this browser, or scan a QR to approve in Nimiq Pay.',
     steps: [],
   }
 }
@@ -170,13 +172,17 @@ export function journeyConnectOptions(mode: JourneyConnectMode): JourneyConnectR
   return undefined
 }
 
-/** Hub is primary on desktop, or on mobile after Pay deeplink failed. */
+/**
+ * Hub is the reliable default in any browser (desktop + mobile Safari/Chrome).
+ * Nimiq Pay stays available as a secondary path when the app is installed.
+ * `showOpenInPay` is retained for callers that still track a failed deeplink.
+ */
 export function journeyHubPreferred(
   mode: JourneyConnectMode,
-  showOpenInPay = false,
+  _showOpenInPay = false,
 ): boolean {
   const surface = asLoginSurface(mode)
-  if (surface === 'desktop') return true
-  if (surface === 'mobile' && showOpenInPay) return true
+  if (surface === 'desktop' || surface === 'mobile') return true
+  void _showOpenInPay
   return false
 }

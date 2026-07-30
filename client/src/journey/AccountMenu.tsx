@@ -16,6 +16,8 @@ interface AccountMenuProps {
   account: JourneyAccount | null
   connecting: boolean
   walletStatus?: string | null
+  /** Wallet connect error (shown inside the Login sheet). */
+  error?: string | null
   /** Resolved login surface (in-pay / mobile / desktop). */
   connectMode?: JourneyConnectMode
   /** Mobile: Pay deeplink failed — prefer Hub in the sheet. */
@@ -37,6 +39,7 @@ export function AccountMenu({
   account,
   connecting,
   walletStatus,
+  error = null,
   connectMode = 'desktop',
   showOpenInPay = false,
   creditBalance = null,
@@ -105,6 +108,7 @@ export function AccountMenu({
             connectMode={connectMode}
             connecting={connecting}
             walletStatus={walletStatus}
+            error={error}
             showOpenInPay={showOpenInPay}
             onClose={() => setLoginOpen(false)}
             onProceed={onConnect}

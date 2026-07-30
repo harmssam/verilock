@@ -21,6 +21,8 @@ interface LoginSheetProps {
   connectMode: JourneyConnectMode
   connecting: boolean
   walletStatus?: string | null
+  /** Wallet connect error — must show inside the sheet (banner can be hidden behind the modal). */
+  error?: string | null
   onClose?: () => void
   /**
    * Start connect. `{ useRedirect: true }` = Hub;
@@ -37,7 +39,7 @@ interface LoginSheetProps {
 
 /**
  * Login chooser sheet.
- * - mobile: Open in Nimiq Pay vs Hub
+ * - mobile: Hub (primary) vs Open in Nimiq Pay
  * - desktop: Hub vs Pay QR (QR is a nested panel)
  * - in-pay: simple proceed (usually skipped by needsSheet)
  */
@@ -46,6 +48,7 @@ export function LoginSheet({
   connectMode,
   connecting,
   walletStatus,
+  error = null,
   onClose,
   onProceed,
   onSession,
@@ -222,55 +225,7 @@ export function LoginSheet({
             </div>
           ) : surface === 'mobile' ? (
             <div className="login-sheet-choices">
-              <div className="login-sheet-choice">
-                <button
-                  type="button"
-                  className={`${payBtnClass} login-sheet-proceed${pendingChoice === 'pay' ? ' btn--busy' : ''}`}
-                  onClick={() => {
-                    setPendingChoice('pay')
-                    onProceed({ useRedirect: false })
-                  }}
-                  disabled={connecting}
-                >
-                  {pendingChoice === 'pay' ? (
-                    <>
-                      <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
-                      {mobileChoice.payBusy}
-                    </>
-                  ) : (
-                    <>
-                      <IPhoneIcon size={16} strokeWidth={2.25} />
-                      {mobileChoice.payIdle}
-                    </>
-                  )}
-                </button>
-                <p className="muted login-sheet-choice-hint">{mobileChoice.payHint}</p>
-                <div className="login-sheet-store-row">
-                  <a
-                    className="btn btn-ghost login-sheet-store-link"
-                    href={NIMIQ_PAY_IOS_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <ExternalLink size={13} strokeWidth={2.25} aria-hidden />
-                    App Store
-                  </a>
-                  <a
-                    className="btn btn-ghost login-sheet-store-link"
-                    href={NIMIQ_PAY_ANDROID_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <ExternalLink size={13} strokeWidth={2.25} aria-hidden />
-                    Google Play
-                  </a>
-                </div>
-              </div>
-
-              <div className="login-sheet-choice-divider" role="presentation">
-                <span>or</span>
-              </div>
-
+              {/* Hub first: no custom scheme; works when Nimiq Pay is not installed. */}
               <div className="login-sheet-choice">
                 <button
                   type="button"
@@ -295,6 +250,59 @@ export function LoginSheet({
                 </button>
                 <p className="muted login-sheet-choice-hint">{mobileChoice.hubHint}</p>
               </div>
+
+              <div className="login-sheet-choice-divider" role="presentation">
+                <span>or</span>
+              </div>
+
+              <div className="login-sheet-choice">
+                <button
+                  type="button"
+                  className={`${payBtnClass} login-sheet-proceed${pendingChoice === 'pay' ? ' btn--busy' : ''}`}
+                  onClick={() => {
+                    setPendingChoice('pay')
+                    onProceed({ useRedirect: false })
+                  }}
+                  disabled={connecting}
+                >
+                  {pendingChoice === 'pay' ? (
+                    <>
+                      <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+                      {mobileChoice.payBusy}
+                    </>
+                  ) : (
+                    <>
+                      <IPhoneIcon size={16} strokeWidth={2.25} />
+                      {mobileChoice.payIdle}
+                    </>
+                  )}
+                </button>
+                <p className="muted login-sheet-choice-hint">
+                  {showOpenInPay
+                    ? 'Nimiq Pay did not open on this device — install the app, or use Nimiq Hub above.'
+                    : mobileChoice.payHint}
+                </p>
+                <div className="login-sheet-store-row">
+                  <a
+                    className="btn btn-ghost login-sheet-store-link"
+                    href={NIMIQ_PAY_IOS_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <ExternalLink size={13} strokeWidth={2.25} aria-hidden />
+                    App Store
+                  </a>
+                  <a
+                    className="btn btn-ghost login-sheet-store-link"
+                    href={NIMIQ_PAY_ANDROID_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <ExternalLink size={13} strokeWidth={2.25} aria-hidden />
+                    Google Play
+                  </a>
+                </div>
+              </div>
             </div>
           ) : (
             <button
@@ -317,7 +325,12 @@ export function LoginSheet({
             </button>
           )}
 
-          {walletStatus && (
+          {error && (
+            <p className="login-sheet-status login-sheet-status--error" role="alert">
+              {error}
+            </p>
+          )}
+          {!error && walletStatus && (
             <p className="login-sheet-status" role="status">
               {walletStatus}
             </p>

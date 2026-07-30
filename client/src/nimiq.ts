@@ -854,7 +854,11 @@ export function payLoginQrPayload(loginId: string): {
 
 export type NimiqPayLaunchResult = 'already-in-pay' | 'launched' | 'unavailable'
 
-/** Only attempts nimiqpay:// on mobile - desktop browsers have no registered handler. */
+/**
+ * Only attempts `nimiqpay://` on mobile — desktop browsers log a scheme error and
+ * never leave the tab. Callers must treat “launched” as best-effort and fall back
+ * if the page stays visible (see useJourneyWallet scheduleDeeplinkFallback).
+ */
 export function launchNimiqPayMiniApp(appUrl?: string): NimiqPayLaunchResult {
   if (isNimiqPayHost()) return 'already-in-pay'
   if (!isMobileDevice()) return 'unavailable'
@@ -867,7 +871,14 @@ export function launchNimiqPayMiniApp(appUrl?: string): NimiqPayLaunchResult {
   } catch {
     savePayReturnPath()
   }
-  window.location.assign(nimiqPayDeepLink(target))
+  const deeplink = nimiqPayDeepLink(target)
+  try {
+    // Prefer assign so Back can return to VeriLock if the OS does not switch apps.
+    window.location.assign(deeplink)
+  } catch {
+    // Some embedded browsers throw on unknown schemes — treat as unavailable.
+    return 'unavailable'
+  }
   return 'launched'
 }
 

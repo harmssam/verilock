@@ -54,10 +54,13 @@ export interface UseJourneyWalletResult {
   showOpenInPay: boolean
 }
 
-const PAY_DEEPLINK_FALLBACK_MS = 2500
-/** Shown only when the page stayed foreground after launch - app likely missing. */
+const PAY_DEEPLINK_FALLBACK_MS = 1800
+/**
+ * Shown only when the page stayed foreground after launch — app missing or
+ * browser has no `nimiqpay://` handler (common on desktop and phones without Pay).
+ */
 const PAY_INSTALL_HINT =
-  'Nimiq Pay did not open. Install the app for the best experience, then try again - or continue with Nimiq Hub.'
+  'Nimiq Pay did not open (this browser has no app for nimiqpay:// links). Use Nimiq Hub instead, or install Nimiq Pay and try again.'
 /**
  * After the browser tab left the foreground (Pay handoff), remind that login
  * lives in the Pay WebView - this tab has a separate sessionStorage.
@@ -435,12 +438,18 @@ export function useJourneyWallet(): UseJourneyWalletResult {
         const alreadyInPay = payHost || hasNimiqProvider
 
         /**
-         * Browser Hub path (desktop, or mobile “Login with Hub”).
-         * No probe / network awaits before chooseAddress so redirect (and future
-         * popup) start in the same turn as the click.
+         * Browser paths (not inside Nimiq Pay WebView):
+         * - Explicit Pay (`useRedirect: false`): try `nimiqpay://` deeplink only.
+         * - Everything else (Hub button, desktop Login, default): Nimiq Hub redirect.
+         *
+         * Hub is the reliable default — it works without a custom URL scheme or app.
+         * No network awaits before chooseAddress so the redirect stays in the click turn.
          */
         if (!alreadyInPay && !payHost) {
-          if (isMobileDevice() && !explicitHubRedirect) {
+          const wantPayDeeplink =
+            isMobileDevice() && options?.useRedirect === false && !explicitHubRedirect
+
+          if (wantPayDeeplink) {
             setWalletStatus('Opening Nimiq Pay…')
             // Full path+query so invite /d/:slug?party= survives Pay open (not just origin → home).
             const appUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`
@@ -451,6 +460,7 @@ export function useJourneyWallet(): UseJourneyWalletResult {
               scheduleDeeplinkFallback()
               return
             }
+            // Desktop / no scheme handler — surface immediately, never silent.
             setShowOpenInPay(true)
             setWalletStatus(null)
             setError(PAY_INSTALL_HINT)

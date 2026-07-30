@@ -210,6 +210,7 @@ export function DocumentJourney({
     address,
     connecting,
     walletStatus,
+    error: walletError,
     connect,
     setError,
     nimiq,
@@ -2631,7 +2632,8 @@ export function DocumentJourney({
         ? signHash === doc.fingerprint
         : Boolean(pdfFile && pdfHash === doc.fingerprint)),
   )
-  const displayError = localError
+  // Wallet errors (Hub/Pay) must surface on the path — not only behind the login modal banner.
+  const displayError = localError ?? walletError
 
   if (missingDeepLink) {
     return (
@@ -2980,6 +2982,7 @@ export function DocumentJourney({
                       connectMode={connectMode}
                       connecting={connecting}
                       walletStatus={walletStatus}
+                      error={walletError}
                       showOpenInPay={showOpenInPay}
                       onClose={() => setLoginSheetOpen(false)}
                       onProceed={connectFromPath}
@@ -3284,6 +3287,7 @@ export function DocumentJourney({
                                 connectMode={connectMode}
                                 connecting={connecting}
                                 walletStatus={walletStatus}
+                                error={walletError}
                                 showOpenInPay={showOpenInPay}
                                 onClose={() => setLoginSheetOpen(false)}
                                 onProceed={connectFromPath}

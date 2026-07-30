@@ -792,6 +792,7 @@ export function App() {
               account={wallet.account}
               connecting={wallet.connecting}
               walletStatus={wallet.walletStatus}
+              error={wallet.error}
               connectMode={connectMode}
               showOpenInPay={wallet.showOpenInPay}
               creditBalance={wallet.account ? creditBalance : null}
