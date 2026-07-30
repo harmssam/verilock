@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isMobileDevice } from './nimiq'
 
 /**
  * Nimiq Pay mini app is portrait-locked and does not support a true landscape
@@ -18,37 +19,29 @@ function readRealLandscape(): boolean {
 }
 
 /**
- * One-shot: phone-sized touch surface (coarse pointer + short edge ≤ 640).
- * Use min(width,height) so landscape phones stay “mobile” (max-width:640 alone
- * fails when the long edge becomes the CSS width).
+ * Phone/tablet client for product UX (ink sheet, mobile CTAs).
+ *
+ * Same rule as {@link isMobileDevice}: browser-reported identity only.
+ * **Not** CSS width — a desktop window shrunk by docked DevTools is still desktop.
+ * Spoofed phone UA / device toolbar is treated as mobile (by design).
  */
 export function isLikelyMobileViewport(): boolean {
-  if (typeof window === 'undefined') return false
-  try {
-    const coarse = window.matchMedia('(pointer: coarse)').matches
-    if (!coarse) return false
-    const shortSide = Math.min(window.innerWidth, window.innerHeight)
-    return shortSide <= 640
-  } catch {
-    return false
-  }
+  return isMobileDevice()
 }
 
 /**
- * Reactive: primary surface is a phone-sized touch device.
- * Prefer this over a one-shot `isLikelyMobileViewport()` when UI must reflow.
+ * Reactive: follows browser-reported device identity (not window width).
+ * Updates if the client identity changes (rare; e.g. toggling device emulation).
  */
 export function useLikelyMobileViewport(): boolean {
   const [mobile, setMobile] = useState(isLikelyMobileViewport)
   useEffect(() => {
     const sync = () => setMobile(isLikelyMobileViewport())
     sync()
-    const mqs = [window.matchMedia('(pointer: coarse)')]
-    for (const mq of mqs) mq.addEventListener('change', sync)
+    // UA rarely changes; keep light listeners for DevTools device-mode toggles.
     window.addEventListener('resize', sync)
     window.addEventListener('orientationchange', sync)
     return () => {
-      for (const mq of mqs) mq.removeEventListener('change', sync)
       window.removeEventListener('resize', sync)
       window.removeEventListener('orientationchange', sync)
     }

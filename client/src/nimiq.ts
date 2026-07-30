@@ -761,6 +761,15 @@ export const NIMIQ_PAY_IOS_URL = 'https://apps.apple.com/us/app/nimiq-pay/id6471
 export const NIMIQ_PAY_ANDROID_URL =
   'https://play.google.com/store/apps/details?id=com.nimiq.pay'
 
+/**
+ * Whether this client is a phone/tablet for login & Pay deeplinks.
+ *
+ * Uses **browser-reported identity only** (UA / platform / touch points) — never
+ * CSS viewport width. Docking DevTools or shrinking a desktop window must not
+ * flip this. If the browser **spoofs** a phone (device toolbar / UA override),
+ * we intentionally treat it as that device; there is no reliable way to see
+ * through spoofing, and trusting the claim is correct for testing.
+ */
 export function isMobileDevice(): boolean {
   if (typeof navigator === 'undefined') return false
   if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return true
