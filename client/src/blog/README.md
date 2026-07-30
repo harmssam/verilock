@@ -250,45 +250,16 @@ Link related guides into these when relevant:
 
 Index is newsroom-style (featured + spotlight cards + compact archive). Shell is wide on desktop for blog/pricing/privacy/agreements; Journey create/sign stays compact. Featured should prefer a medium guide when one is newest.
 
-## Blog Studio (local)
+## Blog Studio (separate repo)
 
-Local UI at `/blog-studio` with two tabs:
+Blog Studio + X Post Studio live in **[clevertech-os/content-studio](https://github.com/clevertech-os/content-studio)** (not this monorepo).
 
-| Tab | What it does |
-|-----|----------------|
-| **Images** | One **Image prompt** box: type your own text, or use **Write image prompt** / **Compare models** to draft from article copy. Then **Generate with Grok Imagine** runs local headless Grok (CLI OAuth) to write `client/public/blog/`. Handoff copy remains a fallback. |
-| **Copy** | Loads live post prose from `client/src/blog/posts/`. Instruct the selected LLM to rewrite; preview; **Apply** writes title, description, and body back to the TypeScript source. |
+```bash
+cd ../content-studio   # or clone clevertech-os/content-studio
+cp .env.example .env   # set CONTENT_ROOT to this verilock checkout if needed
+npm install && npm run dev
+# → http://127.0.0.1:3002/blog-studio
+# → http://127.0.0.1:3002/x-studio
+```
 
-| | |
-|--|--|
-| URL | `http://127.0.0.1:3002/blog-studio` (API server, not Vite) |
-| Enable | Non-production only |
-| Key | `OPENCODE_API_KEY` in `server/.env` (prompt drafting) |
-| Grok Imagine | Local `grok` CLI + `grok login` (OAuth in `~/.grok/auth.json`). Optional `GROK_BIN`, `GROK_IMAGE_TIMEOUT_MS` (default 5m), `GROK_IMAGE_MAX_TURNS` |
-| Models | Four checkboxes (all on by default): `qwen3.5-plus` / `qwen3.6-plus` on **Zen**; **`qwen3.7-plus` / `qwen3.7-max` on Go**. No primary dropdown. |
-| Copy rewrite | **Rewrite copy** runs every checked model; pick a card to apply; failed cards **Retry this model** |
-| Concurrency | Max **3** in-flight OpenCode HTTP calls process-wide (`OPENCODE_MAX_CONCURRENT`, hard-capped at 3). **One** Grok Imagine job at a time. |
-| Abort | **Abort** cancels the active image or copy request (client + server; kills headless `grok` for Imagine) |
-| Image drafts | `server/data/blog-studio-drafts/*.json` + `*.handoff.md` (+ `*.grok-run.log` after Imagine) |
-| Copy apply | Overwrites the post `.ts` file (git to undo) |
-
-### Image flow
-
-1. `npm run dev` (server on :3002)
-2. Ensure Grok CLI is installed and signed in: `grok login` (xAI OAuth - not the X developer API)
-3. Open `/blog-studio`, pick post + asset
-4. Type your own text in **Image prompt**, or **Write image prompt** (from article copy) / **Compare models** → **Use this prompt** (editable after)
-5. **Generate with Grok Imagine** - uses the current prompt box text; server starts a **background** headless `grok` job (UI polls status; disconnect no longer kills the job). Imagine writes/overwrites the target under `client/public/blog/`, preview refreshes
-6. Fallback: **Copy handoff** → paste into Grok Build chat if CLI is unavailable
-7. Commit + push when you want production updated
-
-### Copy flow
-
-1. Same studio URL, pick a post, open the **Copy** tab
-2. Read the live plain-text view of title, description, and body
-3. Enter edit instructions → **Rewrite with Qwen**
-4. Review the proposal (figures keep the same `src` paths)
-5. **Apply rewrite to post file** when satisfied
-6. Reload Journey `/blog` to preview; commit when ready
-
-Studio is localhost-only unless `BLOG_STUDIO_TOKEN` is set.
+Studios write posts into `client/src/blog/posts/` and images into `client/public/blog/`. See that repo’s README for OpenCode, Grok Imagine, and X API env vars.

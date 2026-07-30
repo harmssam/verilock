@@ -47,16 +47,7 @@ client/src/archive/
 branding/
 logo-ideas/
 
-# Local content studios (Blog Studio + X Post Studio - never ship)
-server/src/blogStudio.ts
-server/src/blogStudioCopy.ts
-server/src/blogStudioGrok.ts
-server/src/blogStudioRoutes.ts
-server/src/xPostStudio.ts
-server/src/xPostStudioRoutes.ts
-server/src/xPostSchedule.ts
-server/src/xPostTwitter.ts
-server/scripts/e2e-blog-studio.mjs
+# Legacy local studio data (studios moved to clevertech-os/content-studio)
 server/data/blog-studio-drafts/
 server/data/x-post-studio/
 

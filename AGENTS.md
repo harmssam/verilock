@@ -78,7 +78,7 @@ Archive-only (do not invest product work without an explicit request):
 - **In production.** Content: `client/src/blog/`, art: `client/public/blog/`, UI: `client/src/journey/BlogPage.tsx` (+ CSS).
 - Shell routes `/blog` and `/blog/:slug` in `App.tsx`; footer Blog (+ Security) links; homepage “From the blog”.
 - Server SPA deep links: `server/src/static.ts` `isKnownAppPath` must include `/blog`.
-- **Do not ship** Blog Studio / X Post Studio (still gitignored under `server/src/blogStudio*`, etc.).
+- **Do not ship** content studios here. Blog Studio + X Post Studio live in **`clevertech-os/content-studio`** (sibling checkout; set `CONTENT_ROOT` to this monorepo).
 
 ### If the user says “the app” / “production” / “VeriLock UI”
 
