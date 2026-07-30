@@ -17,13 +17,18 @@ function readRealLandscape(): boolean {
   return mq || window.innerWidth >= window.innerHeight
 }
 
-/** One-shot: phone-sized touch surface (narrow + coarse pointer). */
+/**
+ * One-shot: phone-sized touch surface (coarse pointer + short edge ≤ 640).
+ * Use min(width,height) so landscape phones stay “mobile” (max-width:640 alone
+ * fails when the long edge becomes the CSS width).
+ */
 export function isLikelyMobileViewport(): boolean {
   if (typeof window === 'undefined') return false
   try {
-    const narrow = window.matchMedia('(max-width: 640px)').matches
     const coarse = window.matchMedia('(pointer: coarse)').matches
-    return narrow && coarse
+    if (!coarse) return false
+    const shortSide = Math.min(window.innerWidth, window.innerHeight)
+    return shortSide <= 640
   } catch {
     return false
   }
@@ -38,15 +43,14 @@ export function useLikelyMobileViewport(): boolean {
   useEffect(() => {
     const sync = () => setMobile(isLikelyMobileViewport())
     sync()
-    const mqs = [
-      window.matchMedia('(max-width: 640px)'),
-      window.matchMedia('(pointer: coarse)'),
-    ]
+    const mqs = [window.matchMedia('(pointer: coarse)')]
     for (const mq of mqs) mq.addEventListener('change', sync)
     window.addEventListener('resize', sync)
+    window.addEventListener('orientationchange', sync)
     return () => {
       for (const mq of mqs) mq.removeEventListener('change', sync)
       window.removeEventListener('resize', sync)
+      window.removeEventListener('orientationchange', sync)
     }
   }, [])
   return mobile

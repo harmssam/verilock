@@ -29,8 +29,24 @@ function ensurePdfWorker(): Promise<void> {
   return pdfWorkerReady
 }
 
+/** SHA-256 needs Web Crypto (`crypto.subtle`), which browsers only expose in a secure context. */
+function requireSubtleCrypto(): SubtleCrypto {
+  const subtle = globalThis.crypto?.subtle
+  if (subtle) return subtle
+  const host = typeof location !== 'undefined' ? location.hostname : ''
+  const viaLanIp = Boolean(host && host !== 'localhost' && host !== '127.0.0.1' && !host.endsWith('.local'))
+  throw new Error(
+    viaLanIp
+      ? 'Document fingerprinting needs a secure context (HTTPS or localhost). ' +
+          'This page is open over plain HTTP on a network address, so the browser blocks crypto. ' +
+          'On this machine use http://localhost:5176 — or open the phone via HTTPS / a tunnel for mobile testing.'
+      : 'Document fingerprinting needs a secure context (HTTPS or localhost). ' +
+          'Open VeriLock over HTTPS or http://localhost and try again.',
+  )
+}
+
 export async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  const digest = await requireSubtleCrypto().digest('SHA-256', bytes)
   return Array.from(new Uint8Array(digest))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')

@@ -1,11 +1,11 @@
 /**
  * Full-screen ink capture for phones — shared by QR /m/sign and in-app field signing.
  *
- * - Real OS landscape: normal landscape pad sizing.
- * - Phone portrait (mobile browser **or** Nimiq Pay): skip the rotate gate; **force
- *   landscape frame** via JS pixel geometry + rotate(90deg). Pay is a portrait-locked
- *   browser shell — same pad UX works in Safari/Chrome without requiring OS rotate.
+ * - Phone / Nimiq Pay: always the same landscape layout box (long × short edges).
+ *   Portrait OS: CSS rotate(90deg) so the box fills the screen; tip phone to match.
+ *   Landscape OS: same box, no rotate — pad size stays identical across orientation.
  * - Desktop portrait (rare): blocking rotate gate if this sheet is shown.
+ * - Desktop landscape: normal full-viewport pad (no force frame).
  */
 import { X } from 'lucide-react'
 import {
@@ -15,7 +15,11 @@ import {
   useState,
   type CSSProperties,
 } from 'react'
-import { useIsLandscape, useIsRealPortrait } from '../useViewport'
+import {
+  useForceLandscapeInkHost,
+  useIsLandscape,
+  useIsRealPortrait,
+} from '../useViewport'
 import { paintSignaturePath, type SignaturePathData } from './annotations'
 import {
   SignatureStrokePad,
@@ -23,7 +27,7 @@ import {
 } from './SignatureStrokePad'
 import './InkCaptureSheet.css'
 
-/** Turn (1.4s) + short hold (~0.25s), then fade (~0.3s). */
+/** Turn (1.4s) + short hold (~0.25s), then fade (~0.3s). Play once per pad open. */
 const PORTRAIT_GUIDE_VISIBLE_MS = 1650
 const PORTRAIT_GUIDE_FADE_MS = 300
 
@@ -66,22 +70,26 @@ function IPhoneOutlineIcon({ className }: { className?: string }) {
   )
 }
 
+type ForceFrameState = {
+  style: CSSProperties
+  /** True when CSS rotate(90deg) is active (pointer mapping needs data-ink-force-landscape). */
+  rotated: boolean
+}
+
 /**
- * Forced landscape frame for portrait-locked hosts (Nimiq Pay / mobile browsers).
+ * Stable landscape frame for phone / Nimiq Pay ink hosts.
  *
- * Layout box is landscape-sized (long = physical height, short = physical width),
- * centered, then rotated 90° so it fills the portrait viewport. Hold phone on its side.
- *
- * Pad size is NOT computed here — head + pad stage + Done dock are in-flow flex
- * children; the stage uses container queries so the canvas fills remaining space
- * at the field aspect without overlapping the green button.
+ * Layout box is always longEdge × shortEdge (device edges), so the pad stage
+ * keeps the same CSS size when the user tips the phone. In portrait we rotate
+ * that box 90°; in landscape we leave transform none. No intermediate “OS
+ * landscape sheet” path — that used different padding and looked like a resize.
  */
-function useForcedLandscapeFrame(enabled: boolean): CSSProperties | undefined {
-  const [style, setStyle] = useState<CSSProperties | undefined>(undefined)
+function useForcedLandscapeFrame(enabled: boolean): ForceFrameState | undefined {
+  const [frame, setFrame] = useState<ForceFrameState | undefined>(undefined)
 
   useLayoutEffect(() => {
     if (!enabled) {
-      setStyle(undefined)
+      setFrame(undefined)
       return
     }
 
@@ -89,43 +97,76 @@ function useForcedLandscapeFrame(enabled: boolean): CSSProperties | undefined {
       const vw = window.innerWidth
       const vh = window.innerHeight
       if (vw < 1 || vh < 1) return
-      // Landscape logical size: width = long edge, height = short edge
-      const frameW = vh
-      const frameH = vw
 
-      setStyle({
-        position: 'fixed',
-        zIndex: 230,
-        width: frameW,
-        height: frameH,
-        top: (vh - frameH) / 2,
-        left: (vw - frameW) / 2,
-        right: 'auto',
-        bottom: 'auto',
-        margin: 0,
-        transform: 'rotate(90deg)',
-        transformOrigin: 'center center',
-        boxSizing: 'border-box',
-        ['--ink-force-short' as string]: `${frameH}px`,
-        ['--ink-force-long' as string]: `${frameW}px`,
+      const long = Math.max(vw, vh)
+      const short = Math.min(vw, vh)
+      const portrait = vw < vh
+      // Same logical landscape box in both orientations.
+      const frameW = long
+      const frameH = short
+      const top = (vh - frameH) / 2
+      const left = (vw - frameW) / 2
+
+      setFrame(prev => {
+        if (
+          prev &&
+          prev.rotated === portrait &&
+          prev.style.width === frameW &&
+          prev.style.height === frameH &&
+          prev.style.top === top &&
+          prev.style.left === left
+        ) {
+          return prev
+        }
+        return {
+          rotated: portrait,
+          style: {
+            position: 'fixed',
+            zIndex: 230,
+            width: frameW,
+            height: frameH,
+            top,
+            left,
+            right: 'auto',
+            bottom: 'auto',
+            margin: 0,
+            transform: portrait ? 'rotate(90deg)' : 'none',
+            transformOrigin: 'center center',
+            // Avoid CSS interpolating rotate ↔ none across orientation flips.
+            transition: 'none',
+            boxSizing: 'border-box',
+            ['--ink-force-short' as string]: `${frameH}px`,
+            ['--ink-force-long' as string]: `${frameW}px`,
+          },
+        }
       })
+    }
+
+    let orientTimers: number[] = []
+    const onOrientation = () => {
+      // iOS often fires orientationchange before innerWidth/Height settle.
+      apply()
+      for (const ms of [50, 150, 300]) {
+        orientTimers.push(window.setTimeout(apply, ms))
+      }
     }
 
     apply()
     window.addEventListener('resize', apply)
-    window.addEventListener('orientationchange', apply)
+    window.addEventListener('orientationchange', onOrientation)
     const vv = window.visualViewport
     vv?.addEventListener('resize', apply)
     vv?.addEventListener('scroll', apply)
     return () => {
       window.removeEventListener('resize', apply)
-      window.removeEventListener('orientationchange', apply)
+      window.removeEventListener('orientationchange', onOrientation)
+      for (const t of orientTimers) window.clearTimeout(t)
       vv?.removeEventListener('resize', apply)
       vv?.removeEventListener('scroll', apply)
     }
   }, [enabled])
 
-  return style
+  return frame
 }
 
 export interface InkCaptureExistingInk {
@@ -227,11 +268,14 @@ export function InkCaptureSheet({
 }: InkCaptureSheetProps) {
   const isLandscape = useIsLandscape()
   const isRealPortrait = useIsRealPortrait()
+  const forceInkHost = useForceLandscapeInkHost()
   const isInitial = fieldKind === 'initial'
-  // Phone / Pay: isLandscape true while still real-portrait → force landscape frame
-  // (no “turn sideways” gate). OS landscape: normal draw layout.
+  // Desktop only: block until OS landscape. Phones/Pay always get the force frame.
   const needsLandscape = !isLandscape
-  const isPortraitHost = !needsLandscape && isRealPortrait
+  // Same chrome + long×short box for the whole session (portrait and OS landscape).
+  const isForceHost = forceInkHost && !needsLandscape
+  const forceFrame = useForcedLandscapeFrame(isForceHost)
+  const forceRotated = Boolean(forceFrame?.rotated)
   const canDraw = isLandscape && !disabled
   const title = isInitial ? 'Draw your initials' : 'Draw your signature'
   const aspect =
@@ -240,17 +284,23 @@ export function InkCaptureSheet({
       : isInitial
         ? 1.4
         : 2.8
-  const forceFrame = useForcedLandscapeFrame(isPortraitHost)
 
   /**
-   * One-shot guide: iPhone SVG turns 2s, holds, fades — tip the phone to match the frame.
+   * One-shot guide when the pad first opens in portrait — never re-run on
+   * orientation flips (that felt like a re-render / animation after rotate).
    */
   const [portraitGuide, setPortraitGuide] = useState<'off' | 'play' | 'fade'>('off')
+  const guidePlayedForPadRef = useRef<string | number | null>(null)
   useEffect(() => {
-    if (!isPortraitHost) {
+    if (!isForceHost || !isRealPortrait) {
       setPortraitGuide('off')
       return
     }
+    if (guidePlayedForPadRef.current === padKey) {
+      setPortraitGuide('off')
+      return
+    }
+    guidePlayedForPadRef.current = padKey
     setPortraitGuide('play')
     const fadeTimer = window.setTimeout(() => setPortraitGuide('fade'), PORTRAIT_GUIDE_VISIBLE_MS)
     const offTimer = window.setTimeout(
@@ -261,21 +311,21 @@ export function InkCaptureSheet({
       window.clearTimeout(fadeTimer)
       window.clearTimeout(offTimer)
     }
-  }, [isPortraitHost, padKey])
+  }, [isForceHost, isRealPortrait, padKey])
 
   useEffect(() => {
     if (needsLandscape) return
-    if (variant !== 'overlay' && !isPortraitHost) return
+    if (variant !== 'overlay' && !isForceHost) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = prev
     }
-  }, [isPortraitHost, variant, needsLandscape])
+  }, [isForceHost, variant, needsLandscape])
 
   return (
     <>
-      {isPortraitHost && (
+      {isForceHost && (
         <div className="ink-capture-force-backdrop" aria-hidden />
       )}
       <div
@@ -283,14 +333,15 @@ export function InkCaptureSheet({
           'ink-capture-sheet',
           `ink-capture-sheet--${variant}`,
           needsLandscape ? 'is-rotate' : 'is-draw',
-          isPortraitHost ? 'is-portrait-host' : '',
+          // Portrait-host chrome applies for the whole force-ink session (both orientations).
+          isForceHost ? 'is-portrait-host' : '',
           className,
         ]
           .filter(Boolean)
           .join(' ')}
-        style={forceFrame}
+        style={forceFrame?.style}
         // Marks the rotate(90deg) root for correct pointer → canvas mapping.
-        {...(isPortraitHost ? { 'data-ink-force-landscape': '' } : {})}
+        {...(forceRotated ? { 'data-ink-force-landscape': '' } : {})}
         role={variant === 'overlay' ? 'dialog' : undefined}
         aria-modal={variant === 'overlay' ? true : undefined}
         aria-labelledby={titleId}
@@ -333,7 +384,7 @@ export function InkCaptureSheet({
               aria-label="Close"
               onClick={onClose}
             >
-              <X size={isPortraitHost ? 22 : 20} strokeWidth={2.35} aria-hidden />
+              <X size={isForceHost ? 22 : 20} strokeWidth={2.35} aria-hidden />
             </button>
           )}
         </header>

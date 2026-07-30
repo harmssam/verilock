@@ -461,8 +461,9 @@
 }
 
 /*
- * Forced-landscape host (Nimiq Pay + mobile browser in portrait): geometry from
- * inline JS (width=innerHeight, height=innerWidth, rotate 90deg, centered).
+ * Forced-landscape host (Nimiq Pay + mobile browser): geometry from inline JS
+ * (always longEdge × shortEdge; rotate 90deg only while OS is portrait).
+ * Same chrome + pad stage in both orientations — no reflow “strange pad” on tip.
  * Layout inside the box is normal landscape flex — not a tall portrait stack.
  */
 .ink-capture-sheet.is-portrait-host.is-draw {
@@ -481,6 +482,14 @@
   /* Head / pad / dock all in-flow — no extra bottom for an overlay */
   padding: 0.45rem 0.65rem 0.4rem;
   background: var(--bg, #f8fafc);
+  /* Never animate the frame size/transform across orientation flips */
+  transition: none !important;
+}
+
+.ink-capture-sheet.is-portrait-host .ink-capture-pad-stage,
+.ink-capture-sheet.is-portrait-host .sig-pad,
+.ink-capture-sheet.is-portrait-host .sig-pad-canvas {
+  transition: none !important;
 }
 
 .ink-capture-sheet.is-portrait-host .ink-capture-head {

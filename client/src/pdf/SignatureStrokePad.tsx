@@ -276,20 +276,34 @@ export function SignatureStrokePad({
     const canvas = canvasRef.current
     if (!canvas) return
 
+    let lastW = 0
+    let lastH = 0
+    let raf = 0
+
     const resize = () => {
+      const { w, h } = padCssSize()
+      // Skip no-op resizes (orientation can fire multiple events with the same box).
+      if (w === lastW && h === lastH && canvas.width > 0) return
+      lastW = w
+      lastH = h
       paintAll()
-      // Re-emit so parent PNG preview matches new orientation without changing path.
+      // Re-emit so parent PNG preview matches new pad size without changing path.
       if (unitStrokesRef.current.length > 0) emit()
     }
 
     resize()
     const ro = new ResizeObserver(() => {
       // rAF: layout may still be settling after orientation change
-      requestAnimationFrame(resize)
+      if (raf) cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        resize()
+      })
     })
     ro.observe(canvas)
     window.addEventListener('orientationchange', resize)
     return () => {
+      if (raf) cancelAnimationFrame(raf)
       ro.disconnect()
       window.removeEventListener('orientationchange', resize)
     }

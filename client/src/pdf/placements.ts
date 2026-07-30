@@ -17,7 +17,14 @@ export async function sha256HexBytes(data: ArrayBuffer | Uint8Array): Promise<st
     data instanceof Uint8Array
       ? (data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer)
       : data
-  const digest = await crypto.subtle.digest('SHA-256', buf)
+  const subtle = globalThis.crypto?.subtle
+  if (!subtle) {
+    // Same constraint as hashPdf.sha256Hex — keep message short; create path uses hashPdf primarily.
+    throw new Error(
+      'Hashing needs a secure context (HTTPS or localhost). Plain HTTP on a LAN IP blocks Web Crypto.',
+    )
+  }
+  const digest = await subtle.digest('SHA-256', buf)
   return Array.from(new Uint8Array(digest))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')
