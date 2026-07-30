@@ -1,6 +1,7 @@
 # Production SPA (light shell + journey) at root.
-# VeriLock-Journey may still use railway.service-b.toml or
-# RAILWAY_DOCKERFILE_PATH=Dockerfile.service-b (identical packaging aliases).
+# VeriLock Railway service builds via Dockerfile (RAILWAY_DOCKERFILE_PATH=Dockerfile).
+# This file’s deploy healthcheck/startCommand apply; builder is Docker in service config.
+# Blog lives on clevertech-os/content-studio (service name: blog) — separate packaging.
 
 [build]
 builder = "nixpacks"

@@ -1,6 +1,6 @@
 # Production SPA (light shell + journey) as root; server serves client/dist.
-# Railway may still set RAILWAY_DOCKERFILE_PATH=Dockerfile.service-b (identical alias).
-# Prefer this Dockerfile for new deploys.
+# Sole Dockerfile for the VeriLock Railway service (RAILWAY_DOCKERFILE_PATH=Dockerfile).
+# Blog/content-studio is a separate service/repo — do not change packaging here for it.
 
 FROM node:22-bookworm-slim AS build
 

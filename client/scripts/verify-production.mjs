@@ -55,9 +55,9 @@ check('Dockerfile builds default client', () => {
   assert.match(docker, /npm run build --prefix client/)
 })
 
-check('Dockerfile.service-b remains production-compatible alias', () => {
-  const docker = readFileSync(join(rootDir, 'Dockerfile.service-b'), 'utf8')
-  assert.match(docker, /npm run build --prefix client/)
+check('legacy service-b packaging files are removed', () => {
+  assert.ok(!existsSync(join(rootDir, 'Dockerfile.service-b')), 'Dockerfile.service-b removed; use Dockerfile')
+  assert.ok(!existsSync(join(rootDir, 'railway.service-b.toml')), 'railway.service-b.toml removed; use railway.toml')
 })
 
 check('vite.config.ts is sole root-hosted production config', () => {

@@ -24,12 +24,14 @@ npm run build --prefix client
 npm run test:production --prefix client
 ```
 
-**Legacy aliases** (same as above; do not invent new “service-b” workflows):
+**Legacy npm aliases** (same commands; muscle memory only — no Dockerfile.service-b):
 
 ```bash
 npm run test:service-b --prefix client   # → test:production
 npm run package:service-b --prefix client  # → package.mjs
 ```
+
+Packaging: single root `Dockerfile` for the VeriLock Railway service. Content studio / public blog is **not** this repo (`clevertech-os/content-studio`, Railway service `blog`).
 
 **Do not** look for parallel product UIs:
 
