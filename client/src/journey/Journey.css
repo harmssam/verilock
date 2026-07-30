@@ -196,6 +196,11 @@
   margin-top: 0.05em;
 }
 
+/* Subtle drop-shadow on Login hex (gold on teal) — follows hex shape, not img box. */
+.lr-header .exp-connect-btn .nimiq-hexagon-icon {
+  filter: drop-shadow(0px 0.6px 2.9px rgba(26, 26, 26, 0.37));
+}
+
 /* ── Login sheet (Nimiq how-to + proceed) ── */
 
 .exp-login {
