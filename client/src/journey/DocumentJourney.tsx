@@ -3333,7 +3333,7 @@ export function DocumentJourney({
                                     that already names you.)
                                   </p>
                                 </header>
-                                <ul className="field-stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                                   {signingResolution.openParties.map(p => (
                                     <li key={p.id} style={{ marginBottom: '0.45rem' }}>
                                       <button
