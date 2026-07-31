@@ -184,34 +184,48 @@
 }
 
 /*
- * Official Nimiq hexagon (design kit) - keep aspect ratio in buttons.
- * Safari ≤17: SVG as <img> without CSS width/height can contribute the default
- * replaced size (~300×150) to flex min-content, so Login / Hub CTAs render huge.
- * NimiqHexagonIcon sets --nimiq-hex-w/h; callers may override width/height in CSS.
+ * Official Nimiq hexagon (design kit) — inlined SVG with explicit size.
+ * Cap max size so Safari flex min-content cannot invent a huge mark.
  */
 .nimiq-hexagon-icon {
-  display: inline-block;
+  display: block;
   box-sizing: content-box;
+  flex: 0 0 auto;
   flex-shrink: 0;
   vertical-align: middle;
-  object-fit: contain;
-  width: var(--nimiq-hex-w, 16px);
-  height: var(--nimiq-hex-h, 14px);
+  overflow: visible;
+  max-width: 4rem;
+  max-height: 4rem;
 }
 
-.btn .nimiq-hexagon-icon {
-  /* Slight optical lift next to text */
+.btn .nimiq-hexagon-icon,
+.btn svg.nimiq-hexagon-icon {
   margin-top: 0.05em;
-  /* Buttons are inline-flex: never let the mark grow the control */
   flex: 0 0 auto;
   align-self: center;
+  max-width: 1.25rem;
+  max-height: 1.25rem;
 }
 
-/* Login sheet mark (title row) — same Safari flex min-content trap */
 .login-sheet-mark.nimiq-hexagon-icon,
 .login-sheet-title-row .nimiq-hexagon-icon {
   flex: 0 0 auto;
   align-self: flex-start;
+  max-width: 1.5rem;
+  max-height: 1.5rem;
+}
+
+/*
+ * Safari ≤17: pin icons inside buttons so flex min-content cannot inflate CTAs.
+ */
+.btn > svg,
+.login-sheet .btn svg,
+.login-sheet-proceed svg {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  max-width: 1.25rem;
+  max-height: 1.25rem;
+  overflow: visible;
 }
 
 /* Subtle drop-shadow on Login hex (gold on teal) — follows hex shape, not img box. */
@@ -303,6 +317,8 @@
 
 .login-sheet--inline {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   background:
     linear-gradient(145deg, rgba(94, 234, 212, 0.08), rgba(59, 130, 246, 0.05)),
     #ffffff;
@@ -312,6 +328,10 @@
   box-shadow:
     0 0 0 3px rgba(13, 148, 136, 0.12),
     0 8px 24px rgba(13, 148, 136, 0.08);
+  /* Safari: keep type metrics stable (opsz variable fonts can look inflated) */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  font-optical-sizing: none;
 }
 
 .login-sheet-head {
@@ -407,7 +427,33 @@
 
 .login-sheet-proceed {
   width: 100%;
+  max-width: 100%;
+  min-width: 0 !important;
   justify-content: center;
+  box-sizing: border-box;
+}
+
+/*
+ * Login surfaces: drop Wealthsimple glass mask rings.
+ * Header already does this for .exp-login sheets; dock/inline needs the same
+ * so Safari ≤17 cannot mis-size mask-composite ::before/::after rings.
+ */
+.login-sheet .btn-primary,
+.action-dock .login-sheet .btn-primary,
+.action-dock .btn-primary.btn-lg {
+  min-width: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.login-sheet .btn-primary::before,
+.login-sheet .btn-primary::after,
+.action-dock .login-sheet .btn-primary::before,
+.action-dock .login-sheet .btn-primary::after,
+.action-dock .btn-primary.btn-lg::before,
+.action-dock .btn-primary.btn-lg::after {
+  content: none !important;
+  display: none !important;
 }
 
 .login-sheet-status {
@@ -531,14 +577,22 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 0.55rem 0.65rem;
   align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .login-sheet-choices--side .login-sheet-choice {
   height: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .login-sheet-choices--side .login-sheet-proceed {
-  flex: 1;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0 !important;
   min-height: 2.85rem;
   padding-inline: 0.65rem;
   white-space: normal;
@@ -569,8 +623,11 @@
   min-height: 0.75rem;
 }
 
-/* Very narrow viewports: stack again so buttons stay tappable */
-@media (max-width: 22rem) {
+/*
+ * Stack Hub/Pay below ~480px so Safari ≤17 cannot force 160px min-width
+ * columns to overflow the sheet (looks like “huge” stretched controls).
+ */
+@media (max-width: 30rem) {
   .login-sheet-choices--side {
     grid-template-columns: 1fr;
   }
@@ -1101,6 +1158,7 @@ button.exp-account-menu-full:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
+  box-sizing: border-box;
   padding: 0 16px;
   min-height: 48px;
   border-radius: 1000px;
@@ -1108,9 +1166,13 @@ button.exp-account-menu-full:focus-visible {
   font-size: 14px;
   font-weight: 500;
   letter-spacing: -0.01em;
+  line-height: 1.2;
   text-align: center;
   text-decoration: none;
   cursor: pointer;
+  /* Prevent iOS/Safari text inflation from resizing controls */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   transition:
     box-shadow 0.2s ease,
     background-image 0.2s ease,
@@ -1167,11 +1229,13 @@ button.exp-account-menu-full:focus-visible {
 }
 
 /* Outer 1px stroke ring (::before) + inner glass highlight (::after)
-   Same mask-composite ring technique as Wealthsimple. */
+   Same mask-composite ring technique as Wealthsimple.
+   Use top/right/bottom/left (not only inset) for Safari ≤17 abs positioning. */
 .btn-primary::before,
 .btn-primary::after {
   content: '';
   position: absolute;
+  box-sizing: border-box;
   border-radius: inherit;
   pointer-events: none;
   padding: 1px;
@@ -1186,15 +1250,29 @@ button.exp-account-menu-full:focus-visible {
 }
 
 .btn-primary::before {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   background: var(--btn-glass-outer);
   z-index: 0;
 }
 
 .btn-primary::after {
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  left: 1px;
   inset: 1px;
   background: var(--btn-glass-inner);
   z-index: 0;
+}
+
+/* Keep label/icons above glass rings */
+.btn-primary > * {
+  position: relative;
+  z-index: 1;
 }
 
 .btn-primary:hover:not(:disabled) {
