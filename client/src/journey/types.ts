@@ -191,7 +191,7 @@ export function toJourneyDoc(doc: SealDocument, fileSize = 0): JourneyDoc {
     return {
       id: p.id,
       roleLabel: partyLabel(p),
-      // Server nulls displayName for non-participants
+      // Open claim slots keep displayName for invitee “Who are you?”; other PII stays redacted.
       displayName: p.displayName || null,
       signed,
       walletShort: p.walletAddress

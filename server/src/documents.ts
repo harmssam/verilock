@@ -173,8 +173,11 @@ function signatureImageUrl(documentId: string, signatureId: string): string {
 
 export interface PublicDocumentOptions {
   /**
-   * When set and matches creator or any party/signer wallet, reveal display names
-   * and signature image URLs. Anonymous / unrelated wallets get redacted PII.
+   * When set and matches creator or any party/signer wallet, reveal full participant
+   * PII (all display names, invite emails, signature image URLs).
+   * Open name-only claim slots still expose display names to everyone — needed for
+   * the invitee “Who are you?” picker. Anonymous / unrelated wallets otherwise get
+   * redacted emails and ink.
    */
   viewerAddress?: string | null
   /**
@@ -185,8 +188,9 @@ export interface PublicDocumentOptions {
 }
 
 /**
- * True if viewer may see participant display names and signature ink images.
- * Public links stay useful (roles, wallets, seal proof) without exposing PII.
+ * True if viewer may see full participant details (all names, invite emails, ink images).
+ * Open unclaimed party labels are still returned on the public document for claim UX
+ * even when this is false — see publicDocument parties mapping.
  */
 export function canRevealParticipantDetails(
   doc: Pick<DocumentRecord, 'creatorAddress'>,
@@ -267,13 +271,24 @@ export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOpti
     parties: parties.map(party => {
       const base = publicParty(party, revealPrivate)
       const hasSignature = signatures.some(sig => sig.partyId === party.id)
+      /**
+       * Open name-only slots (pending, no wallet bound yet) are the claim identity for
+       * invitees (“Who are you?”). Surface those labels even when the viewer is not yet a
+       * participant — otherwise the picker falls back to role labels like “signer”.
+       * Invite emails and signature ink stay redacted via revealPrivate.
+       */
+      const isOpenClaimSlot =
+        party.required &&
+        !hasSignature &&
+        party.status !== 'declined' &&
+        !party.walletAddress
       return {
         ...base,
         // Never report signed without a signature row (defense in depth after reconcile).
         status: hasSignature ? ('signed' as const) : party.status === 'declined' ? party.status : ('pending' as const),
         signedAt: hasSignature ? party.signedAt : null,
-        // Always redact human names for non-participants (even placeholders that look real).
-        displayName: revealPrivate ? base.displayName : null,
+        displayName:
+          revealPrivate || isOpenClaimSlot ? base.displayName : null,
       }
     }),
     signatures: signatures.map(sig => ({

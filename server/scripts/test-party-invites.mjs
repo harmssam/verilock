@@ -96,6 +96,17 @@ assert(tenantPub.inviteSentAt === sentAt, 'creator sees inviteSentAt')
 const asAnon = publicDocument((await import('../src/db.ts')).getDocumentById(docId), {})
 const tenantAnon = asAnon.parties.find(p => p.id === tenant.id)
 assert(tenantAnon.inviteEmail == null, 'anon does not see invite email')
+// Open unclaimed slots keep display names so invitees can pick “Who are you?”
+assert(
+  tenantAnon.displayName === 'Tim Wallace',
+  `open claim slot name visible to anon, got: ${tenantAnon.displayName}`,
+)
+const landlordAnon = asAnon.parties.find(p => p.role === 'landlord')
+// Creator slot is wallet-bound — not an open claim slot; name stays private for non-participants.
+assert(
+  landlordAnon.displayName == null,
+  `wallet-bound party name redacted for anon, got: ${landlordAnon.displayName}`,
+)
 
 // Sign without token must fail while invite is active
 let failed = false
