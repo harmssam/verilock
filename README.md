@@ -11,18 +11,6 @@ Built for the [Mini Apps Competition](https://miniappscompetition.com/).
 > **UI source of truth:** production SPA - `client/src/App.tsx` (shell) + `client/src/landing/` + `client/src/journey/`  
 > (default `npm run dev` / `npm run build`). See **`AGENTS.md`**.
 
-## Local-only paths (gitignored)
-
-These stay on developer machines and are **not** published to GitHub. Keep your own copies if you use them; a fresh clone will not include them.
-
-| Path | Purpose |
-|------|---------|
-| `docs/` | Internal design notes, packaging notes, roadmap, anti-slop checklist |
-| `client/src/archive/` | Historical UI snapshots (never ship) |
-| `.grok/skills/verilock-blog-imagine/` | Local Grok skill for blog / marketing stills |
-| `.grok/skills/redesign-existing-projects/` | Local redesign skill |
-| `branding/`, `logo-ideas/`, `.grok/reviews/` | Local brand / agent scratch (see `.gitignore`) |
-
 ## What it does
 
 1. **Fingerprint** a PDF locally (rental agreement, contract, etc.) - the file never leaves your device
