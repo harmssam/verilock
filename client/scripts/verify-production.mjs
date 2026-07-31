@@ -123,17 +123,25 @@ check('product modules live under src/journey and shell under App', () => {
   assert.match(app, /DocumentJourney/)
   assert.ok(!app.includes('BlogPage'), 'production shell must not mount BlogPage (external blog)')
   assert.ok(!app.includes('lr-preview-banner'), 'preview banner must not ship')
-  // PDF annotation experiment may be mounted at /pdf via App (not a parallel shell entry).
-  // Forbidden: separate vite/html experiment product entrypoints.
+  // Forbidden: separate vite/html experiment product entrypoints or /pdf lab routes.
   const main = readFileSync(join(clientDir, 'src/main.tsx'), 'utf8')
   assert.ok(!main.includes('ExperimentApp'), 'production main must not mount ExperimentApp')
   assert.ok(
     !existsSync(join(clientDir, 'vite.experiment.config.ts')),
     'vite.experiment.config.ts must stay removed',
   )
-  if (app.includes("from './experiment") || app.includes('from "./experiment')) {
-    assert.match(app, /isPdfPath|\/pdf/, 'experiment import must be routed (e.g. /pdf)')
-  }
+  assert.ok(
+    !app.includes("from './experiment") && !app.includes('from "./experiment'),
+    'production App must not import client/src/experiment (PDF lab removed; use journey)',
+  )
+  assert.ok(
+    !/['"`]\/pdf(?:\/lab)?['"`]|\/pdf2/.test(app),
+    'production App must not route /pdf, /pdf/lab, or /pdf2',
+  )
+  assert.ok(
+    !existsSync(join(clientDir, 'src/experiment')),
+    'client/src/experiment must stay removed (PDF lab integrated into journey)',
+  )
 })
 
 check('archives stay excluded; blog is external (blog.verilock.online)', () => {

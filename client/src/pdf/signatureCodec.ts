@@ -1,6 +1,6 @@
 /**
- * Signature encoding experiments - strokes, simplification, size estimates.
- * Pure helpers (no React). Used by SignatureLab demo.
+ * Signature stroke encoding - simplification and size estimates.
+ * Pure helpers (no React). Used by SignatureStrokePad / mobile ink capture.
  */
 
 /** Point in pad space (CSS pixels at capture time). */

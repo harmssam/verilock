@@ -1,8 +1,7 @@
 /**
- * PDF annotation lab + Nimiq stream - parallel to the seal product path.
- * Seal (attestations, credits, DocumentJourney) never depends on these flags.
+ * Placement annotation UI + related APIs (plans, fills, on-chain data archive).
  *
- * PDF_ANNOTATION_UI - serve /pdf SPA + stream APIs (default: on)
+ * PDF_ANNOTATION_UI - placement plan APIs used by DocumentJourney (default: on)
  * ANNOTATION_STREAM_BROADCAST - multi-tx on-chain publish (prod: explicit true)
  */
 import { isAnnotationStreamBroadcastEnabled } from './annotationStream.js'
@@ -16,7 +15,7 @@ function envFlag(name: string, fallback: boolean): boolean {
   return fallback
 }
 
-/** Lab UI + reconstruct/pack APIs. Independent of seal. Default on. */
+/** Placement editor + plan/fill APIs for production DocumentJourney. Default on. */
 export function isPdfAnnotationUiEnabled(): boolean {
   return envFlag('PDF_ANNOTATION_UI', true)
 }

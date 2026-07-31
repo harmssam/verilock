@@ -3,7 +3,6 @@ import { join } from 'node:path'
 import type { Express } from 'express'
 import express from 'express'
 import { getClientDistDir } from './paths.js'
-import { isPdfAnnotationUiEnabled } from './pdfAnnotationConfig.js'
 
 function isKnownAppPath(path: string): boolean {
   if (path === '/' || path === '') return true
@@ -18,12 +17,6 @@ function isKnownAppPath(path: string): boolean {
   // Operator admin portal (sign-in + stats dashboard)
   if (/^\/admin(?:\/.*)?\/?$/.test(path)) return true
   // /blog is server 301 to blog.verilock.online (see index.ts) — not SPA content
-  // PDF lab (parallel to seal) - kill-switch via PDF_ANNOTATION_UI=false
-  if (isPdfAnnotationUiEnabled()) {
-    if (/^\/pdf\/?$/.test(path)) return true
-    if (/^\/pdf\/lab\/?$/.test(path)) return true
-    if (/^\/pdf2\/?$/.test(path)) return true
-  }
   if (/^\/d\/[^/]+\/?$/.test(path)) return true
   if (/^\/v\/[^/]+\/?$/.test(path)) return true
   if (/^\/m\/sign\/[^/]+\/?$/.test(path)) return true

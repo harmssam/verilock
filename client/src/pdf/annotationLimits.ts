@@ -1,10 +1,10 @@
 /**
- * Per-document (≈ per seal / credit) annotation caps for the PDF experiment.
+ * Per-document (≈ per seal / credit) annotation caps for DocumentJourney.
  * Keep in sync with server/src/security.ts.
  */
 
 /**
- * RDP max error (pad CSS px). Validated in SignatureLab / product testing.
+ * RDP max error (pad CSS px). Validated in product signature capture.
  * Collinear or near-collinear samples within this band collapse to the
  * segment endpoints — intermediate “points in a row” are not stored.
  * Do not raise without a visual QA pass; do not lower without size need.

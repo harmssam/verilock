@@ -9,8 +9,6 @@ import {
   isBlogPath,
   isFaqPath,
   isKnownAppPath,
-  isPdfLabPath,
-  isPdfPath,
   isPricingPath,
   isPrivacyPath,
   isRedeemPath,
@@ -41,9 +39,6 @@ import { SupportPage } from './SupportPage'
 import { AccountMenu } from './journey/AccountMenu'
 import { AgreementsPage } from './journey/AgreementsPage'
 import { DocumentJourney } from './journey/DocumentJourney'
-import { DocumentJourney as PdfAnnotationJourney } from './experiment/DocumentJourney'
-import { ArchiveLab } from './experiment/ArchiveLab'
-import { SignatureLab } from './experiment/SignatureLab'
 import { NotFoundPage } from './journey/NotFoundPage'
 import { useCreditBalance } from './journey/useCreditBalance'
 import {
@@ -67,8 +62,6 @@ import {
 import type { PathRole } from './journey/types'
 import { LandingHome } from './landing/LandingHome'
 import { PATH_PLACEMENTS, PATH_STILLS, placementImageStyle } from './landing/pathMedia'
-import { api } from './api'
-import { FEATURES } from './features'
 import { isMobileDevice, LOGIN_CANCELED_MESSAGE } from './nimiq'
 import { SignMobilePage } from './SignMobilePage'
 import { PayLoginMobilePage } from './PayLoginMobilePage'
@@ -117,16 +110,13 @@ type ShellScreen =
   | 'support'
   | 'redeem'
   | 'agreements'
-  | 'pdf'
-  | 'pdf-lab'
-  | 'pdf2'
   | 'sign-mobile'
   | 'pay-login'
   | 'stats-pricing'
   | 'faq'
   | 'not-found'
 
-function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotationUi): ShellScreen {
+function screenFromPath(pathname: string): ShellScreen {
   if (isPayLoginPath(pathname)) return 'pay-login'
   if (isSignMobilePath(pathname)) return 'sign-mobile'
   if (isPricingPath(pathname)) return 'pricing'
@@ -137,13 +127,7 @@ function screenFromPath(pathname: string, pdfLabEnabled = FEATURES.pdfAnnotation
   if (isStatsPricingPath(pathname)) return 'stats-pricing'
   if (isFaqPath(pathname)) return 'faq'
   if (isAgreementsPath(pathname)) return 'agreements'
-  // PDF lab is parallel to seal - only mount when flag allows
-  if (pdfLabEnabled && /^\/pdf2\/?$/.test(pathname)) return 'pdf2'
-  if (pdfLabEnabled && isPdfLabPath(pathname)) return 'pdf-lab'
-  if (pdfLabEnabled && isPdfPath(pathname)) return 'pdf'
   if (!isKnownAppPath(pathname)) return 'not-found'
-  // /pdf with lab disabled → 404 shell
-  if (isPdfPath(pathname) || isPdfLabPath(pathname)) return 'not-found'
   return 'journey'
 }
 
@@ -184,33 +168,9 @@ function pushShellUrl(next: string): void {
 export function App() {
   const wallet = useJourneyWallet()
   const { balance: creditBalance, refresh: refreshCredits } = useCreditBalance(wallet.token)
-  /** Runtime kill-switch from /api/features (PDF lab parallel to seal). */
-  const [pdfLabEnabled, setPdfLabEnabled] = useState(FEATURES.pdfAnnotationUi)
   const [screen, setScreen] = useState<ShellScreen>(() =>
     typeof window !== 'undefined' ? screenFromPath(window.location.pathname) : 'journey',
   )
-
-  useEffect(() => {
-    let cancelled = false
-    void api
-      .features()
-      .then(f => {
-        if (cancelled) return
-        if (typeof f.pdfAnnotationUi === 'boolean') {
-          setPdfLabEnabled(f.pdfAnnotationUi)
-          // Re-resolve screen if user is on /pdf while flag flips
-          if (typeof window !== 'undefined') {
-            setScreen(screenFromPath(window.location.pathname, f.pdfAnnotationUi))
-          }
-        }
-      })
-      .catch(() => {
-        /* keep build-time FEATURES default */
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
   const journeyReturnPathRef = useRef('/')
   const [journeyEpoch, setJourneyEpoch] = useState(0)
   const [navEpoch, setNavEpoch] = useState(0)
@@ -301,10 +261,7 @@ export function App() {
       !isSupportPath(window.location.pathname) &&
       !isRedeemPath(window.location.pathname) &&
       !isAgreementsPath(window.location.pathname) &&
-      !isBlogPath(window.location.pathname) &&
-      !isPdfPath(window.location.pathname) &&
-      !isPdfLabPath(window.location.pathname) &&
-      !/^\/pdf2\/?$/.test(window.location.pathname)
+      !isBlogPath(window.location.pathname)
     ) {
       journeyReturnPathRef.current = path || '/'
     }
@@ -449,7 +406,7 @@ export function App() {
   useEffect(() => {
     const onPopState = () => {
       const path = window.location.pathname
-      const nextScreen = screenFromPath(path, pdfLabEnabled)
+      const nextScreen = screenFromPath(path)
       setScreen(nextScreen)
       setNavEpoch(n => n + 1)
       if (nextScreen === 'journey') {
@@ -468,7 +425,7 @@ export function App() {
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [blendToSurface, pdfLabEnabled])
+  }, [blendToSurface])
 
   const walletToken = wallet.token
   const walletBootReady = wallet.bootReady
@@ -557,28 +514,6 @@ export function App() {
       applyPageMeta({ ...PAGE_META.agreements })
       return
     }
-    if (screen === 'pdf' || screen === 'pdf-lab' || screen === 'pdf2') {
-      applyPageMeta({
-        ...PAGE_META.pdf,
-        ...(screen === 'pdf-lab'
-          ? {
-              title: 'Signature encoding lab · VeriLock',
-              path: '/pdf/lab',
-              description:
-                'Compare signature PNG vs simplified vector paths and estimated Nimiq frame counts.',
-            }
-          : screen === 'pdf2'
-            ? {
-                title: 'Hash-only archive lab · VeriLock',
-                path: '/pdf2',
-                description:
-                  'Demo: pack signatures with 8-byte association ids, publish multi-tx frames, reconstruct from fingerprint alone.',
-                noindex: true,
-              }
-            : {}),
-      })
-      return
-    }
     if (screen === 'not-found') {
       applyPageMeta({ ...PAGE_META.notFound, path })
       return
@@ -604,9 +539,6 @@ export function App() {
     screen === 'stats-pricing' ||
     screen === 'support' ||
     screen === 'redeem' ||
-    screen === 'pdf' ||
-    screen === 'pdf-lab' ||
-    screen === 'pdf2' ||
     screen === 'not-found'
 
   // Focused mobile ink capture - no shell chrome / wallet header.
@@ -738,9 +670,6 @@ export function App() {
         screen === 'support' ||
         screen === 'redeem' ||
         screen === 'agreements' ||
-            screen === 'pdf' ||
-        screen === 'pdf-lab' ||
-        screen === 'pdf2' ||
         screen === 'not-found') && (
         <AppLink to="/" onClick={goJourney} className="lr-back">
           ← Back to home
@@ -798,9 +727,6 @@ export function App() {
           onGetCredits={goPricing}
         />
       )}
-      {pdfLabEnabled && screen === 'pdf' && <PdfAnnotationJourney wallet={wallet} />}
-      {pdfLabEnabled && screen === 'pdf-lab' && <SignatureLab />}
-      {pdfLabEnabled && screen === 'pdf2' && <ArchiveLab wallet={wallet} />}
       {screen === 'not-found' && (
         <NotFoundPage
           path={typeof window !== 'undefined' ? window.location.pathname : null}

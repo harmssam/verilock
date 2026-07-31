@@ -205,21 +205,6 @@ export function isBlogPath(path: string): boolean {
   return /^\/blog(?:\/[^/]+)?\/?$/.test(path)
 }
 
-/** PDF annotation experiment (local overlays, no pdf-lib). */
-export function isPdfPath(path: string): boolean {
-  return /^\/pdf\/?$/.test(path) || isPdfLabPath(path) || isPdf2Path(path)
-}
-
-/** Signature encoding lab under /pdf/lab */
-export function isPdfLabPath(path: string): boolean {
-  return /^\/pdf\/lab\/?$/.test(path)
-}
-
-/** Hash-only archive reconstruct demo under /pdf2 */
-export function isPdf2Path(path: string): boolean {
-  return /^\/pdf2\/?$/.test(path)
-}
-
 /** Cross-device mobile signature capture (`/m/sign/:sessionId`). */
 export function isSignMobilePath(path: string): boolean {
   return /^\/m\/sign\/[^/]+\/?$/.test(path)
@@ -251,7 +236,6 @@ export function isKnownAppPath(path: string): boolean {
   if (isFaqPath(path)) return true
   if (isAdminPath(path)) return true
   if (isBlogPath(path)) return true
-  if (isPdfPath(path)) return true
   if (isSignMobilePath(path)) return true
   if (isPayLoginPath(path)) return true
   if (documentSlugFromPath(path)) return true

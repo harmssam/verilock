@@ -1,7 +1,7 @@
 /**
  * Paid multi-tx on-chain data archive for agreements.
  *
- * Uses the same 64-byte Nimiq frame packing proven in the /pdf experiment:
+ * Uses the same 64-byte Nimiq frame packing (annotation stream format):
  * - Production: placement plan batch0 + fill batch frames (signatures, initials, text)
  * - Plus v3 archive manifest (people, wallets, signature roster) for offline reconstruct
  * - Legacy/experiment: free-form document.annotations packed as v1 annotation stream
@@ -128,7 +128,7 @@ function assertValidStreamFrameHex(hex: string, index: number, _source: Document
     throw new Error(`Frame ${index} is ${buf.length} bytes (need 64)`)
   }
   if (buf[0] !== STREAM_MAGIC) {
-    throw new Error(`Frame ${index} has bad stream magic (expected 0xA1 like /pdf lab)`)
+    throw new Error(`Frame ${index} has bad stream magic (expected 0xA1 annotation stream)`)
   }
   const ver = buf[1]!
   // v1 = annotations; v2 = placement; v3 = archive manifest (people/wallets/sigs)
@@ -844,12 +844,12 @@ async function runBackgroundBroadcast(input: {
         error:
           txHashes.length > 0
             ? `Resume needed: ${txHashes.length}/${collected.framesHex.length} frames on-chain - try Store forever again (free)`
-            : 'No packed frames to broadcast (same multi-tx path as /pdf lab). Re-open and retry.',
+            : 'No packed frames to broadcast. Re-open and retry.',
       })
       return
     }
 
-    // Same multi-tx path as /pdf lab (publishAnnotationStream → broadcastStreamFrames).
+    // Multi-tx path: broadcastStreamFrames for packed 0xA1 frames.
     // Use Buffer.copy into fixed 64-byte frames like packAnnotationStream does.
     const frames = remainingHex.map(hex => {
       const raw = Buffer.from(hex, 'hex')
@@ -984,7 +984,7 @@ async function runBackgroundBroadcast(input: {
     }
     const failMsg =
       result.error ||
-      'Could not broadcast data frames on-chain (same path as /pdf lab). Credits refunded if nothing was written.'
+      'Could not broadcast data frames on-chain. Credits refunded if nothing was written.'
     console.error('[data-archive] zero-hash failure', {
       documentId,
       error: failMsg,

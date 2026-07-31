@@ -52,13 +52,6 @@ import {
   type SupportContactBody,
 } from './supportContact.js'
 import {
-  annotationsForPublic,
-  getStreamByHash,
-  isAnnotationStreamBroadcastEnabled,
-  publishAnnotationStream,
-  reconstructFromStoredOrChain,
-} from './annotationStream.js'
-import {
   appendFillBatch,
   getPlanPublic,
   lockPlan as lockPlacementPlan,
@@ -69,7 +62,6 @@ import {
   isPdfAnnotationUiEnabled,
   pdfAnnotationFeaturesPublic,
 } from './pdfAnnotationConfig.js'
-import { isServiceWalletConfigured } from './serviceWallet.js'
 import { verifySignature } from './nimiq-rpc.js'
 import {
   assertSafeBootConfig,
@@ -783,7 +775,7 @@ app.get('/api/chain-data/:sha256/reconstruct', publicReadLimit, async (req, res)
 
 /**
  * Pay credits and broadcast packed annotation / placement frames on Nimiq.
- * Reuses the multi-tx frame pipeline proven in the /pdf experiment.
+ * Reuses the multi-tx frame pipeline (64-byte 0xA1 streams).
  * Body: optional { notifyEmail } for completion email after success.
  */
 app.post(
@@ -1522,9 +1514,9 @@ app.get('/api/documents/:id/certificate', publicReadLimit, (req, res) => {
   res.json(cert)
 })
 
-function pdfLabDisabled(res: express.Response): boolean {
+function pdfAnnotationUiDisabled(res: express.Response): boolean {
   if (isPdfAnnotationUiEnabled()) return false
-  res.status(404).json({ error: 'PDF annotation lab is disabled on this environment' })
+  res.status(404).json({ error: 'PDF annotation UI is disabled on this environment' })
   return true
 }
 
@@ -1539,7 +1531,7 @@ app.post(
   authMiddleware,
   requireVerifiedWallet,
   (req, res) => {
-    if (pdfLabDisabled(res)) return
+    if (pdfAnnotationUiDisabled(res)) return
     const body = req.body as {
       originalSha256?: string
       plan?: unknown
@@ -1596,158 +1588,12 @@ app.post(
 )
 
 /**
- * /pdf2 lab: accept pre-packed multi-stream frames (annotation + manifest),
- * index under documentId `lab:<sha256>` (never mixed into production public index),
- * optional multi-tx broadcast. No seal credits. Gated by PDF_ANNOTATION_UI.
- *
- * Frames must unpack and bind to originalSha256 (8-byte assoc + HEAD full hash).
- * onChain requires every frame hash + full confirmed count (no partial success).
- */
-app.post(
-  '/api/lab/stream-broadcast',
-  annotationStreamLimit,
-  authMiddleware,
-  requireVerifiedWallet,
-  async (req, res) => {
-    if (pdfLabDisabled(res)) return
-    try {
-      const body = (req.body ?? {}) as {
-        originalSha256?: string
-        framesHex?: string[]
-        broadcast?: boolean
-      }
-      const sha = String(body.originalSha256 ?? '').toLowerCase()
-      if (!/^[a-f0-9]{64}$/.test(sha)) {
-        res.status(400).json({ error: 'Valid originalSha256 required' })
-        return
-      }
-      const framesHex = Array.isArray(body.framesHex)
-        ? body.framesHex
-            .filter(h => typeof h === 'string' && /^[a-f0-9]{128}$/i.test(h))
-            .map(h => h.toLowerCase())
-        : []
-      if (framesHex.length === 0) {
-        res.status(400).json({ error: 'framesHex required (64-byte hex frames)' })
-        return
-      }
-      const {
-        isAnnotationStreamBroadcastEnabled,
-        broadcastStreamFrames,
-        MAX_STREAM_FRAMES,
-      } = await import('./annotationStream.js')
-      if (framesHex.length > MAX_STREAM_FRAMES) {
-        res.status(400).json({ error: `Too many frames (max ${MAX_STREAM_FRAMES})` })
-        return
-      }
-
-      const { assertFramesBelongToPdfHash } = await import('./archiveStream.js')
-      try {
-        assertFramesBelongToPdfHash(sha, framesHex)
-      } catch (err) {
-        res.status(400).json({
-          error: err instanceof Error ? err.message : 'Frame validation failed',
-        })
-        return
-      }
-      const { getServiceWalletAddress, isServiceWalletConfigured } = await import(
-        './serviceWallet.js'
-      )
-      const {
-        getLabDocumentDataArchive,
-        upsertDocumentDataArchive,
-      } = await import('./db.js')
-
-      const documentId = `lab:${sha}`
-      const prior = getLabDocumentDataArchive(sha)
-      const now = Date.now()
-      let txHashes: string[] = []
-      let onChain = false
-      let confirmedFrames = 0
-      let broadcastError: string | undefined
-
-      const wantBroadcast = body.broadcast !== false
-      const broadcastEnabled = isAnnotationStreamBroadcastEnabled()
-      const serviceWalletConfigured = isServiceWalletConfigured()
-
-      if (wantBroadcast && broadcastEnabled && serviceWalletConfigured) {
-        const frames = framesHex.map(h => {
-          const raw = Buffer.from(h, 'hex')
-          const f = Buffer.alloc(64)
-          raw.copy(f, 0, 0, 64)
-          return f
-        })
-        const result = await broadcastStreamFrames(frames, {
-          skipVisibilityWait: false,
-          interFrameDelayMs: 120,
-        })
-        txHashes = result.hashes
-        confirmedFrames = result.confirmed
-        // Strict: all hashes + every frame confirmed. No partial onChain.
-        onChain =
-          result.hashes.length === frames.length &&
-          !result.partial &&
-          result.confirmed === frames.length
-        if (result.error) broadcastError = result.error
-        if (result.hashes.length === frames.length && result.confirmed < frames.length) {
-          onChain = false
-          broadcastError =
-            result.error ??
-            `Broadcast ${result.hashes.length} frames; only ${result.confirmed} confirmed — not marked on-chain`
-        }
-        if (result.hashes.length < frames.length) {
-          onChain = false
-          broadcastError =
-            result.error ??
-            `Partial broadcast: ${result.hashes.length}/${frames.length} frames`
-        }
-      } else if (wantBroadcast) {
-        broadcastError = !broadcastEnabled
-          ? 'On-chain broadcast disabled (set ANNOTATION_STREAM_BROADCAST=true)'
-          : 'Service wallet not configured (SERVICE_WALLET_PRIVATE_KEY)'
-      }
-
-      upsertDocumentDataArchive({
-        documentId,
-        originalSha256: sha,
-        source: 'annotations',
-        frameCount: framesHex.length,
-        creditsCharged: 0,
-        framesHex,
-        txHashes,
-        onChain,
-        confirmedFrames,
-        error: broadcastError ?? null,
-        jobStatus: onChain ? 'complete' : broadcastError ? 'failed' : 'idle',
-        createdAt: prior?.createdAt ?? now,
-        updatedAt: now,
-      })
-
-      res.json({
-        originalSha256: sha,
-        documentId,
-        frameCount: framesHex.length,
-        txHashes,
-        onChain,
-        confirmedFrames,
-        broadcastError,
-        broadcastEnabled,
-        serviceWalletConfigured,
-        serviceWalletAddress: getServiceWalletAddress(),
-      })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Lab broadcast failed'
-      res.status(400).json({ error: message })
-    }
-  },
-)
-
-/**
  * Placement plan structure (hashes + geometry). When the viewer is the plan
  * creator or a document party/signee (optional Bearer session), fill wire
  * frames are included so the client can reconstruct a signed document view.
  */
 app.get('/api/placement-plans/:sha256', publicReadLimit, (req, res) => {
-  if (pdfLabDisabled(res)) return
+  if (pdfAnnotationUiDisabled(res)) return
   const sha = routeParam(req.params.sha256).toLowerCase()
   if (!/^[a-f0-9]{64}$/.test(sha)) {
     res.status(400).json({ error: 'Valid sha256 required' })
@@ -1782,7 +1628,7 @@ app.post(
   authMiddleware,
   requireVerifiedWallet,
   (req, res) => {
-    if (pdfLabDisabled(res)) return
+    if (pdfAnnotationUiDisabled(res)) return
     const sha = routeParam(req.params.sha256).toLowerCase()
     if (!/^[a-f0-9]{64}$/.test(sha)) {
       res.status(400).json({ error: 'Valid sha256 required' })
@@ -1820,107 +1666,6 @@ app.post(
     }
   },
 )
-
-/**
- * Experiment: pack annotations into 64-byte frames, index by PDF hash,
- * optionally broadcast each frame via service wallet (on-chain).
- * Owner-scoped: only the publishing wallet may overwrite a hash.
- * Parallel to seal - not used by DocumentJourney seal flow.
- */
-app.post(
-  '/api/annotation-streams',
-  annotationStreamLimit,
-  authMiddleware,
-  requireVerifiedWallet,
-  async (req, res) => {
-    if (pdfLabDisabled(res)) return
-    const body = req.body as {
-      originalSha256?: string
-      annotations?: unknown
-      broadcast?: boolean
-    }
-    if (!body.originalSha256 || !/^[a-f0-9]{64}$/i.test(body.originalSha256)) {
-      res.status(400).json({ error: 'Valid originalSha256 required' })
-      return
-    }
-    const address = res.locals.address as string
-    try {
-      const result = await publishAnnotationStream({
-        originalSha256: body.originalSha256,
-        annotations: body.annotations,
-        creatorAddress: address,
-        broadcast: Boolean(body.broadcast),
-      })
-      res.status(201).json({
-        ...result,
-        serviceWalletConfigured: isServiceWalletConfigured(),
-        broadcastEnabled: isAnnotationStreamBroadcastEnabled(),
-      })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Publish failed'
-      const status = message.includes('Only the stream owner') ? 403 : 400
-      res.status(status).json({ error: message })
-    }
-  },
-)
-
-/** Look up packed stream by PDF fingerprint (no PDF upload). Slim annotations only. */
-app.get('/api/annotation-streams/:sha256', publicReadLimit, (req, res) => {
-  if (pdfLabDisabled(res)) return
-  const sha = routeParam(req.params.sha256).toLowerCase()
-  if (!/^[a-f0-9]{64}$/.test(sha)) {
-    res.status(400).json({ error: 'Valid sha256 required' })
-    return
-  }
-  const stream = getStreamByHash(sha)
-  if (!stream) {
-    res.status(404).json({ error: 'No annotation stream for this PDF hash' })
-    return
-  }
-  let annotations: unknown[] = []
-  try {
-    annotations = annotationsForPublic(JSON.parse(stream.annotationsJson) as unknown[])
-  } catch {
-    annotations = []
-  }
-  res.json({
-    originalSha256: stream.originalSha256,
-    creatorAddress: stream.creatorAddress,
-    frameCount: stream.framesHex.length,
-    payloadBytes: stream.payloadBytes,
-    annotationCount: stream.annotationCount,
-    // framesHex omitted from public GET - use reconstruct for verified payload
-    txHashes: stream.txHashes,
-    onChain: stream.onChain,
-    confirmedFrames: stream.confirmedFrames,
-    annotations,
-    createdAt: stream.createdAt,
-    updatedAt: stream.updatedAt,
-    serviceWalletConfigured: isServiceWalletConfigured(),
-    broadcastEnabled: isAnnotationStreamBroadcastEnabled(),
-  })
-})
-
-/**
- * Reconstruct annotations for a PDF hash - prefers stored wire frames, optional chain sample.
- * Query: ?fallback=index (default) | ?fallback=none (fail closed on chain errors)
- */
-app.get('/api/annotation-streams/:sha256/reconstruct', publicReadLimit, async (req, res) => {
-  if (pdfLabDisabled(res)) return
-  const sha = routeParam(req.params.sha256).toLowerCase()
-  if (!/^[a-f0-9]{64}$/.test(sha)) {
-    res.status(400).json({ error: 'Valid sha256 required' })
-    return
-  }
-  const fallbackRaw = String(req.query.fallback ?? 'index').toLowerCase()
-  const fallbackIndex = fallbackRaw !== 'none' && fallbackRaw !== '0' && fallbackRaw !== 'false'
-  try {
-    const result = await reconstructFromStoredOrChain(sha, { fallbackIndex })
-    res.json(result)
-  } catch (err) {
-    res.status(404).json({ error: err instanceof Error ? err.message : 'Not found' })
-  }
-})
 
 app.post('/api/verify/hash', verifyHashLimit, (req, res) => {
   const { sha256 } = req.body as { sha256?: string }

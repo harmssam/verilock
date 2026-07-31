@@ -16,8 +16,8 @@ export const FEATURES = {
   /** Optional “email me when everyone has signed” on create (Resend). */
   emailNotifyUi: envFlag('VITE_EMAIL_NOTIFY_UI', true),
   /**
-   * PDF annotation lab (/pdf) - parallel to seal, not wired into DocumentJourney.
-   * Runtime server flag PDF_ANNOTATION_UI wins when /api/features is loaded.
+   * Placement editor / signer fill / signed reconstruct in DocumentJourney.
+   * Server kill-switch: PDF_ANNOTATION_UI=false (placement APIs return 404).
    * Build-time override: VITE_PDF_ANNOTATION_UI=false
    */
   pdfAnnotationUi: envFlag('VITE_PDF_ANNOTATION_UI', true),

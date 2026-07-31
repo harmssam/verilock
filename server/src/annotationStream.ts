@@ -867,7 +867,7 @@ async function broadcastStreamFramesUnlocked(
       return { hashes: [], confirmed: 0, partial: false, error: err.message }
     }
     // Fail open on balance read errors (same as credit seals) so a cold light client
-    // does not block the proven /pdf multi-tx path.
+    // does not block the multi-tx broadcast path.
     console.warn('[annotation-stream] could not read service wallet balance', err)
   }
 

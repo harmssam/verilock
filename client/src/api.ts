@@ -308,88 +308,6 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  /**
-   * /pdf2 lab: broadcast pre-packed 0xA1 frames (8-byte assoc layout).
-   * No seal credits. Stores lab index under documentId lab:&lt;sha&gt; for wire reconstruct.
-   */
-  labBroadcastFrames: (
-    token: string,
-    body: { originalSha256: string; framesHex: string[]; broadcast?: boolean },
-  ) =>
-    request<{
-      originalSha256: string
-      frameCount: number
-      txHashes: string[]
-      onChain: boolean
-      confirmedFrames: number
-      broadcastError?: string
-      broadcastEnabled: boolean
-      serviceWalletConfigured: boolean
-      serviceWalletAddress: string | null
-      documentId: string
-    }>('/api/lab/stream-broadcast', {
-      method: 'POST',
-      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }),
-
-  /** Experiment: pack annotations into 64B frames, index by PDF hash, optional on-chain broadcast. */
-  publishAnnotationStream: (
-    token: string,
-    body: { originalSha256: string; annotations: unknown[]; broadcast?: boolean },
-  ) =>
-    request<{
-      originalSha256: string
-      frameCount: number
-      payloadBytes: number
-      framesHex: string[]
-      txHashes: string[]
-      onChain: boolean
-      confirmedFrames: number
-      annotations: unknown[]
-      creatorAddress: string
-      broadcastError?: string
-      partialBroadcast?: boolean
-      serviceWalletConfigured?: boolean
-      broadcastEnabled?: boolean
-    }>('/api/annotation-streams', {
-      method: 'POST',
-      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }),
-
-  getAnnotationStream: (sha256: string) =>
-    request<{
-      originalSha256: string
-      creatorAddress?: string
-      frameCount: number
-      payloadBytes: number
-      annotationCount: number
-      txHashes: string[]
-      onChain: boolean
-      confirmedFrames?: number
-      annotations: unknown[]
-      serviceWalletConfigured?: boolean
-      broadcastEnabled?: boolean
-    }>(`/api/annotation-streams/${sha256.toLowerCase()}`),
-
-  reconstructAnnotationStream: (sha256: string, opts?: { fallback?: 'index' | 'none' }) => {
-    const q = opts?.fallback === 'none' ? '?fallback=none' : ''
-    return request<{
-      originalSha256: string
-      annotations: unknown[]
-      /** wire = packed frames from DB (same bytes as broadcast); chain = full RPC re-read */
-      source: 'index' | 'chain' | 'wire'
-      frameCount: number
-      txHashes: string[]
-      onChain: boolean
-      confirmedFrames?: number
-      chainError?: string
-      chainSampleOk?: boolean
-      integrityOk?: boolean
-    }>(`/api/annotation-streams/${sha256.toLowerCase()}/reconstruct${q}`)
-  },
-
   features: () =>
     request<{
       emailNotifyUi: boolean
@@ -398,7 +316,7 @@ export const api = {
       turnstileRequired?: boolean
       turnstileSiteKey?: string | null
       supportSendEnabled?: boolean
-      /** PDF lab (/pdf) - parallel to seal product path */
+      /** Placement editor / plan APIs in DocumentJourney */
       pdfAnnotationUi?: boolean
       annotationStreamBroadcast?: boolean
       annotationStreamServiceWallet?: boolean

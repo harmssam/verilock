@@ -1546,7 +1546,7 @@ export function getDocumentDataArchive(documentId: string): DocumentDataArchiveR
 /**
  * Public reconstruct index: latest on-chain archive for a PDF fingerprint.
  *
- * Lab rows (`lab:<sha>`) are excluded so free /pdf2 publishes never displace
+ * Lab rows (`lab:<sha>`) are excluded so historical free lab publishes never displace
  * paid production "Store forever" archives for the same fingerprint.
  * Prefer on_chain complete non-lab rows; fall back to any non-lab row with frames.
  */

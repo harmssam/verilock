@@ -99,13 +99,6 @@ export const PAGE_META = {
       'How VeriLock works, pricing, integrations, and how it compares to DocuSign and other e-signature tools. Your document never leaves your device.',
     path: '/faq',
   },
-  pdf: {
-    title: `PDF annotations (experiment)${TITLE_SUFFIX}`,
-    description:
-      'Place signatures and text on a local PDF, store only the hash and overlay data. Experiment - not the main product flow.',
-    path: '/pdf',
-    noindex: true,
-  },
 } satisfies Record<string, PageMeta>
 
 function siteOrigin(): string {
