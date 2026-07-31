@@ -4,5 +4,6 @@ export function normalizeAddress(address: string): string {
 
 export function shortAddress(address: string): string {
   const clean = normalizeAddress(address)
-  return `${clean.slice(0, 6)}…${clean.slice(-4)}`
+  // e.g. NQ23…JGT6 (4 + ellipsis + 4)
+  return `${clean.slice(0, 4)}…${clean.slice(-4)}`
 }

@@ -54,7 +54,7 @@ export function RedeemPage({
   }, [])
 
   const shortAddress = address
-    ? `${address.slice(0, 6)}…${address.slice(-4)}`
+    ? `${address.slice(0, 4)}…${address.slice(-4)}`
     : null
 
   const submit = useCallback(

@@ -18,7 +18,7 @@ function formatWhen(ms: number): string {
 function shortAddress(addr: string): string {
   const a = addr.replace(/\s+/g, '')
   if (a.length <= 14) return a
-  return `${a.slice(0, 6)}…${a.slice(-4)}`
+  return `${a.slice(0, 4)}…${a.slice(-4)}`
 }
 
 function statusLabel(status: string): string {

@@ -14,7 +14,8 @@ export function isValidNimiqAddress(address: string | null | undefined): boolean
 
 export function shortAddress(address: string): string {
   const clean = normalizeAddress(address)
-  return `${clean.slice(0, 6)}…${clean.slice(-4)}`
+  // e.g. NQ23…JGT6 (4 + ellipsis + 4), not NQ23HU…JGT6
+  return `${clean.slice(0, 4)}…${clean.slice(-4)}`
 }
 
 /** Nimiq-style display: groups of four characters (e.g. NQ84 DT0K U4SC …). */

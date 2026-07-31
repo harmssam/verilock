@@ -483,7 +483,7 @@ export function SupportQueue({
                       {t.name} · {t.email}
                       {t.issue ? ` · ${t.issue}` : ''}
                       {t.walletAddress
-                        ? ` · ${t.walletAddress.slice(0, 6)}…${t.walletAddress.slice(-4)}`
+                        ? ` · ${t.walletAddress.slice(0, 4)}…${t.walletAddress.slice(-4)}`
                         : ''}
                       {t.documentSlug ? ` · /d/${t.documentSlug}` : ''}
                     </div>
