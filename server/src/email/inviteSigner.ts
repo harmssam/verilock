@@ -6,10 +6,12 @@
 import { v4 as uuid } from 'uuid'
 import { assertDocumentCreator, hashInviteToken, mintInviteTokenRaw } from '../documents.js'
 import {
+  getActiveInviteForParty,
   getPartiesForDocument,
   getPartyById,
   insertPartyInvite,
   revokeActivePartyInvites,
+  runInTransaction,
   setPartyInviteEmail,
   setPartyInviteMessageId,
 } from '../db.js'
@@ -56,7 +58,17 @@ function resolveOrganizerName(doc: {
 }
 
 export type InviteSignerResult =
-  | { ok: true; id: string; to: string; partyId: string; inviteSentAt: number }
+  | {
+      ok: true
+      id: string
+      to: string
+      partyId: string
+      inviteSentAt: number
+      /** Prior active invite email that was rotated out (null if first invite). */
+      previousEmail: string | null
+      /** How many prior unredeemed invites were revoked for this party. */
+      previousLinksRevoked: number
+    }
   | { ok: false; status: number; error: string }
 
 /**
@@ -250,24 +262,33 @@ export async function sendPartyInviteEmail(input: {
 
   if (result.ok) {
     const sentAt = Date.now()
-    // Rotate prior invites only after delivery so resend failure keeps the old link alive.
-    revokeActivePartyInvites(party.id, sentAt)
-    insertPartyInvite({
-      id: inviteId,
-      documentId: doc.id,
-      partyId: party.id,
-      email: to,
-      tokenHash,
-      channel: 'email',
-      createdAt: sentAt,
-      expiresAt: null,
-      revokedAt: null,
-      redeemedAt: null,
-      redeemedByWallet: null,
-      resendMessageId: result.id ?? null,
+    // Snapshot prior active invite before rotation (for creator UI + logs).
+    const priorActive = getActiveInviteForParty(party.id, sentAt)
+    const previousEmail = priorActive?.email ?? party.inviteEmail ?? null
+
+    // Rotate + mint atomically after delivery so a failed send keeps the old link alive,
+    // and a partial write never leaves two active tokens for the same party.
+    const previousLinksRevoked = runInTransaction(() => {
+      const revoked = revokeActivePartyInvites(party.id, sentAt)
+      insertPartyInvite({
+        id: inviteId,
+        documentId: doc.id,
+        partyId: party.id,
+        email: to,
+        tokenHash,
+        channel: 'email',
+        createdAt: sentAt,
+        expiresAt: null,
+        revokedAt: null,
+        redeemedAt: null,
+        redeemedByWallet: null,
+        resendMessageId: result.id ?? null,
+      })
+      setPartyInviteEmail(party.id, to, sentAt)
+      if (result.id) setPartyInviteMessageId(inviteId, result.id)
+      return revoked
     })
-    setPartyInviteEmail(party.id, to, sentAt)
-    if (result.id) setPartyInviteMessageId(inviteId, result.id)
+
     console.log('[email] party-invite sent', {
       documentId: doc.id,
       partyId: party.id,
@@ -275,8 +296,19 @@ export async function sendPartyInviteEmail(input: {
       to,
       id: result.id,
       organizer: organizerName,
+      previousEmail: previousLinksRevoked > 0 ? previousEmail : null,
+      previousLinksRevoked,
     })
-    return { ok: true, id: result.id, to, partyId: party.id, inviteSentAt: sentAt }
+    return {
+      ok: true,
+      id: result.id,
+      to,
+      partyId: party.id,
+      inviteSentAt: sentAt,
+      // Only surface a replaced email when we actually rotated a prior link.
+      previousEmail: previousLinksRevoked > 0 ? previousEmail : null,
+      previousLinksRevoked,
+    }
   }
 
   if ('skipped' in result && result.skipped) {

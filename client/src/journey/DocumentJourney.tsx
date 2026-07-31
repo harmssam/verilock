@@ -823,6 +823,11 @@ export function DocumentJourney({
   /** Opaque invite token from email deep link (`?invite=`) — never shown in creator UI. */
   const [stashedInviteToken, setStashedInviteToken] = useState<string | null>(null)
   const [invitePartyFromToken, setInvitePartyFromToken] = useState<string | null>(null)
+  /**
+   * Personal invite link was revoked/replaced/redeemed/unknown.
+   * Shown so invitees do not treat a dead email link as still valid.
+   */
+  const [inviteLinkInvalid, setInviteLinkInvalid] = useState<string | null>(null)
 
   // Capture ?invite= into sessionStorage and strip from the address bar.
   useEffect(() => {
@@ -847,16 +852,8 @@ export function DocumentJourney({
       if (!token) {
         setStashedInviteToken(null)
         setInvitePartyFromToken(null)
+        // Keep inviteLinkInvalid if we already know the link is dead (from this mount).
         return
-      }
-
-      setStashedInviteToken(token)
-      if (storageKey) {
-        try {
-          sessionStorage.setItem(storageKey, token)
-        } catch {
-          /* private mode */
-        }
       }
 
       // Drop raw token from visible URL (keep other query flags like openPay).
@@ -871,10 +868,42 @@ export function DocumentJourney({
       void api
         .lookupInviteToken(token)
         .then(res => {
-          if (!cancelled) setInvitePartyFromToken(res.partyId)
+          if (cancelled) return
+          setStashedInviteToken(token)
+          setInvitePartyFromToken(res.partyId)
+          setInviteLinkInvalid(null)
+          if (storageKey) {
+            try {
+              sessionStorage.setItem(storageKey, token)
+            } catch {
+              /* private mode */
+            }
+          }
         })
-        .catch(() => {
-          if (!cancelled) setInvitePartyFromToken(null)
+        .catch((err: unknown) => {
+          if (cancelled) return
+          // Dead personal link: do not keep a revoked token for signing.
+          setStashedInviteToken(null)
+          setInvitePartyFromToken(null)
+          if (storageKey) {
+            try {
+              sessionStorage.removeItem(storageKey)
+            } catch {
+              /* ignore */
+            }
+          }
+          const status =
+            err && typeof err === 'object' && 'status' in err
+              ? Number((err as { status?: number }).status)
+              : 0
+          const message =
+            err instanceof Error && err.message.trim()
+              ? err.message
+              : 'This invite link is no longer valid.'
+          // 410 = revoked/replaced/redeemed/expired; 404 = unknown token.
+          if (status === 410 || status === 404 || fromUrl) {
+            setInviteLinkInvalid(message)
+          }
         })
       return () => {
         cancelled = true
@@ -2849,9 +2878,16 @@ export function DocumentJourney({
                 {displayError}
               </div>
             )}
+            {inviteLinkInvalid && !displayError && (
+              <div className="result-banner result-banner--bad" role="alert">
+                {inviteLinkInvalid} You can still open the agreement with a valid personal link
+                from a newer invite email, or ask the organizer to resend.
+              </div>
+            )}
             {/* Invite dock already explains post-sign state - hide lock flash clutter. */}
             {lockMessage &&
               !displayError &&
+              !inviteLinkInvalid &&
               !(step === 'seal' && busy && creditBalance >= 1) &&
               // Free-complete dock already states print/lock options - hide lock-first flash.
               !(
@@ -3983,11 +4019,21 @@ export function DocumentJourney({
                                     {emailed && !p.signed ? (
                                       <p className="share-cosigner-sent-detail" role="status">
                                         Sent to <strong>{emailed.email}</strong>
-                                        {note && !note.startsWith('Invite sent')
+                                        {note &&
+                                        !note.startsWith('Invite sent') &&
+                                        !note.startsWith('Invite resent')
                                           ? ` · ${note}`
                                           : null}
                                         . Their personal signing link is only in that email.
-                                        You can resend if they need another link.
+                                        Resending (including to a different address) replaces the
+                                        link — the previous email link stops working.
+                                      </p>
+                                    ) : null}
+                                    {note &&
+                                    (note.startsWith('Invite sent') ||
+                                      note.startsWith('Invite resent')) ? (
+                                      <p className="share-cosigner-note" role="status">
+                                        {note}
                                       </p>
                                     ) : null}
                                     {p.walletAddress && (
@@ -4057,9 +4103,19 @@ export function DocumentJourney({
                                                 res.to || to,
                                                 res.inviteSentAt,
                                               )
-                                              setInviteSendNote(prev => ({
-                                                ...prev,
-                                                [p.id]: `Invite sent to ${res.to || to}`,
+                                              const sentTo = res.to || to
+                                              const prev = res.previousEmail?.trim()
+                                              const rotated =
+                                                (res.previousLinksRevoked ?? 0) > 0
+                                              const note =
+                                                rotated && prev && prev.toLowerCase() !== sentTo.toLowerCase()
+                                                  ? `Invite sent to ${sentTo}. Previous link for ${prev} is no longer valid.`
+                                                  : rotated
+                                                    ? `Invite resent to ${sentTo}. The previous personal link no longer works.`
+                                                    : `Invite sent to ${sentTo}`
+                                              setInviteSendNote(prevNotes => ({
+                                                ...prevNotes,
+                                                [p.id]: note,
                                               }))
                                               showInviteHandoffHelp(label, 'email')
                                               // Refresh so party.inviteEmail is server-backed.

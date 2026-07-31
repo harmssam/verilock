@@ -18,7 +18,7 @@ import {
   createSession,
   findDocumentsByHash,
   getDocumentById,
-  getPartyInviteByTokenHash,
+  inspectPartyInviteByTokenHash,
   getSession,
   getSignatureForDocument,
   getSignatureImage,
@@ -1259,6 +1259,7 @@ app.patch(
 /**
  * Public lookup for email deep links (`?invite=`). Returns slug + partyId only —
  * never the token, never invite email. Rate-limited.
+ * Revoked / replaced / redeemed tokens return 410 so the client can hard-stop the invitee.
  */
 app.get('/api/invites/lookup', publicReadLimit, (req, res) => {
   const raw = typeof req.query.token === 'string' ? req.query.token.trim() : ''
@@ -1266,11 +1267,25 @@ app.get('/api/invites/lookup', publicReadLimit, (req, res) => {
     res.status(400).json({ error: 'token required' })
     return
   }
-  const invite = getPartyInviteByTokenHash(hashInviteToken(raw))
-  if (!invite) {
-    res.status(404).json({ error: 'Invite not found or expired' })
+  const looked = inspectPartyInviteByTokenHash(hashInviteToken(raw))
+  if (looked.status === 'not_found') {
+    res.status(404).json({ error: 'Invite not found or expired', reason: 'not_found' })
     return
   }
+  if (looked.status !== 'active') {
+    const messages: Record<'revoked' | 'redeemed' | 'expired', string> = {
+      revoked:
+        'This invite link was replaced. Ask the organizer to send a new invite if you still need to sign.',
+      redeemed: 'This invite link was already used to sign.',
+      expired: 'This invite link has expired. Ask the organizer to resend the invite.',
+    }
+    res.status(410).json({
+      error: messages[looked.status],
+      reason: looked.status,
+    })
+    return
+  }
+  const invite = looked.invite
   const doc = getDocumentById(invite.documentId)
   if (!doc) {
     res.status(404).json({ error: 'Document not found' })
@@ -1315,6 +1330,8 @@ app.post(
       to: result.to,
       partyId: result.partyId,
       inviteSentAt: result.inviteSentAt,
+      previousEmail: result.previousEmail,
+      previousLinksRevoked: result.previousLinksRevoked,
     })
   },
 )

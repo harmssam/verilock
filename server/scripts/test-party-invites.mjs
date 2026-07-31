@@ -224,5 +224,99 @@ insertPartyInvite({
 assert(getPartyInviteByTokenHash(hashInviteToken(oldRaw)) === null, 'old token revoked')
 assert(getActiveInviteForParty(rotateTenant.id)?.id === newId, 'new invite active')
 
+// Full send path: Resend success must rotate tokens (email change invalidates prior link).
+process.env.RESEND_ENABLED = '1'
+process.env.RESEND_API_KEY = 're_test_fake'
+process.env.APP_PUBLIC_URL = 'https://verilock.online'
+const sentBodies = []
+const originalFetch = globalThis.fetch
+globalThis.fetch = async (url, init) => {
+  if (String(url).includes('resend.com') || String(url).includes('api.resend')) {
+    const body = typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body
+    sentBodies.push(body)
+    return new Response(JSON.stringify({ id: `msg_${sentBodies.length}` }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+  return originalFetch(url, init)
+}
+const { sendPartyInviteEmail } = await import('../src/email/inviteSigner.ts')
+const { document: e2eDoc } = createDocument({
+  title: 'E2E rotate email',
+  type: 'rental',
+  creatorAddress: walletA,
+  creatorRole: 'landlord',
+  creatorDisplayName: 'Landlord Name',
+  originalSha256: randomBytes(32).toString('hex'),
+  pageCount: 1,
+  requiredSignatures: 2,
+  parties: [{ role: 'tenant', displayName: 'E2E Tenant', required: true }],
+})
+const e2eTenant = getPartiesForDocument(e2eDoc.id).find(p => p.role === 'tenant')
+const e2eHash = (await import('../src/db.ts')).getDocumentById(e2eDoc.id).originalSha256
+const firstSend = await sendPartyInviteEmail({
+  documentId: e2eDoc.id,
+  creatorAddress: walletA,
+  partyId: e2eTenant.id,
+  to: 'first@example.com',
+})
+assert(firstSend.ok, `first send ok: ${JSON.stringify(firstSend)}`)
+assert(firstSend.previousLinksRevoked === 0, 'first send revokes none')
+const extractInvite = body => {
+  const text = body?.text || body?.html || ''
+  const m = String(text).match(/invite=([A-Za-z0-9_-]+)/)
+  return m?.[1] || null
+}
+const e2eToken1 = extractInvite(sentBodies[0])
+assert(e2eToken1, 'first email has invite token')
+const secondSend = await sendPartyInviteEmail({
+  documentId: e2eDoc.id,
+  creatorAddress: walletA,
+  partyId: e2eTenant.id,
+  to: 'second@example.com',
+})
+assert(secondSend.ok, `second send ok: ${JSON.stringify(secondSend)}`)
+assert(secondSend.previousLinksRevoked === 1, 'second send revokes prior invite')
+assert(secondSend.previousEmail === 'first@example.com', 'previousEmail reported')
+const e2eToken2 = extractInvite(sentBodies[1])
+assert(e2eToken2 && e2eToken2 !== e2eToken1, 'second email has a new token')
+assert(
+  getPartyInviteByTokenHash(hashInviteToken(e2eToken1)) === null,
+  'first personal URL is inactive after email change',
+)
+assert(
+  getPartyInviteByTokenHash(hashInviteToken(e2eToken2))?.email === 'second@example.com',
+  'second personal URL is active',
+)
+let e2eOldFailed = false
+try {
+  addSignature({
+    documentId: e2eDoc.id,
+    partyId: e2eTenant.id,
+    signerAddress: walletB,
+    signatureType: 'typed',
+    clientSha256: e2eHash,
+    displayName: 'E2E Tenant',
+    inviteToken: e2eToken1,
+  })
+} catch {
+  e2eOldFailed = true
+}
+assert(e2eOldFailed, 'old invitee cannot sign with replaced link')
+addSignature({
+  documentId: e2eDoc.id,
+  partyId: e2eTenant.id,
+  signerAddress: walletB,
+  signatureType: 'typed',
+  clientSha256: e2eHash,
+  displayName: 'E2E Tenant',
+  inviteToken: e2eToken2,
+})
+assert(
+  getSignaturesForDocument(e2eDoc.id).some(s => s.partyId === e2eTenant.id),
+  'new invitee signs with current link',
+)
+
 console.log('test-party-invites: ok')
 rmSync(dataDir, { recursive: true, force: true })

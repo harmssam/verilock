@@ -1070,19 +1070,45 @@ export function getActiveInviteForParty(
   return row ? mapPartyInviteRow(row) : null
 }
 
+export type PartyInviteLookupStatus =
+  | 'active'
+  | 'revoked'
+  | 'redeemed'
+  | 'expired'
+  | 'not_found'
+
+export type PartyInviteLookupResult =
+  | { status: 'active'; invite: PartyInviteRecord }
+  | { status: 'revoked' | 'redeemed' | 'expired'; invite: PartyInviteRecord }
+  | { status: 'not_found'; invite: null }
+
+/**
+ * Inspect invite by token hash including inactive rows (for lookup UX).
+ * Signing / gates should keep using {@link getPartyInviteByTokenHash} (active only).
+ */
+export function inspectPartyInviteByTokenHash(
+  tokenHash: string,
+  now = Date.now(),
+): PartyInviteLookupResult {
+  const row = db
+    .prepare('SELECT * FROM party_invites WHERE token_hash = ?')
+    .get(tokenHash) as Record<string, unknown> | undefined
+  if (!row) return { status: 'not_found', invite: null }
+  const invite = mapPartyInviteRow(row)
+  if (invite.revokedAt) return { status: 'revoked', invite }
+  if (invite.redeemedAt) return { status: 'redeemed', invite }
+  if (invite.expiresAt != null && invite.expiresAt <= now) {
+    return { status: 'expired', invite }
+  }
+  return { status: 'active', invite }
+}
+
 export function getPartyInviteByTokenHash(
   tokenHash: string,
   now = Date.now(),
 ): PartyInviteRecord | null {
-  const row = db
-    .prepare('SELECT * FROM party_invites WHERE token_hash = ?')
-    .get(tokenHash) as Record<string, unknown> | undefined
-  if (!row) return null
-  const invite = mapPartyInviteRow(row)
-  if (invite.revokedAt) return null
-  if (invite.redeemedAt) return null
-  if (invite.expiresAt != null && invite.expiresAt <= now) return null
-  return invite
+  const result = inspectPartyInviteByTokenHash(tokenHash, now)
+  return result.status === 'active' ? result.invite : null
 }
 
 export function markPartyInviteRedeemed(

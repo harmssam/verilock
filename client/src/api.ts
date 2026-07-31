@@ -360,6 +360,9 @@ export const api = {
       to: string
       partyId: string
       inviteSentAt?: number
+      /** Prior invite email rotated out (null if first send for this party). */
+      previousEmail?: string | null
+      previousLinksRevoked?: number
     }>(`/api/documents/${docId}/invite-email`, {
       method: 'POST',
       headers: { ...withAuth(token), 'Content-Type': 'application/json' },
@@ -368,6 +371,7 @@ export const api = {
 
   /**
    * Resolve opaque email invite token → document slug + party (no email, no token echo).
+   * Revoked / replaced / redeemed tokens throw with status 410.
    */
   lookupInviteToken: (inviteToken: string) =>
     request<{ documentId: string; slug: string; partyId: string }>(
