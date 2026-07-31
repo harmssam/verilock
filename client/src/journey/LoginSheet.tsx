@@ -1,6 +1,7 @@
 import { ExternalLink, LoaderCircle, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { blogPostUrl } from '../blogPublicUrl'
 import { IPhoneIcon } from '../IPhoneIcon'
 import { isLoopbackAppOrigin, NIMIQ_PAY_ANDROID_URL, NIMIQ_PAY_IOS_URL } from '../nimiq'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
@@ -15,6 +16,9 @@ import {
   type JourneyConnectMode,
   type JourneyConnectRequest,
 } from './journeyConnectUi'
+
+/** Blog: wallet-as-account (no email / site password). */
+const EMAIL_LOGIN_FAQ_URL = blogPostUrl('no-email-no-password-nimiq-accounts')
 
 interface LoginSheetProps {
   open: boolean
@@ -161,7 +165,19 @@ export function LoginSheet({
 
           {/* Miss panel has its own copy — skip the default lead. */}
           {!(surface === 'mobile' && showOpenInPay) && (
-            <p className="login-sheet-about">{copy.about}</p>
+            <>
+              <p className="login-sheet-about">{copy.about}</p>
+              <p className="login-sheet-email-help">
+                <a
+                  className="login-sheet-email-help-link"
+                  href={EMAIL_LOGIN_FAQ_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Why can&apos;t I use my email?
+                </a>
+              </p>
+            </>
           )}
 
           {copy.steps.length > 0 && !(surface === 'mobile' && showOpenInPay) && (

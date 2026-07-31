@@ -356,6 +356,25 @@
   color: var(--text-muted);
 }
 
+.login-sheet-email-help {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.login-sheet-email-help-link {
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--text-muted) 45%, transparent);
+  text-underline-offset: 0.14em;
+}
+
+.login-sheet-email-help-link:hover,
+.login-sheet-email-help-link:focus-visible {
+  color: var(--mint, #0d9488);
+  text-decoration-color: color-mix(in srgb, var(--mint, #0d9488) 55%, transparent);
+}
+
 .login-sheet-steps {
   margin: 0;
   padding-left: 1.15rem;
@@ -6932,6 +6951,16 @@ a.hash-chip.text-link:focus-visible {
 
 .login-sheet-about {
   color: var(--lr-muted);
+}
+
+.login-sheet-email-help-link {
+  color: var(--lr-muted);
+}
+
+.login-sheet-email-help-link:hover,
+.login-sheet-email-help-link:focus-visible {
+  color: var(--lr-accent, #0d9488);
+  text-decoration-color: color-mix(in srgb, var(--lr-accent, #0d9488) 55%, transparent);
 }
 
 .login-sheet-steps {
