@@ -183,17 +183,35 @@
   font-size: 0.82rem !important;
 }
 
-/* Official Nimiq hexagon (design kit) - keep aspect ratio in buttons */
+/*
+ * Official Nimiq hexagon (design kit) - keep aspect ratio in buttons.
+ * Safari ≤17: SVG as <img> without CSS width/height can contribute the default
+ * replaced size (~300×150) to flex min-content, so Login / Hub CTAs render huge.
+ * NimiqHexagonIcon sets --nimiq-hex-w/h; callers may override width/height in CSS.
+ */
 .nimiq-hexagon-icon {
   display: inline-block;
+  box-sizing: content-box;
   flex-shrink: 0;
   vertical-align: middle;
   object-fit: contain;
+  width: var(--nimiq-hex-w, 16px);
+  height: var(--nimiq-hex-h, 14px);
 }
 
 .btn .nimiq-hexagon-icon {
   /* Slight optical lift next to text */
   margin-top: 0.05em;
+  /* Buttons are inline-flex: never let the mark grow the control */
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+/* Login sheet mark (title row) — same Safari flex min-content trap */
+.login-sheet-mark.nimiq-hexagon-icon,
+.login-sheet-title-row .nimiq-hexagon-icon {
+  flex: 0 0 auto;
+  align-self: flex-start;
 }
 
 /* Subtle drop-shadow on Login hex (gold on teal) — follows hex shape, not img box. */
