@@ -252,6 +252,21 @@ export function AdminApp() {
           : 'Admin · Stats · VeriLock'
   }, [auth.kind, tab])
 
+  // Studio tab: lock the document so only the iframe scrolls (no nested page scroll).
+  useEffect(() => {
+    if (auth.kind !== 'authed' || tab !== 'studio') return
+    const html = document.documentElement
+    const body = document.body
+    const prevHtml = html.style.overflow
+    const prevBody = body.style.overflow
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+    return () => {
+      html.style.overflow = prevHtml
+      body.style.overflow = prevBody
+    }
+  }, [auth.kind, tab])
+
   // Turnstile widget on login
   useEffect(() => {
     if (auth.kind !== 'login') return
@@ -355,8 +370,10 @@ export function AdminApp() {
 
   const productHref = isAdminHost() ? 'https://verilock.online' : '/'
 
+  const studioMode = auth.kind === 'authed' && tab === 'studio'
+
   return (
-    <div className="admin-app">
+    <div className={`admin-app${studioMode ? ' admin-app--studio' : ''}`}>
       <header className="admin-header">
         <a className="admin-brand" href={productHref} title="VeriLock">
           <img src="/verilock-mark-96.png" alt="" width={32} height={32} />
@@ -377,7 +394,7 @@ export function AdminApp() {
         </div>
       </header>
 
-      <main className="admin-main">
+      <main className={`admin-main${studioMode ? ' admin-main--studio' : ''}`}>
         {auth.kind === 'loading' && <p className="admin-loading">Loading…</p>}
 
         {auth.kind === 'login' && (
@@ -474,32 +491,63 @@ export function AdminApp() {
 
         {auth.kind === 'authed' && (
           <>
-            <nav className="admin-tabs" aria-label="Admin sections">
-              <button
-                type="button"
-                className={`admin-tab${tab === 'support' ? ' admin-tab--active' : ''}`}
-                onClick={() => setTab('support')}
-              >
-                Support
-                {supportOpenCount(stats) > 0 ? (
-                  <span className="admin-tab-badge">{supportOpenCount(stats)}</span>
-                ) : null}
-              </button>
-              <button
-                type="button"
-                className={`admin-tab${tab === 'stats' ? ' admin-tab--active' : ''}`}
-                onClick={() => setTab('stats')}
-              >
-                Stats
-              </button>
-              <button
-                type="button"
-                className={`admin-tab${tab === 'studio' ? ' admin-tab--active' : ''}`}
-                onClick={() => setTab('studio')}
-              >
-                Studio
-              </button>
-            </nav>
+            <div className="admin-chrome">
+              <nav className="admin-tabs" aria-label="Admin sections">
+                <button
+                  type="button"
+                  className={`admin-tab${tab === 'support' ? ' admin-tab--active' : ''}`}
+                  onClick={() => setTab('support')}
+                >
+                  Support
+                  {supportOpenCount(stats) > 0 ? (
+                    <span className="admin-tab-badge">{supportOpenCount(stats)}</span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  className={`admin-tab${tab === 'stats' ? ' admin-tab--active' : ''}`}
+                  onClick={() => setTab('stats')}
+                >
+                  Stats
+                </button>
+                <button
+                  type="button"
+                  className={`admin-tab${tab === 'studio' ? ' admin-tab--active' : ''}`}
+                  onClick={() => setTab('studio')}
+                >
+                  Studio
+                </button>
+              </nav>
+
+              {tab === 'studio' && features?.studioProxyEnabled ? (
+                <div className="admin-studio-toolbar">
+                  <div className="admin-range" role="group" aria-label="Studio type">
+                    <button
+                      type="button"
+                      className={`admin-range-btn${studioPane === 'x' ? ' admin-range-btn--active' : ''}`}
+                      onClick={() => setStudioPane('x')}
+                    >
+                      X Post Studio
+                    </button>
+                    <button
+                      type="button"
+                      className={`admin-range-btn${studioPane === 'blog' ? ' admin-range-btn--active' : ''}`}
+                      onClick={() => setStudioPane('blog')}
+                    >
+                      Blog Studio
+                    </button>
+                  </div>
+                  <a
+                    className="admin-btn admin-btn-ghost"
+                    href={studioPane === 'blog' ? '/blog-studio' : '/x-studio'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open in new tab
+                  </a>
+                </div>
+              ) : null}
+            </div>
 
             {tab === 'support' && (
               <SupportQueue
@@ -528,40 +576,12 @@ export function AdminApp() {
                     </p>
                   </div>
                 ) : (
-                  <>
-                    <div className="admin-studio-toolbar">
-                      <div className="admin-range" role="group" aria-label="Studio type">
-                        <button
-                          type="button"
-                          className={`admin-range-btn${studioPane === 'x' ? ' admin-range-btn--active' : ''}`}
-                          onClick={() => setStudioPane('x')}
-                        >
-                          X Post Studio
-                        </button>
-                        <button
-                          type="button"
-                          className={`admin-range-btn${studioPane === 'blog' ? ' admin-range-btn--active' : ''}`}
-                          onClick={() => setStudioPane('blog')}
-                        >
-                          Blog Studio
-                        </button>
-                      </div>
-                      <a
-                        className="admin-btn admin-btn-ghost"
-                        href={studioPane === 'blog' ? '/blog-studio' : '/x-studio'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Open in new tab
-                      </a>
-                    </div>
-                    <iframe
-                      key={studioPane}
-                      className="admin-studio-frame"
-                      title={studioPane === 'blog' ? 'Blog Studio' : 'X Post Studio'}
-                      src={studioPane === 'blog' ? '/blog-studio' : '/x-studio'}
-                    />
-                  </>
+                  <iframe
+                    key={studioPane}
+                    className="admin-studio-frame"
+                    title={studioPane === 'blog' ? 'Blog Studio' : 'X Post Studio'}
+                    src={studioPane === 'blog' ? '/blog-studio' : '/x-studio'}
+                  />
                 )}
               </section>
             )}
@@ -569,7 +589,9 @@ export function AdminApp() {
         )}
       </main>
 
-      <footer className="admin-footer">Operator-only · not linked from the public product</footer>
+      {!studioMode && (
+        <footer className="admin-footer">Operator-only · not linked from the public product</footer>
+      )}
     </div>
   )
 }
