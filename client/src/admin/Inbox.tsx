@@ -333,8 +333,13 @@ export function Inbox({ onAuthLost, onUnreadChange }: Props) {
                       className="inbox-html-body"
                       dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml }}
                     />
-                  ) : (
+                  ) : selectedEmail.bodyText ? (
                     <pre className="inbox-text-body">{selectedEmail.bodyText}</pre>
+                  ) : (
+                    <div className="inbox-body-empty">
+                      Email body not available — this email was received before the fix that fetches full content from Resend.
+                      New emails will show the body here.
+                    </div>
                   )}
                 </div>
 

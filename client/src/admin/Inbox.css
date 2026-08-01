@@ -323,6 +323,18 @@
   font-size: 0.9rem;
   line-height: 1.65;
   color: var(--lr-text, #0f172a);
+  min-height: 3rem;
+}
+
+.inbox-body-empty {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--lr-muted, #94a3b8);
+  font-size: 0.82rem;
+  font-style: italic;
+  border: 1px dashed var(--lr-line, rgba(15, 23, 42, 0.15));
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.015);
 }
 
 /* HTML email body — reset styles within the container */
