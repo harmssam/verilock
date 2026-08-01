@@ -109,6 +109,12 @@
   color: var(--av2-text);
 }
 
+.av2-sidenav-child--active {
+  background: var(--av2-mint-light);
+  color: var(--av2-mint);
+  font-weight: 600;
+}
+
 /* ── User block ─────────────────────────────────────────────────────── */
 .av2-sidebar-user {
   display: flex;

@@ -10,6 +10,8 @@ import './MobileTabBar.css'
 interface MobileTabBarProps {
   activeTab: AdminV2Tab
   onTabChange: (tab: AdminV2Tab) => void
+  inboxBadge?: number
+  supportBadge?: number
 }
 
 interface TabItem {
@@ -19,13 +21,18 @@ interface TabItem {
   badge?: number
 }
 
-export function MobileTabBar({ activeTab, onTabChange }: MobileTabBarProps) {
+export function MobileTabBar({
+  activeTab,
+  onTabChange,
+  inboxBadge = 0,
+  supportBadge = 0,
+}: MobileTabBarProps) {
   const [moreOpen, setMoreOpen] = useState(false)
 
   const tabs: TabItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'inbox', label: 'Inbox', icon: '📬', badge: 0 },
-    { id: 'support', label: 'Support', icon: '🎫', badge: 0 },
+    { id: 'inbox', label: 'Inbox', icon: '📬', badge: inboxBadge },
+    { id: 'support', label: 'Support', icon: '🎫', badge: supportBadge },
     { id: 'stats', label: 'Stats', icon: '📈' },
     { id: 'more', label: 'More', icon: '⋯' },
   ]
@@ -48,7 +55,7 @@ export function MobileTabBar({ activeTab, onTabChange }: MobileTabBarProps) {
     onTabChange(tabId)
   }
 
-  const isMoreActive = activeTab === 'content' || activeTab === 'settings'
+  const isMoreActive = activeTab === 'content' || activeTab === 'studio' || activeTab === 'settings'
 
   return (
     <>

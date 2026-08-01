@@ -5,7 +5,16 @@ import { useState } from 'react'
 import { Badge } from './Badge'
 import './Sidebar.css'
 
-export type AdminV2Tab = 'dashboard' | 'inbox' | 'support' | 'stats' | 'content' | 'settings'
+export type AdminV2Tab =
+  | 'dashboard'
+  | 'inbox'
+  | 'support'
+  | 'stats'
+  | 'content'
+  | 'studio'
+  | 'settings'
+
+export type StudioPane = 'x' | 'blog'
 
 interface NavItem {
   id: AdminV2Tab
@@ -17,31 +26,49 @@ interface NavItem {
 
 interface SidebarProps {
   activeTab: AdminV2Tab
-  onTabChange: (tab: AdminV2Tab) => void
+  onTabChange: (tab: AdminV2Tab, opts?: { studioPane?: StudioPane }) => void
   username: string
   onLogout: () => void
+  inboxBadge?: number
+  supportBadge?: number
 }
 
-export function Sidebar({ activeTab, onTabChange, username, onLogout }: SidebarProps) {
+export function Sidebar({
+  activeTab,
+  onTabChange,
+  username,
+  onLogout,
+  inboxBadge = 0,
+  supportBadge = 0,
+}: SidebarProps) {
   const [contentOpen, setContentOpen] = useState(false)
 
-  // TODO: Wire up real badge counts from API in Phase 1
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'inbox', label: 'Inbox', icon: '📬', badge: 0, badgeVariant: 'amber' },
-    { id: 'support', label: 'Support', icon: '🎫', badge: 0, badgeVariant: 'red' },
+    {
+      id: 'inbox',
+      label: 'Inbox',
+      icon: '📬',
+      badge: inboxBadge,
+      badgeVariant: 'amber',
+    },
+    {
+      id: 'support',
+      label: 'Support',
+      icon: '🎫',
+      badge: supportBadge,
+      badgeVariant: 'red',
+    },
     { id: 'stats', label: 'Stats', icon: '📈' },
     { id: 'content', label: 'Content', icon: '✍️' },
   ]
 
-  const bottomItems: NavItem[] = [
-    { id: 'settings', label: 'Settings', icon: '⚙️' },
-  ]
+  const bottomItems: NavItem[] = [{ id: 'settings', label: 'Settings', icon: '⚙️' }]
 
-  const contentChildren: { id: AdminV2Tab; label: string }[] = [
+  const contentChildren: { id: AdminV2Tab; label: string; studioPane?: StudioPane }[] = [
     { id: 'content', label: 'X Ideas' },
-    { id: 'content', label: 'X Post Studio' },
-    { id: 'content', label: 'Blog Studio' },
+    { id: 'studio', label: 'X Post Studio', studioPane: 'x' },
+    { id: 'studio', label: 'Blog Studio', studioPane: 'blog' },
   ]
 
   const userInitial = username.charAt(0).toUpperCase()
@@ -65,13 +92,17 @@ export function Sidebar({ activeTab, onTabChange, username, onLogout }: SidebarP
               }}
               aria-current={activeTab === item.id ? 'page' : undefined}
             >
-              <span className="av2-sidenav-icon" aria-hidden="true">{item.icon}</span>
+              <span className="av2-sidenav-icon" aria-hidden="true">
+                {item.icon}
+              </span>
               <span className="av2-sidenav-label">{item.label}</span>
               {item.badge !== undefined && item.badge > 0 && (
                 <Badge count={item.badge} variant={item.badgeVariant || 'gray'} />
               )}
               {item.id === 'content' && (
-                <span className={`av2-sidenav-chevron${contentOpen ? ' av2-sidenav-chevron--open' : ''}`}>
+                <span
+                  className={`av2-sidenav-chevron${contentOpen ? ' av2-sidenav-chevron--open' : ''}`}
+                >
                   ▾
                 </span>
               )}
@@ -84,8 +115,13 @@ export function Sidebar({ activeTab, onTabChange, username, onLogout }: SidebarP
                   <button
                     key={child.label}
                     type="button"
-                    className="av2-sidenav-child"
-                    onClick={() => onTabChange('content')}
+                    className={`av2-sidenav-child${
+                      activeTab === child.id &&
+                      (child.studioPane ? activeTab === 'studio' : true)
+                        ? ' av2-sidenav-child--active'
+                        : ''
+                    }`}
+                    onClick={() => onTabChange(child.id, { studioPane: child.studioPane })}
                   >
                     {child.label}
                   </button>
@@ -105,7 +141,9 @@ export function Sidebar({ activeTab, onTabChange, username, onLogout }: SidebarP
             onClick={() => onTabChange(item.id)}
             aria-current={activeTab === item.id ? 'page' : undefined}
           >
-            <span className="av2-sidenav-icon" aria-hidden="true">{item.icon}</span>
+            <span className="av2-sidenav-icon" aria-hidden="true">
+              {item.icon}
+            </span>
             <span className="av2-sidenav-label">{item.label}</span>
           </button>
         ))}

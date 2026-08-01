@@ -2,7 +2,7 @@
  * Admin v2 portal - redesigned sidebar layout with auth gate.
  * Shares auth (cookie session, adminApi, Turnstile) with the existing admin.
  */
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { adminApi, type AdminFeatures } from '../admin/adminApi'
 import { isAdminHost } from '../admin/adminHost'
 import { Dashboard } from './Dashboard'
@@ -11,10 +11,11 @@ import { SupportTab } from './SupportTab'
 import { StatsTab } from './StatsTab'
 import { IdeasTab } from './IdeasTab'
 import { SettingsTab } from './SettingsTab'
-import { Sidebar } from './components/Sidebar'
-import { type AdminV2Tab } from './components/Sidebar'
+import { StudioTab } from './StudioTab'
+import { Sidebar, type AdminV2Tab, type StudioPane } from './components/Sidebar'
 import { MobileTabBar } from './components/MobileTabBar'
 import { SearchModal } from './components/SearchModal'
+import { Breadcrumbs, type BreadcrumbSegment } from './components/Breadcrumbs'
 import './AdminAppV2.css'
 
 declare global {
@@ -96,7 +97,15 @@ export function AdminAppV2() {
   const [auth, setAuth] = useState<AuthState>({ kind: 'loading' })
   const [features, setFeatures] = useState<AdminV2Features | null>(null)
   const [tab, setTab] = useState<AdminV2Tab>('dashboard')
+  const [studioPane, setStudioPane] = useState<StudioPane>('x')
   const [searchOpen, setSearchOpen] = useState(false)
+
+  // Badge counts
+  const [inboxUnread, setInboxUnread] = useState(0)
+  const [supportOpen, setSupportOpen] = useState(0)
+
+  // Breadcrumbs
+  const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbSegment[]>([])
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -151,6 +160,36 @@ export function AdminAppV2() {
       return
     }
     document.title = 'Admin · VeriLock'
+  }, [auth.kind])
+
+  // Poll sidebar badge counts every 60s
+  useEffect(() => {
+    if (auth.kind !== 'authed') return
+
+    const fetchCounts = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL ?? ''}/api/admin-v2/sidebar-counts`,
+          { credentials: 'include', headers: { Accept: 'application/json' } },
+        )
+        if (res.ok) {
+          const data = await res.json()
+          setInboxUnread(Number(data.inboxUnread ?? 0))
+          setSupportOpen(Number(data.supportOpen ?? 0))
+        }
+      } catch {
+        /* silent — badge counts are non-critical */
+      }
+    }
+
+    // Initial fetch
+    void fetchCounts()
+
+    const interval = setInterval(() => {
+      void fetchCounts()
+    }, 60_000)
+
+    return () => clearInterval(interval)
   }, [auth.kind])
 
   // Turnstile widget on login
@@ -257,6 +296,37 @@ export function AdminAppV2() {
     setAuth({ kind: 'login' })
   }
 
+  // Tab change handler — updates tab, studio pane, and breadcrumbs
+  const handleTabChange = useCallback(
+    (newTab: AdminV2Tab, opts?: { studioPane?: StudioPane }) => {
+      setTab(newTab)
+      if (opts?.studioPane) {
+        setStudioPane(opts.studioPane)
+      }
+
+      // Build breadcrumbs
+      const segments: BreadcrumbSegment[] = [{ label: tabLabel(newTab), tab: newTab }]
+
+      if (newTab === 'studio') {
+        const pane = opts?.studioPane || studioPane
+        segments.push({ label: pane === 'blog' ? 'Blog Studio' : 'X Post Studio' })
+      }
+
+      setBreadcrumbs(segments)
+    },
+    [studioPane],
+  )
+
+  // Search navigation
+  const handleSearchNavigate = useCallback(
+    (newTab: AdminV2Tab, opts?: { studioPane?: StudioPane; emailId?: string; ticketId?: string }) => {
+      handleTabChange(newTab, opts)
+      // emailId and ticketId are consumed by InboxTab and SupportTab via URL params
+      // They parse their own ?email= and ?ticket= search params
+    },
+    [handleTabChange],
+  )
+
   // Global Cmd+K listener
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -268,6 +338,12 @@ export function AdminAppV2() {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [auth.kind])
+
+  // Breadcrumbs derived from tab
+  const visibleBreadcrumbs = useMemo(() => {
+    if (tab === 'dashboard') return []
+    return breadcrumbs.length > 0 ? breadcrumbs : [{ label: tabLabel(tab), tab }]
+  }, [tab, breadcrumbs])
 
   const productHref = isAdminHost() ? 'https://verilock.online' : '/'
 
@@ -372,9 +448,11 @@ export function AdminAppV2() {
           {/* Desktop sidebar */}
           <Sidebar
             activeTab={tab}
-            onTabChange={setTab}
+            onTabChange={handleTabChange}
             username={auth.username}
             onLogout={() => void onLogout()}
+            inboxBadge={inboxUnread}
+            supportBadge={supportOpen}
           />
 
           {/* Main content area */}
@@ -396,11 +474,20 @@ export function AdminAppV2() {
             </header>
 
             <div className="av2-content">
-              {tab === 'dashboard' && <Dashboard onNavigate={setTab} />}
+              {/* Breadcrumbs */}
+              <Breadcrumbs segments={visibleBreadcrumbs} onNavigate={handleTabChange} />
+
+              {tab === 'dashboard' && <Dashboard onNavigate={handleTabChange} />}
               {tab === 'inbox' && <InboxTab onAuthLost={handleAuthLost} />}
               {tab === 'support' && <SupportTab onAuthLost={handleAuthLost} />}
               {tab === 'stats' && <StatsTab />}
               {tab === 'content' && <IdeasTab onAuthLost={handleAuthLost} />}
+              {tab === 'studio' && (
+                <StudioTab
+                  pane={studioPane}
+                  studioProxyEnabled={features?.studioProxyEnabled}
+                />
+              )}
               {tab === 'settings' && <SettingsTab />}
             </div>
           </main>
@@ -408,13 +495,32 @@ export function AdminAppV2() {
           {/* Mobile bottom tab bar */}
           <MobileTabBar
             activeTab={tab}
-            onTabChange={setTab}
+            onTabChange={handleTabChange}
+            inboxBadge={inboxUnread}
+            supportBadge={supportOpen}
           />
 
           {/* Global search modal */}
-          <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+          <SearchModal
+            open={searchOpen}
+            onClose={() => setSearchOpen(false)}
+            onNavigate={handleSearchNavigate}
+          />
         </div>
       )}
     </div>
   )
+}
+
+function tabLabel(tab: AdminV2Tab): string {
+  const labels: Record<AdminV2Tab, string> = {
+    dashboard: 'Dashboard',
+    inbox: 'Inbox',
+    support: 'Support',
+    stats: 'Stats',
+    content: 'Content',
+    studio: 'Studio',
+    settings: 'Settings',
+  }
+  return labels[tab] || tab
 }

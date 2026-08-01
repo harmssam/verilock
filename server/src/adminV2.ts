@@ -156,6 +156,155 @@ export function attachAdminV2Routes(app: Express, requireAdmin: (req: Request, r
     }
   })
 
+  // Sidebar badge counts (lightweight — cheaper than two API calls)
+  app.get('/api/admin-v2/sidebar-counts', requireAdmin, (_req, res) => {
+    try {
+      // Unread inbox count
+      const inboxRow = db
+        .prepare('SELECT COUNT(*) as n FROM admin_inbox WHERE read = 0 AND archived = 0')
+        .get() as { n: number }
+      const inboxUnread = Number(inboxRow?.n ?? 0)
+
+      // Open support tickets (aggregate from statuses)
+      const ticketCounts = getSupportTicketCounts()
+      const supportOpen = ticketCounts.open
+
+      res.setHeader('Cache-Control', 'no-store')
+      res.json({ inboxUnread, supportOpen })
+    } catch (err) {
+      console.error('[admin-v2] sidebar-counts', err)
+      res.status(500).json({ error: 'Could not load sidebar counts.' })
+    }
+  })
+
+  // Global search — simple LIKE across admin_inbox, support_tickets, admin_x_ideas, documents
+  app.get('/api/admin-v2/search', requireAdmin, (req, res) => {
+    try {
+      const q = (typeof req.query.q === 'string' ? req.query.q : '').trim()
+      if (!q || q.length < 2) {
+        res.json({ results: [] })
+        return
+      }
+
+      const like = `%${q}%`
+      const limit = 20
+
+      interface SearchResultItem {
+        type: string
+        id: string
+        title: string
+        subtitle: string
+        url: string
+      }
+
+      const results: SearchResultItem[] = []
+
+      // Search admin_inbox
+      const inboxRows = db
+        .prepare(
+          `SELECT id, subject, from_email, from_name FROM admin_inbox
+           WHERE (subject LIKE ? OR from_email LIKE ? OR body_text LIKE ?) AND archived = 0
+           ORDER BY received_at DESC
+           LIMIT ?`,
+        )
+        .all(like, like, like, limit) as Array<{
+        id: string
+        subject: string
+        from_email: string
+        from_name: string
+      }>
+      for (const row of inboxRows) {
+        results.push({
+          type: 'inbox',
+          id: row.id,
+          title: row.subject || '(no subject)',
+          subtitle: `from ${row.from_name || row.from_email}`,
+          url: `?tab=inbox&email=${encodeURIComponent(row.id)}`,
+        })
+      }
+
+      // Search support_tickets
+      const ticketRows = db
+        .prepare(
+          `SELECT id, public_id, subject, email, status FROM support_tickets
+           WHERE subject LIKE ? OR email LIKE ? OR public_id LIKE ?
+           ORDER BY updated_at DESC
+           LIMIT ?`,
+        )
+        .all(like, like, like, limit) as Array<{
+        id: string
+        public_id: string
+        subject: string
+        email: string
+        status: string
+      }>
+      for (const row of ticketRows) {
+        results.push({
+          type: 'ticket',
+          id: row.id,
+          title: row.subject || '(no subject)',
+          subtitle: `#${row.public_id} · ${row.email}`,
+          url: `?tab=support&ticket=${encodeURIComponent(row.id)}`,
+        })
+      }
+
+      // Search admin_x_ideas
+      const ideaRows = db
+        .prepare(
+          `SELECT id, copy, source_url FROM admin_x_ideas
+           WHERE copy LIKE ? OR source_url LIKE ?
+           ORDER BY created_at DESC
+           LIMIT ?`,
+        )
+        .all(like, like, limit) as Array<{
+        id: string
+        copy: string
+        source_url: string
+      }>
+      for (const row of ideaRows) {
+        results.push({
+          type: 'idea',
+          id: row.id,
+          title: row.copy.length > 80 ? row.copy.slice(0, 80) + '…' : row.copy,
+          subtitle: row.source_url ? `Source: ${row.source_url.slice(0, 60)}` : 'X Idea',
+          url: `?tab=content`,
+        })
+      }
+
+      // Search documents
+      const docRows = db
+        .prepare(
+          `SELECT id, slug, title FROM documents
+           WHERE title LIKE ? OR slug LIKE ?
+           ORDER BY created_at DESC
+           LIMIT ?`,
+        )
+        .all(like, like, limit) as Array<{
+        id: string
+        slug: string
+        title: string
+      }>
+      for (const row of docRows) {
+        results.push({
+          type: 'document',
+          id: row.id,
+          title: row.title || 'Untitled',
+          subtitle: `/${row.slug}`,
+          url: `/d/${row.slug}`,
+        })
+      }
+
+      // Trim to limit
+      const final = results.slice(0, limit)
+
+      res.setHeader('Cache-Control', 'no-store')
+      res.json({ results: final })
+    } catch (err) {
+      console.error('[admin-v2] search', err)
+      res.status(500).json({ error: 'Search failed.' })
+    }
+  })
+
   // Bulk ticket status change
   app.post('/api/admin-v2/tickets/bulk-status', requireAdmin, (req, res) => {
     try {
