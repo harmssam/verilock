@@ -368,6 +368,13 @@ export const adminApi = {
       }>
       total: number
     }>('/api/admin-v2/notifications'),
+  /** Dismiss a notification so it stops appearing in the bell. */
+  dismissNotification: (type: string, id: string) =>
+    adminRequest<{ ok: true }>('/api/admin-v2/notifications/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, id }),
+    }),
 }
 
 export interface InboxEmail {

@@ -333,9 +333,11 @@ export function AdminAppV2() {
     setAuth({ kind: 'login' })
   }
 
-  // Notification click handler — navigates to relevant tab
+  // Notification click handler — navigates to relevant tab and dismisses
   function handleNotificationClick(n: AdminV2Notification) {
     setNotifOpen(false)
+    setNotifications(prev => prev.filter(p => p.id !== n.id || p.type !== n.type))
+    adminApi.dismissNotification(n.type, n.id).catch(() => { /* non-critical */ })
     if (n.type === 'new_email') {
       handleTabChange('inbox')
     } else if (n.type === 'new_ticket' || n.type === 'ticket_reply') {

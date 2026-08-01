@@ -16,6 +16,20 @@ function columnExists(table: string, column: string): boolean {
   return cols.some(c => c.name === column)
 }
 
+// ── Notification Dismissals ────────────────────────────────────────────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS admin_notification_dismissals (
+    id TEXT PRIMARY KEY,
+    notification_type TEXT NOT NULL,
+    notification_id TEXT NOT NULL,
+    admin_username TEXT NOT NULL,
+    dismissed_at INTEGER NOT NULL,
+    UNIQUE(notification_type, notification_id, admin_username)
+  );
+  CREATE INDEX IF NOT EXISTS idx_admin_notif_dismissals ON admin_notification_dismissals(admin_username, notification_type, notification_id);
+`)
+
 // ── Audit Log ─────────────────────────────────────────────────────────────
 
 db.exec(`
@@ -190,8 +204,17 @@ function getDashboard(): AdminV2DashboardResponse {
 
 // ── Notifications ─────────────────────────────────────────────────────────
 
-function getNotifications(): { notifications: AdminV2Notification[]; total: number } {
+function getNotifications(username: string): { notifications: AdminV2Notification[]; total: number } {
   const dayAgo = Date.now() - 24 * 60 * 60 * 1000
+
+  // Fetch dismissed notification keys for this admin
+  const dismissed = db
+    .prepare(
+      `SELECT notification_type, notification_id FROM admin_notification_dismissals
+       WHERE admin_username = ?`,
+    )
+    .all(username) as Array<{ notification_type: string; notification_id: string }>
+  const dismissedSet = new Set(dismissed.map(d => `${d.notification_type}:${d.notification_id}`))
 
   // Unread inbox emails (last 24h)
   const inboxEmails = db
@@ -271,9 +294,12 @@ function getNotifications(): { notifications: AdminV2Notification[]; total: numb
     })
   }
 
+  // Filter out previously dismissed notifications
+  const filtered = notifications.filter(n => !dismissedSet.has(`${n.item.type}:${n.item.id}`))
+
   // Sort by time descending
-  notifications.sort((a, b) => b.ts - a.ts)
-  const limited = notifications.slice(0, 10)
+  filtered.sort((a, b) => b.ts - a.ts)
+  const limited = filtered.slice(0, 10)
 
   return {
     notifications: limited.map(n => n.item),
@@ -334,13 +360,40 @@ export function attachAdminV2Routes(app: Express, requireAdmin: (req: Request, r
 
   // ── Notifications ────────────────────────────────────────────────────
 
-  app.get('/api/admin-v2/notifications', requireAdmin, (_req, res) => {
+  app.get('/api/admin-v2/notifications', requireAdmin, (req, res) => {
     try {
       res.setHeader('Cache-Control', 'no-store')
-      res.json(getNotifications())
+      const username = (res.locals as any).adminUser || 'admin'
+      res.json(getNotifications(username))
     } catch (err) {
       console.error('[admin-v2] notifications', err)
       res.status(500).json({ error: 'Could not load notifications.' })
+    }
+  })
+
+  app.post('/api/admin-v2/notifications/dismiss', requireAdmin, (req, res) => {
+    try {
+      const body = (req.body ?? {}) as { type?: unknown; id?: unknown }
+      const nType = typeof body.type === 'string' && body.type.length > 0 ? body.type : null
+      const nId = typeof body.id === 'string' && body.id.length > 0 ? body.id : null
+      if (!nType || !nId) {
+        res.status(400).json({ error: 'type and id are required' })
+        return
+      }
+      const validTypes = ['new_email', 'new_ticket', 'ticket_reply'] as const
+      if (!(validTypes as readonly string[]).includes(nType)) {
+        res.status(400).json({ error: 'invalid notification type' })
+        return
+      }
+      const username = (res.locals as any).adminUser || 'admin'
+      db.prepare(
+        `INSERT OR IGNORE INTO admin_notification_dismissals (id, notification_type, notification_id, admin_username, dismissed_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      ).run(randomUUID(), nType, nId, username, Date.now())
+      res.json({ ok: true })
+    } catch (err) {
+      console.error('[admin-v2] notifications dismiss', err)
+      res.status(500).json({ error: 'Could not dismiss notification.' })
     }
   })
 
