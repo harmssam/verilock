@@ -104,7 +104,7 @@
 
 .av2-settings-auto-ack-textarea:focus {
   border-color: var(--av2-mint);
-  background: #fff;
+  background: var(--av2-bg-card);
 }
 
 .av2-settings-auto-ack-footer {

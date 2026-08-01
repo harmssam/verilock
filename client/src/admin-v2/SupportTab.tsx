@@ -97,6 +97,18 @@ export function SupportTab({ onAuthLost }: Props) {
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
   const [tagFilter, setTagFilter] = useState('')
 
+  // Customer profile
+  const [customerProfileOpen, setCustomerProfileOpen] = useState(false)
+  const [customerProfile, setCustomerProfile] = useState<{
+    email: string; tickets: Array<{
+      id: string; public_id: string; subject: string; status: string
+      created_at: number; updated_at: number
+    }>; documents: Array<{
+      id: string; slug: string; title: string; status: string; created_at: number
+    }>
+  } | null>(null)
+  const [profileLoading, setProfileLoading] = useState(false)
+
   const onAuthLostRef = useRef(onAuthLost)
   useEffect(() => { onAuthLostRef.current = onAuthLost }, [onAuthLost])
 
@@ -286,6 +298,45 @@ export function SupportTab({ onAuthLost }: Props) {
       return next
     })
   }, [])
+
+  // Customer profile fetch
+  async function loadCustomerProfile(email: string) {
+    setProfileLoading(true)
+    setCustomerProfile(null)
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL ?? ''
+      const res = await fetch(
+        `${API_BASE}/api/admin-v2/customer/${encodeURIComponent(email)}/profile`,
+        { credentials: 'include', headers: { Accept: 'application/json' } },
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || `Request failed (${res.status})`)
+      }
+      const data = await res.json()
+      setCustomerProfile(data)
+    } catch (err) {
+      handleAuthError(err)
+    } finally {
+      setProfileLoading(false)
+    }
+  }
+
+  function toggleCustomerProfile() {
+    if (!detailTicket) return
+    if (customerProfileOpen) {
+      setCustomerProfileOpen(false)
+    } else {
+      setCustomerProfileOpen(true)
+      void loadCustomerProfile(detailTicket.email)
+    }
+  }
+
+  // Reset profile when ticket changes
+  useEffect(() => {
+    setCustomerProfileOpen(false)
+    setCustomerProfile(null)
+  }, [selectedId])
 
   // Tag helpers
   async function addTag(tag: string) {
@@ -605,6 +656,17 @@ export function SupportTab({ onAuthLost }: Props) {
                     </div>
                   </div>
                 </div>
+
+                {/* Customer profile toggle */}
+                <button
+                  type="button"
+                  className={`av2-btn av2-btn-ghost av2-btn-sm${customerProfileOpen ? ' av2-customer-profile-btn--active' : ''}`}
+                  onClick={toggleCustomerProfile}
+                  style={{ marginTop: '0.5rem' }}
+                >
+                  {customerProfileOpen ? '▼ Hide customer profile' : '👤 Customer profile'}
+                </button>
+
                 <label className="av2-support-status-select">
                   <span>Status</span>
                   <select
@@ -625,6 +687,77 @@ export function SupportTab({ onAuthLost }: Props) {
                 <p className="av2-error" role="alert" style={{ marginBottom: '0.75rem' }}>
                   {detailError}
                 </p>
+              )}
+
+              {/* Customer profile panel */}
+              {customerProfileOpen && (
+                <div className="av2-customer-profile">
+                  {profileLoading ? (
+                    <p className="av2-customer-profile-loading">Loading customer profile…</p>
+                  ) : customerProfile ? (
+                    <>
+                      <div className="av2-customer-profile-section">
+                        <h3 className="av2-customer-profile-heading">
+                          Tickets ({customerProfile.tickets.length})
+                        </h3>
+                        {customerProfile.tickets.length === 0 ? (
+                          <p className="av2-customer-profile-empty">No other tickets from {customerProfile.email}.</p>
+                        ) : (
+                          <div className="av2-customer-profile-list">
+                            {customerProfile.tickets.map(t => (
+                              <button
+                                key={t.id}
+                                type="button"
+                                className={`av2-customer-profile-item${t.id === selectedId ? ' av2-customer-profile-item--active' : ''}`}
+                                onClick={() => {
+                                  setSelectedId(t.id)
+                                  setReplyBody('')
+                                  setReplyError(null)
+                                }}
+                              >
+                                <span className="av2-customer-profile-item-id">{t.public_id}</span>
+                                <span className="av2-customer-profile-item-subject">{t.subject}</span>
+                                <span className={`av2-badge av2-badge--${t.status === 'open' ? 'red' : t.status === 'resolved' ? 'mint' : 'amber'}`}>
+                                  {TICKET_STATUS_LABELS[t.status as SupportTicketStatus] ?? statusLabel(t.status)}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="av2-customer-profile-section">
+                        <h3 className="av2-customer-profile-heading">
+                          Documents ({customerProfile.documents.length})
+                        </h3>
+                        {customerProfile.documents.length === 0 ? (
+                          <p className="av2-customer-profile-empty">No documents from this email.</p>
+                        ) : (
+                          <div className="av2-customer-profile-list">
+                            {customerProfile.documents.map(d => (
+                              <a
+                                key={d.id}
+                                href={`/d/${d.slug}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="av2-customer-profile-item av2-customer-profile-doc"
+                              >
+                                <span className="av2-customer-profile-item-title">
+                                  {d.title || 'Untitled'}
+                                </span>
+                                <span className={`av2-badge${d.status === 'locked' ? ' av2-badge--mint' : ' av2-badge--gray'}`}>
+                                  {statusLabel(d.status)}
+                                </span>
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="av2-error" role="alert">Could not load customer profile.</p>
+                  )}
+                </div>
               )}
 
               {/* Message thread */}

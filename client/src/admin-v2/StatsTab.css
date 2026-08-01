@@ -45,12 +45,58 @@
   color: #fff;
 }
 
+/* ── Custom date inputs ───────────────────────────────────────────────── */
+.av2-stats-date-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.av2-stats-date-input {
+  height: 32px;
+  padding: 0 0.4rem;
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius-sm);
+  font-size: 0.75rem;
+  font-family: monospace;
+  background: transparent;
+  color: var(--av2-text);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.av2-stats-date-input:focus {
+  outline: none;
+  border-color: var(--av2-mint);
+  box-shadow: 0 0 0 2px var(--av2-mint-light);
+}
+
+.av2-stats-date-input:hover {
+  border-color: var(--av2-mint);
+}
+
+.av2-stats-date-sep {
+  font-size: 0.75rem;
+  color: var(--av2-text-dim);
+  user-select: none;
+}
+
 /* ── Note ────────────────────────────────────────────────────────────── */
 .av2-stats-note {
   font-size: 0.75rem;
   color: var(--av2-text-dim);
   margin-bottom: 1rem;
   line-height: 1.4;
+}
+
+.av2-stats-compare-note {
+  font-size: 0.75rem;
+  color: var(--av2-mint);
+  margin-bottom: 1rem;
+  line-height: 1.4;
+  padding: 0.5rem 0.75rem;
+  background: var(--av2-mint-light);
+  border-radius: var(--av2-radius-sm);
 }
 
 /* ── Stat Grid ───────────────────────────────────────────────────────── */
@@ -169,12 +215,4 @@
   font-family: monospace;
   font-size: 0.7rem;
   color: var(--av2-text-dim);
-}
-
-/* ── Common ──────────────────────────────────────────────────────────── */
-.av2-empty {
-  padding: 1.5rem 1rem;
-  text-align: center;
-  color: var(--av2-text-dim);
-  font-size: 0.82rem;
 }

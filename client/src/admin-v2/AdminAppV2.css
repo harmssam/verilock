@@ -161,7 +161,7 @@
   border-radius: var(--av2-radius-sm);
   font-size: 0.95rem;
   font-family: var(--av2-font-body);
-  background: #fff;
+  background: var(--av2-bg-card);
   color: var(--av2-text);
   transition: border-color 0.15s;
 }
@@ -191,6 +191,38 @@
 .av2-turnstile-loading {
   font-size: 0.8rem;
   color: var(--av2-text-dim);
+}
+
+/* ── Chips ──────────────────────────────────────────────────────────── */
+.av2-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 0.65rem;
+  border: 1px solid var(--av2-line);
+  border-radius: 100px;
+  background: transparent;
+  font-size: 0.78rem;
+  font-family: var(--av2-font-body);
+  font-weight: 500;
+  color: var(--av2-text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.av2-chip:hover {
+  background: var(--av2-mint-light);
+  color: var(--av2-mint);
+  border-color: rgba(13, 148, 136, 0.2);
+}
+
+.av2-chip--active {
+  background: var(--av2-mint);
+  border-color: var(--av2-mint);
+  color: #fff;
+  font-weight: 600;
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────── */
@@ -455,6 +487,10 @@
   background: var(--av2-mint-light);
 }
 
+.av2-notif-item:active {
+  background: rgba(13, 148, 136, 0.18);
+}
+
 .av2-notif-item-icon {
   font-size: 1.1rem;
   flex-shrink: 0;
@@ -498,7 +534,146 @@
     display: none;
   }
 
-  .av2-login-card {
-    padding: 1.5rem 1.25rem;
+  .av2-notif-dropdown {
+    width: 280px;
+    right: -40px;
   }
+}
+
+/* ── Dark mode overrides ──────────────────────────────────────────────── */
+[data-theme='dark'] {
+  --av2-bg-deep: #0f172a;
+  --av2-bg-card: rgba(30, 41, 59, 0.92);
+  --av2-bg-sidebar: rgba(15, 23, 42, 0.96);
+  --av2-text: #e2e8f0;
+  --av2-text-muted: #94a3b8;
+  --av2-text-dim: #64748b;
+  --av2-line: rgba(148, 163, 184, 0.12);
+  --av2-mint-light: rgba(13, 148, 136, 0.15);
+  --av2-mint-glow: rgba(13, 148, 136, 0.08);
+}
+
+[data-theme='dark'] .av2-app {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, var(--av2-mint-glow), transparent 55%),
+    var(--av2-bg-deep);
+  color-scheme: dark;
+}
+
+[data-theme='dark'] .av2-field input,
+[data-theme='dark'] .av2-inbox-search-input,
+[data-theme='dark'] input[type='search'],
+[data-theme='dark'] input[type='text'],
+[data-theme='dark'] input[type='url'],
+[data-theme='dark'] input[type='date'],
+[data-theme='dark'] input[type='password'],
+[data-theme='dark'] textarea,
+[data-theme='dark'] select {
+  background: #1e293b;
+  color: var(--av2-text);
+  border-color: var(--av2-line);
+}
+
+[data-theme='dark'] .av2-field input:focus,
+[data-theme='dark'] textarea:focus,
+[data-theme='dark'] select:focus {
+  border-color: var(--av2-mint);
+  box-shadow: 0 0 0 3px var(--av2-mint-light);
+}
+
+[data-theme='dark'] .av2-dialog-content,
+[data-theme='dark'] .av2-shortcut-content {
+  background: #1e293b;
+}
+
+[data-theme='dark'] .av2-dialog {
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='dark'] .av2-dialog::backdrop,
+[data-theme='dark'] .av2-shortcut-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+[data-theme='dark'] .av2-shortcut-keys {
+  background: rgba(148, 163, 184, 0.1);
+  border-color: var(--av2-line);
+}
+
+[data-theme='dark'] .av2-btn-ghost:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+[data-theme='dark'] .av2-sidenav-item:hover,
+[data-theme='dark'] .av2-sidenav-child:hover {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+[data-theme='dark'] .av2-header,
+[data-theme='dark'] .av2-stats-panel,
+[data-theme='dark'] .av2-activity-feed {
+  background: rgba(30, 41, 59, 0.88);
+}
+
+[data-theme='dark'] .av2-turnstile iframe {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+[data-theme='dark'] .av2-shortcut-close:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+[data-theme='dark'] .av2-warn {
+  background: rgba(234, 179, 8, 0.08);
+}
+
+[data-theme='dark'] .av2-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+}
+
+[data-theme='dark'] .av2-badge--gray {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+}
+
+/* ── Search modal dark mode ─────────────────────────────────────────── */
+[data-theme='dark'] .av2-search-panel {
+  background: #1e293b;
+}
+
+[data-theme='dark'] .av2-search-result:hover {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+/* ── Inbox + support focus dark mode ────────────────────────────────── */
+[data-theme='dark'] .av2-inbox-search-input:focus,
+[data-theme='dark'] .av2-support-search input:focus,
+[data-theme='dark'] .av2-support-reply-form textarea:focus,
+[data-theme='dark'] .av2-inbox-reply-textarea:focus,
+[data-theme='dark'] .av2-settings-auto-ack-textarea:focus,
+[data-theme='dark'] .av2-ideas-field input:focus,
+[data-theme='dark'] .av2-ideas-field textarea:focus {
+  background: #1e293b;
+}
+
+/* ── Common shared styles ────────────────────────────────────────────── */
+.av2-empty {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--av2-text-dim);
+  font-size: 0.82rem;
+}
+
+.av2-error {
+  font-size: 0.8rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  padding: 0.45rem 0.65rem;
+  border-radius: 6px;
+}
+
+@keyframes av2-fade-in {
+  from { opacity: 0 }
+  to { opacity: 1 }
 }

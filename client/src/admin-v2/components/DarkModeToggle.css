@@ -1,0 +1,19 @@
+/* ── Dark Mode Toggle ─────────────────────────────────────────────────── */
+.av2-theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--av2-touch);
+  height: var(--av2-touch);
+  border: none;
+  background: transparent;
+  color: var(--av2-text-muted);
+  cursor: pointer;
+  border-radius: var(--av2-radius-sm);
+  transition: background 0.15s, color 0.15s;
+}
+
+.av2-theme-toggle:hover {
+  background: var(--av2-mint-light);
+  color: var(--av2-mint);
+}

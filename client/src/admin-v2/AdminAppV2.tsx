@@ -15,6 +15,8 @@ import { StudioTab } from './StudioTab'
 import { Sidebar, type AdminV2Tab, type StudioPane } from './components/Sidebar'
 import { MobileTabBar } from './components/MobileTabBar'
 import { SearchModal } from './components/SearchModal'
+import { DarkModeToggle } from './components/DarkModeToggle'
+import { ShortcutModal } from './components/ShortcutModal'
 import { Breadcrumbs, type BreadcrumbSegment } from './components/Breadcrumbs'
 import './AdminAppV2.css'
 
@@ -106,6 +108,7 @@ export function AdminAppV2() {
   const [tab, setTab] = useState<AdminV2Tab>('dashboard')
   const [studioPane, setStudioPane] = useState<StudioPane>('x')
   const [searchOpen, setSearchOpen] = useState(false)
+  const [shortcutOpen, setShortcutOpen] = useState(false)
 
   // Badge counts
   const [inboxUnread, setInboxUnread] = useState(0)
@@ -368,17 +371,110 @@ export function AdminAppV2() {
     [handleTabChange],
   )
 
-  // Global Cmd+K listener
+  // Global keyboard shortcuts
   useEffect(() => {
+    let gPrefix = false
+    let gTimer: ReturnType<typeof setTimeout> | null = null
+
     const handler = (e: KeyboardEvent) => {
+      // Don't capture when typing in inputs
+      const tag = (e.target as HTMLElement)?.tagName
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+      const isContentEditable = (e.target as HTMLElement)?.isContentEditable
+
+      // Cmd+K / Ctrl+K — search
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         if (auth.kind === 'authed') setSearchOpen(prev => !prev)
+        return
+      }
+
+      if (auth.kind !== 'authed') return
+      if (isInput || isContentEditable) {
+        // Still allow Escape in inputs
+        if (e.key === 'Escape') {
+          setShortcutOpen(false)
+        }
+        return
+      }
+
+      // ? — show shortcut modal
+      if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault()
+        setShortcutOpen(prev => !prev)
+        return
+      }
+
+      // g prefix for tab navigation
+      if (e.key === 'g' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault()
+        gPrefix = true
+        if (gTimer) clearTimeout(gTimer)
+        gTimer = setTimeout(() => { gPrefix = false }, 1500)
+        return
+      }
+
+      if (gPrefix) {
+        e.preventDefault()
+        gPrefix = false
+        if (gTimer) { clearTimeout(gTimer); gTimer = null }
+
+        const tabMap: Record<string, AdminV2Tab> = {
+          d: 'dashboard',
+          i: 'inbox',
+          s: 'support',
+          t: 'stats',
+          c: 'content',
+          m: 'studio',
+          e: 'settings',
+        }
+        const target = tabMap[e.key.toLowerCase()]
+        if (target) {
+          if (target === 'studio') {
+            handleTabChange('studio', { studioPane: 'x' })
+          } else {
+            handleTabChange(target)
+          }
+        }
+        return
+      }
+
+      // Numbered shortcuts 1-7 for tabs
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key >= '1' && e.key <= '7') {
+        e.preventDefault()
+        const numTabs: AdminV2Tab[] = [
+          'dashboard', 'inbox', 'support', 'stats', 'content', 'studio', 'settings',
+        ]
+        const idx = Number(e.key) - 1
+        const target = numTabs[idx]
+        if (target) {
+          if (target === 'studio') {
+            handleTabChange('studio', { studioPane: 'x' })
+          } else {
+            handleTabChange(target)
+          }
+        }
       }
     }
+
     window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [auth.kind])
+    return () => {
+      window.removeEventListener('keydown', handler)
+      if (gTimer) clearTimeout(gTimer)
+    }
+  }, [auth.kind, handleTabChange])
+
+  // Dark mode init on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('verilock-admin-v2-theme')
+      if (stored === 'dark' || stored === 'light') {
+        document.documentElement.setAttribute('data-theme', stored)
+      } else if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.setAttribute('data-theme', 'dark')
+      }
+    } catch { /* noop */ }
+  }, [])
 
   // Breadcrumbs derived from tab
   const visibleBreadcrumbs = useMemo(() => {
@@ -564,6 +660,7 @@ export function AdminAppV2() {
                 </div>
 
                 <span className="av2-user">{auth.username}</span>
+                <DarkModeToggle />
                 <button type="button" className="av2-btn av2-btn-ghost" onClick={() => void onLogout()}>
                   Sign out
                 </button>
@@ -602,6 +699,12 @@ export function AdminAppV2() {
             open={searchOpen}
             onClose={() => setSearchOpen(false)}
             onNavigate={handleSearchNavigate}
+          />
+
+          {/* Keyboard shortcut reference */}
+          <ShortcutModal
+            open={shortcutOpen}
+            onClose={() => setShortcutOpen(false)}
           />
         </div>
       )}

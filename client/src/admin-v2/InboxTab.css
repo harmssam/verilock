@@ -72,7 +72,7 @@
 
 .av2-inbox-search-input:focus {
   border-color: var(--av2-mint);
-  background: #fff;
+  background: var(--av2-bg-card);
 }
 
 .av2-inbox-search-input::placeholder {
@@ -445,7 +445,7 @@
 
 .av2-inbox-reply-textarea:focus {
   border-color: var(--av2-mint);
-  background: #fff;
+  background: var(--av2-bg-card);
 }
 
 .av2-inbox-reply-actions {

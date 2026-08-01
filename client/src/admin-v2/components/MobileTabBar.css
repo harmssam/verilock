@@ -91,7 +91,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: #fff;
+  background: var(--av2-bg-card);
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
   z-index: 42;
@@ -148,11 +148,6 @@
 }
 
 /* ── Animations ─────────────────────────────────────────────────────── */
-@keyframes av2-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
 @keyframes av2-slide-up {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }

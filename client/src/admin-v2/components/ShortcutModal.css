@@ -1,0 +1,108 @@
+/* ── Shortcut Modal ────────────────────────────────────────────────────── */
+.av2-shortcut-dialog {
+  border: none;
+  border-radius: var(--av2-radius);
+  padding: 0;
+  background: transparent;
+  max-width: 520px;
+  width: calc(100% - 2rem);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+  animation: av2-dialog-enter 0.2s ease;
+}
+
+.av2-shortcut-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.35);
+  animation: av2-fade-in 0.2s ease;
+}
+
+.av2-shortcut-content {
+  background: var(--av2-bg-card);
+  border-radius: var(--av2-radius);
+  padding: 1.5rem;
+}
+
+.av2-shortcut-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.av2-shortcut-title {
+  font-family: var(--av2-font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.av2-shortcut-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--av2-text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: background 0.15s;
+}
+
+.av2-shortcut-close:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.av2-shortcut-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.av2-shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+}
+
+.av2-shortcut-keys {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 90px;
+  padding: 0.25rem 0.5rem;
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid var(--av2-line);
+  border-radius: 5px;
+  font-family: monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--av2-text);
+  white-space: nowrap;
+}
+
+.av2-shortcut-desc {
+  font-size: 0.85rem;
+  color: var(--av2-text-muted);
+}
+
+.av2-shortcut-hint {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--av2-line);
+  font-size: 0.75rem;
+  color: var(--av2-text-dim);
+  line-height: 1.5;
+}
+
+.av2-shortcut-hint kbd {
+  display: inline;
+  padding: 0.1em 0.4em;
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid var(--av2-line);
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.85em;
+  font-weight: 600;
+}

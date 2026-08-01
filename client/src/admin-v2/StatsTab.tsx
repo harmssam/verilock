@@ -1,9 +1,10 @@
 /**
- * Admin v2 Stats — ported from StatsDashboard with v2 styling.
- * New: CSV export, uses v2 StatCard component.
+ * Admin v2 Stats — date range picker, comparison mode, CSV export.
+ * Replaces the 30/60/90 toggle with custom start/end date inputs.
+ * Comparison mode shows delta vs previous equal-length period.
  */
-import { useCallback, useEffect, useState } from 'react'
-import { adminApi, type AdminStats, type AdminTimelineRange } from '../admin/adminApi'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { adminApi, type AdminStats } from '../admin/adminApi'
 import { StatCard } from './components/StatCard'
 import './StatsTab.css'
 
@@ -50,20 +51,44 @@ function supportTotalCount(stats: AdminStats): number {
   return Number.isFinite(n) && n >= 0 ? n : 0
 }
 
-function sliceRange(series: number[] | undefined, range: AdminTimelineRange): number[] {
-  if (!series?.length) return []
-  return series.slice(-range)
+type SeriesKey = keyof NonNullable<AdminStats['timeline']>['series']
+
+function sliceRangeToDates(
+  days: string[],
+  series: number[],
+  startDate: string,
+  endDate: string,
+): number[] {
+  if (!series?.length || !days?.length) return []
+  return days.reduce<number[]>((acc, day, i) => {
+    if (day >= startDate && day <= endDate) {
+      acc.push(series[i] ?? 0)
+    }
+    return acc
+  }, [])
 }
 
 function sum(values: number[]): number {
   return values.reduce((acc, n) => acc + (Number(n) || 0), 0)
 }
 
-function periodCount(range: AdminTimelineRange, values: number[], unit: string): string {
-  return `${sum(values).toLocaleString()} ${unit} · last ${range}d`
+function getDateDaysAgo(daysAgo: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - daysAgo)
+  return d.toISOString().slice(0, 10)
 }
 
-type SeriesKey = keyof NonNullable<AdminStats['timeline']>['series']
+function subtractDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T00:00:00Z')
+  d.setDate(d.getDate() - days)
+  return d.toISOString().slice(0, 10)
+}
+
+function daysBetween(start: string, end: string): number {
+  const s = new Date(start + 'T00:00:00Z')
+  const e = new Date(end + 'T00:00:00Z')
+  return Math.round((e.getTime() - s.getTime()) / 86400000) + 1
+}
 
 interface StatCardData {
   id: string
@@ -72,123 +97,19 @@ interface StatCardData {
   hint?: string
   period?: string
   series: number[]
+  /** Numeric delta when comparison mode is active */
+  deltaValue?: number
 }
-
-function buildStatCards(stats: AdminStats, range: AdminTimelineRange): StatCardData[] {
-  const series = stats.timeline?.series
-  const take = (key: SeriesKey) => sliceRange(series?.[key], range)
-  const hasTimeline = Boolean(series)
-
-  const documentsCreated = take('documentsCreated')
-  const documentsLocked = take('documentsLocked')
-  const walletsNew = take('uniqueWalletsFirstSeen')
-  const signatures = take('signatures')
-  const parties = take('parties')
-  const attestations = take('attestations')
-  const archives = take('dataArchives')
-  const creditGranted = take('creditGranted')
-  const creditSpent = take('creditSpent')
-  const sessions = take('sessionsCreated')
-  const supportNew = take('supportTickets')
-  const creditNet = creditGranted.map((g, i) => g - (creditSpent[i] ?? 0))
-
-  return [
-    {
-      id: 'documents',
-      label: 'Documents',
-      value: stats.documents.total,
-      hint: `${stats.documents.createdLast24h} last 24h · ${stats.documents.createdLast7d} last 7d`,
-      period: hasTimeline ? periodCount(range, documentsCreated, 'created') : undefined,
-      series: documentsCreated,
-    },
-    {
-      id: 'locked',
-      label: 'Locked on chain',
-      value: stats.documents.locked,
-      hint:
-        stats.documents.withLockedAt !== stats.documents.locked
-          ? `${stats.documents.withLockedAt} with locked_at`
-          : 'status = locked',
-      period: hasTimeline ? periodCount(range, documentsLocked, 'locked') : undefined,
-      series: documentsLocked,
-    },
-    {
-      id: 'wallets',
-      label: 'Unique wallets',
-      value: stats.wallets.uniqueAll,
-      hint: `${stats.wallets.uniqueCreators} creators · ${stats.wallets.uniqueSigners} signers`,
-      period: hasTimeline ? periodCount(range, walletsNew, 'first seen') : undefined,
-      series: walletsNew,
-    },
-    {
-      id: 'signatures',
-      label: 'Signatures',
-      value: stats.signatures.total,
-      period: hasTimeline ? periodCount(range, signatures, 'signed') : undefined,
-      series: signatures,
-    },
-    {
-      id: 'parties',
-      label: 'Parties',
-      value: stats.parties.total,
-      hint: `${stats.parties.withWallet} with wallet`,
-      period: hasTimeline ? periodCount(range, parties, 'on new docs') : undefined,
-      series: parties,
-    },
-    {
-      id: 'attestations',
-      label: 'Attestations',
-      value: stats.attestations.total,
-      hint: Object.entries(stats.attestations.byStatus)
-        .sort((a, b) => b[1] - a[1])
-        .map(([k, v]) => `${v} ${k}`)
-        .join(' · ') || 'none yet',
-      period: hasTimeline ? periodCount(range, attestations, 'created') : undefined,
-      series: attestations,
-    },
-    {
-      id: 'archives',
-      label: 'Data archives',
-      value: stats.dataArchives.total,
-      hint: `${stats.dataArchives.onChain} on-chain`,
-      period: hasTimeline ? periodCount(range, archives, 'created') : undefined,
-      series: archives,
-    },
-    {
-      id: 'credits',
-      label: 'Credit balance',
-      value: stats.credits.totalBalance,
-      hint: `${stats.credits.accountsWithBalance} wallets with balance`,
-      period: hasTimeline
-        ? `+${sum(creditGranted).toLocaleString()} granted · ${sum(creditSpent).toLocaleString()} spent · last ${range}d`
-        : undefined,
-      series: creditNet,
-    },
-    {
-      id: 'sessions',
-      label: 'Active sessions',
-      value: stats.sessions.verifiedActive,
-      period: hasTimeline ? periodCount(range, sessions, 'created') : undefined,
-      series: sessions,
-    },
-    {
-      id: 'support',
-      label: 'Support open',
-      value: supportOpenCount(stats),
-      hint: `${supportTotalCount(stats)} total · open / in progress / waiting`,
-      period: hasTimeline ? periodCount(range, supportNew, 'tickets') : undefined,
-      series: supportNew,
-    },
-  ]
-}
-
-const RANGES: AdminTimelineRange[] = [30, 60, 90]
 
 export function StatsTab() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [range, setRange] = useState<AdminTimelineRange>(30)
+
+  // Date range — defaults to last 30 days
+  const [startDate, setStartDate] = useState(() => getDateDaysAgo(30))
+  const [endDate, setEndDate] = useState(() => getDateDaysAgo(0))
+  const [compareMode, setCompareMode] = useState(false)
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
@@ -207,17 +128,190 @@ export function StatsTab() {
     void fetchStats()
   }, [fetchStats])
 
+  // Quick range buttons
+  function setQuickRange(days: number) {
+    setEndDate(getDateDaysAgo(0))
+    setStartDate(getDateDaysAgo(days - 1))
+  }
+
+  // Build stat cards with optional comparison
+  const cards = useMemo(() => {
+    if (!stats) return []
+    const timeline = stats.timeline
+    const hasTimeline = Boolean(timeline?.series && timeline?.days)
+
+    const take = (key: SeriesKey): number[] => {
+      if (!hasTimeline) return []
+      return sliceRangeToDates(timeline!.days, timeline!.series[key], startDate, endDate)
+    }
+
+    const documentsCreated = take('documentsCreated')
+    const documentsLocked = take('documentsLocked')
+    const walletsNew = take('uniqueWalletsFirstSeen')
+    const signatures = take('signatures')
+    const parties = take('parties')
+    const attestations = take('attestations')
+    const archives = take('dataArchives')
+    const creditGranted = take('creditGranted')
+    const creditSpent = take('creditSpent')
+    const sessions = take('sessionsCreated')
+    const supportNew = take('supportTickets')
+    const creditNet = creditGranted.map((g, i) => g - (creditSpent[i] ?? 0))
+
+    // Comparison: previous equal-length period
+    const periodDays = daysBetween(startDate, endDate)
+    const prevStart = subtractDays(startDate, periodDays)
+    const prevEnd = subtractDays(startDate, 1)
+
+    function prevTake(key: SeriesKey): number[] {
+      if (!hasTimeline) return []
+      return sliceRangeToDates(timeline!.days, timeline!.series[key], prevStart, prevEnd)
+    }
+
+    const prevMap: Record<string, number[]> = {}
+    if (compareMode && hasTimeline) {
+      for (const [id, key] of Object.entries({
+        documents: 'documentsCreated' as SeriesKey,
+        locked: 'documentsLocked' as SeriesKey,
+        wallets: 'uniqueWalletsFirstSeen' as SeriesKey,
+        signatures: 'signatures' as SeriesKey,
+        parties: 'parties' as SeriesKey,
+        attestations: 'attestations' as SeriesKey,
+        archives: 'dataArchives' as SeriesKey,
+        credits: null, // handled below
+        sessions: 'sessionsCreated' as SeriesKey,
+        support: 'supportTickets' as SeriesKey,
+      })) {
+        if (key) prevMap[id] = prevTake(key)
+      }
+      // Credits net
+      const prevGranted = prevTake('creditGranted')
+      const prevSpent = prevTake('creditSpent')
+      prevMap['credits'] = prevGranted.map((g, i) => g - (prevSpent[i] ?? 0))
+    }
+
+    function computeDelta(currentValues: number[], prevValues: number[]): number | undefined {
+      if (!compareMode || prevValues.length === 0) return undefined
+      return sum(currentValues) - sum(prevValues)
+    }
+
+    const fmtPeriod = (s: number[]): string | undefined => {
+      if (!hasTimeline || s.length === 0) return undefined
+      const total = sum(s)
+      return `${total.toLocaleString()} · ${startDate} → ${endDate}`
+    }
+
+    const result: StatCardData[] = [
+      {
+        id: 'documents',
+        label: 'Documents',
+        value: stats.documents.total,
+        hint: `${stats.documents.createdLast24h} last 24h · ${stats.documents.createdLast7d} last 7d`,
+        period: fmtPeriod(documentsCreated),
+        series: documentsCreated,
+        deltaValue: computeDelta(documentsCreated, prevMap['documents'] || []),
+      },
+      {
+        id: 'locked',
+        label: 'Locked on chain',
+        value: stats.documents.locked,
+        hint:
+          stats.documents.withLockedAt !== stats.documents.locked
+            ? `${stats.documents.withLockedAt} with locked_at`
+            : 'status = locked',
+        period: fmtPeriod(documentsLocked),
+        series: documentsLocked,
+        deltaValue: computeDelta(documentsLocked, prevMap['locked'] || []),
+      },
+      {
+        id: 'wallets',
+        label: 'Unique wallets',
+        value: stats.wallets.uniqueAll,
+        hint: `${stats.wallets.uniqueCreators} creators · ${stats.wallets.uniqueSigners} signers`,
+        period: fmtPeriod(walletsNew),
+        series: walletsNew,
+        deltaValue: computeDelta(walletsNew, prevMap['wallets'] || []),
+      },
+      {
+        id: 'signatures',
+        label: 'Signatures',
+        value: stats.signatures.total,
+        period: fmtPeriod(signatures),
+        series: signatures,
+        deltaValue: computeDelta(signatures, prevMap['signatures'] || []),
+      },
+      {
+        id: 'parties',
+        label: 'Parties',
+        value: stats.parties.total,
+        hint: `${stats.parties.withWallet} with wallet`,
+        period: fmtPeriod(parties),
+        series: parties,
+        deltaValue: computeDelta(parties, prevMap['parties'] || []),
+      },
+      {
+        id: 'attestations',
+        label: 'Attestations',
+        value: stats.attestations.total,
+        hint: Object.entries(stats.attestations.byStatus)
+          .sort((a, b) => b[1] - a[1])
+          .map(([k, v]) => `${v} ${k}`)
+          .join(' · ') || 'none yet',
+        period: fmtPeriod(attestations),
+        series: attestations,
+        deltaValue: computeDelta(attestations, prevMap['attestations'] || []),
+      },
+      {
+        id: 'archives',
+        label: 'Data archives',
+        value: stats.dataArchives.total,
+        hint: `${stats.dataArchives.onChain} on-chain`,
+        period: fmtPeriod(archives),
+        series: archives,
+        deltaValue: computeDelta(archives, prevMap['archives'] || []),
+      },
+      {
+        id: 'credits',
+        label: 'Credit balance',
+        value: stats.credits.totalBalance,
+        hint: `${stats.credits.accountsWithBalance} wallets with balance`,
+        period: hasTimeline
+          ? `+${sum(creditGranted).toLocaleString()} granted · ${sum(creditSpent).toLocaleString()} spent`
+          : undefined,
+        series: creditNet,
+        deltaValue: computeDelta(creditNet, prevMap['credits'] || []),
+      },
+      {
+        id: 'sessions',
+        label: 'Active sessions',
+        value: stats.sessions.verifiedActive,
+        period: fmtPeriod(sessions),
+        series: sessions,
+        deltaValue: computeDelta(sessions, prevMap['sessions'] || []),
+      },
+      {
+        id: 'support',
+        label: 'Support open',
+        value: supportOpenCount(stats),
+        hint: `${supportTotalCount(stats)} total · open / in progress / waiting`,
+        period: fmtPeriod(supportNew),
+        series: supportNew,
+        deltaValue: computeDelta(supportNew, prevMap['support'] || []),
+      },
+    ]
+
+    return result
+  }, [stats, startDate, endDate, compareMode])
+
   function downloadCSV() {
     if (!stats) return
 
     const headers = ['Metric', 'Value']
     const rows: string[][] = []
-    const cards = buildStatCards(stats, range)
     for (const card of cards) {
       rows.push([card.label, String(card.value)])
     }
 
-    // Add breakdowns
     rows.push([''])
     rows.push(['', ''])
     rows.push(['Documents by Status', ''])
@@ -245,6 +339,10 @@ export function StatsTab() {
     URL.revokeObjectURL(url)
   }
 
+  const periodDays = daysBetween(startDate, endDate)
+  const prevStart = subtractDays(startDate, periodDays)
+  const prevEnd = subtractDays(startDate, 1)
+
   if (loading && !stats) {
     return <p className="av2-loading">Loading statistics…</p>
   }
@@ -262,9 +360,11 @@ export function StatsTab() {
 
   if (!stats) return null
 
-  const cards = buildStatCards(stats, range)
   const statusEntries = Object.entries(stats.documents.byStatus).sort((a, b) => b[1] - a[1])
   const hasTimeline = Boolean(stats.timeline?.series)
+
+  const today = getDateDaysAgo(0)
+  const ninetyDaysAgo = getDateDaysAgo(90)
 
   return (
     <div className="av2-stats">
@@ -274,19 +374,53 @@ export function StatsTab() {
           <p className="av2-dash-subtitle">Updated {formatWhen(stats.generatedAt)}</p>
         </div>
         <div className="av2-stats-actions">
-          <div className="av2-stats-range" role="group" aria-label="Timeline range">
-            {RANGES.map(days => (
+          {/* Quick range presets */}
+          <div className="av2-stats-range" role="group" aria-label="Quick date range">
+            {[7, 30, 60, 90].map(days => (
               <button
                 key={days}
                 type="button"
-                className={`av2-stats-range-btn${range === days ? ' av2-stats-range-btn--active' : ''}`}
-                onClick={() => setRange(days)}
-                aria-pressed={range === days}
+                className={`av2-stats-range-btn${startDate === getDateDaysAgo(days - 1) && endDate === today ? ' av2-stats-range-btn--active' : ''}`}
+                onClick={() => setQuickRange(days)}
               >
                 {days}d
               </button>
             ))}
           </div>
+
+          {/* Custom date inputs */}
+          <div className="av2-stats-date-inputs">
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              min={ninetyDaysAgo}
+              max={endDate}
+              aria-label="Start date"
+              className="av2-stats-date-input"
+            />
+            <span className="av2-stats-date-sep">→</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              min={startDate}
+              max={today}
+              aria-label="End date"
+              className="av2-stats-date-input"
+            />
+          </div>
+
+          {/* Compare toggle */}
+          <button
+            type="button"
+            className={`av2-chip${compareMode ? ' av2-chip--active' : ''}`}
+            onClick={() => setCompareMode(c => !c)}
+            title="Compare to previous equal-length period"
+          >
+            Compare
+          </button>
+
           <button
             type="button"
             className="av2-btn av2-btn-ghost"
@@ -311,9 +445,16 @@ export function StatsTab() {
         </p>
       )}
 
-      {hasTimeline ? (
+      {compareMode && (
+        <p className="av2-stats-compare-note">
+          Comparing {startDate} → {endDate} ({periodDays}d) with previous period {prevStart} → {prevEnd}.
+          Green ▲ = increase, Red ▼ = decrease.
+        </p>
+      )}
+
+      {hasTimeline && !compareMode ? (
         <p className="av2-stats-note">
-          Sparklines show daily activity over the last {range} days (UTC). Card totals are
+          Sparklines show daily activity for {startDate} → {endDate} ({periodDays} days). Card totals are
           all-time; the period line is new activity in that window.
         </p>
       ) : null}
@@ -325,7 +466,16 @@ export function StatsTab() {
             key={card.id}
             label={card.label}
             value={card.value}
-            delta={card.period}
+            delta={
+              compareMode && card.deltaValue !== undefined
+                ? formatDelta(card.deltaValue)
+                : card.period
+            }
+            deltaPositive={
+              compareMode && card.deltaValue !== undefined
+                ? card.deltaValue > 0
+                : undefined
+            }
           />
         ))}
       </div>
@@ -410,4 +560,10 @@ export function StatsTab() {
       </div>
     </div>
   )
+}
+
+function formatDelta(value: number): string {
+  if (value === 0) return '±0'
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${value.toLocaleString()}`
 }

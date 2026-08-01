@@ -23,7 +23,7 @@
 .av2-search-panel {
   position: relative;
   z-index: 1;
-  background: #fff;
+  background: var(--av2-bg-card);
   border-radius: var(--av2-radius);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
   width: 580px;

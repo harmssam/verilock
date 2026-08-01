@@ -366,7 +366,7 @@ export function IdeasTab({ onAuthLost }: Props) {
         <div className="av2-ideas-edit-overlay" onClick={() => { setPostUrlIdea(null); setPostUrlValue('') }}>
           <div className="av2-ideas-edit-card" onClick={e => e.stopPropagation()}>
             <h3>Mark as Posted</h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--av2-text-muted)', marginBottom: '0.75rem' }}>
+            <p className="av2-settings-section-desc">
               Enter the URL of the published X post.
             </p>
             <div className="av2-ideas-field">

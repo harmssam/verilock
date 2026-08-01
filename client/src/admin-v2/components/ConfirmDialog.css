@@ -16,7 +16,7 @@
 }
 
 .av2-dialog-content {
-  background: #fff;
+  background: var(--av2-bg-card);
   border-radius: var(--av2-radius);
   padding: 1.5rem;
 }

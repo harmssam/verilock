@@ -778,4 +778,49 @@ export function attachAdminV2Routes(app: Express, requireAdmin: (req: Request, r
       res.status(500).json({ error: 'Could not update ticket tags.' })
     }
   })
+
+  // ── Customer Profile ──────────────────────────────────────────────
+
+  app.get('/api/admin-v2/customer/:email/profile', requireAdmin, (req, res) => {
+    try {
+      const email = decodeURIComponent(String(req.params.email ?? '')).trim().toLowerCase()
+      if (!email) {
+        res.status(400).json({ error: 'Email is required.' })
+        return
+      }
+
+      // All tickets for this email
+      const tickets = db
+        .prepare(
+          `SELECT id, public_id, subject, status, created_at, updated_at
+           FROM support_tickets
+           WHERE LOWER(email) = ?
+           ORDER BY created_at DESC
+           LIMIT 50`,
+        )
+        .all(email) as Array<{
+        id: string; public_id: string; subject: string; status: string
+        created_at: number; updated_at: number
+      }>
+
+      // All draft/locked documents owned by this email
+      const documents = db
+        .prepare(
+          `SELECT d.id, d.slug, d.title, d.status, d.created_at
+           FROM documents d
+           WHERE LOWER(d.creator_email) = ?
+           ORDER BY d.created_at DESC
+           LIMIT 50`,
+        )
+        .all(email) as Array<{
+        id: string; slug: string; title: string; status: string; created_at: number
+      }>
+
+      res.setHeader('Cache-Control', 'no-store')
+      res.json({ email, tickets, documents })
+    } catch (err) {
+      console.error('[admin-v2] customer profile', err)
+      res.status(500).json({ error: 'Could not load customer profile.' })
+    }
+  })
 }
