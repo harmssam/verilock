@@ -779,6 +779,46 @@ export function attachAdminV2Routes(app: Express, requireAdmin: (req: Request, r
     }
   })
 
+  // Batch get tags for multiple tickets (avoids N+1 requests client-side)
+  app.post('/api/admin-v2/tickets/tags/batch', requireAdmin, (req, res) => {
+    try {
+      const body = (req.body ?? {}) as { ids?: unknown }
+      if (!Array.isArray(body.ids) || body.ids.length === 0) {
+        res.json({ tags: {} })
+        return
+      }
+      const ids = body.ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      if (ids.length === 0) {
+        res.json({ tags: {} })
+        return
+      }
+
+      const tagsMap: Record<string, string[]> = {}
+      const placeholders = ids.map(() => '?').join(',')
+      const rows = db
+        .prepare(
+          `SELECT ticket_id, tag FROM admin_ticket_tags WHERE ticket_id IN (${placeholders}) ORDER BY tag`,
+        )
+        .all(...ids) as Array<{ ticket_id: string; tag: string }>
+
+      for (const row of rows) {
+        if (!tagsMap[row.ticket_id]) tagsMap[row.ticket_id] = []
+        tagsMap[row.ticket_id].push(row.tag)
+      }
+
+      // Ensure all requested IDs have an entry (empty array if no tags)
+      for (const id of ids) {
+        if (!tagsMap[id]) tagsMap[id] = []
+      }
+
+      res.setHeader('Cache-Control', 'no-store')
+      res.json({ tags: tagsMap })
+    } catch (err) {
+      console.error('[admin-v2] batch tags', err)
+      res.status(500).json({ error: 'Could not load batch tags.' })
+    }
+  })
+
   // ── Customer Profile ──────────────────────────────────────────────
 
   app.get('/api/admin-v2/customer/:email/profile', requireAdmin, (req, res) => {

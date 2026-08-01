@@ -1,7 +1,15 @@
 /**
- * Desktop sidebar navigation (≥768px). Collapses to icon-only on tablet (768-1023px).
+ * Desktop sidebar navigation (>=768px). Collapses to icon-only on tablet (768-1023px).
  */
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import {
+  BarChart3,
+  MailOpen,
+  Ticket,
+  TrendingUp,
+  PenLine,
+  Settings,
+} from 'lucide-react'
 import { Badge } from './Badge'
 import './Sidebar.css'
 
@@ -19,7 +27,7 @@ export type StudioPane = 'x' | 'blog'
 interface NavItem {
   id: AdminV2Tab
   label: string
-  icon: string
+  icon: ReactNode
   badge?: number
   badgeVariant?: 'mint' | 'amber' | 'red' | 'gray'
 }
@@ -33,6 +41,9 @@ interface SidebarProps {
   supportBadge?: number
 }
 
+const iconSize = 20
+const iconStroke = 1.5
+
 export function Sidebar({
   activeTab,
   onTabChange,
@@ -44,26 +55,28 @@ export function Sidebar({
   const [contentOpen, setContentOpen] = useState(false)
 
   const navItems: NavItem[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 size={iconSize} strokeWidth={iconStroke} /> },
     {
       id: 'inbox',
       label: 'Inbox',
-      icon: '📬',
+      icon: <MailOpen size={iconSize} strokeWidth={iconStroke} />,
       badge: inboxBadge,
       badgeVariant: 'amber',
     },
     {
       id: 'support',
       label: 'Support',
-      icon: '🎫',
+      icon: <Ticket size={iconSize} strokeWidth={iconStroke} />,
       badge: supportBadge,
       badgeVariant: 'red',
     },
-    { id: 'stats', label: 'Stats', icon: '📈' },
-    { id: 'content', label: 'Content', icon: '✍️' },
+    { id: 'stats', label: 'Stats', icon: <TrendingUp size={iconSize} strokeWidth={iconStroke} /> },
+    { id: 'content', label: 'Content', icon: <PenLine size={iconSize} strokeWidth={iconStroke} /> },
   ]
 
-  const bottomItems: NavItem[] = [{ id: 'settings', label: 'Settings', icon: '⚙️' }]
+  const bottomItems: NavItem[] = [
+    { id: 'settings', label: 'Settings', icon: <Settings size={iconSize} strokeWidth={iconStroke} /> },
+  ]
 
   const contentChildren: { id: AdminV2Tab; label: string; studioPane?: StudioPane }[] = [
     { id: 'content', label: 'X Ideas' },

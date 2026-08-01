@@ -299,7 +299,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.85rem 1.5rem;
+  padding: 1rem 2rem;
   border-bottom: 1px solid var(--av2-line);
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(10px);
@@ -357,7 +357,7 @@
 
 .av2-content {
   flex: 1;
-  padding: 1.5rem;
+  padding: 2rem;
 }
 
 /* ── Page placeholders ──────────────────────────────────────────────── */

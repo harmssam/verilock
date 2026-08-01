@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
   flex-wrap: wrap;
 }
 
@@ -103,7 +103,7 @@
 .av2-support-layout {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1rem;
+  gap: 1.25rem;
   min-height: 0;
 }
 
@@ -173,7 +173,7 @@
 .av2-support-row-check {
   display: flex;
   align-items: center;
-  padding: 0.75rem 0 0.75rem 0.85rem;
+  padding: 0.85rem 0 0.85rem 1rem;
   min-height: var(--av2-touch);
   flex-shrink: 0;
 }
@@ -185,7 +185,7 @@
 .av2-support-row-btn {
   display: block;
   width: 100%;
-  padding: 0.75rem 0.85rem 0.75rem 0.5rem;
+  padding: 0.85rem 1rem 0.85rem 0.65rem;
   border: none;
   background: transparent;
   text-align: left;
@@ -241,7 +241,7 @@
   border: 1px solid var(--av2-line);
   border-radius: var(--av2-radius);
   background: var(--av2-bg-card);
-  padding: 1rem;
+  padding: 1.25rem;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   display: flex;
@@ -253,8 +253,8 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1rem;
-  padding-bottom: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
   border-bottom: 1px solid var(--av2-line);
   flex-wrap: wrap;
 }
@@ -317,12 +317,12 @@
 .av2-support-thread {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
   margin-bottom: 1.5rem;
 }
 
 .av2-support-msg {
-  padding: 0.75rem;
+  padding: 0.85rem;
   border-radius: var(--av2-radius-sm);
   font-size: 0.85rem;
   line-height: 1.55;

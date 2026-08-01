@@ -3,6 +3,16 @@
  * Fetches data from GET /api/admin-v2/dashboard.
  */
 import { useCallback, useEffect, useState } from 'react'
+import {
+  FileText,
+  Ticket,
+  PenLine,
+  Pin,
+  Users,
+  CircleDollarSign,
+  TrendingUp,
+  MailX,
+} from 'lucide-react'
 import { StatCard } from './components/StatCard'
 import { EmptyState } from './components/EmptyState'
 import { type AdminV2Tab } from './components/Sidebar'
@@ -23,16 +33,19 @@ function timeAgo(isoString: string): string {
   return new Date(isoString).toLocaleDateString()
 }
 
-function activityIcon(type: string): string {
+const iconSize = 18
+const iconStroke = 1.5
+
+function activityIcon(type: string) {
   switch (type) {
     case 'document_created':
-      return '📄'
+      return <FileText size={iconSize} strokeWidth={iconStroke} />
     case 'ticket_opened':
-      return '🎫'
+      return <Ticket size={iconSize} strokeWidth={iconStroke} />
     case 'signature_completed':
-      return '✍️'
+      return <PenLine size={iconSize} strokeWidth={iconStroke} />
     default:
-      return '📌'
+      return <Pin size={iconSize} strokeWidth={iconStroke} />
   }
 }
 
@@ -122,22 +135,22 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <StatCard
           label="Documents Today"
           value={data.kpi.documentsToday}
-          icon="📄"
+          icon={<FileText size={20} strokeWidth={1.5} />}
         />
         <StatCard
           label="Active Sessions"
           value={data.kpi.activeSessions}
-          icon="👥"
+          icon={<Users size={20} strokeWidth={1.5} />}
         />
         <StatCard
           label="Open Tickets"
           value={data.kpi.openTickets}
-          icon="🎫"
+          icon={<Ticket size={20} strokeWidth={1.5} />}
         />
         <StatCard
           label="Credit Balance"
           value={data.kpi.creditBalance}
-          icon="💰"
+          icon={<CircleDollarSign size={20} strokeWidth={1.5} />}
         />
       </div>
 
@@ -146,13 +159,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <h2 className="av2-section-title">Quick Actions</h2>
         <div className="av2-quick-actions">
           <button type="button" className="av2-btn av2-btn-accent" onClick={() => onNavigate('content')}>
-            ✍️ New Blog Post
+            <PenLine size={16} strokeWidth={1.5} /> New Blog Post
           </button>
           <button type="button" className="av2-btn av2-btn-accent" onClick={() => onNavigate('support')}>
-            🎫 Check Tickets
+            <Ticket size={16} strokeWidth={1.5} /> Check Tickets
           </button>
           <button type="button" className="av2-btn av2-btn-accent" onClick={() => onNavigate('stats')}>
-            📈 View Stats
+            <TrendingUp size={16} strokeWidth={1.5} /> View Stats
           </button>
         </div>
       </section>
@@ -162,7 +175,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <h2 className="av2-section-title">Recent Activity</h2>
         {data.recentActivity.length === 0 ? (
           <EmptyState
-            icon="📭"
+            icon={<MailX size={40} strokeWidth={1.5} />}
             title="No recent activity"
             description="Activity will appear here as documents are created and signed."
           />

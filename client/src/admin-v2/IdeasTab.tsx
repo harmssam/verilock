@@ -2,6 +2,7 @@
  * Admin v2 X Ideas — Content Pipeline with statuses, kanban view, and posted URLs.
  */
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { ExternalLink } from 'lucide-react'
 import { adminApi, type XIdea, type XIdeaInput } from '../admin/adminApi'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import './IdeasTab.css'
@@ -486,7 +487,7 @@ export function IdeasTab({ onAuthLost }: Props) {
                 rel="noopener noreferrer"
                 title={idea.posted_url}
               >
-                ↗ View post
+                <ExternalLink size={12} strokeWidth={1.5} /> View post
               </a>
             )}
           </div>

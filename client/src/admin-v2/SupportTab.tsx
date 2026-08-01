@@ -3,6 +3,7 @@
  * New: SLA/time-since indicator colors, bulk status change, ticket tags.
  */
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { User } from 'lucide-react'
 import {
   adminApi,
   type SupportReplyTemplate,
@@ -129,19 +130,16 @@ export function SupportTab({ onAuthLost }: Props) {
 
       // Client-side tag filter (server doesn't filter by tag in tickets endpoint)
       if (tagFilter.trim()) {
-        // Fetch tags for all tickets and filter
-        const tagPromises = filtered.map(async t => {
-          try {
-            const r = await adminApi.ticketTagsForTicket(t.id)
-            return { id: t.id, tags: r.tags }
-          } catch { return { id: t.id, tags: [] as string[] } }
-        })
-        const tagResults = await Promise.all(tagPromises)
-        const tagMap = new Map(tagResults.map(r => [r.id, r.tags]))
-        filtered = filtered.filter(t => {
-          const tags = tagMap.get(t.id) ?? []
-          return tags.some(tag => tag.includes(tagFilter.toLowerCase()))
-        })
+        // Fetch tags for all tickets in a single batch request
+        try {
+          const tagResult = await adminApi.ticketTagsBatch(filtered.map(t => t.id))
+          filtered = filtered.filter(t => {
+            const tags = tagResult.tags[t.id] ?? []
+            return tags.some(tag => tag.includes(tagFilter.toLowerCase()))
+          })
+        } catch {
+          // If batch fails, show all tickets
+        }
       }
 
       setTickets(filtered)
@@ -664,7 +662,7 @@ export function SupportTab({ onAuthLost }: Props) {
                   onClick={toggleCustomerProfile}
                   style={{ marginTop: '0.5rem' }}
                 >
-                  {customerProfileOpen ? '▼ Hide customer profile' : '👤 Customer profile'}
+                  {customerProfileOpen ? '▼ Hide customer profile' : <><User size={14} strokeWidth={1.5} /> Customer profile</>}
                 </button>
 
                 <label className="av2-support-status-select">

@@ -2,7 +2,9 @@
  * Admin v2 portal - redesigned sidebar layout with auth gate.
  * Shares auth (cookie session, adminApi, Turnstile) with the existing admin.
  */
+import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { Mail, Ticket, MessageCircle } from 'lucide-react'
 import { adminApi, type AdminFeatures } from '../admin/adminApi'
 import { isAdminHost } from '../admin/adminHost'
 import { Dashboard } from './Dashboard'
@@ -485,10 +487,10 @@ export function AdminAppV2() {
   const productHref = isAdminHost() ? 'https://verilock.online' : '/'
 
   // Notification icons
-  const notifIcon = (type: string) => {
-    if (type === 'new_email') return '📧'
-    if (type === 'new_ticket') return '🎫'
-    return '💬'
+  const notifIcon = (type: string): ReactNode => {
+    if (type === 'new_email') return <Mail size={16} strokeWidth={1.5} />
+    if (type === 'new_ticket') return <Ticket size={16} strokeWidth={1.5} />
+    return <MessageCircle size={16} strokeWidth={1.5} />
   }
 
   return (

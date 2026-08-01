@@ -327,6 +327,13 @@ export const adminApi = {
   ticketTagsForTicket: (ticketId: string) =>
     adminRequest<{ tags: string[] }>(`/api/admin-v2/tickets/${encodeURIComponent(ticketId)}/tags`),
 
+  /** Get tags for multiple tickets in a single batch request */
+  ticketTagsBatch: (ids: string[]) =>
+    adminRequest<{ tags: Record<string, string[]> }>('/api/admin-v2/tickets/tags/batch', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
+
   /** Replace tags for a ticket */
   ticketTagsSet: (ticketId: string, tags: string[]) =>
     adminRequest<{ tags: string[] }>(`/api/admin-v2/tickets/${encodeURIComponent(ticketId)}/tags`, {

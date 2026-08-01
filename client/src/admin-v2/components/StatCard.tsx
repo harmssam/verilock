@@ -1,12 +1,13 @@
 /**
  * KPI stat card — used in Dashboard + Stats pages.
  */
+import type { ReactNode } from 'react'
 import './StatCard.css'
 
 interface StatCardProps {
   label: string
   value: number | string
-  icon?: string
+  icon?: ReactNode
   delta?: string
   deltaPositive?: boolean
   clickable?: boolean

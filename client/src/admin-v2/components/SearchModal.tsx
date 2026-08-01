@@ -2,6 +2,14 @@
  * Cmd+K global search modal — wired to GET /api/admin-v2/search?q=...
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  Search,
+  Ticket,
+  MailOpen,
+  Lightbulb,
+  FileText,
+  Link,
+} from 'lucide-react'
 import { EmptyState } from './EmptyState'
 import type { AdminV2Tab, StudioPane } from './Sidebar'
 import './SearchModal.css'
@@ -20,20 +28,23 @@ interface SearchResult {
   url: string
 }
 
+const iconSize = 16
+const iconStroke = 1.5
+
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
-function typeIcon(type: string): string {
+function typeIcon(type: string) {
   switch (type) {
     case 'ticket':
-      return '🎫'
+      return <Ticket size={iconSize} strokeWidth={iconStroke} />
     case 'inbox':
-      return '📬'
+      return <MailOpen size={iconSize} strokeWidth={iconStroke} />
     case 'idea':
-      return '💡'
+      return <Lightbulb size={iconSize} strokeWidth={iconStroke} />
     case 'document':
-      return '📄'
+      return <FileText size={iconSize} strokeWidth={iconStroke} />
     default:
-      return '🔗'
+      return <Link size={iconSize} strokeWidth={iconStroke} />
   }
 }
 
@@ -175,7 +186,7 @@ export function SearchModal({ open, onClose, onNavigate }: SearchModalProps) {
       <div className="av2-search-panel" role="dialog" aria-label="Search">
         <div className="av2-search-input-wrap">
           <span className="av2-search-input-icon" aria-hidden="true">
-            🔍
+            <Search size={18} strokeWidth={1.5} />
           </span>
           <input
             ref={inputRef}
@@ -203,7 +214,7 @@ export function SearchModal({ open, onClose, onNavigate }: SearchModalProps) {
           )}
           {!loading && query.trim().length >= 2 && results.length === 0 && (
             <EmptyState
-              icon="🔎"
+              icon={<Search size={40} strokeWidth={1.5} />}
               title="No results found"
               description={`No results for "${query}".`}
             />

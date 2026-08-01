@@ -2,7 +2,16 @@
  * Mobile bottom tab bar (<768px). Fixed at the bottom with 5 icon tabs.
  * "More" tab opens a slide-up menu with Content + Settings.
  */
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import {
+  BarChart3,
+  MailOpen,
+  Ticket,
+  TrendingUp,
+  MoreHorizontal,
+  PenLine,
+  Settings,
+} from 'lucide-react'
 import { Badge } from './Badge'
 import type { AdminV2Tab } from './Sidebar'
 import './MobileTabBar.css'
@@ -17,9 +26,12 @@ interface MobileTabBarProps {
 interface TabItem {
   id: AdminV2Tab | 'more'
   label: string
-  icon: string
+  icon: ReactNode
   badge?: number
 }
+
+const iconSize = 20
+const iconStroke = 1.5
 
 export function MobileTabBar({
   activeTab,
@@ -30,16 +42,16 @@ export function MobileTabBar({
   const [moreOpen, setMoreOpen] = useState(false)
 
   const tabs: TabItem[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'inbox', label: 'Inbox', icon: '📬', badge: inboxBadge },
-    { id: 'support', label: 'Support', icon: '🎫', badge: supportBadge },
-    { id: 'stats', label: 'Stats', icon: '📈' },
-    { id: 'more', label: 'More', icon: '⋯' },
+    { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 size={iconSize} strokeWidth={iconStroke} /> },
+    { id: 'inbox', label: 'Inbox', icon: <MailOpen size={iconSize} strokeWidth={iconStroke} />, badge: inboxBadge },
+    { id: 'support', label: 'Support', icon: <Ticket size={iconSize} strokeWidth={iconStroke} />, badge: supportBadge },
+    { id: 'stats', label: 'Stats', icon: <TrendingUp size={iconSize} strokeWidth={iconStroke} /> },
+    { id: 'more', label: 'More', icon: <MoreHorizontal size={iconSize} strokeWidth={iconStroke} /> },
   ]
 
-  const moreItems: { id: AdminV2Tab; label: string; icon: string }[] = [
-    { id: 'content', label: 'Content', icon: '✍️' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' },
+  const moreItems: { id: AdminV2Tab; label: string; icon: ReactNode }[] = [
+    { id: 'content', label: 'Content', icon: <PenLine size={iconSize} strokeWidth={iconStroke} /> },
+    { id: 'settings', label: 'Settings', icon: <Settings size={iconSize} strokeWidth={iconStroke} /> },
   ]
 
   const handleTabPress = (tabId: AdminV2Tab | 'more') => {

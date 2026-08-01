@@ -140,6 +140,10 @@ if (!messageCols.some(col => col.name === 'message_kind')) {
 db.exec(`CREATE INDEX IF NOT EXISTS idx_support_ticket_messages_kind
   ON support_ticket_messages(message_kind)`)
 
+// Composite index for fast ticket message lookups (list query + window functions)
+db.exec(`CREATE INDEX IF NOT EXISTS idx_support_ticket_messages_ticket_created
+  ON support_ticket_messages(ticket_id, created_at DESC)`)
+
 function isSupportTicketStatus(value: string): value is SupportTicketStatus {
   return (SUPPORT_TICKET_STATUSES as readonly string[]).includes(value)
 }
@@ -393,18 +397,29 @@ export function listSupportTickets(opts: {
     )?.n ?? 0,
   )
 
+  // Use a CTE with ROW_NUMBER() window function to get latest message per ticket
+  // in a single pass, instead of N correlated subqueries per row.
   const rows = db
     .prepare(
-      `SELECT t.id, t.public_id, t.name, t.email, t.subject, t.issue, t.wallet_address, t.status, t.document_slug,
+      `WITH latest_msg AS (
+         SELECT ticket_id, body, created_at, author_kind,
+           ROW_NUMBER() OVER (PARTITION BY ticket_id ORDER BY created_at DESC) AS rn
+         FROM support_ticket_messages
+       ),
+       msg_counts AS (
+         SELECT ticket_id, COUNT(*) AS cnt
+         FROM support_ticket_messages
+         GROUP BY ticket_id
+       )
+       SELECT t.id, t.public_id, t.name, t.email, t.subject, t.issue, t.wallet_address, t.status, t.document_slug,
               t.created_at, t.updated_at, t.resolved_at, t.volume_notice_sent_at,
-              (SELECT COUNT(*) FROM support_ticket_messages m WHERE m.ticket_id = t.id) AS message_count,
-              (SELECT m.created_at FROM support_ticket_messages m
-                 WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message_at,
-              (SELECT m.body FROM support_ticket_messages m
-                 WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message_preview,
-              (SELECT m.author_kind FROM support_ticket_messages m
-                 WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_author_kind
+              COALESCE(mc.cnt, 0) AS message_count,
+              lm.created_at AS last_message_at,
+              lm.body AS last_message_preview,
+              lm.author_kind AS last_author_kind
        FROM support_tickets t
+       LEFT JOIN msg_counts mc ON mc.ticket_id = t.id
+       LEFT JOIN latest_msg lm ON lm.ticket_id = t.id AND lm.rn = 1
        ${whereSql}
        ORDER BY t.updated_at DESC
        LIMIT ? OFFSET ?`,

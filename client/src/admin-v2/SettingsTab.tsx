@@ -2,6 +2,7 @@
  * Admin v2 Settings — auto-ack editor + audit log.
  */
 import { useCallback, useEffect, useState } from 'react'
+import { Mail, ClipboardList, Palette } from 'lucide-react'
 import { adminApi, type SupportAutoAckSettings } from '../admin/adminApi'
 import './SettingsTab.css'
 
@@ -143,7 +144,9 @@ export function SettingsTab() {
       {/* ── Auto-ack section ─────────────────────────────────────────── */}
       <section className="av2-settings-section">
         <h2 className="av2-settings-section-title">
-          <span className="av2-settings-section-icon" aria-hidden="true">📧</span>
+          <span className="av2-settings-section-icon" aria-hidden="true">
+            <Mail size={18} strokeWidth={1.5} />
+          </span>
           Support Auto-Reply
         </h2>
         <p className="av2-settings-section-desc">
@@ -232,7 +235,9 @@ export function SettingsTab() {
       {/* ── Audit Log section ────────────────────────────────────────── */}
       <section className="av2-settings-section">
         <h2 className="av2-settings-section-title">
-          <span className="av2-settings-section-icon" aria-hidden="true">📋</span>
+          <span className="av2-settings-section-icon" aria-hidden="true">
+            <ClipboardList size={18} strokeWidth={1.5} />
+          </span>
           Audit Log
         </h2>
         <p className="av2-settings-section-desc">
@@ -319,7 +324,9 @@ export function SettingsTab() {
       {/* ── Display placeholder ──────────────────────────────────────── */}
       <section className="av2-settings-section av2-settings-section--placeholder">
         <h2 className="av2-settings-section-title">
-          <span className="av2-settings-section-icon" aria-hidden="true">🎨</span>
+          <span className="av2-settings-section-icon" aria-hidden="true">
+            <Palette size={18} strokeWidth={1.5} />
+          </span>
           Display
         </h2>
         <p className="av2-settings-placeholder-text">

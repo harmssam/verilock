@@ -3,6 +3,7 @@
  * New: bulk archive, reply-and-archive, Inbox zero EmptyState.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Archive, MailX } from 'lucide-react'
 import { adminApi, type InboxEmail } from '../admin/adminApi'
 import { EmptyState } from './components/EmptyState'
 import './InboxTab.css'
@@ -313,7 +314,7 @@ export function InboxTab({ onAuthLost }: Props) {
 
             {!loading && emails.length === 0 && (
               <EmptyState
-                icon={showArchived ? '📦' : '📭'}
+                icon={showArchived ? <Archive size={40} strokeWidth={1.5} /> : <MailX size={40} strokeWidth={1.5} />}
                 title={showArchived ? 'No archived emails' : 'Inbox zero'}
                 description={showArchived ? 'Nothing has been archived yet.' : 'You\'ve read and handled every email. Nice work!'}
               />
