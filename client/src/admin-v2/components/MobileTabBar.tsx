@@ -11,6 +11,7 @@ import {
   MoreHorizontal,
   PenLine,
   Settings,
+  MonitorPlay,
 } from 'lucide-react'
 import { Badge } from './Badge'
 import type { AdminV2Tab } from './Sidebar'
@@ -51,6 +52,7 @@ export function MobileTabBar({
 
   const moreItems: { id: AdminV2Tab; label: string; icon: ReactNode }[] = [
     { id: 'content', label: 'Content', icon: <PenLine size={iconSize} strokeWidth={iconStroke} /> },
+    { id: 'studio', label: 'Studio', icon: <MonitorPlay size={iconSize} strokeWidth={iconStroke} /> },
     { id: 'settings', label: 'Settings', icon: <Settings size={iconSize} strokeWidth={iconStroke} /> },
   ]
 

@@ -16,6 +16,46 @@
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(8px);
   flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.av2-studio-panes {
+  display: inline-flex;
+  padding: 0.15rem;
+  border-radius: var(--av2-radius-sm);
+  border: 1px solid var(--av2-line);
+  background: var(--av2-bg-card);
+  gap: 0.1rem;
+}
+
+.av2-studio-panes .av2-range-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--av2-text-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.av2-studio-panes .av2-range-btn:hover {
+  color: var(--av2-text);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.av2-studio-panes .av2-range-btn--active {
+  color: #fff;
+  background: var(--av2-mint);
+}
+
+.av2-studio-panes .av2-range-btn--active:hover {
+  color: #fff;
+  background: var(--av2-mint-deep);
 }
 
 .av2-studio-status {

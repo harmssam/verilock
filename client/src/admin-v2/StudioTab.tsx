@@ -8,15 +8,32 @@ import './StudioTab.css'
 interface StudioTabProps {
   pane: StudioPane
   studioProxyEnabled?: boolean
+  onPaneChange?: (pane: StudioPane) => void
 }
 
-export function StudioTab({ pane, studioProxyEnabled }: StudioTabProps) {
+export function StudioTab({ pane, studioProxyEnabled, onPaneChange }: StudioTabProps) {
   const title = pane === 'blog' ? 'Blog Studio' : 'X Post Studio'
   const src = pane === 'blog' ? '/blog-studio' : '/x-studio'
 
   return (
     <div className="av2-studio">
       <div className="av2-studio-toolbar">
+        <div className="av2-studio-panes">
+          <button
+            type="button"
+            className={`av2-range-btn${pane === 'x' ? ' av2-range-btn--active' : ''}`}
+            onClick={() => onPaneChange?.('x')}
+          >
+            X Post Studio
+          </button>
+          <button
+            type="button"
+            className={`av2-range-btn${pane === 'blog' ? ' av2-range-btn--active' : ''}`}
+            onClick={() => onPaneChange?.('blog')}
+          >
+            Blog Studio
+          </button>
+        </div>
         <div className="av2-studio-status">
           <span
             className={`av2-studio-status-dot${studioProxyEnabled ? ' av2-studio-status-dot--on' : ''}`}

@@ -682,6 +682,7 @@ export function AdminAppV2() {
                 <StudioTab
                   pane={studioPane}
                   studioProxyEnabled={features?.studioProxyEnabled}
+                  onPaneChange={setStudioPane}
                 />
               )}
               {tab === 'settings' && <SettingsTab />}
