@@ -490,3 +490,123 @@
 .mono {
   font-family: monospace;
 }
+
+/* ── Tag filter dropdown ─────────────────────────────────────────────── */
+.av2-support-tag-filter {
+  margin-bottom: 0.75rem;
+}
+
+.av2-support-tag-select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius-sm);
+  font-size: 0.8rem;
+  font-family: inherit;
+  background: var(--av2-bg-card);
+  color: var(--av2-text);
+}
+
+/* ── Ticket tags (detail panel) ──────────────────────────────────────── */
+.av2-ticket-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.av2-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 100px;
+  background: var(--av2-mint-light);
+  color: var(--av2-mint);
+  white-space: nowrap;
+}
+
+.av2-tag-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: none;
+  background: none;
+  color: var(--av2-mint);
+  cursor: pointer;
+  font-size: 0.6rem;
+  opacity: 0.6;
+  padding: 0;
+  line-height: 1;
+  border-radius: 50%;
+  transition: opacity 0.12s, background 0.12s;
+}
+
+.av2-tag-chip-remove:hover {
+  opacity: 1;
+  background: rgba(13, 148, 136, 0.2);
+}
+
+.av2-tag-input-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.av2-tag-input {
+  width: 100px;
+  padding: 0.15rem 0.35rem;
+  border: 1px dashed var(--av2-line);
+  border-radius: 100px;
+  font-size: 0.72rem;
+  font-family: inherit;
+  background: none;
+  color: var(--av2-text-muted);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.av2-tag-input:focus {
+  border-color: var(--av2-mint);
+  color: var(--av2-text);
+}
+
+.av2-tag-input::placeholder {
+  color: var(--av2-text-dim);
+}
+
+.av2-tag-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--av2-bg-card);
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius-sm);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+  z-index: 30;
+  min-width: 140px;
+  overflow: hidden;
+}
+
+.av2-tag-suggestion-item {
+  display: block;
+  width: 100%;
+  padding: 0.35rem 0.65rem;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 0.75rem;
+  font-family: inherit;
+  color: var(--av2-text);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.av2-tag-suggestion-item:hover {
+  background: var(--av2-mint-light);
+  color: var(--av2-mint);
+}

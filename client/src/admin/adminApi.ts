@@ -310,6 +310,57 @@ export const adminApi = {
     adminRequest<{ ok: true }>(`/api/admin/x-ideas/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
+
+  // ── Admin v2-specific endpoints ────────────────────────────────────
+
+  /** Update idea pipeline status + posted_url */
+  xIdeasPipeline: (id: string, body: { status?: string; posted_url?: string }) =>
+    adminRequest<{ idea: XIdea }>(`/api/admin-v2/x-ideas/${encodeURIComponent(id)}/pipeline`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  /** Get all unique ticket tags for autocomplete */
+  ticketTags: () => adminRequest<{ tags: string[] }>('/api/admin-v2/tags'),
+
+  /** Get tags for a specific ticket */
+  ticketTagsForTicket: (ticketId: string) =>
+    adminRequest<{ tags: string[] }>(`/api/admin-v2/tickets/${encodeURIComponent(ticketId)}/tags`),
+
+  /** Replace tags for a ticket */
+  ticketTagsSet: (ticketId: string, tags: string[]) =>
+    adminRequest<{ tags: string[] }>(`/api/admin-v2/tickets/${encodeURIComponent(ticketId)}/tags`, {
+      method: 'PUT',
+      body: JSON.stringify({ tags }),
+    }),
+
+  /** Get audit log entries */
+  auditLog: (params?: { limit?: number; offset?: number; action?: string }) => {
+    const sp = new URLSearchParams()
+    if (params?.limit != null) sp.set('limit', String(params.limit))
+    if (params?.offset != null) sp.set('offset', String(params.offset))
+    if (params?.action) sp.set('action', params.action)
+    const qs = sp.toString()
+    return adminRequest<{
+      entries: Array<{
+        id: string; action: string; actor: string; target_type: string | null
+        target_id: string | null; detail: string | null; metadata: unknown
+        created_at: number
+      }>
+      total: number
+      actions: string[]
+    }>(`/api/admin-v2/audit-log${qs ? `?${qs}` : ''}`)
+  },
+
+  /** Get recent notifications */
+  notifications: () =>
+    adminRequest<{
+      notifications: Array<{
+        type: 'new_email' | 'new_ticket' | 'ticket_reply'
+        title: string; subtitle: string; id: string
+      }>
+      total: number
+    }>('/api/admin-v2/notifications'),
 }
 
 export interface InboxEmail {
@@ -334,6 +385,8 @@ export interface XIdea {
   source_url: string
   copy: string
   idea_date: string
+  status: string
+  posted_url: string
   created_at: number
   updated_at: number
 }
@@ -342,4 +395,6 @@ export interface XIdeaInput {
   source_url?: string
   copy?: string
   idea_date?: string
+  status?: string
+  posted_url?: string
 }

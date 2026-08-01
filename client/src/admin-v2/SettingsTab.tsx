@@ -1,9 +1,31 @@
 /**
- * Admin v2 Settings — auto-ack editor + placeholder sections for Notifications and Display.
+ * Admin v2 Settings — auto-ack editor + audit log.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { adminApi, type SupportAutoAckSettings } from '../admin/adminApi'
 import './SettingsTab.css'
+
+interface AuditEntry {
+  id: string
+  action: string
+  actor: string
+  target_type: string | null
+  target_id: string | null
+  detail: string | null
+  metadata: unknown
+  created_at: number
+}
+
+function formatWhen(ms: number): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(new Date(ms))
+  } catch {
+    return new Date(ms).toISOString()
+  }
+}
 
 export function SettingsTab() {
   // Auto-ack
@@ -13,6 +35,15 @@ export function SettingsTab() {
   const [autoAckBusy, setAutoAckBusy] = useState(false)
   const [autoAckError, setAutoAckError] = useState<string | null>(null)
   const [autoAckSaved, setAutoAckSaved] = useState(false)
+
+  // Audit log
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
+  const [auditTotal, setAuditTotal] = useState(0)
+  const [auditActions, setAuditActions] = useState<string[]>([])
+  const [auditFilter, setAuditFilter] = useState('')
+  const [auditOffset, setAuditOffset] = useState(0)
+  const [auditLoading, setAuditLoading] = useState(false)
+  const auditPageSize = 20
 
   const loadAutoAck = useCallback(async () => {
     setAutoAckLoading(true)
@@ -29,9 +60,28 @@ export function SettingsTab() {
     }
   }, [])
 
+  const loadAuditLog = useCallback(async (offset: number, filter: string) => {
+    setAuditLoading(true)
+    try {
+      const result = await adminApi.auditLog({
+        limit: auditPageSize,
+        offset,
+        action: filter || undefined,
+      })
+      setAuditEntries(result.entries)
+      setAuditTotal(result.total)
+      setAuditActions(result.actions)
+    } catch (err) {
+      console.error('[settings] audit log load', err)
+    } finally {
+      setAuditLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void loadAutoAck()
-  }, [loadAutoAck])
+    void loadAuditLog(0, '')
+  }, [loadAutoAck, loadAuditLog])
 
   async function saveAutoAck() {
     if (autoAckBusy) return
@@ -67,12 +117,26 @@ export function SettingsTab() {
     }
   }
 
+  function handleAuditFilterChange(newFilter: string) {
+    setAuditFilter(newFilter)
+    setAuditOffset(0)
+    void loadAuditLog(0, newFilter)
+  }
+
+  function handleAuditPage(offset: number) {
+    setAuditOffset(offset)
+    void loadAuditLog(offset, auditFilter)
+  }
+
+  const hasPrev = auditOffset > 0
+  const hasNext = auditOffset + auditPageSize < auditTotal
+
   return (
     <div className="av2-settings">
       <div className="av2-dash-head">
         <div>
           <h1 className="av2-dash-title">Settings</h1>
-          <p className="av2-dash-subtitle">Configure admin behavior and preferences.</p>
+          <p className="av2-dash-subtitle">Configure admin behavior and review activity.</p>
         </div>
       </div>
 
@@ -165,19 +229,94 @@ export function SettingsTab() {
         )}
       </section>
 
-      {/* ── Notifications placeholder (Phase 3) ──────────────────────── */}
-      <section className="av2-settings-section av2-settings-section--placeholder">
+      {/* ── Audit Log section ────────────────────────────────────────── */}
+      <section className="av2-settings-section">
         <h2 className="av2-settings-section-title">
-          <span className="av2-settings-section-icon" aria-hidden="true">🔔</span>
-          Notifications
+          <span className="av2-settings-section-icon" aria-hidden="true">📋</span>
+          Audit Log
         </h2>
-        <p className="av2-settings-placeholder-text">
-          Notification preferences will be available in a future update. You'll be able to
-          configure email digests, browser notifications, and ticket assignment alerts.
+        <p className="av2-settings-section-desc">
+          Track admin actions — status changes, bulk operations, tag updates, and more.
         </p>
+
+        {/* Filter */}
+        {auditActions.length > 0 && (
+          <div className="av2-audit-filters" style={{ marginBottom: '0.75rem' }}>
+            <select
+              value={auditFilter}
+              onChange={e => handleAuditFilterChange(e.target.value)}
+              className="av2-audit-select"
+              aria-label="Filter by action type"
+            >
+              <option value="">All actions</option>
+              {auditActions.map(a => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+            <span className="av2-audit-total">{auditTotal.toLocaleString()} entries</span>
+          </div>
+        )}
+
+        {auditLoading && auditEntries.length === 0 ? (
+          <p className="av2-settings-loading">Loading audit log…</p>
+        ) : auditEntries.length === 0 ? (
+          <p className="av2-settings-placeholder-text">
+            No audit log entries yet. Admin actions will appear here as they happen.
+          </p>
+        ) : (
+          <>
+            <div className="av2-audit-table-wrap">
+              <table className="av2-audit-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Detail</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditEntries.map(e => (
+                    <tr key={e.id}>
+                      <td className="av2-audit-time">{formatWhen(e.created_at)}</td>
+                      <td className="av2-audit-actor">{e.actor}</td>
+                      <td>
+                        <span className="av2-audit-action-chip">{e.action}</span>
+                      </td>
+                      <td className="av2-audit-detail">{e.detail || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="av2-audit-pagination">
+              <button
+                type="button"
+                className="av2-btn av2-btn-ghost av2-btn-sm"
+                disabled={!hasPrev}
+                onClick={() => handleAuditPage(auditOffset - auditPageSize)}
+              >
+                ← Previous
+              </button>
+              <span className="av2-audit-page-info">
+                {auditOffset + 1}–{Math.min(auditOffset + auditPageSize, auditTotal)} of {auditTotal.toLocaleString()}
+              </span>
+              <button
+                type="button"
+                className="av2-btn av2-btn-ghost av2-btn-sm"
+                disabled={!hasNext}
+                onClick={() => handleAuditPage(auditOffset + auditPageSize)}
+              >
+                Next →
+              </button>
+            </div>
+          </>
+        )}
       </section>
 
-      {/* ── Display placeholder (Phase 4) ────────────────────────────── */}
+      {/* ── Display placeholder ──────────────────────────────────────── */}
       <section className="av2-settings-section av2-settings-section--placeholder">
         <h2 className="av2-settings-section-title">
           <span className="av2-settings-section-icon" aria-hidden="true">🎨</span>

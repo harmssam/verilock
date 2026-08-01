@@ -116,6 +116,8 @@ export interface XIdea {
   source_url: string
   copy: string
   idea_date: string
+  status: string
+  posted_url: string
   created_at: number
   updated_at: number
 }
@@ -124,6 +126,8 @@ export interface XIdeaInput {
   source_url?: string
   copy?: string
   idea_date?: string
+  status?: string
+  posted_url?: string
 }
 
 // ── CRUD ───────────────────────────────────────────────────────────────────

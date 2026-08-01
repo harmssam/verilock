@@ -88,6 +88,13 @@ export interface AdminV2DashboardData {
   }>
 }
 
+export interface AdminV2Notification {
+  type: 'new_email' | 'new_ticket' | 'ticket_reply'
+  title: string
+  subtitle: string
+  id: string
+}
+
 type AuthState =
   | { kind: 'loading' }
   | { kind: 'login' }
@@ -103,6 +110,11 @@ export function AdminAppV2() {
   // Badge counts
   const [inboxUnread, setInboxUnread] = useState(0)
   const [supportOpen, setSupportOpen] = useState(0)
+
+  // Notification center
+  const [notifications, setNotifications] = useState<AdminV2Notification[]>([])
+  const [notifOpen, setNotifOpen] = useState(false)
+  const notifRef = useRef<HTMLDivElement>(null)
 
   // Breadcrumbs
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbSegment[]>([])
@@ -162,7 +174,7 @@ export function AdminAppV2() {
     document.title = 'Admin · VeriLock'
   }, [auth.kind])
 
-  // Poll sidebar badge counts every 60s
+  // Poll sidebar badge counts + notifications every 60s
   useEffect(() => {
     if (auth.kind !== 'authed') return
 
@@ -182,15 +194,37 @@ export function AdminAppV2() {
       }
     }
 
-    // Initial fetch
+    const fetchNotifications = async () => {
+      try {
+        const data = await adminApi.notifications()
+        setNotifications(data.notifications)
+      } catch {
+        /* silent */
+      }
+    }
+
     void fetchCounts()
+    void fetchNotifications()
 
     const interval = setInterval(() => {
       void fetchCounts()
+      void fetchNotifications()
     }, 60_000)
 
     return () => clearInterval(interval)
   }, [auth.kind])
+
+  // Close notification dropdown on outside click
+  useEffect(() => {
+    if (!notifOpen) return
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [notifOpen])
 
   // Turnstile widget on login
   useEffect(() => {
@@ -296,6 +330,16 @@ export function AdminAppV2() {
     setAuth({ kind: 'login' })
   }
 
+  // Notification click handler — navigates to relevant tab
+  function handleNotificationClick(n: AdminV2Notification) {
+    setNotifOpen(false)
+    if (n.type === 'new_email') {
+      handleTabChange('inbox')
+    } else if (n.type === 'new_ticket' || n.type === 'ticket_reply') {
+      handleTabChange('support')
+    }
+  }
+
   // Tab change handler — updates tab, studio pane, and breadcrumbs
   const handleTabChange = useCallback(
     (newTab: AdminV2Tab, opts?: { studioPane?: StudioPane }) => {
@@ -304,7 +348,6 @@ export function AdminAppV2() {
         setStudioPane(opts.studioPane)
       }
 
-      // Build breadcrumbs
       const segments: BreadcrumbSegment[] = [{ label: tabLabel(newTab), tab: newTab }]
 
       if (newTab === 'studio') {
@@ -321,8 +364,6 @@ export function AdminAppV2() {
   const handleSearchNavigate = useCallback(
     (newTab: AdminV2Tab, opts?: { studioPane?: StudioPane; emailId?: string; ticketId?: string }) => {
       handleTabChange(newTab, opts)
-      // emailId and ticketId are consumed by InboxTab and SupportTab via URL params
-      // They parse their own ?email= and ?ticket= search params
     },
     [handleTabChange],
   )
@@ -346,6 +387,13 @@ export function AdminAppV2() {
   }, [tab, breadcrumbs])
 
   const productHref = isAdminHost() ? 'https://verilock.online' : '/'
+
+  // Notification icons
+  const notifIcon = (type: string) => {
+    if (type === 'new_email') return '📧'
+    if (type === 'new_ticket') return '🎫'
+    return '💬'
+  }
 
   return (
     <div className="av2-app">
@@ -466,6 +514,55 @@ export function AdminAppV2() {
                 </span>
               </a>
               <div className="av2-header-actions">
+                {/* Notification bell */}
+                <div className="av2-notif-wrap" ref={notifRef}>
+                  <button
+                    type="button"
+                    className={`av2-notif-bell${notifOpen ? ' av2-notif-bell--active' : ''}`}
+                    onClick={() => setNotifOpen(prev => !prev)}
+                    aria-label={`${notifications.length} notifications`}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    {notifications.length > 0 && (
+                      <span className="av2-notif-badge">{notifications.length}</span>
+                    )}
+                  </button>
+
+                  {/* Notification dropdown */}
+                  {notifOpen && (
+                    <div className="av2-notif-dropdown">
+                      <div className="av2-notif-dropdown-head">
+                        <span className="av2-notif-dropdown-title">
+                          Notifications ({notifications.length})
+                        </span>
+                      </div>
+                      <div className="av2-notif-dropdown-body">
+                        {notifications.length === 0 ? (
+                          <p className="av2-notif-empty">No recent activity.</p>
+                        ) : (
+                          notifications.map(n => (
+                            <button
+                              key={`${n.type}-${n.id}`}
+                              type="button"
+                              className="av2-notif-item"
+                              onClick={() => handleNotificationClick(n)}
+                            >
+                              <span className="av2-notif-item-icon">{notifIcon(n.type)}</span>
+                              <div className="av2-notif-item-body">
+                                <span className="av2-notif-item-title">{n.title}</span>
+                                <span className="av2-notif-item-sub">{n.subtitle}</span>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <span className="av2-user">{auth.username}</span>
                 <button type="button" className="av2-btn av2-btn-ghost" onClick={() => void onLogout()}>
                   Sign out

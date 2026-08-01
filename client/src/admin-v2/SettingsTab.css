@@ -2,7 +2,7 @@
 
 .av2-settings {
   min-height: 0;
-  max-width: 720px;
+  max-width: 780px;
 }
 
 /* ── Sections ────────────────────────────────────────────────────────── */
@@ -131,4 +131,97 @@
   font-size: 0.78rem;
   color: var(--av2-mint);
   font-weight: 500;
+}
+
+/* ── Audit Log ───────────────────────────────────────────────────────── */
+.av2-audit-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.av2-audit-select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius-sm);
+  font-size: 0.8rem;
+  font-family: inherit;
+  background: var(--av2-bg-card);
+  color: var(--av2-text);
+}
+
+.av2-audit-total {
+  font-size: 0.72rem;
+  color: var(--av2-text-dim);
+}
+
+.av2-audit-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 0.75rem;
+}
+
+.av2-audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.av2-audit-table th {
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--av2-text-dim);
+  border-bottom: 1px solid var(--av2-line);
+}
+
+.av2-audit-table td {
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid var(--av2-line);
+  vertical-align: top;
+}
+
+.av2-audit-time {
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: var(--av2-text-muted);
+}
+
+.av2-audit-actor {
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.av2-audit-action-chip {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.av2-audit-detail {
+  font-size: 0.82rem;
+  color: var(--av2-text-muted);
+  max-width: 300px;
+}
+
+.av2-audit-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.av2-audit-page-info {
+  font-size: 0.78rem;
+  color: var(--av2-text-dim);
 }

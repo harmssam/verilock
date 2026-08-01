@@ -1,8 +1,8 @@
 /**
  * Admin v2 Support — ported from SupportQueue with v2 styling.
- * New: SLA/time-since indicator colors, bulk status change.
+ * New: SLA/time-since indicator colors, bulk status change, ticket tags.
  */
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import {
   adminApi,
   type SupportReplyTemplate,
@@ -90,6 +90,13 @@ export function SupportTab({ onAuthLost }: Props) {
   const [bulkStatus, setBulkStatus] = useState<SupportTicketStatus | ''>('')
   const [bulkBusy, setBulkBusy] = useState(false)
 
+  // Ticket tags
+  const [ticketTags, setTicketTags] = useState<string[]>([])
+  const [allTags, setAllTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
+  const [tagFilter, setTagFilter] = useState('')
+
   const onAuthLostRef = useRef(onAuthLost)
   useEffect(() => { onAuthLostRef.current = onAuthLost }, [onAuthLost])
 
@@ -106,28 +113,53 @@ export function SupportTab({ onAuthLost }: Props) {
         q: query || undefined,
         limit: 100,
       })
-      setTickets(result.tickets)
-      setTotal(result.total)
+      let filtered = result.tickets
+
+      // Client-side tag filter (server doesn't filter by tag in tickets endpoint)
+      if (tagFilter.trim()) {
+        // Fetch tags for all tickets and filter
+        const tagPromises = filtered.map(async t => {
+          try {
+            const r = await adminApi.ticketTagsForTicket(t.id)
+            return { id: t.id, tags: r.tags }
+          } catch { return { id: t.id, tags: [] as string[] } }
+        })
+        const tagResults = await Promise.all(tagPromises)
+        const tagMap = new Map(tagResults.map(r => [r.id, r.tags]))
+        filtered = filtered.filter(t => {
+          const tags = tagMap.get(t.id) ?? []
+          return tags.some(tag => tag.includes(tagFilter.toLowerCase()))
+        })
+      }
+
+      setTickets(filtered)
+      setTotal(filtered.length)
     } catch (err) {
       handleAuthError(err)
       setListError(err instanceof Error ? err.message : 'Could not load tickets')
     } finally {
       setListLoading(false)
     }
-  }, [filter, query, handleAuthError])
+  }, [filter, query, tagFilter, handleAuthError])
 
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true)
     setDetailError(null)
     try {
-      const result = await adminApi.ticket(id)
-      setDetailTicket(result.ticket)
-      setMessages(result.messages)
+      const [ticketResult, tagsResult] = await Promise.all([
+        adminApi.ticket(id),
+        adminApi.ticketTagsForTicket(id).catch(() => ({ tags: [] as string[] })),
+      ])
+      setDetailTicket(ticketResult.ticket)
+      setMessages(ticketResult.messages)
+      setTicketTags(tagsResult.tags)
+      setTagInput('')
     } catch (err) {
       handleAuthError(err)
       setDetailError(err instanceof Error ? err.message : 'Could not load ticket')
       setDetailTicket(null)
       setMessages([])
+      setTicketTags([])
     } finally {
       setDetailLoading(false)
     }
@@ -137,8 +169,14 @@ export function SupportTab({ onAuthLost }: Props) {
 
   useEffect(() => {
     let cancelled = false
-    void adminApi.supportTemplates().then(r => {
-      if (!cancelled) setTemplates(r.templates)
+    void Promise.all([
+      adminApi.supportTemplates().catch(() => ({ templates: [] as SupportReplyTemplate[] })),
+      adminApi.ticketTags().catch(() => ({ tags: [] as string[] })),
+    ]).then(([tplResult, tagResult]) => {
+      if (!cancelled) {
+        setTemplates(tplResult.templates)
+        setAllTags(tagResult.tags)
+      }
     }).catch(err => { handleAuthError(err) })
     return () => { cancelled = true }
   }, [handleAuthError])
@@ -147,6 +185,7 @@ export function SupportTab({ onAuthLost }: Props) {
     if (!selectedId) {
       setDetailTicket(null)
       setMessages([])
+      setTicketTags([])
       return
     }
     void loadDetail(selectedId)
@@ -248,6 +287,57 @@ export function SupportTab({ onAuthLost }: Props) {
     })
   }, [])
 
+  // Tag helpers
+  async function addTag(tag: string) {
+    if (!detailTicket) return
+    const clean = tag.trim().toLowerCase()
+    if (!clean || ticketTags.includes(clean)) return
+    const updated = [...ticketTags, clean]
+    try {
+      await adminApi.ticketTagsSet(detailTicket.id, updated)
+      setTicketTags(updated)
+      setTagInput('')
+      // Refresh allTags
+      const r = await adminApi.ticketTags().catch(() => ({ tags: allTags }))
+      setAllTags(r.tags)
+    } catch (err) {
+      handleAuthError(err)
+    }
+  }
+
+  async function removeTag(tag: string) {
+    if (!detailTicket) return
+    const updated = ticketTags.filter(t => t !== tag)
+    try {
+      await adminApi.ticketTagsSet(detailTicket.id, updated)
+      setTicketTags(updated)
+    } catch (err) {
+      handleAuthError(err)
+    }
+  }
+
+  function handleTagKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      void addTag(tagInput)
+    }
+    if (e.key === 'Backspace' && !tagInput && ticketTags.length > 0) {
+      removeTag(ticketTags[ticketTags.length - 1])
+    }
+  }
+
+  function handleTagInputChange(value: string) {
+    setTagInput(value)
+    if (value.trim()) {
+      const suggestions = allTags.filter(t =>
+        t.includes(value.toLowerCase()) && !ticketTags.includes(t),
+      ).slice(0, 5)
+      setTagSuggestions(suggestions)
+    } else {
+      setTagSuggestions([])
+    }
+  }
+
   return (
     <div className="av2-support">
       <div className="av2-dash-head">
@@ -310,6 +400,23 @@ export function SupportTab({ onAuthLost }: Props) {
           </button>
         </form>
       </div>
+
+      {/* Tag filter */}
+      {allTags.length > 0 && (
+        <div className="av2-support-tag-filter">
+          <select
+            value={tagFilter}
+            onChange={e => setTagFilter(e.target.value)}
+            className="av2-support-tag-select"
+            aria-label="Filter by tag"
+          >
+            <option value="">All tags</option>
+            {allTags.map(t => (
+              <option key={t} value={t}>#{t}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {listError && (
         <p className="av2-error" role="alert" style={{ marginBottom: '1rem' }}>
@@ -452,6 +559,51 @@ export function SupportTab({ onAuthLost }: Props) {
                     Opened {formatWhen(detailTicket.createdAt)} · Updated{' '}
                     {formatWhen(detailTicket.updatedAt)}
                   </p>
+
+                  {/* Tags */}
+                  <div className="av2-ticket-tags">
+                    {ticketTags.map(tag => (
+                      <span key={tag} className="av2-tag-chip">
+                        #{tag}
+                        <button
+                          type="button"
+                          className="av2-tag-chip-remove"
+                          onClick={() => void removeTag(tag)}
+                          aria-label={`Remove tag ${tag}`}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                    <div className="av2-tag-input-wrap">
+                      <input
+                        type="text"
+                        className="av2-tag-input"
+                        placeholder={ticketTags.length === 0 ? '+ Add tag…' : '+'}
+                        value={tagInput}
+                        onChange={e => handleTagInputChange(e.target.value)}
+                        onKeyDown={e => handleTagKeyDown(e)}
+                        aria-label="Add tag"
+                      />
+                      {tagSuggestions.length > 0 && tagInput.trim() && (
+                        <div className="av2-tag-suggestions">
+                          {tagSuggestions.map(s => (
+                            <button
+                              key={s}
+                              type="button"
+                              className="av2-tag-suggestion-item"
+                              onClick={() => {
+                                void addTag(s)
+                                setTagSuggestions([])
+                              }}
+                            >
+                              #{s}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <label className="av2-support-status-select">
                   <span>Status</span>

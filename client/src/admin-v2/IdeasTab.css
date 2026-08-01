@@ -2,12 +2,34 @@
 
 .av2-ideas {
   min-height: 0;
-  max-width: 720px;
+  max-width: 960px;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────── */
+.av2-ideas-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.av2-ideas-filters {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.av2-ideas-view-toggle {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
 }
 
 /* ── Form ────────────────────────────────────────────────────────────── */
 .av2-ideas-form {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   padding: 1rem;
   border: 1px solid var(--av2-line);
   border-radius: var(--av2-radius);
@@ -132,6 +154,63 @@
   margin-top: 0.75rem;
 }
 
+/* ── Status badges ───────────────────────────────────────────────────── */
+.av2-ideas-status {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+
+.av2-ideas-status--gray {
+  background: rgba(148, 163, 184, 0.15);
+  color: #64748b;
+}
+
+.av2-ideas-status--amber {
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+}
+
+.av2-ideas-status--blue {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.av2-ideas-status--green {
+  background: rgba(13, 148, 136, 0.12);
+  color: var(--av2-mint);
+}
+
+.av2-ideas-status--dim {
+  background: rgba(148, 163, 184, 0.08);
+  color: #94a3b8;
+}
+
+/* ── Posted URL link ─────────────────────────────────────────────────── */
+.av2-ideas-posted-url {
+  font-size: 0.72rem;
+  color: var(--av2-mint);
+  text-decoration: none;
+  margin-left: 0.5rem;
+}
+
+.av2-ideas-posted-url:hover {
+  text-decoration: underline;
+}
+
+/* ── Card meta row ───────────────────────────────────────────────────── */
+.av2-ideas-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.3rem;
+}
+
 /* ── List ────────────────────────────────────────────────────────────── */
 .av2-ideas-empty {
   text-align: center;
@@ -185,7 +264,7 @@
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.15rem;
   color: var(--av2-text);
 }
 
@@ -200,6 +279,83 @@
   flex-shrink: 0;
   flex-direction: column;
   align-items: flex-end;
+}
+
+/* ── Kanban view ─────────────────────────────────────────────────────── */
+.av2-ideas-kanban {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.75rem;
+  min-height: 300px;
+  overflow-x: auto;
+}
+
+@media (max-width: 1200px) {
+  .av2-ideas-kanban {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .av2-ideas-kanban {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+.av2-ideas-kanban-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.av2-ideas-kanban-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--av2-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.av2-ideas-kanban-header--gray { background: rgba(148, 163, 184, 0.12); color: #64748b; }
+.av2-ideas-kanban-header--amber { background: rgba(217, 119, 6, 0.1); color: #b45309; }
+.av2-ideas-kanban-header--blue { background: rgba(59, 130, 246, 0.1); color: #2563eb; }
+.av2-ideas-kanban-header--green { background: rgba(13, 148, 136, 0.1); color: var(--av2-mint); }
+.av2-ideas-kanban-header--dim { background: rgba(148, 163, 184, 0.06); color: #94a3b8; }
+
+.av2-ideas-kanban-count {
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  padding: 0.1rem 0.45rem;
+  min-width: 1.4em;
+  text-align: center;
+}
+
+.av2-ideas-kanban-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.av2-ideas-kanban-cards .av2-ideas-card {
+  font-size: 0.78rem;
+  padding: 0.6rem 0.75rem;
+}
+
+.av2-ideas-kanban-cards .av2-ideas-card-body {
+  font-size: 0.82rem;
+}
+
+.av2-ideas-kanban-cards .av2-ideas-card-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.2rem;
 }
 
 /* ── Danger text button style ────────────────────────────────────────── */
