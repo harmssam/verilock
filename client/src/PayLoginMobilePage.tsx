@@ -24,7 +24,6 @@ import {
   NIMIQ_PAY_IOS_URL,
   probeNimiqPay,
   signChallenge,
-  warmNimiqProvider,
 } from './nimiq'
 import { saveSession } from './session'
 import './PayLoginMobilePage.css'
@@ -81,6 +80,11 @@ export function PayLoginMobilePage() {
 
     try {
       await probeNimiqPay(30_000)
+      // Let the Nimiq Pay bridge settle before opening native dialogs.
+      // Without this, rapid connect→sign sheets can hang the prove prompt.
+      await new Promise<void>(resolve => {
+        window.setTimeout(resolve, 450)
+      })
       const { token: sessionToken, nonce } = await api.challenge(null)
       const { nimiq } = await connectNimiq()
       const { publicKey, signature } = await signChallenge(nimiq, nonce)
@@ -169,7 +173,6 @@ export function PayLoginMobilePage() {
     startedForIdRef.current = id
 
     if (isNimiqPayHost()) {
-      warmNimiqProvider()
       void runPayLogin(id)
       return
     }
