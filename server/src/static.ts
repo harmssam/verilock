@@ -16,6 +16,8 @@ function isKnownAppPath(path: string): boolean {
   if (/^\/faq\/?$/.test(path)) return true
   // Operator admin portal (sign-in + stats dashboard)
   if (/^\/admin(?:\/.*)?\/?$/.test(path)) return true
+  // Admin v2 portal (redesigned admin)
+  if (/^\/admin-v2(?:\/.*)?\/?$/.test(path)) return true
   // /blog is server 301 to blog.verilock.online (see index.ts) — not SPA content
   if (/^\/d\/[^/]+\/?$/.test(path)) return true
   if (/^\/v\/[^/]+\/?$/.test(path)) return true

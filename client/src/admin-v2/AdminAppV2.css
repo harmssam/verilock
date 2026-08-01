@@ -1,0 +1,366 @@
+/* ── Admin v2 core tokens ───────────────────────────────────────────── */
+:root {
+  --av2-mint: #0d9488;
+  --av2-mint-light: rgba(13, 148, 136, 0.1);
+  --av2-mint-glow: rgba(13, 148, 136, 0.15);
+  --av2-bg-deep: #fafdfc;
+  --av2-bg-card: rgba(255, 255, 255, 0.92);
+  --av2-bg-sidebar: rgba(255, 255, 255, 0.96);
+  --av2-text: #0f172a;
+  --av2-text-muted: #4b5c6b;
+  --av2-text-dim: #94a3b8;
+  --av2-line: rgba(15, 23, 42, 0.08);
+  --av2-radius: 12px;
+  --av2-radius-sm: 8px;
+  --av2-font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --av2-font-body: 'Figtree', system-ui, sans-serif;
+  --av2-touch: 44px;
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────── */
+.av2-app,
+.av2-app *,
+.av2-app *::before,
+.av2-app *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.av2-app {
+  min-height: 100dvh;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, var(--av2-mint-glow), transparent 55%),
+    var(--av2-bg-deep);
+  color: var(--av2-text);
+  font-family: var(--av2-font-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Loading ────────────────────────────────────────────────────────── */
+.av2-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  font-size: 1.1rem;
+  color: var(--av2-text-muted);
+}
+
+/* ── Login ──────────────────────────────────────────────────────────── */
+.av2-login-layout {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  gap: 2rem;
+}
+
+.av2-login-copy {
+  text-align: center;
+  max-width: 480px;
+}
+
+.av2-login-copy h1 {
+  font-family: var(--av2-font-display);
+  font-weight: 800;
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+}
+
+.av2-login-copy p {
+  color: var(--av2-text-muted);
+  font-size: 0.95rem;
+}
+
+.av2-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--av2-mint);
+  margin-bottom: 0.5rem;
+}
+
+.av2-login-card {
+  background: var(--av2-bg-card);
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius);
+  padding: 2rem;
+  max-width: 420px;
+  width: 100%;
+  backdrop-filter: blur(12px);
+}
+
+.av2-login-card h2 {
+  font-family: var(--av2-font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.av2-lead {
+  color: var(--av2-text-muted);
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+.av2-warn {
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  border-radius: var(--av2-radius-sm);
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.av2-warn code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.av2-error {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--av2-radius-sm);
+  padding: 0.65rem 1rem;
+  font-size: 0.85rem;
+  color: #b91c1c;
+  margin-bottom: 1rem;
+}
+
+.av2-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.av2-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.av2-field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--av2-text-muted);
+}
+
+.av2-field input {
+  height: var(--av2-touch);
+  padding: 0 0.75rem;
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius-sm);
+  font-size: 0.95rem;
+  font-family: var(--av2-font-body);
+  background: #fff;
+  color: var(--av2-text);
+  transition: border-color 0.15s;
+}
+
+.av2-field input:focus {
+  outline: none;
+  border-color: var(--av2-mint);
+  box-shadow: 0 0 0 3px var(--av2-mint-light);
+}
+
+.av2-hp {
+  position: absolute;
+  opacity: 0;
+  height: 0;
+  width: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.av2-turnstile {
+  display: flex;
+  justify-content: center;
+  min-height: 65px;
+  align-items: center;
+}
+
+.av2-turnstile-loading {
+  font-size: 0.8rem;
+  color: var(--av2-text-dim);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────── */
+.av2-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: var(--av2-touch);
+  padding: 0 1.25rem;
+  border: none;
+  border-radius: var(--av2-radius-sm);
+  font-family: var(--av2-font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.av2-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.av2-btn-primary {
+  background: var(--av2-mint);
+  color: #fff;
+}
+
+.av2-btn-primary:hover:not(:disabled) {
+  background: #0f766e;
+}
+
+.av2-btn-ghost {
+  background: transparent;
+  color: var(--av2-text-muted);
+}
+
+.av2-btn-ghost:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.av2-btn-sm {
+  height: 36px;
+  padding: 0 0.75rem;
+  font-size: 0.8rem;
+}
+
+.av2-btn-accent {
+  background: var(--av2-mint-light);
+  color: var(--av2-mint);
+  border: 1px solid rgba(13, 148, 136, 0.2);
+}
+
+.av2-btn-accent:hover:not(:disabled) {
+  background: rgba(13, 148, 136, 0.18);
+}
+
+/* ── Shell layout ───────────────────────────────────────────────────── */
+.av2-shell {
+  display: flex;
+  min-height: 100dvh;
+}
+
+.av2-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.av2-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.5rem;
+  border-bottom: 1px solid var(--av2-line);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.av2-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.av2-brand img {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.av2-brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.av2-brand-name {
+  font-family: var(--av2-font-display);
+  font-weight: 800;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.av2-brand-sub {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--av2-text-dim);
+}
+
+.av2-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.av2-user {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--av2-text-muted);
+}
+
+.av2-content {
+  flex: 1;
+  padding: 1.5rem;
+}
+
+/* ── Page placeholders ──────────────────────────────────────────────── */
+.av2-page-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  text-align: center;
+  color: var(--av2-text-muted);
+}
+
+.av2-page-placeholder h2 {
+  font-family: var(--av2-font-display);
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ── Mobile (<768px) ────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .av2-header {
+    padding: 0.65rem 1rem;
+  }
+
+  .av2-content {
+    padding: 1rem;
+    padding-bottom: calc(var(--av2-touch) + 1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .av2-brand-sub {
+    display: none;
+  }
+
+  .av2-login-card {
+    padding: 1.5rem 1.25rem;
+  }
+}

@@ -197,7 +197,7 @@ function readAdminSession(req: Request): AdminSessionPayload | null {
   return verifySignedToken(raw)
 }
 
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   const session = readAdminSession(req)
   if (!session) {
     res.status(401).json({ error: 'Admin sign-in required' })

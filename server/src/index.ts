@@ -41,7 +41,8 @@ import { emailFeaturesPublic } from './email/config.js'
 import { sendPartyInviteEmail } from './email/inviteSigner.js'
 import { verifyHubSignedMessage } from './hub-signature.js'
 import { rateLimit } from './rate-limit.js'
-import { attachAdminRoutes, requireAdminOrRedirect } from './admin.js'
+import { attachAdminRoutes, requireAdmin, requireAdminOrRedirect } from './admin.js'
+import { attachAdminV2Routes } from './adminV2.js'
 import { handleInboxWebhook } from './adminInbox.js'
 import { attachAdminStudioProxy } from './adminStudioProxy.js'
 import {
@@ -1016,6 +1017,9 @@ app.get('/api/features', (_req, res) => {
 
 // Operator admin portal (password + Turnstile cookie session): stats + support queue.
 attachAdminRoutes(app)
+
+// Admin v2 portal — dashboard + redesigned UI (under /admin-v2 during dev).
+attachAdminV2Routes(app, requireAdmin)
 
 // Content Studio (Blog + X) via private Railway service — admin session required.
 attachAdminStudioProxy(app, requireAdminOrRedirect)

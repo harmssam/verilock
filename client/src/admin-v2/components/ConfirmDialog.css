@@ -1,0 +1,63 @@
+/* ── Confirm Dialog ──────────────────────────────────────────────────── */
+.av2-dialog {
+  border: none;
+  border-radius: var(--av2-radius);
+  padding: 0;
+  background: transparent;
+  max-width: 420px;
+  width: calc(100% - 2rem);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+  animation: av2-dialog-enter 0.2s ease;
+}
+
+.av2-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.35);
+  animation: av2-fade-in 0.2s ease;
+}
+
+.av2-dialog-content {
+  background: #fff;
+  border-radius: var(--av2-radius);
+  padding: 1.5rem;
+}
+
+.av2-dialog-title {
+  font-family: var(--av2-font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.av2-dialog-message {
+  color: var(--av2-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 1.25rem;
+}
+
+.av2-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.av2-btn-danger {
+  background: #dc2626;
+  color: #fff;
+}
+
+.av2-btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+/* ── Animations ─────────────────────────────────────────────────────── */
+@keyframes av2-dialog-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

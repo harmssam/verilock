@@ -11,7 +11,8 @@ import './index.css'
 import './journey/Journey.css'
 import { App } from './App'
 import { AdminApp } from './admin/AdminApp'
-import { isAdminSurface } from './admin/adminHost'
+import { AdminAppV2 } from './admin-v2/AdminAppV2'
+import { isAdminSurface, isAdminV2Surface } from './admin/adminHost'
 /* Shell layout (header/home/footer) then page chrome (pricing/404) */
 import './App.css'
 import './shellPages.css'
@@ -81,7 +82,8 @@ window.addEventListener('unhandledrejection', event => {
 })
 
 // Admin portal is a separate shell (password + stats) for /admin and admin.* hosts.
-const Root = isAdminSurface() ? AdminApp : App
+// Admin v2 portal is the redesigned admin at /admin-v2.
+const Root = isAdminSurface() ? AdminApp : isAdminV2Surface() ? AdminAppV2 : App
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -1,0 +1,60 @@
+/* ── Stat Card ───────────────────────────────────────────────────────── */
+.av2-stat-card {
+  background: var(--av2-bg-card);
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius);
+  padding: 1.15rem 1.25rem;
+  backdrop-filter: blur(8px);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.av2-stat-card--clickable {
+  cursor: pointer;
+}
+
+.av2-stat-card--clickable:hover {
+  border-color: var(--av2-mint);
+  box-shadow: 0 0 0 3px var(--av2-mint-light);
+}
+
+.av2-stat-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.av2-stat-card-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--av2-text-dim);
+}
+
+.av2-stat-card-icon {
+  font-size: 1.2rem;
+}
+
+.av2-stat-card-value {
+  font-family: var(--av2-font-display);
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--av2-text);
+  margin-bottom: 0.15rem;
+}
+
+.av2-stat-card-delta {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--av2-text-muted);
+}
+
+.av2-stat-card-delta--up {
+  color: #16a34a;
+}
+
+.av2-stat-card-delta--down {
+  color: #dc2626;
+}

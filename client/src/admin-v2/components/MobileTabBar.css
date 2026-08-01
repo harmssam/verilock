@@ -1,0 +1,159 @@
+/* ── Mobile Tab Bar ──────────────────────────────────────────────────── */
+.av2-mobile-tabs {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--av2-touch) + 0.5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--av2-line);
+  z-index: 40;
+  justify-content: space-around;
+  align-items: center;
+}
+
+@media (max-width: 767px) {
+  .av2-mobile-tabs {
+    display: flex;
+  }
+}
+
+.av2-mobile-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  padding: 4px 2px;
+  border: none;
+  background: transparent;
+  color: var(--av2-text-dim);
+  font-family: var(--av2-font-body);
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.av2-mobile-tab--active {
+  color: var(--av2-mint);
+}
+
+.av2-mobile-tab-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.av2-mobile-tab-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.av2-mobile-tab-badge {
+  position: absolute;
+  top: 4px;
+  right: calc(50% - 22px);
+  min-width: 16px;
+  height: 16px;
+  font-size: 0.6rem;
+  padding: 0 4px;
+}
+
+/* ── More slide-up menu ─────────────────────────────────────────────── */
+.av2-mobile-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 41;
+  animation: av2-fade-in 0.2s ease;
+}
+
+@media (max-width: 767px) {
+  .av2-mobile-overlay {
+    display: block;
+  }
+}
+
+.av2-mobile-more-menu {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+  z-index: 42;
+  padding: 0.5rem 1rem 2rem;
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+  animation: av2-slide-up 0.25s ease;
+}
+
+@media (max-width: 767px) {
+  .av2-mobile-more-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
+
+.av2-mobile-more-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--av2-line);
+  margin: 0.5rem auto 0.75rem;
+}
+
+.av2-mobile-more-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: var(--av2-touch);
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--av2-radius-sm);
+  background: transparent;
+  color: var(--av2-text);
+  font-family: var(--av2-font-body);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.av2-mobile-more-item--active {
+  background: var(--av2-mint-light);
+  color: var(--av2-mint);
+  font-weight: 600;
+}
+
+.av2-mobile-more-item-icon {
+  font-size: 1.2rem;
+  width: 28px;
+  text-align: center;
+}
+
+/* ── Animations ─────────────────────────────────────────────────────── */
+@keyframes av2-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes av2-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}

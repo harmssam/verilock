@@ -1,0 +1,132 @@
+/* ── Dashboard ───────────────────────────────────────────────────────── */
+.av2-dashboard {
+  max-width: 960px;
+}
+
+.av2-dash-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.av2-dash-title {
+  font-family: var(--av2-font-display);
+  font-weight: 800;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.15rem;
+}
+
+.av2-dash-subtitle {
+  color: var(--av2-text-muted);
+  font-size: 0.875rem;
+}
+
+/* ── KPI Grid ───────────────────────────────────────────────────────── */
+.av2-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.85rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 900px) {
+  .av2-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .av2-kpi-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ── Sections ───────────────────────────────────────────────────────── */
+.av2-section {
+  margin-bottom: 2rem;
+}
+
+.av2-section-title {
+  font-family: var(--av2-font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+/* ── Quick Actions ──────────────────────────────────────────────────── */
+.av2-quick-actions {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+/* ── Activity Feed ──────────────────────────────────────────────────── */
+.av2-activity-feed {
+  background: var(--av2-bg-card);
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+
+.av2-activity-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--av2-line);
+  align-items: flex-start;
+}
+
+.av2-activity-item:last-child {
+  border-bottom: none;
+}
+
+.av2-activity-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.av2-activity-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.av2-activity-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.15rem;
+}
+
+.av2-activity-type {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--av2-text-dim);
+}
+
+.av2-activity-time {
+  font-size: 0.7rem;
+  color: var(--av2-text-dim);
+  flex-shrink: 0;
+}
+
+.av2-activity-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.av2-activity-slug {
+  font-size: 0.72rem;
+  color: var(--av2-text-dim);
+  font-family: monospace;
+  margin-top: 0.1rem;
+}
