@@ -292,6 +292,24 @@ export const adminApi = {
       `/api/admin/inbox/${encodeURIComponent(id)}/reply`,
       { method: 'POST', body: JSON.stringify({ body }) },
     ),
+
+  // ── X Ideas ───────────────────────────────────────────────────────
+
+  xIdeasList: () => adminRequest<{ ideas: XIdea[] }>('/api/admin/x-ideas'),
+  xIdeasCreate: (body: XIdeaInput) =>
+    adminRequest<{ idea: XIdea }>('/api/admin/x-ideas', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  xIdeasUpdate: (id: string, body: XIdeaInput) =>
+    adminRequest<{ idea: XIdea }>(`/api/admin/x-ideas/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  xIdeasDelete: (id: string) =>
+    adminRequest<{ ok: true }>(`/api/admin/x-ideas/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
 }
 
 export interface InboxEmail {
@@ -307,4 +325,21 @@ export interface InboxEmail {
   read: boolean
   archived: boolean
   replySentAt: number | null
+}
+
+// ── X Ideas ───────────────────────────────────────────────────────────
+
+export interface XIdea {
+  id: string
+  source_url: string
+  copy: string
+  idea_date: string
+  created_at: number
+  updated_at: number
+}
+
+export interface XIdeaInput {
+  source_url?: string
+  copy?: string
+  idea_date?: string
 }

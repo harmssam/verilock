@@ -8,6 +8,7 @@ import { isAdminHost } from './adminHost'
 import { StatsDashboard } from './StatsDashboard'
 import { SupportQueue } from './SupportQueue'
 import { Inbox } from './Inbox'
+import { XIdeas } from './XIdeas'
 import './AdminApp.css'
 
 declare global {
@@ -99,7 +100,7 @@ type AuthState =
   | { kind: 'login' }
   | { kind: 'authed'; username: string }
 
-type AdminTab = 'inbox' | 'support' | 'stats' | 'studio'
+type AdminTab = 'inbox' | 'support' | 'stats' | 'xideas' | 'studio'
 type StudioPane = 'blog' | 'x'
 
 export function AdminApp() {
@@ -251,7 +252,9 @@ export function AdminApp() {
         ? 'Admin · Inbox · VeriLock'
         : tab === 'support'
         ? 'Admin · Support · VeriLock'
-        : tab === 'studio'
+        : tab === 'xideas'
+          ? 'Admin · X Ideas · VeriLock'
+          : tab === 'studio'
           ? 'Admin · Studio · VeriLock'
           : 'Admin · Stats · VeriLock'
   }, [auth.kind, tab])
@@ -526,6 +529,13 @@ export function AdminApp() {
                 </button>
                 <button
                   type="button"
+                  className={`admin-tab${tab === 'xideas' ? ' admin-tab--active' : ''}`}
+                  onClick={() => setTab('xideas')}
+                >
+                  X Ideas
+                </button>
+                <button
+                  type="button"
                   className={`admin-tab${tab === 'studio' ? ' admin-tab--active' : ''}`}
                   onClick={() => setTab('studio')}
                 >
@@ -582,6 +592,9 @@ export function AdminApp() {
                 error={statsError}
                 onRefresh={() => void loadStats()}
               />
+            )}
+            {tab === 'xideas' && (
+              <XIdeas onAuthLost={handleAuthLost} />
             )}
             {tab === 'studio' && (
               <section className="admin-studio">

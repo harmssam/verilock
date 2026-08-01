@@ -26,6 +26,7 @@ import {
   replyToInbox,
   updateInboxEmail,
 } from './adminInbox.js'
+import { attachAdminXIdeasRoutes } from './adminXIdeas.js'
 import { listSupportReplyTemplates } from './supportTemplates.js'
 import {
   SUPPORT_TICKET_STATUSES,
@@ -632,6 +633,9 @@ export function attachAdminRoutes(app: Express): void {
     void replyToInbox(req, res)
   })
   app.post('/api/admin/inbox/mark-all-read', inboxMutateLimit, requireAdmin, markAllRead)
+
+  // ── X Ideas ─────────────────────────────────────────────────────────
+  attachAdminXIdeasRoutes(app, requireAdmin)
 
   if (isAdminConfigured()) {
     console.log('[admin] portal enabled (username=%s)', adminUsername())

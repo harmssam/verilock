@@ -1231,3 +1231,220 @@
   border-radius: 10px 10px 0 0;
   box-shadow: none;
 }
+
+/* ── X Ideas ──────────────────────────────────────────────────────────── */
+
+.admin-ideas {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+.admin-ideas h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.35rem;
+  font-weight: 650;
+}
+
+.admin-ideas-desc {
+  margin: 0 0 1.5rem;
+  color: var(--lr-muted, #64748b);
+  font-size: 0.9rem;
+}
+
+.admin-ideas-form {
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.08));
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.admin-ideas-form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-ideas-form-row .admin-field {
+  flex: 1;
+}
+
+.admin-ideas-form-row .admin-field--date {
+  flex: 0 0 160px;
+}
+
+.admin-ideas-form .admin-field {
+  margin-bottom: 0.75rem;
+}
+
+.admin-ideas-form label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--lr-text, #0f172a);
+}
+
+.admin-ideas-form input,
+.admin-ideas-form textarea {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.15));
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: var(--bg-deep, #fafdfc);
+  color: var(--lr-text, #0f172a);
+  box-sizing: border-box;
+}
+
+.admin-ideas-form textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.admin-ideas-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.admin-ideas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-ideas-card {
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.08));
+  border-radius: 10px;
+  padding: 1rem 1.15rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.admin-ideas-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-ideas-source {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--lr-accent, #0d9488);
+  text-decoration: none;
+  margin-bottom: 0.35rem;
+  word-break: break-all;
+}
+
+.admin-ideas-source:hover {
+  text-decoration: underline;
+}
+
+.admin-ideas-copy {
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--lr-text, #0f172a);
+  white-space: pre-wrap;
+}
+
+.admin-ideas-date {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--lr-muted, #94a3b8);
+}
+
+.admin-ideas-card-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  padding-top: 0.15rem;
+}
+
+.admin-ideas-empty {
+  text-align: center;
+  color: var(--lr-muted, #94a3b8);
+  padding: 2rem 0;
+}
+
+/* Edit overlay */
+.admin-ideas-edit-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.admin-ideas-edit-card {
+  background: var(--bg-card, #fff);
+  border-radius: 14px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 540px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.18);
+}
+
+.admin-ideas-edit-card h3 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.admin-ideas-edit-card .admin-field {
+  margin-bottom: 0.85rem;
+}
+
+.admin-ideas-edit-card label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--lr-text, #0f172a);
+}
+
+.admin-ideas-edit-card input,
+.admin-ideas-edit-card textarea {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.15));
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  background: var(--bg-deep, #fafdfc);
+  color: var(--lr-text, #0f172a);
+  box-sizing: border-box;
+}
+
+.admin-ideas-edit-card textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+
+.admin-ideas-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+/* Danger button subtle */
+.admin-btn-danger {
+  color: #dc2626;
+}
+.admin-btn-danger:hover {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+/* Small button variant */
+.admin-btn-sm {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.78rem;
+}
