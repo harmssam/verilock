@@ -1,11 +1,12 @@
 /* ── Admin v2 core tokens ───────────────────────────────────────────── */
 :root {
   --av2-mint: #0d9488;
+  --av2-mint-deep: #0f766e;
   --av2-mint-light: rgba(13, 148, 136, 0.1);
   --av2-mint-glow: rgba(13, 148, 136, 0.15);
   --av2-bg-deep: #fafdfc;
-  --av2-bg-card: rgba(255, 255, 255, 0.92);
-  --av2-bg-sidebar: rgba(255, 255, 255, 0.96);
+  --av2-bg-card: #ffffff;
+  --av2-bg-sidebar: #ffffff;
   --av2-text: #0f172a;
   --av2-text-muted: #4b5c6b;
   --av2-text-dim: #94a3b8;
@@ -90,10 +91,10 @@
   background: var(--av2-bg-card);
   border: 1px solid var(--av2-line);
   border-radius: var(--av2-radius);
-  padding: 2rem;
+  padding: 2.5rem;
   max-width: 420px;
   width: 100%;
-  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
 }
 
 .av2-login-card h2 {
@@ -253,7 +254,7 @@
 }
 
 .av2-btn-primary:hover:not(:disabled) {
-  background: #0f766e;
+  background: var(--av2-mint-deep);
 }
 
 .av2-btn-ghost {
@@ -357,7 +358,15 @@
 
 .av2-content {
   flex: 1;
-  padding: 2rem;
+  padding: 2rem 2.5rem 3rem;
+}
+
+/* Desktop: sidebar user block owns identity/sign-out — keep header lean */
+@media (min-width: 768px) {
+  .av2-user,
+  .av2-header-signout {
+    display: none;
+  }
 }
 
 /* ── Page placeholders ──────────────────────────────────────────────── */
@@ -543,8 +552,8 @@
 /* ── Dark mode overrides ──────────────────────────────────────────────── */
 [data-theme='dark'] {
   --av2-bg-deep: #0f172a;
-  --av2-bg-card: rgba(30, 41, 59, 0.92);
-  --av2-bg-sidebar: rgba(15, 23, 42, 0.96);
+  --av2-bg-card: #1e293b;
+  --av2-bg-sidebar: #0f172a;
   --av2-text: #e2e8f0;
   --av2-text-muted: #94a3b8;
   --av2-text-dim: #64748b;
@@ -609,10 +618,8 @@
   background: rgba(148, 163, 184, 0.08);
 }
 
-[data-theme='dark'] .av2-header,
-[data-theme='dark'] .av2-stats-panel,
-[data-theme='dark'] .av2-activity-feed {
-  background: rgba(30, 41, 59, 0.88);
+[data-theme='dark'] .av2-header {
+  background: rgba(15, 23, 42, 0.88);
 }
 
 [data-theme='dark'] .av2-turnstile iframe {
@@ -663,14 +670,6 @@
   text-align: center;
   color: var(--av2-text-dim);
   font-size: 0.82rem;
-}
-
-.av2-error {
-  font-size: 0.8rem;
-  color: #b91c1c;
-  background: #fef2f2;
-  padding: 0.45rem 0.65rem;
-  border-radius: 6px;
 }
 
 @keyframes av2-fade-in {

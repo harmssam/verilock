@@ -3,7 +3,7 @@
  * New: bulk archive, reply-and-archive, Inbox zero EmptyState.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Archive, MailX } from 'lucide-react'
+import { Archive, MailOpen, MailX } from 'lucide-react'
 import { adminApi, type InboxEmail } from '../admin/adminApi'
 import { EmptyState } from './components/EmptyState'
 import './InboxTab.css'
@@ -373,6 +373,15 @@ export function InboxTab({ onAuthLost }: Props) {
         </div>
 
         {/* ── Detail Panel ────────────────────────────────────────────── */}
+        {!selectedId && (
+          <div className="av2-inbox-detail av2-inbox-detail--empty">
+            <EmptyState
+              icon={<MailOpen size={40} strokeWidth={1.5} />}
+              title="No email selected"
+              description="Select an email from the list to read and reply."
+            />
+          </div>
+        )}
         {selectedId && (
           <div className="av2-inbox-detail">
             {detailLoading ? (

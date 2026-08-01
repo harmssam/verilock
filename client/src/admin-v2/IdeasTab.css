@@ -30,11 +30,10 @@
 /* ── Form ────────────────────────────────────────────────────────────── */
 .av2-ideas-form {
   margin-bottom: 1rem;
-  padding: 1rem;
+  padding: 1.5rem;
   border: 1px solid var(--av2-line);
   border-radius: var(--av2-radius);
   background: var(--av2-bg-card);
-  backdrop-filter: blur(8px);
 }
 
 .av2-ideas-form-row {
@@ -229,7 +228,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 0.85rem 1rem;
+  padding: 1rem 1.25rem;
   border: 1px solid var(--av2-line);
   border-radius: var(--av2-radius);
   background: var(--av2-bg-card);

@@ -1,7 +1,7 @@
 /**
  * Desktop sidebar navigation (>=768px). Collapses to icon-only on tablet (768-1023px).
  */
-import { useState, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import {
   BarChart3,
   MailOpen,
@@ -34,6 +34,7 @@ interface NavItem {
 
 interface SidebarProps {
   activeTab: AdminV2Tab
+  activeStudioPane?: StudioPane
   onTabChange: (tab: AdminV2Tab, opts?: { studioPane?: StudioPane }) => void
   username: string
   onLogout: () => void
@@ -46,6 +47,7 @@ const iconStroke = 1.5
 
 export function Sidebar({
   activeTab,
+  activeStudioPane = 'x',
   onTabChange,
   username,
   onLogout,
@@ -53,6 +55,11 @@ export function Sidebar({
   supportBadge = 0,
 }: SidebarProps) {
   const [contentOpen, setContentOpen] = useState(false)
+
+  // Auto-expand Content section when on a content child tab
+  useEffect(() => {
+    if (activeTab === 'studio' || activeTab === 'content') setContentOpen(true)
+  }, [activeTab])
 
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 size={iconSize} strokeWidth={iconStroke} /> },
@@ -124,21 +131,22 @@ export function Sidebar({
             {/* Content children */}
             {item.id === 'content' && contentOpen && (
               <div className="av2-sidenav-children">
-                {contentChildren.map(child => (
-                  <button
-                    key={child.label}
-                    type="button"
-                    className={`av2-sidenav-child${
-                      activeTab === child.id &&
-                      (child.studioPane ? activeTab === 'studio' : true)
-                        ? ' av2-sidenav-child--active'
-                        : ''
-                    }`}
-                    onClick={() => onTabChange(child.id, { studioPane: child.studioPane })}
-                  >
-                    {child.label}
-                  </button>
-                ))}
+                {contentChildren.map(child => {
+                  const childActive =
+                    child.id === 'content'
+                      ? activeTab === 'content'
+                      : activeTab === 'studio' && child.studioPane === activeStudioPane
+                  return (
+                    <button
+                      key={child.label}
+                      type="button"
+                      className={`av2-sidenav-child${childActive ? ' av2-sidenav-child--active' : ''}`}
+                      onClick={() => onTabChange(child.id, { studioPane: child.studioPane })}
+                    >
+                      {child.label}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>

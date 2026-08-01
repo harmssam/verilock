@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { StatCard } from './components/StatCard'
 import { EmptyState } from './components/EmptyState'
-import { type AdminV2Tab } from './components/Sidebar'
+import { type AdminV2Tab, type StudioPane } from './components/Sidebar'
 import type { AdminV2DashboardData } from './AdminAppV2'
 import './Dashboard.css'
 
@@ -63,7 +63,7 @@ function activityLabel(type: string): string {
 }
 
 interface DashboardProps {
-  onNavigate: (tab: AdminV2Tab) => void
+  onNavigate: (tab: AdminV2Tab, opts?: { studioPane?: StudioPane }) => void
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
@@ -158,7 +158,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <section className="av2-section">
         <h2 className="av2-section-title">Quick Actions</h2>
         <div className="av2-quick-actions">
-          <button type="button" className="av2-btn av2-btn-accent" onClick={() => onNavigate('content')}>
+          <button type="button" className="av2-btn av2-btn-accent" onClick={() => onNavigate('studio', { studioPane: 'blog' })}>
             <PenLine size={16} strokeWidth={1.5} /> New Blog Post
           </button>
           <button type="button" className="av2-btn av2-btn-accent" onClick={() => onNavigate('support')}>

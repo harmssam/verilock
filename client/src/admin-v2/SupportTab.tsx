@@ -3,7 +3,7 @@
  * New: SLA/time-since indicator colors, bulk status change, ticket tags.
  */
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { User } from 'lucide-react'
+import { Ticket, User } from 'lucide-react'
 import {
   adminApi,
   type SupportReplyTemplate,
@@ -12,6 +12,7 @@ import {
   type SupportTicketMessage,
   type SupportTicketStatus,
 } from '../admin/adminApi'
+import { EmptyState } from './components/EmptyState'
 import './SupportTab.css'
 
 const TICKET_STATUS_LABELS: Record<SupportTicketStatus, string> = {
@@ -564,7 +565,13 @@ export function SupportTab({ onAuthLost }: Props) {
 
         {/* Ticket detail */}
         <section className="av2-support-detail-panel" aria-label="Ticket detail">
-          {!selectedId && <p className="av2-empty">Select a ticket to read and reply.</p>}
+          {!selectedId && (
+            <EmptyState
+              icon={<Ticket size={40} strokeWidth={1.5} />}
+              title="No ticket selected"
+              description="Select a ticket from the queue to read and reply."
+            />
+          )}
           {selectedId && detailLoading && !detailTicket && (
             <p className="av2-empty">Loading…</p>
           )}

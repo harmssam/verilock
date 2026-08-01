@@ -3,8 +3,7 @@
   background: var(--av2-bg-card);
   border: 1px solid var(--av2-line);
   border-radius: var(--av2-radius);
-  padding: 1.15rem 1.25rem;
-  backdrop-filter: blur(8px);
+  padding: 1.35rem 1.5rem;
   transition: box-shadow 0.2s, border-color 0.2s;
 }
 
@@ -38,7 +37,7 @@
 
 .av2-stat-card-value {
   font-family: var(--av2-font-display);
-  font-size: 1.6rem;
+  font-size: 1.8rem;
   font-weight: 800;
   line-height: 1.2;
   color: var(--av2-text);

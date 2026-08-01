@@ -3,8 +3,11 @@
  * Shares auth (cookie session, adminApi, Turnstile) with the existing admin.
  */
 import type { ReactNode } from 'react'
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Mail, Ticket, MessageCircle } from 'lucide-react'
+/* Design tokens + reset must load before any tab/component CSS so the
+   universal reset cannot clobber their margins/paddings. */
+import './AdminAppV2.css'
 import { adminApi, type AdminFeatures } from '../admin/adminApi'
 import { isAdminHost } from '../admin/adminHost'
 import { Dashboard } from './Dashboard'
@@ -19,8 +22,6 @@ import { MobileTabBar } from './components/MobileTabBar'
 import { SearchModal } from './components/SearchModal'
 import { DarkModeToggle } from './components/DarkModeToggle'
 import { ShortcutModal } from './components/ShortcutModal'
-import { Breadcrumbs, type BreadcrumbSegment } from './components/Breadcrumbs'
-import './AdminAppV2.css'
 
 declare global {
   interface Window {
@@ -121,9 +122,6 @@ export function AdminAppV2() {
   const [notifOpen, setNotifOpen] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
 
-  // Breadcrumbs
-  const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbSegment[]>([])
-
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [website, setWebsite] = useState('')
@@ -176,8 +174,8 @@ export function AdminAppV2() {
       document.title = 'Admin sign-in · VeriLock'
       return
     }
-    document.title = 'Admin · VeriLock'
-  }, [auth.kind])
+    document.title = `${tabLabel(tab)} · Admin · VeriLock`
+  }, [auth.kind, tab])
 
   // Poll sidebar badge counts + notifications every 60s
   useEffect(() => {
@@ -345,25 +343,13 @@ export function AdminAppV2() {
     }
   }
 
-  // Tab change handler — updates tab, studio pane, and breadcrumbs
-  const handleTabChange = useCallback(
-    (newTab: AdminV2Tab, opts?: { studioPane?: StudioPane }) => {
-      setTab(newTab)
-      if (opts?.studioPane) {
-        setStudioPane(opts.studioPane)
-      }
-
-      const segments: BreadcrumbSegment[] = [{ label: tabLabel(newTab), tab: newTab }]
-
-      if (newTab === 'studio') {
-        const pane = opts?.studioPane || studioPane
-        segments.push({ label: pane === 'blog' ? 'Blog Studio' : 'X Post Studio' })
-      }
-
-      setBreadcrumbs(segments)
-    },
-    [studioPane],
-  )
+  // Tab change handler — updates tab and studio pane
+  const handleTabChange = useCallback((newTab: AdminV2Tab, opts?: { studioPane?: StudioPane }) => {
+    setTab(newTab)
+    if (opts?.studioPane) {
+      setStudioPane(opts.studioPane)
+    }
+  }, [])
 
   // Search navigation
   const handleSearchNavigate = useCallback(
@@ -478,12 +464,6 @@ export function AdminAppV2() {
     } catch { /* noop */ }
   }, [])
 
-  // Breadcrumbs derived from tab
-  const visibleBreadcrumbs = useMemo(() => {
-    if (tab === 'dashboard') return []
-    return breadcrumbs.length > 0 ? breadcrumbs : [{ label: tabLabel(tab), tab }]
-  }, [tab, breadcrumbs])
-
   const productHref = isAdminHost() ? 'https://verilock.online' : '/'
 
   // Notification icons
@@ -594,6 +574,7 @@ export function AdminAppV2() {
           {/* Desktop sidebar */}
           <Sidebar
             activeTab={tab}
+            activeStudioPane={studioPane}
             onTabChange={handleTabChange}
             username={auth.username}
             onLogout={() => void onLogout()}
@@ -663,16 +644,13 @@ export function AdminAppV2() {
 
                 <span className="av2-user">{auth.username}</span>
                 <DarkModeToggle />
-                <button type="button" className="av2-btn av2-btn-ghost" onClick={() => void onLogout()}>
+                <button type="button" className="av2-btn av2-btn-ghost av2-header-signout" onClick={() => void onLogout()}>
                   Sign out
                 </button>
               </div>
             </header>
 
             <div className="av2-content">
-              {/* Breadcrumbs */}
-              <Breadcrumbs segments={visibleBreadcrumbs} onNavigate={handleTabChange} />
-
               {tab === 'dashboard' && <Dashboard onNavigate={handleTabChange} />}
               {tab === 'inbox' && <InboxTab onAuthLost={handleAuthLost} />}
               {tab === 'support' && <SupportTab onAuthLost={handleAuthLost} />}

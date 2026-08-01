@@ -139,8 +139,7 @@
   border: 1px solid var(--av2-line);
   border-radius: var(--av2-radius);
   background: var(--av2-bg-card);
-  padding: 1rem;
-  backdrop-filter: blur(8px);
+  padding: 1.5rem;
 }
 
 .av2-stats-panel h2 {

@@ -29,7 +29,7 @@
 .av2-kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
+  gap: 1.25rem;
   margin-bottom: 2.5rem;
 }
 
@@ -69,7 +69,6 @@
   background: var(--av2-bg-card);
   border: 1px solid var(--av2-line);
   border-radius: var(--av2-radius);
-  backdrop-filter: blur(8px);
   overflow: hidden;
 }
 

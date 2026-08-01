@@ -10,9 +10,8 @@
   border: 1px solid var(--av2-line);
   border-radius: var(--av2-radius);
   background: var(--av2-bg-card);
-  padding: 1.25rem;
-  margin-bottom: 1.25rem;
-  backdrop-filter: blur(8px);
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.5rem;
 }
 
 .av2-settings-section--placeholder {

@@ -110,7 +110,7 @@
 @media (min-width: 768px) {
   .av2-support-layout {
     grid-template-columns: minmax(340px, 440px) 1fr;
-    height: calc(100dvh - 280px);
+    height: calc(100dvh - 300px);
   }
 }
 
@@ -241,7 +241,7 @@
   border: 1px solid var(--av2-line);
   border-radius: var(--av2-radius);
   background: var(--av2-bg-card);
-  padding: 1.25rem;
+  padding: 1.5rem;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   display: flex;
@@ -443,14 +443,6 @@
 
 .av2-support-check input[type='checkbox'] {
   accent-color: var(--av2-mint);
-}
-
-/* ── Common ──────────────────────────────────────────────────────────── */
-.av2-empty {
-  padding: 1.5rem 1rem;
-  text-align: center;
-  color: var(--av2-text-dim);
-  font-size: 0.82rem;
 }
 
 .mono {
