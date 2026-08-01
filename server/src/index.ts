@@ -42,6 +42,7 @@ import { sendPartyInviteEmail } from './email/inviteSigner.js'
 import { verifyHubSignedMessage } from './hub-signature.js'
 import { rateLimit } from './rate-limit.js'
 import { attachAdminRoutes, requireAdminOrRedirect } from './admin.js'
+import { handleInboxWebhook } from './adminInbox.js'
 import { attachAdminStudioProxy } from './adminStudioProxy.js'
 import {
   clientIpFromRequest,
@@ -1018,6 +1019,13 @@ attachAdminRoutes(app)
 
 // Content Studio (Blog + X) via private Railway service — admin session required.
 attachAdminStudioProxy(app, requireAdminOrRedirect)
+
+// Resend inbound webhook — no admin auth (called by Resend servers).
+// Only accepts mail for sam@verilock.online (or ADMIN_INBOX_TO).
+const inboxWebhookLimit = rateLimit(30, 60_000)
+app.post('/api/admin/inbox/inbound', inboxWebhookLimit, (req, res) => {
+  void handleInboxWebhook(req, res)
+})
 
 app.post('/api/support/contact', supportContactLimit, async (req, res) => {
   const body = (req.body ?? {}) as SupportContactBody

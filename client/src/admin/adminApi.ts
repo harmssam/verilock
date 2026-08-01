@@ -261,4 +261,44 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify({ reset: true }),
     }),
+
+  // ── Inbox ──────────────────────────────────────────────────────────
+
+  inboxList: (params?: { q?: string; archived?: boolean; limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams()
+    if (params?.q) sp.set('q', params.q)
+    if (params?.archived) sp.set('archived', '1')
+    if (params?.limit != null) sp.set('limit', String(params.limit))
+    if (params?.offset != null) sp.set('offset', String(params.offset))
+    const qs = sp.toString()
+    return adminRequest<{ emails: InboxEmail[]; total: number; unreadCount: number }>(
+      `/api/admin/inbox${qs ? `?${qs}` : ''}`,
+    )
+  },
+  inboxEmail: (id: string) =>
+    adminRequest<{ email: InboxEmail }>(`/api/admin/inbox/${encodeURIComponent(id)}`),
+  inboxUpdate: (id: string, body: { read?: boolean; archived?: boolean }) =>
+    adminRequest<{ email: InboxEmail }>(`/api/admin/inbox/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  inboxMarkAllRead: () =>
+    adminRequest<{ ok: true }>('/api/admin/inbox/mark-all-read', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+}
+
+export interface InboxEmail {
+  id: string
+  resendEmailId: string | null
+  fromEmail: string
+  fromName: string
+  toEmail: string
+  subject: string
+  bodyText: string
+  bodyHtml: string | null
+  receivedAt: number
+  read: boolean
+  archived: boolean
 }

@@ -7,6 +7,7 @@ import { adminApi, type AdminFeatures, type AdminStats } from './adminApi'
 import { isAdminHost } from './adminHost'
 import { StatsDashboard } from './StatsDashboard'
 import { SupportQueue } from './SupportQueue'
+import { Inbox } from './Inbox'
 import './AdminApp.css'
 
 declare global {
@@ -98,7 +99,7 @@ type AuthState =
   | { kind: 'login' }
   | { kind: 'authed'; username: string }
 
-type AdminTab = 'stats' | 'support' | 'studio'
+type AdminTab = 'inbox' | 'support' | 'stats' | 'studio'
 type StudioPane = 'blog' | 'x'
 
 export function AdminApp() {
@@ -109,6 +110,7 @@ export function AdminApp() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [statsError, setStatsError] = useState<string | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
+  const [unreadInboxCount, setUnreadInboxCount] = useState(0)
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -245,7 +247,9 @@ export function AdminApp() {
       return
     }
     document.title =
-      tab === 'support'
+      tab === 'inbox'
+        ? 'Admin · Inbox · VeriLock'
+        : tab === 'support'
         ? 'Admin · Support · VeriLock'
         : tab === 'studio'
           ? 'Admin · Studio · VeriLock'
@@ -495,6 +499,16 @@ export function AdminApp() {
               <nav className="admin-tabs" aria-label="Admin sections">
                 <button
                   type="button"
+                  className={`admin-tab${tab === 'inbox' ? ' admin-tab--active' : ''}`}
+                  onClick={() => setTab('inbox')}
+                >
+                  Inbox
+                  {unreadInboxCount > 0 ? (
+                    <span className="admin-tab-badge">{unreadInboxCount}</span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
                   className={`admin-tab${tab === 'support' ? ' admin-tab--active' : ''}`}
                   onClick={() => setTab('support')}
                 >
@@ -549,6 +563,12 @@ export function AdminApp() {
               ) : null}
             </div>
 
+            {tab === 'inbox' && (
+              <Inbox
+                onAuthLost={handleAuthLost}
+                onUnreadChange={setUnreadInboxCount}
+              />
+            )}
             {tab === 'support' && (
               <SupportQueue
                 onAuthLost={handleAuthLost}

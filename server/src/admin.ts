@@ -19,6 +19,12 @@ import {
   verifyTurnstileToken,
 } from './supportContact.js'
 import { sendCustomerTicketEmail } from './supportOutbound.js'
+import {
+  getInboxEmail,
+  listInbox,
+  markAllRead,
+  updateInboxEmail,
+} from './adminInbox.js'
 import { listSupportReplyTemplates } from './supportTemplates.js'
 import {
   SUPPORT_TICKET_STATUSES,
@@ -614,6 +620,14 @@ export function attachAdminRoutes(app: Express): void {
       }
     },
   )
+
+  const inboxLimit = rateLimit(60, 60_000)
+  const inboxMutateLimit = rateLimit(30, 60_000)
+
+  app.get('/api/admin/inbox', inboxLimit, requireAdmin, listInbox)
+  app.get('/api/admin/inbox/:id', inboxLimit, requireAdmin, getInboxEmail)
+  app.patch('/api/admin/inbox/:id', inboxMutateLimit, requireAdmin, updateInboxEmail)
+  app.post('/api/admin/inbox/mark-all-read', inboxMutateLimit, requireAdmin, markAllRead)
 
   if (isAdminConfigured()) {
     console.log('[admin] portal enabled (username=%s)', adminUsername())
