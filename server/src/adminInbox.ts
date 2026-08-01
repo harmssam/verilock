@@ -4,6 +4,7 @@
  * Separate from the support ticket queue — completely different data and purpose.
  */
 import type { Request, Response } from 'express'
+import { Resend } from 'resend'
 import { db } from './db.js'
 import { isResendSendEnabled, resendFromAddress } from './email/config.js'
 import { sendTransactionalEmail } from './email/resend.js'
@@ -103,6 +104,12 @@ function coalesce(obj: Record<string, unknown>, ...keys: string[]): string {
 
 // ── Inbound webhook handler (no admin auth — called by Resend) ─────────────
 
+function getResendClient(): Resend | null {
+  const key = process.env.RESEND_API_KEY?.trim()
+  if (!key) return null
+  return new Resend(key)
+}
+
 export async function handleInboxWebhook(req: Request, res: Response): Promise<void> {
   const payload = req.body as Record<string, unknown>
   const eventType = String(payload.type || '')
@@ -113,12 +120,32 @@ export async function handleInboxWebhook(req: Request, res: Response): Promise<v
   }
 
   const data = (payload.data || {}) as Record<string, unknown>
-  // Resend sometimes nests the full email under `data.email`, sometimes `data` IS the email
-  const email = (data.email && typeof data.email === 'object' ? data.email : data) as Record<string, unknown>
+
+  // Resend webhook only sends metadata — fetch full email (with body) via API
+  const emailId = coalesce(data, 'email_id', 'id')
+  let fullEmail: Record<string, unknown> | null = null
+
+  if (emailId) {
+    const resend = getResendClient()
+    if (resend) {
+      try {
+        const result = await resend.emails.receiving.get(emailId)
+        if (result.data) {
+          fullEmail = result.data as unknown as Record<string, unknown>
+        }
+      } catch (err) {
+        console.warn(`[inbox] could not fetch full email ${emailId}:`, err instanceof Error ? err.message : String(err))
+      }
+    }
+  }
+
+  // Fall back to webhook data if API call failed
+  const email = fullEmail || data
 
   // Recipient filtering
-  const toRaw = Array.isArray(email.to) ? String(email.to[0] || '') : String(email.to || '')
-  const toEmail = extractEmailAddress(toRaw)
+  const toArray = email.to
+  const toRaw = Array.isArray(toArray) ? String(toArray[0] || '') : String(toArray || '')
+  const toEmail = extractEmailAddress(toRaw) || coalesce(data, 'received_for')
   const expectedTo = inboxToAddress()
 
   if (toEmail !== expectedTo.toLowerCase()) {
@@ -126,20 +153,19 @@ export async function handleInboxWebhook(req: Request, res: Response): Promise<v
     return
   }
 
-  // Robust field extraction — Resend uses text/html/body_text/body.html/content.text etc.
-  const fromRaw = coalesce(email, 'from', 'from_email', 'sender', 'mail_from')
+  // Field extraction — from the full fetched email or webhook fallback
+  const fromRaw = coalesce(email, 'from', 'from_email', 'sender')
   const fromEmail = extractEmailAddress(fromRaw) || 'unknown@unknown.com'
   const fromName = extractEmailName(fromRaw)
   const subject = coalesce(email, 'subject', 'mail_subject').slice(0, 500) || '(no subject)'
-  let bodyText = coalesce(email, 'text', 'body_text', 'body.text', 'content.text')
-  let bodyHtml = coalesce(email, 'html', 'body_html', 'body.html', 'content.html') || null
-  // Fallback: if only HTML, derive text from it
+  let bodyText = coalesce(email, 'text', 'body_text')
+  let bodyHtml = coalesce(email, 'html', 'body_html') || null
   if (!bodyText && bodyHtml) {
     bodyText = bodyHtml.replace(/<[^>]*>/g, '').slice(0, 5000)
   }
 
-  const resendEmailId = (coalesce(email, 'id', 'email_id') || coalesce(data, 'email_id') || null) as string | null
-  const receivedAtRaw = coalesce(email, 'created_at', 'received_at', 'date', 'timestamp', 'receivedAt', 'createdAt')
+  const resendEmailId = emailId || (coalesce(data, 'email_id') || null) as string | null
+  const receivedAtRaw = coalesce(email, 'created_at', 'received_at', 'date')
   const receivedAt = receivedAtRaw ? new Date(receivedAtRaw).getTime() : Date.now()
 
   const id = resendEmailId || `inbox_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -158,7 +184,7 @@ export async function handleInboxWebhook(req: Request, res: Response): Promise<v
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, resendEmailId, fromEmail, fromName, toEmail, subject, bodyText, bodyHtml, receivedAt)
 
-  console.log(`[inbox] ${fromEmail} → ${toEmail}  "${subject.slice(0, 60)}"`)
+  console.log(`[inbox] ${fromEmail} → ${toEmail}  "${subject.slice(0, 60)}"  body=${bodyText ? `${bodyText.length} chars` : 'EMPTY'}`)
   res.json({ ok: true })
 }
 
