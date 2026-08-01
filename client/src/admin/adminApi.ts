@@ -287,6 +287,11 @@ export const adminApi = {
       method: 'POST',
       body: JSON.stringify({}),
     }),
+  inboxReply: (id: string, body: string) =>
+    adminRequest<{ ok: true; email: InboxEmail }>(
+      `/api/admin/inbox/${encodeURIComponent(id)}/reply`,
+      { method: 'POST', body: JSON.stringify({ body }) },
+    ),
 }
 
 export interface InboxEmail {
@@ -301,4 +306,5 @@ export interface InboxEmail {
   receivedAt: number
   read: boolean
   archived: boolean
+  replySentAt: number | null
 }

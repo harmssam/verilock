@@ -356,3 +356,60 @@
   font-size: inherit;
   line-height: inherit;
 }
+
+/* ── Reply ──────────────────────────────────────────────────── */
+
+.inbox-reply-section {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--lr-line, rgba(15, 23, 42, 0.08));
+}
+
+.inbox-reply-sent {
+  font-size: 0.82rem;
+  color: var(--lr-accent, #0d9488);
+  font-weight: 500;
+}
+
+.inbox-reply-error {
+  font-size: 0.78rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  padding: 0.45rem 0.65rem;
+  border-radius: 6px;
+  margin-bottom: 0.6rem;
+}
+
+.inbox-reply-textarea {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--lr-line, rgba(15, 23, 42, 0.15));
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  line-height: 1.55;
+  resize: vertical;
+  background: rgba(15, 23, 42, 0.02);
+  color: var(--lr-text, #0f172a);
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.inbox-reply-textarea:focus {
+  border-color: var(--lr-accent, #0d9488);
+  background: #fff;
+}
+
+.inbox-reply-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.inbox-reply-hint {
+  font-size: 0.7rem;
+  color: var(--lr-muted, #94a3b8);
+}

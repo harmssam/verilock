@@ -5,6 +5,8 @@
  */
 import type { Request, Response } from 'express'
 import { db } from './db.js'
+import { isResendSendEnabled, resendFromAddress } from './email/config.js'
+import { sendTransactionalEmail } from './email/resend.js'
 
 // ── DB migration ──────────────────────────────────────────────────────────
 
@@ -26,6 +28,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_admin_inbox_unread ON admin_inbox(read, archived);
 `)
 
+// Add reply column if missing (migration for existing DBs)
+const inboxColumns = db.prepare('PRAGMA table_info(admin_inbox)').all() as Array<{ name: string }>
+if (!inboxColumns.some(c => c.name === 'reply_sent_at')) {
+  db.exec('ALTER TABLE admin_inbox ADD COLUMN reply_sent_at INTEGER')
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface InboxEmail {
@@ -40,6 +48,7 @@ export interface InboxEmail {
   receivedAt: number
   read: boolean
   archived: boolean
+  replySentAt: number | null
 }
 
 function rowToEmail(row: Record<string, unknown>): InboxEmail {
@@ -55,6 +64,7 @@ function rowToEmail(row: Record<string, unknown>): InboxEmail {
     receivedAt: row.received_at as number,
     read: Boolean(row.read),
     archived: Boolean(row.archived),
+    replySentAt: (row.reply_sent_at as number) || null,
   }
 }
 
@@ -81,6 +91,16 @@ function extractEmailName(raw: string): string {
   return ''
 }
 
+/** Try multiple field names — Resend uses different keys depending on context. */
+function coalesce(obj: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const val = obj[key]
+    if (typeof val === 'string' && val.trim()) return val.trim()
+    if (typeof val === 'number') return String(val)
+  }
+  return ''
+}
+
 // ── Inbound webhook handler (no admin auth — called by Resend) ─────────────
 
 export async function handleInboxWebhook(req: Request, res: Response): Promise<void> {
@@ -93,8 +113,10 @@ export async function handleInboxWebhook(req: Request, res: Response): Promise<v
   }
 
   const data = (payload.data || {}) as Record<string, unknown>
-  const email = (data.email || data) as Record<string, unknown>
+  // Resend sometimes nests the full email under `data.email`, sometimes `data` IS the email
+  const email = (data.email && typeof data.email === 'object' ? data.email : data) as Record<string, unknown>
 
+  // Recipient filtering
   const toRaw = Array.isArray(email.to) ? String(email.to[0] || '') : String(email.to || '')
   const toEmail = extractEmailAddress(toRaw)
   const expectedTo = inboxToAddress()
@@ -104,16 +126,21 @@ export async function handleInboxWebhook(req: Request, res: Response): Promise<v
     return
   }
 
-  const fromRaw = String(email.from || '')
-  const fromEmail = extractEmailAddress(fromRaw)
+  // Robust field extraction — Resend uses text/html/body_text/body.html/content.text etc.
+  const fromRaw = coalesce(email, 'from', 'from_email', 'sender', 'mail_from')
+  const fromEmail = extractEmailAddress(fromRaw) || 'unknown@unknown.com'
   const fromName = extractEmailName(fromRaw)
-  const subject = String(email.subject || '').slice(0, 500)
-  const bodyText = String(email.text || email.body_text || '')
-  const bodyHtml = String(email.html || email.body_html || '') || null
-  const resendEmailId = (String(data.email_id || email.email_id || email.id || '') || null) as string | null
-  const receivedAt = (email.created_at || email.received_at)
-    ? new Date(String(email.created_at || email.received_at)).getTime()
-    : Date.now()
+  const subject = coalesce(email, 'subject', 'mail_subject').slice(0, 500) || '(no subject)'
+  let bodyText = coalesce(email, 'text', 'body_text', 'body.text', 'content.text')
+  let bodyHtml = coalesce(email, 'html', 'body_html', 'body.html', 'content.html') || null
+  // Fallback: if only HTML, derive text from it
+  if (!bodyText && bodyHtml) {
+    bodyText = bodyHtml.replace(/<[^>]*>/g, '').slice(0, 5000)
+  }
+
+  const resendEmailId = (coalesce(email, 'id', 'email_id') || coalesce(data, 'email_id') || null) as string | null
+  const receivedAtRaw = coalesce(email, 'created_at', 'received_at', 'date', 'timestamp', 'receivedAt', 'createdAt')
+  const receivedAt = receivedAtRaw ? new Date(receivedAtRaw).getTime() : Date.now()
 
   const id = resendEmailId || `inbox_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 
@@ -205,4 +232,56 @@ export function updateInboxEmail(req: Request, res: Response): void {
 export function markAllRead(_req: Request, res: Response): void {
   db.prepare('UPDATE admin_inbox SET read = 1 WHERE read = 0 AND archived = 0').run()
   res.json({ ok: true })
+}
+
+// ── Reply ──────────────────────────────────────────────────────────────────
+
+const MAX_REPLY_LENGTH = 8000
+
+export async function replyToInbox(req: Request, res: Response): Promise<void> {
+  const id = paramId(req.params.id)
+  const body = req.body as { body?: unknown }
+
+  const email = db.prepare('SELECT * FROM admin_inbox WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  if (!email) {
+    res.status(404).json({ error: 'Email not found' })
+    return
+  }
+
+  const replyBody = typeof body.body === 'string' ? body.body.trim() : ''
+  if (!replyBody) {
+    res.status(400).json({ error: 'Reply body is required' })
+    return
+  }
+  if (replyBody.length > MAX_REPLY_LENGTH) {
+    res.status(400).json({ error: `Reply too long (max ${MAX_REPLY_LENGTH} characters)` })
+    return
+  }
+
+  if (!isResendSendEnabled()) {
+    res.status(503).json({ error: 'Email sending is not enabled on this server' })
+    return
+  }
+
+  const subject = String(email.subject || '(no subject)')
+  const replySubject = subject.startsWith('Re:') ? subject : `Re: ${subject}`
+  const fromAddr = resendFromAddress()
+
+  const result = await sendTransactionalEmail({
+    to: email.from_email as string,
+    subject: replySubject,
+    text: replyBody,
+    html: `<div style="font-family:system-ui,sans-serif;line-height:1.6;max-width:560px"><div style="white-space:pre-wrap">${replyBody.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div></div>`,
+  })
+
+  if (!result.ok) {
+    const errMsg = result.skipped ? result.reason : result.error
+    res.status(502).json({ error: errMsg })
+    return
+  }
+
+  db.prepare('UPDATE admin_inbox SET reply_sent_at = ? WHERE id = ?').run(Date.now(), id)
+
+  const updated = db.prepare('SELECT * FROM admin_inbox WHERE id = ?').get(id) as Record<string, unknown>
+  res.json({ ok: true, email: rowToEmail(updated) })
 }

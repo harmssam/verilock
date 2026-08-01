@@ -23,6 +23,7 @@ import {
   getInboxEmail,
   listInbox,
   markAllRead,
+  replyToInbox,
   updateInboxEmail,
 } from './adminInbox.js'
 import { listSupportReplyTemplates } from './supportTemplates.js'
@@ -627,6 +628,9 @@ export function attachAdminRoutes(app: Express): void {
   app.get('/api/admin/inbox', inboxLimit, requireAdmin, listInbox)
   app.get('/api/admin/inbox/:id', inboxLimit, requireAdmin, getInboxEmail)
   app.patch('/api/admin/inbox/:id', inboxMutateLimit, requireAdmin, updateInboxEmail)
+  app.post('/api/admin/inbox/:id/reply', inboxMutateLimit, requireAdmin, (req, res) => {
+    void replyToInbox(req, res)
+  })
   app.post('/api/admin/inbox/mark-all-read', inboxMutateLimit, requireAdmin, markAllRead)
 
   if (isAdminConfigured()) {

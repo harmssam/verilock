@@ -48,6 +48,10 @@ export function Inbox({ onAuthLost, onUnreadChange }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedEmail, setSelectedEmail] = useState<InboxEmail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [replyText, setReplyText] = useState('')
+  const [replySending, setReplySending] = useState(false)
+  const [replySent, setReplySent] = useState(false)
+  const [replyError, setReplyError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -94,6 +98,9 @@ export function Inbox({ onAuthLost, onUnreadChange }: Props) {
   const loadDetail = useCallback(async (id: string) => {
     setSelectedId(id)
     setDetailLoading(true)
+    setReplyText('')
+    setReplySent(false)
+    setReplyError(null)
     try {
       const result = await adminApi.inboxEmail(id)
       setSelectedEmail(result.email)
@@ -130,6 +137,22 @@ export function Inbox({ onAuthLost, onUnreadChange }: Props) {
       if ((err as { status?: number }).status === 401) onAuthLost()
     }
   }, [selectedId, loadList, onAuthLost])
+
+  const handleReply = useCallback(async () => {
+    if (!selectedId || !replyText.trim()) return
+    setReplySending(true)
+    setReplyError(null)
+    try {
+      await adminApi.inboxReply(selectedId, replyText.trim())
+      setReplySent(true)
+      setReplyText('')
+    } catch (err) {
+      if ((err as { status?: number }).status === 401) onAuthLost()
+      else setReplyError(err instanceof Error ? err.message : 'Reply failed')
+    } finally {
+      setReplySending(false)
+    }
+  }, [selectedId, replyText, onAuthLost])
 
   const handleMarkAllRead = useCallback(async () => {
     try {
@@ -312,6 +335,48 @@ export function Inbox({ onAuthLost, onUnreadChange }: Props) {
                     />
                   ) : (
                     <pre className="inbox-text-body">{selectedEmail.bodyText}</pre>
+                  )}
+                </div>
+
+                {/* Reply form */}
+                <div className="inbox-reply-section">
+                  {selectedEmail.replySentAt ? (
+                    <div className="inbox-reply-sent">
+                      ✓ Reply sent {formatTime(selectedEmail.replySentAt)}
+                    </div>
+                  ) : replySent ? (
+                    <div className="inbox-reply-sent">✓ Reply sent</div>
+                  ) : (
+                    <>
+                      {replyError && (
+                        <div className="inbox-reply-error" role="alert">{replyError}</div>
+                      )}
+                      <textarea
+                        className="inbox-reply-textarea"
+                        rows={4}
+                        placeholder={`Reply to ${selectedEmail.fromName || selectedEmail.fromEmail}…`}
+                        value={replyText}
+                        onChange={e => setReplyText(e.target.value)}
+                        disabled={replySending}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                            e.preventDefault()
+                            void handleReply()
+                          }
+                        }}
+                      />
+                      <div className="inbox-reply-actions">
+                        <span className="inbox-reply-hint">⌘+Enter to send</span>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn-primary"
+                          disabled={!replyText.trim() || replySending}
+                          onClick={() => void handleReply()}
+                        >
+                          {replySending ? 'Sending…' : 'Send reply'}
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
               </article>
