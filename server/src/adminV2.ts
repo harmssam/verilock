@@ -1,10 +1,11 @@
 /**
  * Admin v2 portal API — dashboard KPI + recent activity.
  * Shares the same cookie session (verilock_admin) as the existing admin.
+ * Also adds v2-specific bulk endpoints.
  */
 import type { Express, Request, Response, NextFunction } from 'express'
 import { db } from './db.js'
-import { getSupportTicketCounts } from './supportTickets.js'
+import { getSupportTicketCounts, SUPPORT_TICKET_STATUSES, updateSupportTicketStatus } from './supportTickets.js'
 import { isAdminConfigured, adminPublicFeatures } from './admin.js'
 
 // Re-expose the same features endpoint for v2 (no new env vars needed yet).
@@ -125,6 +126,73 @@ export function attachAdminV2Routes(app: Express, requireAdmin: (req: Request, r
     } catch (err) {
       console.error('[admin-v2] dashboard', err)
       res.status(500).json({ error: 'Could not load dashboard.' })
+    }
+  })
+
+  // Bulk inbox operations
+  app.post('/api/admin-v2/inbox/bulk', requireAdmin, (req, res) => {
+    try {
+      const body = (req.body ?? {}) as { ids?: unknown; archived?: unknown }
+      if (!Array.isArray(body.ids) || body.ids.length === 0) {
+        res.status(400).json({ error: 'ids (array of email ids) is required' })
+        return
+      }
+      const archive = body.archived === true
+      const ids = body.ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      if (ids.length === 0) {
+        res.status(400).json({ error: 'No valid email ids provided' })
+        return
+      }
+
+      const placeholders = ids.map(() => '?').join(',')
+      db.prepare(
+        `UPDATE admin_inbox SET archived = ? WHERE id IN (${placeholders})`,
+      ).run(archive ? 1 : 0, ...ids)
+
+      res.json({ ok: true, updated: ids.length })
+    } catch (err) {
+      console.error('[admin-v2] inbox bulk', err)
+      res.status(500).json({ error: 'Could not update emails.' })
+    }
+  })
+
+  // Bulk ticket status change
+  app.post('/api/admin-v2/tickets/bulk-status', requireAdmin, (req, res) => {
+    try {
+      const body = (req.body ?? {}) as { ids?: unknown; status?: unknown }
+      if (!Array.isArray(body.ids) || body.ids.length === 0) {
+        res.status(400).json({ error: 'ids (array of ticket ids) is required' })
+        return
+      }
+      if (typeof body.status !== 'string') {
+        res.status(400).json({ error: 'status (string) is required' })
+        return
+      }
+
+      // Validate status
+      if (!(SUPPORT_TICKET_STATUSES as readonly string[]).includes(body.status)) {
+        res.status(400).json({
+          error: `Invalid status. Use one of: ${(SUPPORT_TICKET_STATUSES as readonly string[]).join(', ')}`,
+        })
+        return
+      }
+
+      const ids = body.ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      if (ids.length === 0) {
+        res.status(400).json({ error: 'No valid ticket ids provided' })
+        return
+      }
+
+      let updated = 0
+      for (const id of ids) {
+        const next = updateSupportTicketStatus(id, body.status as Parameters<typeof updateSupportTicketStatus>[1])
+        if (next) updated++
+      }
+
+      res.json({ ok: true, updated })
+    } catch (err) {
+      console.error('[admin-v2] bulk status', err)
+      res.status(500).json({ error: 'Could not update tickets.' })
     }
   })
 }

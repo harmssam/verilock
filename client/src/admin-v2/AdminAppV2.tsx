@@ -6,6 +6,11 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { adminApi, type AdminFeatures } from '../admin/adminApi'
 import { isAdminHost } from '../admin/adminHost'
 import { Dashboard } from './Dashboard'
+import { InboxTab } from './InboxTab'
+import { SupportTab } from './SupportTab'
+import { StatsTab } from './StatsTab'
+import { IdeasTab } from './IdeasTab'
+import { SettingsTab } from './SettingsTab'
 import { Sidebar } from './components/Sidebar'
 import { type AdminV2Tab } from './components/Sidebar'
 import { MobileTabBar } from './components/MobileTabBar'
@@ -248,6 +253,10 @@ export function AdminAppV2() {
     setAuth({ kind: 'login' })
   }
 
+  function handleAuthLost() {
+    setAuth({ kind: 'login' })
+  }
+
   // Global Cmd+K listener
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -388,36 +397,11 @@ export function AdminAppV2() {
 
             <div className="av2-content">
               {tab === 'dashboard' && <Dashboard onNavigate={setTab} />}
-              {tab === 'inbox' && (
-                <div className="av2-page-placeholder">
-                  <h2>📬 Inbox</h2>
-                  <p>Coming in Phase 1.</p>
-                </div>
-              )}
-              {tab === 'support' && (
-                <div className="av2-page-placeholder">
-                  <h2>🎫 Support</h2>
-                  <p>Coming in Phase 1.</p>
-                </div>
-              )}
-              {tab === 'stats' && (
-                <div className="av2-page-placeholder">
-                  <h2>📈 Stats</h2>
-                  <p>Coming in Phase 1.</p>
-                </div>
-              )}
-              {tab === 'content' && (
-                <div className="av2-page-placeholder">
-                  <h2>✍️ Content</h2>
-                  <p>Coming in Phase 2.</p>
-                </div>
-              )}
-              {tab === 'settings' && (
-                <div className="av2-page-placeholder">
-                  <h2>⚙️ Settings</h2>
-                  <p>Coming in Phase 2.</p>
-                </div>
-              )}
+              {tab === 'inbox' && <InboxTab onAuthLost={handleAuthLost} />}
+              {tab === 'support' && <SupportTab onAuthLost={handleAuthLost} />}
+              {tab === 'stats' && <StatsTab />}
+              {tab === 'content' && <IdeasTab onAuthLost={handleAuthLost} />}
+              {tab === 'settings' && <SettingsTab />}
             </div>
           </main>
 

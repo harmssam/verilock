@@ -1,0 +1,212 @@
+/* ── Ideas v2 ────────────────────────────────────────────────────────── */
+
+.av2-ideas {
+  min-height: 0;
+  max-width: 720px;
+}
+
+/* ── Form ────────────────────────────────────────────────────────────── */
+.av2-ideas-form {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius);
+  background: var(--av2-bg-card);
+  backdrop-filter: blur(8px);
+}
+
+.av2-ideas-form-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+@media (max-width: 480px) {
+  .av2-ideas-form-row {
+    flex-direction: column;
+  }
+}
+
+.av2-ideas-field {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0.1rem;
+}
+
+.av2-ideas-field--date {
+  flex: 0 0 160px;
+}
+
+.av2-ideas-field label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--av2-text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.av2-ideas-field input,
+.av2-ideas-field textarea {
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius-sm);
+  font-size: 0.85rem;
+  font-family: inherit;
+  background: rgba(15, 23, 42, 0.02);
+  color: var(--av2-text);
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.av2-ideas-field input:focus,
+.av2-ideas-field textarea:focus {
+  border-color: var(--av2-mint);
+  background: #fff;
+}
+
+.av2-ideas-field textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.av2-ideas-form-actions {
+  margin-top: 0.5rem;
+}
+
+/* ── Character counter ───────────────────────────────────────────────── */
+.av2-ideas-counter {
+  text-align: right;
+  font-size: 0.7rem;
+  margin-top: 0.15rem;
+  color: var(--av2-text-dim);
+}
+
+.av2-ideas-counter--amber {
+  color: #d97706;
+  font-weight: 600;
+}
+
+.av2-ideas-counter--red {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+/* ── Edit overlay / modal ────────────────────────────────────────────── */
+.av2-ideas-edit-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+}
+
+.av2-ideas-edit-card {
+  background: var(--av2-bg-card);
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius);
+  padding: 1.25rem;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  backdrop-filter: blur(12px);
+}
+
+.av2-ideas-edit-card h3 {
+  font-family: var(--av2-font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.av2-ideas-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+/* ── List ────────────────────────────────────────────────────────────── */
+.av2-ideas-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--av2-text-dim);
+  font-size: 0.88rem;
+}
+
+.av2-ideas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.av2-ideas-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius);
+  background: var(--av2-bg-card);
+  gap: 0.75rem;
+  transition: border-color 0.15s;
+}
+
+.av2-ideas-card:hover {
+  border-color: var(--av2-mint);
+}
+
+.av2-ideas-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.av2-ideas-source {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--av2-mint);
+  text-decoration: none;
+  margin-bottom: 0.3rem;
+  word-break: break-all;
+}
+
+.av2-ideas-source:hover {
+  text-decoration: underline;
+}
+
+.av2-ideas-copy {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 0.35rem;
+  color: var(--av2-text);
+}
+
+.av2-ideas-date {
+  font-size: 0.72rem;
+  color: var(--av2-text-dim);
+}
+
+.av2-ideas-card-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+/* ── Danger text button style ────────────────────────────────────────── */
+.av2-btn-danger-text {
+  color: #dc2626 !important;
+}
+
+.av2-btn-danger-text:hover {
+  background: rgba(220, 38, 38, 0.08) !important;
+}

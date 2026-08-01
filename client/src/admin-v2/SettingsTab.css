@@ -1,0 +1,134 @@
+/* ── Settings v2 ─────────────────────────────────────────────────────── */
+
+.av2-settings {
+  min-height: 0;
+  max-width: 720px;
+}
+
+/* ── Sections ────────────────────────────────────────────────────────── */
+.av2-settings-section {
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius);
+  background: var(--av2-bg-card);
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  backdrop-filter: blur(8px);
+}
+
+.av2-settings-section--placeholder {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+.av2-settings-section-title {
+  font-family: var(--av2-font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.av2-settings-section-icon {
+  font-size: 1.1rem;
+}
+
+.av2-settings-section-desc {
+  font-size: 0.8rem;
+  color: var(--av2-text-muted);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.av2-settings-section-desc code {
+  background: rgba(15, 23, 42, 0.06);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+}
+
+.av2-settings-placeholder-text {
+  font-size: 0.82rem;
+  color: var(--av2-text-dim);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.av2-settings-loading {
+  text-align: center;
+  padding: 1rem;
+  color: var(--av2-text-dim);
+  font-size: 0.85rem;
+}
+
+/* ── Auto-ack ────────────────────────────────────────────────────────── */
+.av2-settings-auto-ack-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.av2-settings-auto-ack-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 100px;
+  background: var(--av2-mint-light);
+  color: var(--av2-mint);
+}
+
+.av2-settings-auto-ack-updated {
+  font-size: 0.7rem;
+  color: var(--av2-text-dim);
+}
+
+.av2-settings-auto-ack-textarea {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius-sm);
+  font-size: 0.85rem;
+  font-family: inherit;
+  line-height: 1.55;
+  resize: vertical;
+  background: rgba(15, 23, 42, 0.02);
+  color: var(--av2-text);
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.av2-settings-auto-ack-textarea:focus {
+  border-color: var(--av2-mint);
+  background: #fff;
+}
+
+.av2-settings-auto-ack-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.av2-settings-auto-ack-count {
+  font-size: 0.7rem;
+  color: var(--av2-text-dim);
+}
+
+.av2-settings-auto-ack-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.av2-settings-saved {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--av2-mint);
+  font-weight: 500;
+}
