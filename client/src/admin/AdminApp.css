@@ -1448,3 +1448,106 @@
   padding: 0.25rem 0.55rem;
   font-size: 0.78rem;
 }
+
+/* ── Mobile (≤480px) ───────────────────────────────────── */
+
+@media (max-width: 480px) {
+  /* --- Touch targets: make small buttons tappable (≥44px) --- */
+  .admin-btn-sm {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.85rem;
+    min-height: 2.75rem;
+  }
+
+  /* --- Header: tighter padding --- */
+  .admin-header {
+    padding: 0.55rem 0.75rem;
+  }
+
+  /* --- Main: reduce horizontal padding --- */
+  .admin-main {
+    padding: 1rem 0.75rem 2rem;
+  }
+
+  /* --- Tabs: full-width wrap, no fit-content clamp --- */
+  .admin-tabs {
+    width: 100%;
+    padding: 0.2rem;
+    gap: 0.25rem;
+  }
+
+  .admin-tab {
+    padding: 0.4rem 0.7rem;
+    font-size: 0.82rem;
+  }
+
+  /* --- Studio toolbar: suppress margin-left when wrapped --- */
+  .admin-studio-toolbar {
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  /* --- X Ideas: stack form row vertically --- */
+  .admin-ideas-form-row {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .admin-ideas-form-row .admin-field--date {
+    flex: 1 1 auto;
+  }
+
+  /* --- X Ideas: stack card actions below content --- */
+  .admin-ideas-card {
+    flex-direction: column;
+  }
+
+  .admin-ideas-card-actions {
+    align-self: flex-end;
+  }
+
+  /* --- X Ideas: prevent long URLs from busting card width --- */
+  .admin-ideas-copy {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  /* --- X Ideas: larger textarea for thumb-typing --- */
+  .admin-ideas-form textarea {
+    min-height: 100px;
+  }
+
+  /* --- X Ideas: tighten section padding --- */
+  .admin-ideas {
+    padding: 0.75rem 0.5rem 2rem;
+  }
+
+  .admin-ideas-form {
+    padding: 1rem;
+  }
+
+  /* --- Edit modal: near full-screen on mobile --- */
+  .admin-ideas-edit-overlay {
+    padding: 0.5rem;
+  }
+
+  .admin-ideas-edit-card {
+    padding: 1rem;
+    border-radius: 0;
+    max-width: none;
+  }
+
+  .admin-ideas-edit-card textarea {
+    min-height: 100px;
+  }
+
+  /* --- Studio: reduce chrome padding in studio mode --- */
+  .admin-main--studio {
+    padding: 0.4rem 0.4rem 0;
+  }
+
+  .admin-main--studio .admin-tab {
+    padding: 0.3rem 0.55rem;
+    font-size: 0.78rem;
+  }
+}
