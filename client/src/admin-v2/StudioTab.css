@@ -2,7 +2,7 @@
 .av2-studio {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
   min-height: 0;
 }
 
@@ -119,6 +119,7 @@
 /* ── Mobile ─────────────────────────────────────────────────────────── */
 @media (max-width: 767px) {
   .av2-studio {
+    flex: none;
     height: calc(100dvh - 120px); /* account for header + bottom tab bar */
   }
 
