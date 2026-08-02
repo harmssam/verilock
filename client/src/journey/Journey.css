@@ -5839,25 +5839,26 @@ a.hash-chip.text-link:focus-visible {
 .pdf-drop {
   display: block;
   position: relative;
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  border: 1.5px dashed rgba(148, 163, 184, 0.35);
+  padding: 1.5rem 1.25rem;
+  border-radius: var(--radius-lg);
+  border: 2px dashed rgba(148, 163, 184, 0.22);
   background: #ffffff;
   cursor: pointer;
   transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    box-shadow 0.2s ease,
+    border-color 0.25s ease,
+    background 0.25s ease,
+    box-shadow 0.25s ease,
     transform 0.2s ease;
 }
 
 .pdf-drop--hero {
-  padding: 1.4rem 1rem;
+  padding: 2rem 1.25rem;
 }
 
 .pdf-drop:hover:not(.pdf-drop--disabled) {
-  border-color: rgba(94, 234, 212, 0.45);
-  background: rgba(94, 234, 212, 0.06);
+  border-color: rgba(94, 234, 212, 0.4);
+  background: rgba(94, 234, 212, 0.035);
+  box-shadow: 0 0 0 4px rgba(94, 234, 212, 0.06);
 }
 
 .pdf-drop--dragging {
@@ -5891,21 +5892,28 @@ a.hash-chip.text-link:focus-visible {
 }
 
 .pdf-drop-browse {
-  margin-top: 0.45rem;
-  padding: 0.4rem 0.9rem;
+  margin-top: 0.6rem;
+  padding: 0.45rem 1.05rem;
   border-radius: var(--radius-pill);
-  border: 1px solid rgba(94, 234, 212, 0.4);
-  background: rgba(94, 234, 212, 0.12);
-  color: var(--mint);
-  font-size: 0.8rem;
-  font-weight: 700;
+  border: 1px solid rgba(94, 234, 212, 0.35);
+  background: rgba(94, 234, 212, 0.1);
+  color: var(--mint-deep);
+  font-size: 0.82rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 
 .pdf-drop-browse:hover:not(:disabled) {
-  background: rgba(94, 234, 212, 0.2);
-  border-color: rgba(94, 234, 212, 0.55);
+  background: rgba(94, 234, 212, 0.18);
+  border-color: rgba(94, 234, 212, 0.5);
+  box-shadow: 0 2px 8px rgba(13,148,136,0.1);
+  transform: translateY(-1px);
 }
 
 .pdf-drop-browse:disabled {
@@ -5927,20 +5935,21 @@ a.hash-chip.text-link:focus-visible {
 .pdf-drop-empty {
   flex-direction: column;
   text-align: center;
-  gap: 0.3rem;
-  padding: 0.4rem 0;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
 }
 
 .pdf-drop-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.6rem;
-  height: 2.6rem;
+  width: 3rem;
+  height: 3rem;
   border-radius: 50%;
-  background: rgba(94, 234, 212, 0.12);
+  background: linear-gradient(135deg, rgba(94,234,212,0.18), rgba(13,148,136,0.06));
   color: var(--mint);
-  margin-bottom: 0.15rem;
+  margin-bottom: 0.25rem;
+  box-shadow: 0 2px 12px rgba(13,148,136,0.08);
 }
 
 .pdf-drop-icon--file {
@@ -5949,8 +5958,10 @@ a.hash-chip.text-link:focus-visible {
 }
 
 .pdf-drop-label {
-  font-size: 0.95rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
 }
 
 .pdf-drop-hint {
