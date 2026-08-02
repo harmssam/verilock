@@ -18,8 +18,8 @@ const DB_NAME = 'verilock-journey'
 const DB_VERSION = 1
 const STORE = 'drafts'
 const CREATE_KEY = 'create-pdf'
-/** Drop drafts older than 24h (stale tab after abandon). */
-const MAX_AGE_MS = 24 * 60 * 60 * 1000
+/** Drop drafts older than 2h (Hub redirect + casual return). */
+const MAX_AGE_MS = 2 * 60 * 60 * 1000
 
 /** Lightweight form sidecar - survives full-page Hub return in the same tab. */
 const CREATE_FORM_CACHE_KEY = 'verilock-create-form-v1'
@@ -188,7 +188,7 @@ export async function loadCreatePdfDraft(): Promise<CreatePdfDraft | null> {
     if (!raw || typeof raw !== 'object') return null
     const draft = raw as CreatePdfDraft
     if (!draft.blob || !draft.fileName) return null
-    if (typeof draft.savedAt === 'number' && Date.now() - draft.savedAt > MAX_AGE_MS) {
+    if (typeof draft.savedAt !== 'number' || Date.now() - draft.savedAt > MAX_AGE_MS) {
       await clearCreatePdfDraft()
       return null
     }
