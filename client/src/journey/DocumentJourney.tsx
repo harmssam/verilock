@@ -3905,10 +3905,15 @@ export function DocumentJourney({
                         */}
                         {doc.parties.filter(p => p.required && !p.signed).length > 0 && (
                           <div className="field-stack">
-                            <span className="field-label">Invite each person</span>
+                            <span className="field-label">
+                              {(() => {
+                                const c = doc.parties.filter(p => p.required && !p.signed).length
+                                return c === 1 ? 'Invite signer' : `Invite ${c} signers`
+                              })()}
+                            </span>
                             <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
                               Send email for a private personal link (only in the message — not
-                              shown here). Or share the open document link below for slots that
+                              shown here). Or share the fallback link below for slots that
                               are not email-invited. Hand off the PDF file separately — VeriLock
                               never hosts it.
                             </p>
@@ -3919,11 +3924,12 @@ export function DocumentJourney({
                               return (
                                 <div className="field-stack share-cosigner-fields">
                                   <div className="share-cosigner-head">
-                                    <div className="share-cosigner-title">Document link</div>
+                                    <div className="share-cosigner-title">Fallback link (not a personal invite)</div>
                                   </div>
                                   <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
-                                    Open agreement link (no personal secret). After you email a
-                                    person, their slot requires the link from that email.
+                                    Generic agreement link — no personal secret. Only share this
+                                    after you've emailed the person. Their slot requires the link
+                                    from that email; this fallback won't let them sign.
                                   </p>
                                   <code className="share-cosigner-link mono">{base}</code>
                                   <div className="share-cosigner-actions">
@@ -3936,7 +3942,7 @@ export function DocumentJourney({
                                       }
                                     >
                                       <Copy size={16} strokeWidth={2.25} aria-hidden />
-                                      Copy document link
+                                      Copy fallback link
                                     </button>
                                     {typeof navigator !== 'undefined' &&
                                       typeof navigator.share === 'function' && (
@@ -4012,7 +4018,7 @@ export function DocumentJourney({
                                           title={`Invite email sent to ${emailed.email}`}
                                         >
                                           <MailCheck size={13} strokeWidth={2.5} aria-hidden />
-                                          Invite emailed
+                                          Invite sent
                                         </span>
                                       ) : null}
                                     </div>
@@ -4024,9 +4030,17 @@ export function DocumentJourney({
                                         !note.startsWith('Invite resent')
                                           ? ` · ${note}`
                                           : null}
-                                        . Their personal signing link is only in that email.
-                                        Resending (including to a different address) replaces the
-                                        link — the previous email link stops working.
+                                        .{' '}
+                                        <details style={{ display: 'inline', fontSize: '0.78rem' }}>
+                                          <summary style={{ display: 'inline', cursor: 'pointer', color: '#64748b' }}>
+                                            More info
+                                          </summary>
+                                          <span style={{ color: '#64748b' }}>
+                                            Their personal signing link is only in that email.
+                                            Resending (including to a different address) replaces the
+                                            link — the previous email link stops working.
+                                          </span>
+                                        </details>
                                       </p>
                                     ) : null}
                                     {note &&
@@ -4084,6 +4098,13 @@ export function DocumentJourney({
                                           if (!token || !doc) return
                                           const to = emailVal.trim()
                                           if (!to) return
+                                          // Confirm before replacing an active invite link
+                                          if (emailed) {
+                                            const ok = window.confirm(
+                                              `This will invalidate the previous invite link for ${label}. Continue?`,
+                                            )
+                                            if (!ok) return
+                                          }
                                           setInviteSendBusyId(p.id)
                                           setInviteSendNote(prev => {
                                             const next = { ...prev }
@@ -4129,11 +4150,19 @@ export function DocumentJourney({
                                                 })
                                             })
                                             .catch(err => {
-                                              setLocalError(
-                                                err instanceof Error
-                                                  ? err.message
-                                                  : 'Could not send invite email',
-                                              )
+                                              const status =
+                                                err && typeof err === 'object' && 'status' in err
+                                                  ? Number((err as { status?: number }).status)
+                                                  : 0
+                                              let message = err instanceof Error ? err.message : 'Could not send invite email'
+                                              if (status === 429) {
+                                                message = 'Too many invites sent. Please wait a minute and try again.'
+                                              } else if (status === 503) {
+                                                message = 'Email service is temporarily unavailable. Try again in a moment.'
+                                              } else if (status === 502) {
+                                                message = 'Email provider error. Try again or check the recipient address.'
+                                              }
+                                              setLocalError(message)
                                             })
                                             .finally(() => setInviteSendBusyId(null))
                                         }}

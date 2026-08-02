@@ -278,7 +278,7 @@ export async function sendPartyInviteEmail(input: {
         tokenHash,
         channel: 'email',
         createdAt: sentAt,
-        expiresAt: null,
+        expiresAt: sentAt + 30 * 24 * 60 * 60 * 1000, // 30-day invite expiry
         revokedAt: null,
         redeemedAt: null,
         redeemedByWallet: null,
@@ -293,7 +293,7 @@ export async function sendPartyInviteEmail(input: {
       documentId: doc.id,
       partyId: party.id,
       inviteId,
-      to,
+      to: to.replace(/(.).*(@.*)/, '$1***$2'), // PII: mask recipient email
       id: result.id,
       organizer: organizerName,
       previousEmail: previousLinksRevoked > 0 ? previousEmail : null,
