@@ -1908,14 +1908,11 @@ button.exp-account-menu-full:focus-visible {
     transform 0.25s ease,
     background 0.25s ease,
     box-shadow 0.25s ease;
-  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.1);
 }
 
 .doc-stage--accepting:hover .doc-card-empty-icon {
   background: rgba(94, 234, 212, 0.15);
-  box-shadow:
-    0 0 0 1px rgba(94, 234, 212, 0.22),
-    0 0 28px rgba(94, 234, 212, 0.08);
+  box-shadow: 0 0 28px rgba(94, 234, 212, 0.08);
   transform: scale(1.06);
 }
 
@@ -4784,7 +4781,7 @@ a.hash-chip.text-link:focus-visible {
   max-width: 15rem;
   font-weight: 450;
   line-height: 1.4;
-  color: #94a3b8;
+  color: #64748b;
   font-size: 0.73rem;
 }
 

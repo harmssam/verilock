@@ -286,7 +286,7 @@ export function DocumentStage({
                 <span className="doc-card-empty-sub">No file chosen yet</span>
               ) : canInteract ? (
                 <span className="doc-card-empty-sub doc-card-empty-sub--hint">
-                  {DOCUMENT_FORMATS_LABEL}. Opened in your browser only — never sent to VeriLock
+                  {DOCUMENT_FORMATS_LABEL}. Opened in your browser only - never sent to VeriLock
                   servers.
                 </span>
               ) : null}
