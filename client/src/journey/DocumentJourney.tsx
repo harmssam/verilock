@@ -2565,16 +2565,16 @@ export function DocumentJourney({
     if (account) setLoginSheetOpen(false)
   }, [account])
 
-  const connectFromPath = (options?: JourneyConnectRequest) => {
+  const connectFromPath = async (options?: JourneyConnectRequest) => {
     // Stamp intent into URL only when connecting (Hub return needs it).
     if (role) {
       saveJourneyIntent(role)
       syncIntentToUrl(role)
     }
     saveHubReturnPath()
-    // Kick draft flush without await so Hub chooseAddress runs in the click turn.
-    // Form cache is sync; PDF blob is auto-saved while editing (IndexedDB race is rare).
-    if (pdfFile && !doc) void flushCreatePdfDraft()
+    // Await the draft flush so IndexedDB is committed before the Hub redirect.
+    // Form cache is sync; PDF blob write must finish or the restore has no file.
+    if (pdfFile && !doc) await flushCreatePdfDraft()
     void connect(options !== undefined ? options : journeyConnectOptions(connectMode))
   }
 

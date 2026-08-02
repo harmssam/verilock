@@ -52,7 +52,7 @@ import {
   journeyConnectOptions,
   resolveJourneyConnectMode,
 } from './journey/journeyConnectUi'
-import { kickCreatePdfDraftFlush } from './journey/journeyPdfDraft'
+import { flushCreatePdfDraftIfNeeded } from './journey/journeyPdfDraft'
 import { useJourneyWallet } from './journey/useJourneyWallet'
 import {
   clearStripeCheckoutReturnFromUrl,
@@ -384,7 +384,7 @@ export function App() {
   )
 
   const connectPreservingPath = useCallback(
-    (options?: { useRedirect?: boolean }) => {
+    async (options?: { useRedirect?: boolean }) => {
       const intent = resolveIntentForConnect(null)
       if (intent) {
         saveJourneyIntent(intent)
@@ -393,9 +393,8 @@ export function App() {
       }
       saveHubReturnPath()
       // Explicit options from mobile chooser (Pay vs Hub); otherwise resolve from mode.
-      // Kick draft flush without await so Hub redirect stays in the click turn
-      // (Nimiq: no await before Hub; form cache is sync, PDF auto-saved while editing).
-      kickCreatePdfDraftFlush()
+      // Await the draft flush so IndexedDB is committed before Hub redirect.
+      await flushCreatePdfDraftIfNeeded()
       void wallet.connect(
         options !== undefined ? options : journeyConnectOptions(connectMode),
       )

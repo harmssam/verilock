@@ -301,24 +301,22 @@ export function useCreatePdfDraft({
   }, [])
 
   const onFileChange = useCallback(
-    (file: File | null) => {
+    async (file: File | null) => {
       setPdfFile(file)
       if (!file) {
         lastBlobKeyRef.current = null
-        void clearCreatePdfDraft()
+        await clearCreatePdfDraft()
         // Keep form cache so type/title survive clearing the file.
         return
       }
       lastBlobKeyRef.current = fileKey(file)
-      void (async () => {
-        try {
-          await saveCreatePdfDraft(
-            await createPdfDraftFromFile(file, draftMeta(metaRef.current, roleRef.current)),
-          )
-        } catch {
-          /* hash effect will report unreadable files */
-        }
-      })()
+      try {
+        await saveCreatePdfDraft(
+          await createPdfDraftFromFile(file, draftMeta(metaRef.current, roleRef.current)),
+        )
+      } catch {
+        /* hash effect will report unreadable files */
+      }
       saveCreateFormCache(formFieldsFromMeta(metaRef.current))
     },
     [setPdfFile],
