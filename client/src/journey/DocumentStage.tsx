@@ -15,7 +15,7 @@ import {
   isSupportedDocumentFile,
   unsupportedDocumentMessage,
 } from '../pdf/documentKinds'
-import { formatFileSize } from './PdfDropZone'
+import { formatFileSize } from './formatFileSize'
 import { signedCount, type JourneyDoc, type JourneyStepId } from './types'
 
 interface DocumentStageProps {
@@ -268,12 +268,14 @@ export function DocumentStage({
           <div className="doc-card-lines" />
           {!hasFile ? (
             <div className="doc-card-empty">
-              {canInteract ? (
-                <FolderOpen size={36} strokeWidth={1.75} />
-              ) : (
-                <FileText size={36} strokeWidth={1.75} />
-              )}
-              <span>
+              <div className="doc-card-empty-icon" aria-hidden="true">
+                {canInteract ? (
+                  <FolderOpen size={30} strokeWidth={1.5} />
+                ) : (
+                  <FileText size={30} strokeWidth={1.5} />
+                )}
+              </div>
+              <span className="doc-card-empty-title">
                 {needsLocalCopy
                   ? 'Drop file here or browse'
                   : canInteract
@@ -284,7 +286,7 @@ export function DocumentStage({
                 <span className="doc-card-empty-sub">No file chosen yet</span>
               ) : canInteract ? (
                 <span className="doc-card-empty-sub doc-card-empty-sub--hint">
-                  {DOCUMENT_FORMATS_LABEL}. Opened in your browser only - never sent to VeriLock
+                  {DOCUMENT_FORMATS_LABEL}. Opened in your browser only — never sent to VeriLock
                   servers.
                 </span>
               ) : null}
