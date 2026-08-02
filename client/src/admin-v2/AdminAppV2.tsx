@@ -572,7 +572,7 @@ export function AdminAppV2() {
       )}
 
       {auth.kind === 'authed' && (
-        <div className="av2-shell">
+        <div className={`av2-shell${tab === 'studio' ? ' av2-shell--studio' : ''}`}>
           {/* Desktop sidebar */}
           <Sidebar
             activeTab={tab}
@@ -585,7 +585,7 @@ export function AdminAppV2() {
           />
 
           {/* Main content area */}
-          <main className="av2-main">
+          <main className={`av2-main${tab === 'studio' ? ' av2-main--studio' : ''}`}>
             <header className="av2-header">
               <a className="av2-brand" href={productHref} title="VeriLock">
                 <img src="/verilock-mark-96.png" alt="" width={32} height={32} />
@@ -652,7 +652,7 @@ export function AdminAppV2() {
               </div>
             </header>
 
-            <div className="av2-content">
+            <div className={`av2-content${tab === 'studio' ? ' av2-content--studio' : ''}`}>
               {tab === 'dashboard' && <Dashboard onNavigate={handleTabChange} />}
               {tab === 'inbox' && <InboxTab onAuthLost={handleAuthLost} />}
               {tab === 'support' && <SupportTab onAuthLost={handleAuthLost} />}

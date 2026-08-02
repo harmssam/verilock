@@ -364,6 +364,25 @@
   padding: 2rem 2.5rem 3rem;
 }
 
+/* Studio is an embedded application: lock the shell and let its iframe own
+   the available canvas and scrolling, like the standalone studio route. */
+.av2-shell--studio {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.av2-main--studio {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.av2-content--studio {
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 0 0.5rem;
+}
+
 /* Desktop: sidebar user block owns identity/sign-out — keep header lean */
 @media (min-width: 768px) {
   .av2-user,
