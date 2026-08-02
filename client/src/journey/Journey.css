@@ -4269,8 +4269,14 @@ a.hash-chip.text-link:focus-visible {
   min-width: 8.5rem;
 }
 
+.invite-waiting-status {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
 .invite-waiting-foot {
-  margin: 0;
+  margin: 0.5rem 0 0;
   font-size: 0.78rem;
   line-height: 1.45;
 }

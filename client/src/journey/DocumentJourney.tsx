@@ -3789,6 +3789,28 @@ export function DocumentJourney({
                         </div>
                       </div>
 
+                      {(() => {
+                        const pending = doc.parties.filter(p => p.required && !p.signed).length
+                        const lastInvite = Object.values(inviteEmailSent)
+                          .map(r => r.sentAt)
+                          .sort((a, b) => b - a)[0]
+                        const ago = lastInvite
+                          ? Math.max(0, Math.round((Date.now() - lastInvite) / 60000))
+                          : null
+                        return (
+                          <p className="muted invite-waiting-status">
+                            {pending > 0
+                              ? `${pending} signer${pending === 1 ? '' : 's'} still need to sign.`
+                              : 'All signers have signed.'}
+                            {lastInvite
+                              ? ` Last invite sent ${
+                                  ago === 0 ? 'just now' : `${ago}m ago`
+                                }.`
+                              : ''}
+                          </p>
+                        )
+                      })()}
+
                       <div className="invite-waiting-actions">
                         <button
                           type="button"
@@ -3796,6 +3818,13 @@ export function DocumentJourney({
                           onClick={reopenInviteSetup}
                         >
                           Manage invites
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={reopenInviteSetup}
+                        >
+                          Resend invites
                         </button>
                         {onHome ? (
                           <button type="button" className="btn btn-ghost" onClick={onHome}>
