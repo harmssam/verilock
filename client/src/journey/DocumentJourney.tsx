@@ -829,6 +829,9 @@ export function DocumentJourney({
    */
   const [inviteLinkInvalid, setInviteLinkInvalid] = useState<string | null>(null)
 
+  /** Max age for a sessionStorage-restored invite token. Short — Hub redirect round-trip only, not days. */
+  const INVITE_TOKEN_TTL_MS = 30 * 60 * 1000
+
   // Capture ?invite= into sessionStorage and strip from the address bar.
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -844,7 +847,20 @@ export function DocumentJourney({
       let token = fromUrl
       if (!token && storageKey) {
         try {
-          token = sessionStorage.getItem(storageKey)
+          const raw = sessionStorage.getItem(storageKey)
+          if (raw) {
+            // Stored as JSON { token, ts } with a short TTL — reject stale restores.
+            const parsed = JSON.parse(raw) as { token?: string; ts?: number }
+            if (
+              typeof parsed.token === 'string' &&
+              typeof parsed.ts === 'number' &&
+              Date.now() - parsed.ts <= INVITE_TOKEN_TTL_MS
+            ) {
+              token = parsed.token
+            } else {
+              sessionStorage.removeItem(storageKey)
+            }
+          }
         } catch {
           token = null
         }
@@ -874,7 +890,10 @@ export function DocumentJourney({
           setInviteLinkInvalid(null)
           if (storageKey) {
             try {
-              sessionStorage.setItem(storageKey, token)
+              sessionStorage.setItem(
+                storageKey,
+                JSON.stringify({ token, ts: Date.now() }),
+              )
             } catch {
               /* private mode */
             }
@@ -3913,7 +3932,7 @@ export function DocumentJourney({
                             </span>
                             <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
                               Send email for a private personal link (only in the message — not
-                              shown here). Or share the fallback link below for slots that
+                              shown here). Or share the general link below for slots that
                               are not email-invited. Hand off the PDF file separately — VeriLock
                               never hosts it.
                             </p>
@@ -3924,12 +3943,12 @@ export function DocumentJourney({
                               return (
                                 <div className="field-stack share-cosigner-fields">
                                   <div className="share-cosigner-head">
-                                    <div className="share-cosigner-title">Fallback link (not a personal invite)</div>
+                                    <div className="share-cosigner-title">General link</div>
                                   </div>
                                   <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
                                     Generic agreement link — no personal secret. Only share this
                                     after you've emailed the person. Their slot requires the link
-                                    from that email; this fallback won't let them sign.
+                                    from that email; this general link doesn't specify a signer.
                                   </p>
                                   <code className="share-cosigner-link mono">{base}</code>
                                   <div className="share-cosigner-actions">
@@ -3942,7 +3961,7 @@ export function DocumentJourney({
                                       }
                                     >
                                       <Copy size={16} strokeWidth={2.25} aria-hidden />
-                                      Copy fallback link
+                                      Copy general link
                                     </button>
                                     {typeof navigator !== 'undefined' &&
                                       typeof navigator.share === 'function' && (
