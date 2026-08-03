@@ -19,7 +19,7 @@
     "@nimiq/mini-app-sdk": "^0.1.0",
     "@nimiq/rpc": "^0.4.1",
     "lucide-react": "^1.28.0",
-    "pdfjs-dist": "^4.10.38",
+    "pdfjs-dist": "^6.2.108",
     "qrcode": "^1.5.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
