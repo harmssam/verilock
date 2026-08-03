@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@nimiq/core": "^2.7.1",
-    "better-sqlite3": "^11.8.1",
+    "better-sqlite3": "^13.0.2",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "helmet": "^8.2.0",
