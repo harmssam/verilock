@@ -318,9 +318,9 @@ export function SettingsTab() {
           >
             OpenCode Go
           </a>{' '}
-          (coding models via OpenCode Zen). Saved keys are stored in the server database and
-          override <code>OPENCODE_API_KEY</code> from the environment. The full token is never
-          shown after save.
+          used by Blog Studio / X Studio LLM. Saving here stores the key on VeriLock and pushes it
+          to the content-studio service (runtime override of <code>OPENCODE_API_KEY</code> — no
+          redeploy). The full token is never shown after save.
         </p>
 
         {openCodeLoading && !openCodeMeta ? (
@@ -440,7 +440,19 @@ export function SettingsTab() {
             ) : null}
             {openCodeSaved && !openCodeError ? (
               <p className="av2-settings-saved" role="status">
-                ✓ Saved. Server will use this key for OpenCode Go.
+                {openCodeMeta?.studioSynced === false
+                  ? '✓ Saved on VeriLock, but content-studio sync failed — see error below.'
+                  : '✓ Saved. Blog Studio will use this key for OpenCode Go.'}
+              </p>
+            ) : null}
+            {openCodeMeta?.studioError ? (
+              <p className="av2-error" role="alert">
+                Studio sync: {openCodeMeta.studioError}
+              </p>
+            ) : null}
+            {openCodeMeta?.studioSynced === true && !openCodeError && !openCodeSaved ? (
+              <p className="av2-settings-auto-ack-updated" style={{ marginTop: '0.5rem' }}>
+                Content-studio is using this key for generation.
               </p>
             ) : null}
           </div>

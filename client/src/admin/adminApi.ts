@@ -196,6 +196,9 @@ export interface OpenCodeConfigStatus {
   hasEnvironmentKey: boolean
   model: string | null
   modelFallback: string | null
+  /** True when content-studio accepted the key (blog LLM). */
+  studioSynced?: boolean
+  studioError?: string
 }
 
 export const adminApi = {

@@ -11,6 +11,10 @@ import {
   getOpenCodeConfigStatus,
   setOpenCodeApiKey,
 } from './adminSettings.js'
+import {
+  fetchOpenCodeStatusFromStudio,
+  syncOpenCodeKeyToStudio,
+} from './adminStudioProxy.js'
 import { getSupportTicketCounts, SUPPORT_TICKET_STATUSES, updateSupportTicketStatus } from './supportTickets.js'
 import { isAdminConfigured, adminPublicFeatures } from './admin.js'
 
@@ -923,33 +927,66 @@ export function attachAdminV2Routes(app: Express, requireAdmin: (req: Request, r
   })
 
   // ── Config: OpenCode Go API ──────────────────────────────────────────
+  // Stored on VeriLock + synced to content-studio (blog LLM consumer).
 
-  app.get('/api/admin-v2/config/opencode', requireAdmin, (_req, res) => {
+  app.get('/api/admin-v2/config/opencode', requireAdmin, async (_req, res) => {
     try {
       res.setHeader('Cache-Control', 'no-store')
-      res.json(getOpenCodeConfigStatus())
+      const local = getOpenCodeConfigStatus()
+      const studio = await fetchOpenCodeStatusFromStudio()
+      res.json({
+        ...local,
+        // Prefer studio effective key when available (that is what generates).
+        studioSynced: studio.ok,
+        studio: studio.ok ? studio.status : undefined,
+        studioError: studio.ok ? undefined : studio.detail,
+        // If studio reports a key, surface its mask as the effective one for operators.
+        ...(studio.ok && studio.status
+          ? {
+              configured: Boolean(studio.status.configured ?? local.configured),
+              source: (studio.status.source as typeof local.source) ?? local.source,
+              maskedToken:
+                (studio.status.maskedToken as string | null | undefined) ?? local.maskedToken,
+              hasDatabaseOverride: Boolean(
+                studio.status.hasDatabaseOverride ?? local.hasDatabaseOverride,
+              ),
+              hasEnvironmentKey: Boolean(
+                studio.status.hasEnvironmentKey ?? local.hasEnvironmentKey,
+              ),
+            }
+          : {}),
+      })
     } catch (err) {
       console.error('[admin-v2] opencode config get', err)
       res.status(500).json({ error: 'Could not load OpenCode config.' })
     }
   })
 
-  app.put('/api/admin-v2/config/opencode', requireAdmin, (req, res) => {
+  app.put('/api/admin-v2/config/opencode', requireAdmin, async (req, res) => {
     try {
       const body = (req.body ?? {}) as { apiKey?: unknown; clear?: unknown }
       const username = (res.locals as { adminUser?: string }).adminUser || 'admin'
 
       if (body.clear === true) {
         const status = clearOpenCodeApiKey()
+        const sync = await syncOpenCodeKeyToStudio({ clear: true })
         logAdminAction(
           'opencode_api_key_clear',
           username,
           'config',
           'opencode',
-          'Cleared saved OpenCode Go API key (env fallback may still apply)',
+          sync.synced
+            ? 'Cleared OpenCode key on VeriLock + content-studio'
+            : `Cleared VeriLock key; studio sync failed: ${sync.detail ?? 'unknown'}`,
         )
         res.setHeader('Cache-Control', 'no-store')
-        res.json({ ok: true as const, ...status })
+        res.json({
+          ok: true as const,
+          ...status,
+          studioSynced: sync.synced,
+          studio: sync.studio,
+          studioError: sync.synced ? undefined : sync.detail,
+        })
         return
       }
 
@@ -959,15 +996,34 @@ export function attachAdminV2Routes(app: Express, requireAdmin: (req: Request, r
       }
 
       const status = setOpenCodeApiKey(body.apiKey)
+      const sync = await syncOpenCodeKeyToStudio({ apiKey: body.apiKey.trim() })
       logAdminAction(
         'opencode_api_key_set',
         username,
         'config',
         'opencode',
-        `Saved OpenCode Go API key (${status.maskedToken ?? 'set'})`,
+        sync.synced
+          ? `Saved OpenCode key (${status.maskedToken ?? 'set'}) on VeriLock + content-studio`
+          : `Saved on VeriLock (${status.maskedToken ?? 'set'}); studio sync failed: ${sync.detail ?? 'unknown'}`,
       )
       res.setHeader('Cache-Control', 'no-store')
-      res.json({ ok: true as const, ...status })
+      res.json({
+        ok: true as const,
+        ...status,
+        // Prefer studio mask after successful sync
+        ...(sync.synced && sync.studio
+          ? {
+              source: (sync.studio.source as typeof status.source) ?? 'database',
+              maskedToken:
+                (sync.studio.maskedToken as string | null | undefined) ?? status.maskedToken,
+              hasDatabaseOverride: true,
+              configured: true,
+            }
+          : {}),
+        studioSynced: sync.synced,
+        studio: sync.studio,
+        studioError: sync.synced ? undefined : sync.detail,
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not save OpenCode config.'
       if (message.includes('too short') || message.includes('at most')) {

@@ -23,6 +23,103 @@ export function contentStudioPublicFeatures() {
   }
 }
 
+/** Server-to-server call into content-studio (injects studio token). */
+export async function contentStudioFetch(
+  path: string,
+  init?: { method?: string; body?: unknown; timeoutMs?: number },
+): Promise<{ ok: boolean; status: number; json: unknown; text: string }> {
+  const base = studioBaseUrl()
+  if (!base) {
+    return { ok: false, status: 0, json: null, text: 'CONTENT_STUDIO_URL unset' }
+  }
+  const token = studioToken()
+  const url = `${base}${path.startsWith('/') ? path : `/${path}`}`
+  const method = init?.method ?? 'GET'
+  const controller = new AbortController()
+  const timeoutMs = init?.timeoutMs ?? 15_000
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+    }
+    if (token) {
+      headers['x-blog-studio-token'] = token
+      headers['x-studio-token'] = token
+    }
+    let body: string | undefined
+    if (init?.body !== undefined) {
+      headers['Content-Type'] = 'application/json'
+      body = JSON.stringify(init.body)
+    }
+    const res = await fetch(url, {
+      method,
+      headers,
+      body,
+      signal: controller.signal,
+    })
+    const text = await res.text()
+    let json: unknown = null
+    try {
+      json = text ? JSON.parse(text) : null
+    } catch {
+      json = null
+    }
+    return { ok: res.ok, status: res.status, json, text }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, status: 0, json: null, text: message }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * Push OpenCode API key to content-studio (blog LLM). Returns null if studio
+ * is not configured; otherwise status payload or error detail.
+ */
+export async function syncOpenCodeKeyToStudio(
+  action: { apiKey: string } | { clear: true },
+): Promise<{ synced: boolean; detail?: string; studio?: Record<string, unknown> }> {
+  if (!contentStudioConfigured()) {
+    return { synced: false, detail: 'Content studio not configured (CONTENT_STUDIO_URL unset)' }
+  }
+  const body = 'clear' in action && action.clear ? { clear: true } : action
+  const result = await contentStudioFetch('/api/blog-studio/config/opencode', {
+    method: 'PUT',
+    body,
+  })
+  if (!result.ok) {
+    return {
+      synced: false,
+      detail: `Studio HTTP ${result.status}: ${result.text.slice(0, 200)}`,
+    }
+  }
+  return {
+    synced: true,
+    studio: (result.json && typeof result.json === 'object'
+      ? (result.json as Record<string, unknown>)
+      : undefined),
+  }
+}
+
+export async function fetchOpenCodeStatusFromStudio(): Promise<{
+  ok: boolean
+  status?: Record<string, unknown>
+  detail?: string
+}> {
+  if (!contentStudioConfigured()) {
+    return { ok: false, detail: 'Content studio not configured' }
+  }
+  const result = await contentStudioFetch('/api/blog-studio/config/opencode')
+  if (!result.ok) {
+    return { ok: false, detail: `Studio HTTP ${result.status}: ${result.text.slice(0, 200)}` }
+  }
+  if (result.json && typeof result.json === 'object') {
+    return { ok: true, status: result.json as Record<string, unknown> }
+  }
+  return { ok: false, detail: 'Invalid studio response' }
+}
+
 function studioBaseUrl(): string | null {
   const raw = process.env.CONTENT_STUDIO_URL?.trim()
   if (!raw) return null
