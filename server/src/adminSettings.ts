@@ -195,3 +195,150 @@ export function clearOpenCodeApiKey(): OpenCodeConfigStatus {
   deleteKv(KEY_OPENCODE_API_KEY)
   return getOpenCodeConfigStatus()
 }
+
+// ── Grok Imagine proxy ────────────────────────────────────────────────────
+
+const KEY_IMAGINE_PROXY_URL = 'imagine_proxy_url'
+const KEY_IMAGINE_PROXY_TOKEN = 'imagine_proxy_token'
+
+export interface ImagineProxyConfigStatus {
+  configured: boolean
+  source: OpenCodeKeySource | null
+  proxyUrl: string | null
+  maskedToken: string | null
+  tokenConfigured: boolean
+  updatedAt: number | null
+  hasDatabaseOverride: boolean
+  hasEnvironmentUrl: boolean
+  hasEnvironmentToken: boolean
+}
+
+function envImagineProxyUrl(): string | null {
+  const raw = (
+    process.env.IMAGINE_PROXY_URL ||
+    process.env.GROK_IMAGINE_PROXY_URL ||
+    ''
+  ).trim()
+  return raw ? raw.replace(/\/+$/, '') : null
+}
+
+function envImagineProxyToken(): string | null {
+  const raw =
+    process.env.IMAGINE_PROXY_TOKEN?.trim() ||
+    process.env.GROK_IMAGINE_PROXY_TOKEN?.trim() ||
+    ''
+  return raw || null
+}
+
+function normalizeProxyUrl(raw: string): string {
+  return raw.trim().replace(/\/+$/, '')
+}
+
+export function getImagineProxyConfigStatus(): ImagineProxyConfigStatus {
+  const storedUrl = getKv(KEY_IMAGINE_PROXY_URL)
+  const storedToken = getKv(KEY_IMAGINE_PROXY_TOKEN)
+  const fileUrl = storedUrl?.trim() ? normalizeProxyUrl(storedUrl) : null
+  const fileToken = storedToken?.trim() || null
+  const hasDatabaseOverride = Boolean(fileUrl || fileToken)
+
+  const envUrl = envImagineProxyUrl()
+  const envToken = envImagineProxyToken()
+
+  let source: OpenCodeKeySource | null = null
+  let proxyUrl: string | null = null
+  let token: string | null = null
+  let updatedAt: number | null = null
+
+  if (hasDatabaseOverride) {
+    source = 'database'
+    proxyUrl = fileUrl || envUrl
+    token = fileToken || envToken
+    const row = db
+      .prepare(
+        `SELECT MAX(updated_at) AS updatedAt FROM admin_kv WHERE key IN (?, ?)`,
+      )
+      .get(KEY_IMAGINE_PROXY_URL, KEY_IMAGINE_PROXY_TOKEN) as
+      | { updatedAt: number | null }
+      | undefined
+    updatedAt = row?.updatedAt ?? null
+  } else if (envUrl) {
+    source = 'environment'
+    proxyUrl = envUrl
+    token = envToken
+  }
+
+  return {
+    configured: Boolean(proxyUrl),
+    source,
+    proxyUrl,
+    maskedToken: token ? maskSecret(token) : null,
+    tokenConfigured: Boolean(token),
+    updatedAt,
+    hasDatabaseOverride,
+    hasEnvironmentUrl: envUrl != null,
+    hasEnvironmentToken: envToken != null,
+  }
+}
+
+export function setImagineProxyConfig(input: {
+  proxyUrl?: string
+  proxyToken?: string
+}): ImagineProxyConfigStatus {
+  const currentUrl = getKv(KEY_IMAGINE_PROXY_URL)?.trim() || ''
+  const currentToken = getKv(KEY_IMAGINE_PROXY_TOKEN)?.trim() || ''
+
+  let nextUrl =
+    input.proxyUrl !== undefined ? normalizeProxyUrl(input.proxyUrl) : currentUrl
+  let nextToken =
+    input.proxyToken !== undefined ? input.proxyToken.trim() : currentToken
+
+  if (nextUrl) {
+    try {
+      const u = new URL(nextUrl)
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        throw new Error('Proxy URL must be http or https.')
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('http')) throw err
+      throw new Error('Invalid proxy URL.')
+    }
+  }
+
+  if (nextToken.length > 512) {
+    throw new Error('Proxy token must be at most 512 characters.')
+  }
+
+  if (!nextUrl && !nextToken) {
+    return clearImagineProxyConfig()
+  }
+  if (!nextUrl) {
+    throw new Error('proxyUrl is required when saving Imagine proxy settings.')
+  }
+
+  setKv(KEY_IMAGINE_PROXY_URL, nextUrl)
+  if (input.proxyToken !== undefined) {
+    if (nextToken) setKv(KEY_IMAGINE_PROXY_TOKEN, nextToken)
+    else deleteKv(KEY_IMAGINE_PROXY_TOKEN)
+  }
+  return getImagineProxyConfigStatus()
+}
+
+export function clearImagineProxyConfig(): ImagineProxyConfigStatus {
+  deleteKv(KEY_IMAGINE_PROXY_URL)
+  deleteKv(KEY_IMAGINE_PROXY_TOKEN)
+  return getImagineProxyConfigStatus()
+}
+
+/** Effective values for server-side use / studio sync. */
+export function getImagineProxyEffective(): {
+  proxyUrl: string | null
+  proxyToken: string | null
+} {
+  const status = getImagineProxyConfigStatus()
+  const storedUrl = getKv(KEY_IMAGINE_PROXY_URL)?.trim()
+  const storedToken = getKv(KEY_IMAGINE_PROXY_TOKEN)?.trim()
+  return {
+    proxyUrl: storedUrl ? normalizeProxyUrl(storedUrl) : status.proxyUrl,
+    proxyToken: storedToken || envImagineProxyToken(),
+  }
+}

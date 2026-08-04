@@ -1,10 +1,11 @@
 /**
- * Admin v2 Settings — auto-ack editor, OpenCode config, audit log.
+ * Admin v2 Settings — auto-ack, OpenCode, Imagine proxy, audit log.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Mail, ClipboardList, Palette, KeyRound } from 'lucide-react'
+import { Mail, ClipboardList, Palette, KeyRound, Image } from 'lucide-react'
 import {
   adminApi,
+  type ImagineProxyConfigStatus,
   type OpenCodeConfigStatus,
   type SupportAutoAckSettings,
 } from '../admin/adminApi'
@@ -50,6 +51,16 @@ export function SettingsTab() {
   const [openCodeSaved, setOpenCodeSaved] = useState(false)
   const [openCodeShow, setOpenCodeShow] = useState(false)
 
+  // Grok Imagine proxy
+  const [imagineMeta, setImagineMeta] = useState<ImagineProxyConfigStatus | null>(null)
+  const [imagineUrlDraft, setImagineUrlDraft] = useState('')
+  const [imagineTokenDraft, setImagineTokenDraft] = useState('')
+  const [imagineLoading, setImagineLoading] = useState(true)
+  const [imagineBusy, setImagineBusy] = useState(false)
+  const [imagineError, setImagineError] = useState<string | null>(null)
+  const [imagineSaved, setImagineSaved] = useState(false)
+  const [imagineTokenShow, setImagineTokenShow] = useState(false)
+
   // Audit log
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
   const [auditTotal, setAuditTotal] = useState(0)
@@ -89,6 +100,22 @@ export function SettingsTab() {
     }
   }, [])
 
+  const loadImagine = useCallback(async () => {
+    setImagineLoading(true)
+    setImagineError(null)
+    try {
+      const status = await adminApi.imagineProxyConfig()
+      setImagineMeta(status)
+      setImagineUrlDraft(status.proxyUrl ?? '')
+      setImagineTokenDraft('')
+      setImagineSaved(false)
+    } catch (err) {
+      setImagineError(err instanceof Error ? err.message : 'Could not load Imagine proxy config')
+    } finally {
+      setImagineLoading(false)
+    }
+  }, [])
+
   const loadAuditLog = useCallback(async (offset: number, filter: string) => {
     setAuditLoading(true)
     try {
@@ -110,8 +137,9 @@ export function SettingsTab() {
   useEffect(() => {
     void loadAutoAck()
     void loadOpenCode()
+    void loadImagine()
     void loadAuditLog(0, '')
-  }, [loadAutoAck, loadOpenCode, loadAuditLog])
+  }, [loadAutoAck, loadOpenCode, loadImagine, loadAuditLog])
 
   async function saveAutoAck() {
     if (autoAckBusy) return
@@ -183,6 +211,65 @@ export function SettingsTab() {
       setOpenCodeError(err instanceof Error ? err.message : 'Could not clear API key')
     } finally {
       setOpenCodeBusy(false)
+    }
+  }
+
+  async function saveImagine() {
+    if (imagineBusy) return
+    const url = imagineUrlDraft.trim()
+    const token = imagineTokenDraft.trim()
+    if (!url && !token) {
+      setImagineError('Enter a proxy URL (and optional token).')
+      return
+    }
+    if (url) {
+      try {
+        const u = new URL(url)
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+          setImagineError('Proxy URL must be http or https.')
+          return
+        }
+      } catch {
+        setImagineError('Invalid proxy URL.')
+        return
+      }
+    }
+    setImagineBusy(true)
+    setImagineError(null)
+    setImagineSaved(false)
+    try {
+      const body: { proxyUrl?: string; proxyToken?: string } = {}
+      if (url) body.proxyUrl = url
+      if (token) body.proxyToken = token
+      // If only token changed, still send current URL so studio has a full override.
+      if (!url && token && imagineMeta?.proxyUrl) body.proxyUrl = imagineMeta.proxyUrl
+      const result = await adminApi.saveImagineProxyConfig(body)
+      setImagineMeta(result)
+      setImagineUrlDraft(result.proxyUrl ?? '')
+      setImagineTokenDraft('')
+      setImagineSaved(true)
+    } catch (err) {
+      setImagineError(err instanceof Error ? err.message : 'Could not save Imagine proxy')
+    } finally {
+      setImagineBusy(false)
+    }
+  }
+
+  async function clearImagine() {
+    if (imagineBusy) return
+    setImagineBusy(true)
+    setImagineError(null)
+    setImagineSaved(false)
+    try {
+      const result = await adminApi.clearImagineProxyConfig()
+      setImagineMeta(result)
+      setImagineUrlDraft(result.proxyUrl ?? '')
+      setImagineTokenDraft('')
+      setImagineSaved(true)
+    } catch (err) {
+      setImagineError(err instanceof Error ? err.message : 'Could not clear Imagine proxy')
+    } finally {
+      setImagineBusy(false)
     }
   }
 
@@ -453,6 +540,170 @@ export function SettingsTab() {
             {openCodeMeta?.studioSynced === true && !openCodeError && !openCodeSaved ? (
               <p className="av2-settings-auto-ack-updated" style={{ marginTop: '0.5rem' }}>
                 Content-studio is using this key for generation.
+              </p>
+            ) : null}
+          </div>
+        )}
+      </section>
+
+      {/* ── Grok Imagine proxy ───────────────────────────────────────── */}
+      <section className="av2-settings-section">
+        <h2 className="av2-settings-section-title">
+          <span className="av2-settings-section-icon" aria-hidden="true">
+            <Image size={18} strokeWidth={1.5} />
+          </span>
+          Grok Imagine proxy
+        </h2>
+        <p className="av2-settings-section-desc">
+          Public tunnel URL for the local OAuth bridge (
+          <code>npm run imagine-proxy</code> / Imagine Bridge.app in content-studio). Required for
+          Blog Studio image generation on Railway. Paste the tunnel URL after each bridge launch
+          (quick tunnels change). Optionally set a shared secret matching{' '}
+          <code>IMAGINE_PROXY_TOKEN</code> on the laptop. Saved here and pushed to content-studio —
+          no redeploy.
+        </p>
+
+        {imagineLoading && !imagineMeta ? (
+          <p className="av2-settings-loading">Loading Imagine proxy config…</p>
+        ) : (
+          <div className="av2-settings-imagine">
+            <div className="av2-settings-auto-ack-meta">
+              <span
+                className={
+                  imagineMeta?.configured
+                    ? 'av2-settings-auto-ack-badge'
+                    : 'av2-settings-auto-ack-badge av2-settings-badge--muted'
+                }
+              >
+                {imagineMeta?.configured
+                  ? imagineMeta.source === 'database'
+                    ? 'Saved in database'
+                    : 'From environment'
+                  : 'Not configured'}
+              </span>
+              {imagineMeta?.tokenConfigured ? (
+                <span className="av2-settings-token-mask" title="Masked token">
+                  token <code>{imagineMeta.maskedToken ?? '••••'}</code>
+                </span>
+              ) : (
+                <span className="av2-settings-auto-ack-updated">No proxy token set</span>
+              )}
+              {imagineMeta?.updatedAt ? (
+                <span className="av2-settings-auto-ack-updated">
+                  Last updated: {new Date(imagineMeta.updatedAt).toLocaleString()}
+                </span>
+              ) : null}
+            </div>
+
+            <label className="av2-settings-field-label" htmlFor="av2-imagine-proxy-url">
+              Proxy URL
+            </label>
+            <input
+              id="av2-imagine-proxy-url"
+              className="av2-settings-token-input"
+              type="url"
+              value={imagineUrlDraft}
+              onChange={e => {
+                setImagineUrlDraft(e.target.value)
+                setImagineSaved(false)
+                setImagineError(null)
+              }}
+              placeholder="https://….trycloudflare.com"
+              autoComplete="off"
+              spellCheck={false}
+              disabled={imagineBusy}
+              aria-label="Imagine proxy URL"
+            />
+
+            <label
+              className="av2-settings-field-label"
+              htmlFor="av2-imagine-proxy-token"
+              style={{ marginTop: '0.85rem' }}
+            >
+              Shared token {imagineMeta?.tokenConfigured ? '(leave blank to keep)' : '(optional)'}
+            </label>
+            <div className="av2-settings-token-row">
+              <input
+                id="av2-imagine-proxy-token"
+                className="av2-settings-token-input"
+                type={imagineTokenShow ? 'text' : 'password'}
+                value={imagineTokenDraft}
+                onChange={e => {
+                  setImagineTokenDraft(e.target.value)
+                  setImagineSaved(false)
+                  setImagineError(null)
+                }}
+                placeholder={
+                  imagineMeta?.tokenConfigured
+                    ? 'Paste a new token to replace'
+                    : 'Same as laptop IMAGINE_PROXY_TOKEN'
+                }
+                autoComplete="off"
+                spellCheck={false}
+                disabled={imagineBusy}
+                aria-label="Imagine proxy shared token"
+              />
+              <button
+                type="button"
+                className="av2-btn av2-btn-ghost av2-btn-sm"
+                onClick={() => setImagineTokenShow(v => !v)}
+                disabled={imagineBusy}
+              >
+                {imagineTokenShow ? 'Hide' : 'Show'}
+              </button>
+            </div>
+
+            <div className="av2-settings-auto-ack-footer">
+              <span className="av2-settings-auto-ack-count">
+                {imagineMeta?.hasEnvironmentUrl
+                  ? 'Env URL present — clear saved settings to fall back to it.'
+                  : imagineMeta?.hasDatabaseOverride
+                    ? 'Using database override (syncs to content-studio).'
+                    : 'Run the local bridge, then paste its public URL here.'}
+              </span>
+              <div className="av2-settings-auto-ack-actions">
+                <button
+                  type="button"
+                  className="av2-btn av2-btn-ghost"
+                  onClick={() => void clearImagine()}
+                  disabled={imagineBusy || !imagineMeta?.hasDatabaseOverride}
+                  title={
+                    imagineMeta?.hasDatabaseOverride
+                      ? 'Remove saved URL/token (env may still apply)'
+                      : 'No database override to clear'
+                  }
+                >
+                  Clear saved
+                </button>
+                <button
+                  type="button"
+                  className="av2-btn av2-btn-primary"
+                  onClick={() => void saveImagine()}
+                  disabled={
+                    imagineBusy ||
+                    (!imagineUrlDraft.trim() && !imagineTokenDraft.trim())
+                  }
+                >
+                  {imagineBusy ? 'Saving…' : 'Save proxy'}
+                </button>
+              </div>
+            </div>
+
+            {imagineError ? (
+              <p className="av2-error" role="alert">
+                {imagineError}
+              </p>
+            ) : null}
+            {imagineSaved && !imagineError ? (
+              <p className="av2-settings-saved" role="status">
+                {imagineMeta?.studioSynced === false
+                  ? '✓ Saved on VeriLock, but content-studio sync failed — see error below.'
+                  : '✓ Saved. Blog Studio Imagine will use this proxy URL.'}
+              </p>
+            ) : null}
+            {imagineMeta?.studioError ? (
+              <p className="av2-error" role="alert">
+                Studio sync: {imagineMeta.studioError}
               </p>
             ) : null}
           </div>

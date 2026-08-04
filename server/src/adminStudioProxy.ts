@@ -120,6 +120,52 @@ export async function fetchOpenCodeStatusFromStudio(): Promise<{
   return { ok: false, detail: 'Invalid studio response' }
 }
 
+export async function syncImagineProxyToStudio(
+  action:
+    | { proxyUrl?: string; proxyToken?: string }
+    | { clear: true },
+): Promise<{ synced: boolean; detail?: string; studio?: Record<string, unknown> }> {
+  if (!contentStudioConfigured()) {
+    return { synced: false, detail: 'Content studio not configured (CONTENT_STUDIO_URL unset)' }
+  }
+  const body = 'clear' in action && action.clear ? { clear: true } : action
+  const result = await contentStudioFetch('/api/blog-studio/config/imagine-proxy', {
+    method: 'PUT',
+    body,
+  })
+  if (!result.ok) {
+    return {
+      synced: false,
+      detail: `Studio HTTP ${result.status}: ${result.text.slice(0, 200)}`,
+    }
+  }
+  return {
+    synced: true,
+    studio:
+      result.json && typeof result.json === 'object'
+        ? (result.json as Record<string, unknown>)
+        : undefined,
+  }
+}
+
+export async function fetchImagineProxyStatusFromStudio(): Promise<{
+  ok: boolean
+  status?: Record<string, unknown>
+  detail?: string
+}> {
+  if (!contentStudioConfigured()) {
+    return { ok: false, detail: 'Content studio not configured' }
+  }
+  const result = await contentStudioFetch('/api/blog-studio/config/imagine-proxy')
+  if (!result.ok) {
+    return { ok: false, detail: `Studio HTTP ${result.status}: ${result.text.slice(0, 200)}` }
+  }
+  if (result.json && typeof result.json === 'object') {
+    return { ok: true, status: result.json as Record<string, unknown> }
+  }
+  return { ok: false, detail: 'Invalid studio response' }
+}
+
 function studioBaseUrl(): string | null {
   const raw = process.env.CONTENT_STUDIO_URL?.trim()
   if (!raw) return null

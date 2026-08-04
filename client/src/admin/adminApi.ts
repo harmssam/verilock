@@ -201,6 +201,21 @@ export interface OpenCodeConfigStatus {
   studioError?: string
 }
 
+/** Grok Imagine local bridge (IMAGINE_PROXY_URL + token). */
+export interface ImagineProxyConfigStatus {
+  configured: boolean
+  source: 'database' | 'environment' | null
+  proxyUrl: string | null
+  maskedToken: string | null
+  tokenConfigured: boolean
+  updatedAt: number | null
+  hasDatabaseOverride: boolean
+  hasEnvironmentUrl: boolean
+  hasEnvironmentToken: boolean
+  studioSynced?: boolean
+  studioError?: string
+}
+
 export const adminApi = {
   features: () => adminRequest<AdminFeatures>('/api/admin/features'),
   me: () => adminRequest<AdminMe>('/api/admin/me'),
@@ -406,6 +421,26 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify({ clear: true }),
     }),
+
+  /** Grok Imagine proxy (local OAuth bridge tunnel URL + shared secret). */
+  imagineProxyConfig: () =>
+    adminRequest<ImagineProxyConfigStatus>('/api/admin-v2/config/imagine-proxy'),
+  saveImagineProxyConfig: (body: { proxyUrl?: string; proxyToken?: string }) =>
+    adminRequest<{ ok: true } & ImagineProxyConfigStatus>(
+      '/api/admin-v2/config/imagine-proxy',
+      {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      },
+    ),
+  clearImagineProxyConfig: () =>
+    adminRequest<{ ok: true } & ImagineProxyConfigStatus>(
+      '/api/admin-v2/config/imagine-proxy',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ clear: true }),
+      },
+    ),
 }
 
 export interface InboxEmail {

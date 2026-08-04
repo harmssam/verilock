@@ -7,12 +7,17 @@ import type { Express, Request, Response, NextFunction } from 'express'
 import { randomUUID } from 'node:crypto'
 import { db } from './db.js'
 import {
+  clearImagineProxyConfig,
   clearOpenCodeApiKey,
+  getImagineProxyConfigStatus,
   getOpenCodeConfigStatus,
+  setImagineProxyConfig,
   setOpenCodeApiKey,
 } from './adminSettings.js'
 import {
+  fetchImagineProxyStatusFromStudio,
   fetchOpenCodeStatusFromStudio,
+  syncImagineProxyToStudio,
   syncOpenCodeKeyToStudio,
 } from './adminStudioProxy.js'
 import { getSupportTicketCounts, SUPPORT_TICKET_STATUSES, updateSupportTicketStatus } from './supportTickets.js'
@@ -1032,6 +1037,138 @@ export function attachAdminV2Routes(app: Express, requireAdmin: (req: Request, r
       }
       console.error('[admin-v2] opencode config put', err)
       res.status(500).json({ error: 'Could not save OpenCode config.' })
+    }
+  })
+
+  // ── Config: Grok Imagine proxy ───────────────────────────────────────
+
+  app.get('/api/admin-v2/config/imagine-proxy', requireAdmin, async (_req, res) => {
+    try {
+      res.setHeader('Cache-Control', 'no-store')
+      const local = getImagineProxyConfigStatus()
+      const studio = await fetchImagineProxyStatusFromStudio()
+      res.json({
+        ...local,
+        studioSynced: studio.ok,
+        studio: studio.ok ? studio.status : undefined,
+        studioError: studio.ok ? undefined : studio.detail,
+        ...(studio.ok && studio.status
+          ? {
+              configured: Boolean(studio.status.configured ?? local.configured),
+              source: (studio.status.source as typeof local.source) ?? local.source,
+              proxyUrl:
+                (studio.status.proxyUrl as string | null | undefined) ?? local.proxyUrl,
+              maskedToken:
+                (studio.status.maskedToken as string | null | undefined) ??
+                local.maskedToken,
+              tokenConfigured: Boolean(
+                studio.status.tokenConfigured ?? local.tokenConfigured,
+              ),
+              hasDatabaseOverride: Boolean(
+                studio.status.hasDatabaseOverride ?? local.hasDatabaseOverride,
+              ),
+            }
+          : {}),
+      })
+    } catch (err) {
+      console.error('[admin-v2] imagine-proxy config get', err)
+      res.status(500).json({ error: 'Could not load Imagine proxy config.' })
+    }
+  })
+
+  app.put('/api/admin-v2/config/imagine-proxy', requireAdmin, async (req, res) => {
+    try {
+      const body = (req.body ?? {}) as {
+        proxyUrl?: unknown
+        proxyToken?: unknown
+        clear?: unknown
+      }
+      const username = (res.locals as { adminUser?: string }).adminUser || 'admin'
+
+      if (body.clear === true) {
+        const status = clearImagineProxyConfig()
+        const sync = await syncImagineProxyToStudio({ clear: true })
+        logAdminAction(
+          'imagine_proxy_clear',
+          username,
+          'config',
+          'imagine-proxy',
+          sync.synced
+            ? 'Cleared Imagine proxy on VeriLock + content-studio'
+            : `Cleared VeriLock; studio sync failed: ${sync.detail ?? 'unknown'}`,
+        )
+        res.setHeader('Cache-Control', 'no-store')
+        res.json({
+          ok: true as const,
+          ...status,
+          studioSynced: sync.synced,
+          studio: sync.studio,
+          studioError: sync.synced ? undefined : sync.detail,
+        })
+        return
+      }
+
+      const hasUrl = typeof body.proxyUrl === 'string'
+      const hasToken = typeof body.proxyToken === 'string'
+      if (!hasUrl && !hasToken) {
+        res.status(400).json({
+          error: 'proxyUrl and/or proxyToken required, or pass clear: true.',
+        })
+        return
+      }
+
+      const payload: { proxyUrl?: string; proxyToken?: string } = {}
+      if (hasUrl) payload.proxyUrl = body.proxyUrl as string
+      if (hasToken) payload.proxyToken = body.proxyToken as string
+
+      const status = setImagineProxyConfig(payload)
+      const syncBody: { proxyUrl?: string; proxyToken?: string } = {}
+      if (status.proxyUrl) syncBody.proxyUrl = status.proxyUrl
+      if (hasToken) syncBody.proxyToken = (body.proxyToken as string).trim()
+      const sync = await syncImagineProxyToStudio(syncBody)
+
+      logAdminAction(
+        'imagine_proxy_set',
+        username,
+        'config',
+        'imagine-proxy',
+        sync.synced
+          ? `Saved Imagine proxy (${status.proxyUrl ?? 'url set'}) on VeriLock + content-studio`
+          : `Saved on VeriLock (${status.proxyUrl ?? 'url'}); studio sync failed: ${sync.detail ?? 'unknown'}`,
+      )
+      res.setHeader('Cache-Control', 'no-store')
+      res.json({
+        ok: true as const,
+        ...status,
+        ...(sync.synced && sync.studio
+          ? {
+              source: (sync.studio.source as typeof status.source) ?? 'database',
+              proxyUrl:
+                (sync.studio.proxyUrl as string | null | undefined) ?? status.proxyUrl,
+              maskedToken:
+                (sync.studio.maskedToken as string | null | undefined) ??
+                status.maskedToken,
+              hasDatabaseOverride: true,
+              configured: true,
+            }
+          : {}),
+        studioSynced: sync.synced,
+        studio: sync.studio,
+        studioError: sync.synced ? undefined : sync.detail,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not save Imagine proxy config.'
+      if (
+        message.includes('required') ||
+        message.includes('Invalid') ||
+        message.includes('must be') ||
+        message.includes('at most')
+      ) {
+        res.status(400).json({ error: message })
+        return
+      }
+      console.error('[admin-v2] imagine-proxy config put', err)
+      res.status(500).json({ error: 'Could not save Imagine proxy config.' })
     }
   })
 }
