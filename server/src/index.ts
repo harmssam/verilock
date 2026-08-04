@@ -87,6 +87,7 @@ import { startSessionCleanup } from './session-cleanup.js'
 // Ensure support schema is migrated before any route handles tickets/stats.
 import './supportTickets.js'
 import { startSupportVolumeNoticeWorker } from './supportVolumeNotice.js'
+import { startAdminActivityDigestWorker } from './adminActivityDigest.js'
 import { attachLocalStudios } from './localStudios.js'
 import * as sigHandoff from './sigHandoff.js'
 
@@ -1913,6 +1914,7 @@ app.delete(
 startAttestationPoller()
 startSessionCleanup()
 startSupportVolumeNoticeWorker()
+startAdminActivityDigestWorker()
 
 if (IS_PRODUCTION) {
   attachClientStatic(app)
