@@ -6,6 +6,11 @@
 import type { Express, Request, Response, NextFunction } from 'express'
 import { randomUUID } from 'node:crypto'
 import { db } from './db.js'
+import {
+  clearOpenCodeApiKey,
+  getOpenCodeConfigStatus,
+  setOpenCodeApiKey,
+} from './adminSettings.js'
 import { getSupportTicketCounts, SUPPORT_TICKET_STATUSES, updateSupportTicketStatus } from './supportTickets.js'
 import { isAdminConfigured, adminPublicFeatures } from './admin.js'
 
@@ -914,6 +919,63 @@ export function attachAdminV2Routes(app: Express, requireAdmin: (req: Request, r
     } catch (err) {
       console.error('[admin-v2] customer profile', err)
       res.status(500).json({ error: 'Could not load customer profile.' })
+    }
+  })
+
+  // ── Config: OpenCode Go API ──────────────────────────────────────────
+
+  app.get('/api/admin-v2/config/opencode', requireAdmin, (_req, res) => {
+    try {
+      res.setHeader('Cache-Control', 'no-store')
+      res.json(getOpenCodeConfigStatus())
+    } catch (err) {
+      console.error('[admin-v2] opencode config get', err)
+      res.status(500).json({ error: 'Could not load OpenCode config.' })
+    }
+  })
+
+  app.put('/api/admin-v2/config/opencode', requireAdmin, (req, res) => {
+    try {
+      const body = (req.body ?? {}) as { apiKey?: unknown; clear?: unknown }
+      const username = (res.locals as { adminUser?: string }).adminUser || 'admin'
+
+      if (body.clear === true) {
+        const status = clearOpenCodeApiKey()
+        logAdminAction(
+          'opencode_api_key_clear',
+          username,
+          'config',
+          'opencode',
+          'Cleared saved OpenCode Go API key (env fallback may still apply)',
+        )
+        res.setHeader('Cache-Control', 'no-store')
+        res.json({ ok: true as const, ...status })
+        return
+      }
+
+      if (typeof body.apiKey !== 'string') {
+        res.status(400).json({ error: 'apiKey (string) is required, or pass clear: true.' })
+        return
+      }
+
+      const status = setOpenCodeApiKey(body.apiKey)
+      logAdminAction(
+        'opencode_api_key_set',
+        username,
+        'config',
+        'opencode',
+        `Saved OpenCode Go API key (${status.maskedToken ?? 'set'})`,
+      )
+      res.setHeader('Cache-Control', 'no-store')
+      res.json({ ok: true as const, ...status })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not save OpenCode config.'
+      if (message.includes('too short') || message.includes('at most')) {
+        res.status(400).json({ error: message })
+        return
+      }
+      console.error('[admin-v2] opencode config put', err)
+      res.status(500).json({ error: 'Could not save OpenCode config.' })
     }
   })
 }

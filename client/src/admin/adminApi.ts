@@ -186,6 +186,18 @@ export interface SupportAutoAckSettings {
   placeholders: string[]
 }
 
+/** OpenCode Go API key status (admin config). Never includes the raw secret. */
+export interface OpenCodeConfigStatus {
+  configured: boolean
+  source: 'database' | 'environment' | null
+  maskedToken: string | null
+  updatedAt: number | null
+  hasDatabaseOverride: boolean
+  hasEnvironmentKey: boolean
+  model: string | null
+  modelFallback: string | null
+}
+
 export const adminApi = {
   features: () => adminRequest<AdminFeatures>('/api/admin/features'),
   me: () => adminRequest<AdminMe>('/api/admin/me'),
@@ -374,6 +386,22 @@ export const adminApi = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, id }),
+    }),
+
+  // ── Config ────────────────────────────────────────────────────────────
+
+  /** OpenCode Go API token status (masked; never the full secret). */
+  openCodeConfig: () =>
+    adminRequest<OpenCodeConfigStatus>('/api/admin-v2/config/opencode'),
+  saveOpenCodeApiKey: (apiKey: string) =>
+    adminRequest<{ ok: true } & OpenCodeConfigStatus>('/api/admin-v2/config/opencode', {
+      method: 'PUT',
+      body: JSON.stringify({ apiKey }),
+    }),
+  clearOpenCodeApiKey: () =>
+    adminRequest<{ ok: true } & OpenCodeConfigStatus>('/api/admin-v2/config/opencode', {
+      method: 'PUT',
+      body: JSON.stringify({ clear: true }),
     }),
 }
 

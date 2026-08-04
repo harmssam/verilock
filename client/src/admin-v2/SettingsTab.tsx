@@ -1,9 +1,13 @@
 /**
- * Admin v2 Settings — auto-ack editor + audit log.
+ * Admin v2 Settings — auto-ack editor, OpenCode config, audit log.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Mail, ClipboardList, Palette } from 'lucide-react'
-import { adminApi, type SupportAutoAckSettings } from '../admin/adminApi'
+import { Mail, ClipboardList, Palette, KeyRound } from 'lucide-react'
+import {
+  adminApi,
+  type OpenCodeConfigStatus,
+  type SupportAutoAckSettings,
+} from '../admin/adminApi'
 import './SettingsTab.css'
 
 interface AuditEntry {
@@ -37,6 +41,15 @@ export function SettingsTab() {
   const [autoAckError, setAutoAckError] = useState<string | null>(null)
   const [autoAckSaved, setAutoAckSaved] = useState(false)
 
+  // OpenCode Go API
+  const [openCodeMeta, setOpenCodeMeta] = useState<OpenCodeConfigStatus | null>(null)
+  const [openCodeDraft, setOpenCodeDraft] = useState('')
+  const [openCodeLoading, setOpenCodeLoading] = useState(true)
+  const [openCodeBusy, setOpenCodeBusy] = useState(false)
+  const [openCodeError, setOpenCodeError] = useState<string | null>(null)
+  const [openCodeSaved, setOpenCodeSaved] = useState(false)
+  const [openCodeShow, setOpenCodeShow] = useState(false)
+
   // Audit log
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
   const [auditTotal, setAuditTotal] = useState(0)
@@ -61,6 +74,21 @@ export function SettingsTab() {
     }
   }, [])
 
+  const loadOpenCode = useCallback(async () => {
+    setOpenCodeLoading(true)
+    setOpenCodeError(null)
+    try {
+      const status = await adminApi.openCodeConfig()
+      setOpenCodeMeta(status)
+      setOpenCodeDraft('')
+      setOpenCodeSaved(false)
+    } catch (err) {
+      setOpenCodeError(err instanceof Error ? err.message : 'Could not load OpenCode config')
+    } finally {
+      setOpenCodeLoading(false)
+    }
+  }, [])
+
   const loadAuditLog = useCallback(async (offset: number, filter: string) => {
     setAuditLoading(true)
     try {
@@ -81,8 +109,9 @@ export function SettingsTab() {
 
   useEffect(() => {
     void loadAutoAck()
+    void loadOpenCode()
     void loadAuditLog(0, '')
-  }, [loadAutoAck, loadAuditLog])
+  }, [loadAutoAck, loadOpenCode, loadAuditLog])
 
   async function saveAutoAck() {
     if (autoAckBusy) return
@@ -115,6 +144,45 @@ export function SettingsTab() {
       setAutoAckError(err instanceof Error ? err.message : 'Could not reset auto-reply')
     } finally {
       setAutoAckBusy(false)
+    }
+  }
+
+  async function saveOpenCode() {
+    if (openCodeBusy) return
+    const key = openCodeDraft.trim()
+    if (key.length < 8) {
+      setOpenCodeError('API key is too short.')
+      return
+    }
+    setOpenCodeBusy(true)
+    setOpenCodeError(null)
+    setOpenCodeSaved(false)
+    try {
+      const result = await adminApi.saveOpenCodeApiKey(key)
+      setOpenCodeMeta(result)
+      setOpenCodeDraft('')
+      setOpenCodeSaved(true)
+    } catch (err) {
+      setOpenCodeError(err instanceof Error ? err.message : 'Could not save API key')
+    } finally {
+      setOpenCodeBusy(false)
+    }
+  }
+
+  async function clearOpenCode() {
+    if (openCodeBusy) return
+    setOpenCodeBusy(true)
+    setOpenCodeError(null)
+    setOpenCodeSaved(false)
+    try {
+      const result = await adminApi.clearOpenCodeApiKey()
+      setOpenCodeMeta(result)
+      setOpenCodeDraft('')
+      setOpenCodeSaved(true)
+    } catch (err) {
+      setOpenCodeError(err instanceof Error ? err.message : 'Could not clear API key')
+    } finally {
+      setOpenCodeBusy(false)
     }
   }
 
@@ -226,6 +294,153 @@ export function SettingsTab() {
             {autoAckSaved && !autoAckError ? (
               <p className="av2-settings-saved" role="status">
                 ✓ Saved. New contact submissions will use this message.
+              </p>
+            ) : null}
+          </div>
+        )}
+      </section>
+
+      {/* ── OpenCode Go API ──────────────────────────────────────────── */}
+      <section className="av2-settings-section">
+        <h2 className="av2-settings-section-title">
+          <span className="av2-settings-section-icon" aria-hidden="true">
+            <KeyRound size={18} strokeWidth={1.5} />
+          </span>
+          OpenCode Go API
+        </h2>
+        <p className="av2-settings-section-desc">
+          API key for{' '}
+          <a
+            href="https://opencode.ai/docs/go/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="av2-settings-link"
+          >
+            OpenCode Go
+          </a>{' '}
+          (coding models via OpenCode Zen). Saved keys are stored in the server database and
+          override <code>OPENCODE_API_KEY</code> from the environment. The full token is never
+          shown after save.
+        </p>
+
+        {openCodeLoading && !openCodeMeta ? (
+          <p className="av2-settings-loading">Loading OpenCode config…</p>
+        ) : (
+          <div className="av2-settings-opencode">
+            <div className="av2-settings-auto-ack-meta">
+              <span
+                className={
+                  openCodeMeta?.configured
+                    ? 'av2-settings-auto-ack-badge'
+                    : 'av2-settings-auto-ack-badge av2-settings-badge--muted'
+                }
+              >
+                {openCodeMeta?.configured
+                  ? openCodeMeta.source === 'database'
+                    ? 'Saved in database'
+                    : 'From environment'
+                  : 'Not configured'}
+              </span>
+              {openCodeMeta?.maskedToken ? (
+                <span className="av2-settings-token-mask" title="Masked token">
+                  <code>{openCodeMeta.maskedToken}</code>
+                </span>
+              ) : null}
+              {openCodeMeta?.updatedAt ? (
+                <span className="av2-settings-auto-ack-updated">
+                  Last updated: {new Date(openCodeMeta.updatedAt).toLocaleString()}
+                </span>
+              ) : null}
+            </div>
+
+            {(openCodeMeta?.model || openCodeMeta?.modelFallback) && (
+              <p className="av2-settings-opencode-models">
+                Models (env):{' '}
+                {openCodeMeta.model ? <code>{openCodeMeta.model}</code> : '—'}
+                {openCodeMeta.modelFallback ? (
+                  <>
+                    {' '}
+                    · fallback <code>{openCodeMeta.modelFallback}</code>
+                  </>
+                ) : null}
+              </p>
+            )}
+
+            <label className="av2-settings-field-label" htmlFor="av2-opencode-api-key">
+              {openCodeMeta?.configured ? 'Replace API key' : 'API key'}
+            </label>
+            <div className="av2-settings-token-row">
+              <input
+                id="av2-opencode-api-key"
+                className="av2-settings-token-input"
+                type={openCodeShow ? 'text' : 'password'}
+                value={openCodeDraft}
+                onChange={e => {
+                  setOpenCodeDraft(e.target.value)
+                  setOpenCodeSaved(false)
+                  setOpenCodeError(null)
+                }}
+                placeholder={
+                  openCodeMeta?.configured
+                    ? 'Paste a new key to replace the current one'
+                    : 'sk-…'
+                }
+                autoComplete="off"
+                spellCheck={false}
+                disabled={openCodeBusy}
+                aria-label="OpenCode Go API key"
+              />
+              <button
+                type="button"
+                className="av2-btn av2-btn-ghost av2-btn-sm"
+                onClick={() => setOpenCodeShow(v => !v)}
+                disabled={openCodeBusy}
+              >
+                {openCodeShow ? 'Hide' : 'Show'}
+              </button>
+            </div>
+
+            <div className="av2-settings-auto-ack-footer">
+              <span className="av2-settings-auto-ack-count">
+                {openCodeMeta?.hasEnvironmentKey
+                  ? 'Env key present — clear saved key to fall back to it.'
+                  : openCodeMeta?.hasDatabaseOverride
+                    ? 'Only the database key is set.'
+                    : 'No key in env or database yet.'}
+              </span>
+              <div className="av2-settings-auto-ack-actions">
+                <button
+                  type="button"
+                  className="av2-btn av2-btn-ghost"
+                  onClick={() => void clearOpenCode()}
+                  disabled={openCodeBusy || !openCodeMeta?.hasDatabaseOverride}
+                  title={
+                    openCodeMeta?.hasDatabaseOverride
+                      ? 'Remove the database key (env may still apply)'
+                      : 'No database key to clear'
+                  }
+                >
+                  Clear saved key
+                </button>
+                <button
+                  type="button"
+                  className="av2-btn av2-btn-primary"
+                  onClick={() => void saveOpenCode()}
+                  disabled={openCodeBusy || openCodeDraft.trim().length < 8}
+                >
+                  {openCodeBusy ? 'Saving…' : 'Save API key'}
+                </button>
+              </div>
+            </div>
+
+            {openCodeError ? (
+              <p className="av2-error" role="alert">
+                {openCodeError}
+              </p>
+            ) : null}
+            {openCodeSaved && !openCodeError ? (
+              <p className="av2-settings-saved" role="status">
+                ✓ Saved. Server will use this key for OpenCode Go.
               </p>
             ) : null}
           </div>

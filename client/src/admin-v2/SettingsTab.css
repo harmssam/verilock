@@ -132,6 +132,84 @@
   font-weight: 500;
 }
 
+/* ── OpenCode Go API ─────────────────────────────────────────────────── */
+.av2-settings-badge--muted {
+  background: rgba(148, 163, 184, 0.15);
+  color: #64748b;
+}
+
+.av2-settings-link {
+  color: var(--av2-mint);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.av2-settings-link:hover {
+  opacity: 0.85;
+}
+
+.av2-settings-token-mask code {
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  background: rgba(15, 23, 42, 0.06);
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+}
+
+.av2-settings-opencode-models {
+  font-size: 0.78rem;
+  color: var(--av2-text-muted);
+  margin: 0 0 0.85rem;
+  line-height: 1.45;
+}
+
+.av2-settings-opencode-models code {
+  background: rgba(15, 23, 42, 0.06);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.76rem;
+}
+
+.av2-settings-field-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--av2-text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.av2-settings-token-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.av2-settings-token-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--av2-line);
+  border-radius: var(--av2-radius-sm);
+  font-size: 0.85rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: rgba(15, 23, 42, 0.02);
+  color: var(--av2-text);
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.av2-settings-token-input:focus {
+  border-color: var(--av2-mint);
+  background: var(--av2-bg-card);
+}
+
+.av2-settings-token-input::placeholder {
+  color: var(--av2-text-dim);
+  font-family: inherit;
+  font-size: 0.82rem;
+}
+
 /* ── Audit Log ───────────────────────────────────────────────────────── */
 .av2-audit-filters {
   display: flex;
