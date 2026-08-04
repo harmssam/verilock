@@ -1,5 +1,6 @@
 /**
- * Desktop sidebar navigation (>=768px). Collapses to icon-only on tablet (768-1023px).
+ * Desktop sidebar navigation (>=768px). Collapses to icon-only on tablet (768-1023px)
+ * or when the operator toggles collapse (persisted in localStorage).
  */
 import { useState, useEffect, type ReactNode } from 'react'
 import {
@@ -9,9 +10,13 @@ import {
   TrendingUp,
   PenLine,
   Settings,
+  PanelLeftClose,
+  PanelLeft,
 } from 'lucide-react'
 import { Badge } from './Badge'
 import './Sidebar.css'
+
+const COLLAPSED_KEY = 'verilock-admin-v2-sidebar-collapsed'
 
 export type AdminV2Tab =
   | 'dashboard'
@@ -55,11 +60,33 @@ export function Sidebar({
   supportBadge = 0,
 }: SidebarProps) {
   const [contentOpen, setContentOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(COLLAPSED_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
 
-  // Auto-expand Content section when on a content child tab
+  // Auto-expand Content section when on a content child tab (only when expanded)
   useEffect(() => {
-    if (activeTab === 'studio' || activeTab === 'content') setContentOpen(true)
-  }, [activeTab])
+    if (!collapsed && (activeTab === 'studio' || activeTab === 'content')) {
+      setContentOpen(true)
+    }
+  }, [activeTab, collapsed])
+
+  function toggleCollapsed() {
+    setCollapsed(prev => {
+      const next = !prev
+      try {
+        localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0')
+      } catch {
+        /* ignore */
+      }
+      if (next) setContentOpen(false)
+      return next
+    })
+  }
 
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 size={iconSize} strokeWidth={iconStroke} /> },
@@ -94,23 +121,55 @@ export function Sidebar({
   const userInitial = username.charAt(0).toUpperCase()
 
   return (
-    <nav className="av2-sidebar" aria-label="Main navigation">
+    <nav
+      className={`av2-sidebar${collapsed ? ' av2-sidebar--collapsed' : ''}`}
+      aria-label="Main navigation"
+      data-collapsed={collapsed ? 'true' : 'false'}
+    >
       <div className="av2-sidebar-top">
+        <div className="av2-sidebar-collapse-row">
+          <button
+            type="button"
+            className="av2-sidebar-collapse-btn"
+            onClick={toggleCollapsed}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand menu' : 'Collapse menu'}
+          >
+            {collapsed ? (
+              <PanelLeft size={iconSize} strokeWidth={iconStroke} />
+            ) : (
+              <PanelLeftClose size={iconSize} strokeWidth={iconStroke} />
+            )}
+            <span className="av2-sidenav-label">Collapse</span>
+          </button>
+        </div>
+
         {navItems.map(item => (
           <div key={item.id}>
             <button
               type="button"
-              className={`av2-sidenav-item${activeTab === item.id ? ' av2-sidenav-item--active' : ''}${
-                item.id === 'content' && contentOpen ? ' av2-sidenav-item--expanded' : ''
+              className={`av2-sidenav-item${activeTab === item.id || (item.id === 'content' && activeTab === 'studio') ? ' av2-sidenav-item--active' : ''}${
+                item.id === 'content' && contentOpen && !collapsed ? ' av2-sidenav-item--expanded' : ''
               }`}
               onClick={() => {
                 if (item.id === 'content') {
-                  setContentOpen(!contentOpen)
+                  if (collapsed) {
+                    // Icon-only: go to X Ideas (content)
+                    onTabChange('content')
+                  } else {
+                    setContentOpen(!contentOpen)
+                  }
                 } else {
                   onTabChange(item.id)
                 }
               }}
-              aria-current={activeTab === item.id ? 'page' : undefined}
+              aria-current={
+                activeTab === item.id || (item.id === 'content' && activeTab === 'studio')
+                  ? 'page'
+                  : undefined
+              }
+              title={collapsed ? item.label : undefined}
             >
               <span className="av2-sidenav-icon" aria-hidden="true">
                 {item.icon}
@@ -119,7 +178,7 @@ export function Sidebar({
               {item.badge !== undefined && item.badge > 0 && (
                 <Badge count={item.badge} variant={item.badgeVariant || 'gray'} />
               )}
-              {item.id === 'content' && (
+              {item.id === 'content' && !collapsed && (
                 <span
                   className={`av2-sidenav-chevron${contentOpen ? ' av2-sidenav-chevron--open' : ''}`}
                 >
@@ -128,8 +187,8 @@ export function Sidebar({
               )}
             </button>
 
-            {/* Content children */}
-            {item.id === 'content' && contentOpen && (
+            {/* Content children — only when expanded */}
+            {item.id === 'content' && contentOpen && !collapsed && (
               <div className="av2-sidenav-children">
                 {contentChildren.map(child => {
                   const childActive =
@@ -161,6 +220,7 @@ export function Sidebar({
             className={`av2-sidenav-item${activeTab === item.id ? ' av2-sidenav-item--active' : ''}`}
             onClick={() => onTabChange(item.id)}
             aria-current={activeTab === item.id ? 'page' : undefined}
+            title={collapsed ? item.label : undefined}
           >
             <span className="av2-sidenav-icon" aria-hidden="true">
               {item.icon}
@@ -169,7 +229,7 @@ export function Sidebar({
           </button>
         ))}
 
-        <div className="av2-sidebar-user">
+        <div className="av2-sidebar-user" title={collapsed ? username : undefined}>
           <div className="av2-sidebar-avatar">{userInitial}</div>
           <div className="av2-sidebar-user-info">
             <span className="av2-sidebar-username">{username}</span>
