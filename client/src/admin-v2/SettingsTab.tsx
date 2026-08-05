@@ -53,6 +53,7 @@ export function SettingsTab() {
 
   // Grok Imagine proxy
   const [imagineMeta, setImagineMeta] = useState<ImagineProxyConfigStatus | null>(null)
+  const [imaginePasteDraft, setImaginePasteDraft] = useState('')
   const [imagineUrlDraft, setImagineUrlDraft] = useState('')
   const [imagineTokenDraft, setImagineTokenDraft] = useState('')
   const [imagineLoading, setImagineLoading] = useState(true)
@@ -60,6 +61,7 @@ export function SettingsTab() {
   const [imagineError, setImagineError] = useState<string | null>(null)
   const [imagineSaved, setImagineSaved] = useState(false)
   const [imagineTokenShow, setImagineTokenShow] = useState(false)
+  const [imagineShowAdvanced, setImagineShowAdvanced] = useState(false)
 
   // Audit log
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
@@ -216,13 +218,14 @@ export function SettingsTab() {
 
   async function saveImagine() {
     if (imagineBusy) return
+    const paste = imaginePasteDraft.trim()
     const url = imagineUrlDraft.trim()
     const token = imagineTokenDraft.trim()
-    if (!url && !token) {
-      setImagineError('Enter a proxy URL (and optional token).')
+    if (!paste && !url && !token) {
+      setImagineError('Paste the setup string from Imagine Bridge (or enter a proxy URL).')
       return
     }
-    if (url) {
+    if (!paste && url) {
       try {
         const u = new URL(url)
         if (u.protocol !== 'http:' && u.protocol !== 'https:') {
@@ -238,6 +241,16 @@ export function SettingsTab() {
     setImagineError(null)
     setImagineSaved(false)
     try {
+      // Prefer one clipboard paste from Imagine Bridge.
+      if (paste) {
+        const result = await adminApi.saveImagineProxyConfig({ paste })
+        setImagineMeta(result)
+        setImagineUrlDraft(result.proxyUrl ?? '')
+        setImagineTokenDraft('')
+        setImaginePasteDraft('')
+        setImagineSaved(true)
+        return
+      }
       const body: { proxyUrl?: string; proxyToken?: string } = {}
       if (url) body.proxyUrl = url
       if (token) body.proxyToken = token
@@ -263,6 +276,7 @@ export function SettingsTab() {
     try {
       const result = await adminApi.clearImagineProxyConfig()
       setImagineMeta(result)
+      setImaginePasteDraft('')
       setImagineUrlDraft(result.proxyUrl ?? '')
       setImagineTokenDraft('')
       setImagineSaved(true)
@@ -555,12 +569,9 @@ export function SettingsTab() {
           Grok Imagine proxy
         </h2>
         <p className="av2-settings-section-desc">
-          Public tunnel URL for the local OAuth bridge (
-          <code>npm run imagine-proxy</code> / Imagine Bridge.app in content-studio). Required for
-          Blog Studio image generation on Railway. Paste the tunnel URL after each bridge launch
-          (quick tunnels change). Optionally set a shared secret matching{' '}
-          <code>IMAGINE_PROXY_TOKEN</code> on the laptop. Saved here and pushed to content-studio —
-          no redeploy.
+          One paste from Imagine Bridge. Copy the setup string on the bridge status page
+          (looks like <code>https://….trycloudflare.com#token=…</code>), paste below, Save.
+          Pushed to content-studio — no redeploy. Quick tunnels change every launch.
         </p>
 
         {imagineLoading && !imagineMeta ? (
@@ -595,71 +606,50 @@ export function SettingsTab() {
               ) : null}
             </div>
 
-            <label className="av2-settings-field-label" htmlFor="av2-imagine-proxy-url">
-              Proxy URL
+            {imagineMeta?.proxyUrl ? (
+              <p className="av2-settings-auto-ack-updated" style={{ margin: '0.35rem 0 0.75rem' }}>
+                Current URL: <code style={{ wordBreak: 'break-all' }}>{imagineMeta.proxyUrl}</code>
+              </p>
+            ) : null}
+
+            <label className="av2-settings-field-label" htmlFor="av2-imagine-proxy-paste">
+              Setup string (paste once)
             </label>
-            <input
-              id="av2-imagine-proxy-url"
-              className="av2-settings-token-input"
-              type="url"
-              value={imagineUrlDraft}
+            <textarea
+              id="av2-imagine-proxy-paste"
+              className="av2-settings-auto-ack-textarea av2-settings-imagine-paste"
+              value={imaginePasteDraft}
               onChange={e => {
-                setImagineUrlDraft(e.target.value)
+                setImaginePasteDraft(e.target.value)
                 setImagineSaved(false)
                 setImagineError(null)
               }}
-              placeholder="https://….trycloudflare.com"
+              onPaste={e => {
+                // Capture clipboard even if browser tries to sanitize
+                const text = e.clipboardData?.getData('text')?.trim()
+                if (text && (text.includes('#token=') || text.includes('IMAGINE_PROXY') || text.includes('|'))) {
+                  e.preventDefault()
+                  setImaginePasteDraft(text)
+                  setImagineSaved(false)
+                  setImagineError(null)
+                }
+              }}
+              placeholder="https://something.trycloudflare.com#token=yoursecret"
+              rows={3}
               autoComplete="off"
               spellCheck={false}
               disabled={imagineBusy}
-              aria-label="Imagine proxy URL"
+              aria-label="Imagine Bridge setup string"
             />
+            <p className="av2-settings-auto-ack-updated" style={{ marginTop: '0.35rem' }}>
+              Paste the full line from Imagine Bridge — do not split into URL and token.
+            </p>
 
-            <label
-              className="av2-settings-field-label"
-              htmlFor="av2-imagine-proxy-token"
-              style={{ marginTop: '0.85rem' }}
-            >
-              Shared token {imagineMeta?.tokenConfigured ? '(leave blank to keep)' : '(optional)'}
-            </label>
-            <div className="av2-settings-token-row">
-              <input
-                id="av2-imagine-proxy-token"
-                className="av2-settings-token-input"
-                type={imagineTokenShow ? 'text' : 'password'}
-                value={imagineTokenDraft}
-                onChange={e => {
-                  setImagineTokenDraft(e.target.value)
-                  setImagineSaved(false)
-                  setImagineError(null)
-                }}
-                placeholder={
-                  imagineMeta?.tokenConfigured
-                    ? 'Paste a new token to replace'
-                    : 'Same as laptop IMAGINE_PROXY_TOKEN'
-                }
-                autoComplete="off"
-                spellCheck={false}
-                disabled={imagineBusy}
-                aria-label="Imagine proxy shared token"
-              />
-              <button
-                type="button"
-                className="av2-btn av2-btn-ghost av2-btn-sm"
-                onClick={() => setImagineTokenShow(v => !v)}
-                disabled={imagineBusy}
-              >
-                {imagineTokenShow ? 'Hide' : 'Show'}
-              </button>
-            </div>
-
-            <div className="av2-settings-auto-ack-footer">
+            <div className="av2-settings-auto-ack-footer" style={{ marginTop: '0.85rem' }}>
               <span className="av2-settings-auto-ack-count">
-                {imagineMeta?.hasEnvironmentUrl
-                  ? 'Env URL present — clear saved settings to fall back to it.'
-                  : imagineMeta?.hasDatabaseOverride
-                    ? 'Using database override (syncs to content-studio).'
-                    : 'Run the local bridge, then paste its public URL here.'}
+                {imagineMeta?.hasDatabaseOverride
+                  ? 'Using database override (syncs to content-studio).'
+                  : 'Run Imagine Bridge → Connected → Copy setup string → paste here → Save.'}
               </span>
               <div className="av2-settings-auto-ack-actions">
                 <button
@@ -681,13 +671,104 @@ export function SettingsTab() {
                   onClick={() => void saveImagine()}
                   disabled={
                     imagineBusy ||
-                    (!imagineUrlDraft.trim() && !imagineTokenDraft.trim())
+                    (!imaginePasteDraft.trim() &&
+                      !imagineUrlDraft.trim() &&
+                      !imagineTokenDraft.trim())
                   }
                 >
-                  {imagineBusy ? 'Saving…' : 'Save proxy'}
+                  {imagineBusy ? 'Saving…' : 'Save setup string'}
                 </button>
               </div>
             </div>
+
+            <button
+              type="button"
+              className="av2-btn av2-btn-ghost av2-btn-sm"
+              style={{ marginTop: '0.85rem' }}
+              onClick={() => setImagineShowAdvanced(v => !v)}
+              disabled={imagineBusy}
+            >
+              {imagineShowAdvanced ? 'Hide advanced fields' : 'Advanced: separate URL / token'}
+            </button>
+
+            {imagineShowAdvanced ? (
+              <>
+                <label
+                  className="av2-settings-field-label"
+                  htmlFor="av2-imagine-proxy-url"
+                  style={{ marginTop: '0.85rem' }}
+                >
+                  Proxy URL
+                </label>
+                <input
+                  id="av2-imagine-proxy-url"
+                  className="av2-settings-token-input"
+                  type="text"
+                  inputMode="url"
+                  value={imagineUrlDraft}
+                  onChange={e => {
+                    const v = e.target.value
+                    // If operator pastes full setup string into URL field, route to paste box
+                    if (
+                      v.includes('#token=') ||
+                      v.includes('|') ||
+                      /IMAGINE_PROXY_/i.test(v)
+                    ) {
+                      setImaginePasteDraft(v.trim())
+                      setImagineUrlDraft('')
+                      setImagineTokenDraft('')
+                    } else {
+                      setImagineUrlDraft(v)
+                    }
+                    setImagineSaved(false)
+                    setImagineError(null)
+                  }}
+                  placeholder="https://….trycloudflare.com"
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={imagineBusy}
+                  aria-label="Imagine proxy URL"
+                />
+
+                <label
+                  className="av2-settings-field-label"
+                  htmlFor="av2-imagine-proxy-token"
+                  style={{ marginTop: '0.85rem' }}
+                >
+                  Shared token {imagineMeta?.tokenConfigured ? '(leave blank to keep)' : '(optional)'}
+                </label>
+                <div className="av2-settings-token-row">
+                  <input
+                    id="av2-imagine-proxy-token"
+                    className="av2-settings-token-input"
+                    type={imagineTokenShow ? 'text' : 'password'}
+                    value={imagineTokenDraft}
+                    onChange={e => {
+                      setImagineTokenDraft(e.target.value)
+                      setImagineSaved(false)
+                      setImagineError(null)
+                    }}
+                    placeholder={
+                      imagineMeta?.tokenConfigured
+                        ? 'Paste a new token to replace'
+                        : 'Same as laptop IMAGINE_PROXY_TOKEN'
+                    }
+                    autoComplete="off"
+                    spellCheck={false}
+                    disabled={imagineBusy}
+                    aria-label="Imagine proxy shared token"
+                  />
+                  <button
+                    type="button"
+                    className="av2-btn av2-btn-ghost av2-btn-sm"
+                    onClick={() => setImagineTokenShow(v => !v)}
+                    disabled={imagineBusy}
+                  >
+                    {imagineTokenShow ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </>
+            ) : null}
 
             {imagineError ? (
               <p className="av2-error" role="alert">

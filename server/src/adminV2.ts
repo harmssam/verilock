@@ -11,6 +11,7 @@ import {
   clearOpenCodeApiKey,
   getImagineProxyConfigStatus,
   getOpenCodeConfigStatus,
+  parseImagineProxyPaste,
   setImagineProxyConfig,
   setOpenCodeApiKey,
 } from './adminSettings.js'
@@ -1081,6 +1082,7 @@ export function attachAdminV2Routes(app: Express, requireAdmin: (req: Request, r
       const body = (req.body ?? {}) as {
         proxyUrl?: unknown
         proxyToken?: unknown
+        paste?: unknown
         clear?: unknown
       }
       const username = (res.locals as { adminUser?: string }).adminUser || 'admin'
@@ -1108,23 +1110,38 @@ export function attachAdminV2Routes(app: Express, requireAdmin: (req: Request, r
         return
       }
 
-      const hasUrl = typeof body.proxyUrl === 'string'
-      const hasToken = typeof body.proxyToken === 'string'
-      if (!hasUrl && !hasToken) {
+      let proxyUrl: string | undefined
+      let proxyToken: string | undefined
+      if (typeof body.paste === 'string' && body.paste.trim()) {
+        const parsed = parseImagineProxyPaste(body.paste)
+        proxyUrl = parsed.proxyUrl
+        proxyToken = parsed.proxyToken
+        if (!proxyUrl && !proxyToken) {
+          res.status(400).json({
+            error:
+              'Could not parse paste. Copy the one setup string from Imagine Bridge.',
+          })
+          return
+        }
+      }
+      if (typeof body.proxyUrl === 'string') proxyUrl = body.proxyUrl
+      if (typeof body.proxyToken === 'string') proxyToken = body.proxyToken
+
+      if (proxyUrl === undefined && proxyToken === undefined) {
         res.status(400).json({
-          error: 'proxyUrl and/or proxyToken required, or pass clear: true.',
+          error: 'paste, proxyUrl, and/or proxyToken required, or pass clear: true.',
         })
         return
       }
 
       const payload: { proxyUrl?: string; proxyToken?: string } = {}
-      if (hasUrl) payload.proxyUrl = body.proxyUrl as string
-      if (hasToken) payload.proxyToken = body.proxyToken as string
+      if (proxyUrl !== undefined) payload.proxyUrl = proxyUrl
+      if (proxyToken !== undefined) payload.proxyToken = proxyToken
 
       const status = setImagineProxyConfig(payload)
       const syncBody: { proxyUrl?: string; proxyToken?: string } = {}
       if (status.proxyUrl) syncBody.proxyUrl = status.proxyUrl
-      if (hasToken) syncBody.proxyToken = (body.proxyToken as string).trim()
+      if (proxyToken !== undefined) syncBody.proxyToken = proxyToken.trim()
       const sync = await syncImagineProxyToStudio(syncBody)
 
       logAdminAction(

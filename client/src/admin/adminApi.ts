@@ -425,7 +425,12 @@ export const adminApi = {
   /** Grok Imagine proxy (local OAuth bridge tunnel URL + shared secret). */
   imagineProxyConfig: () =>
     adminRequest<ImagineProxyConfigStatus>('/api/admin-v2/config/imagine-proxy'),
-  saveImagineProxyConfig: (body: { proxyUrl?: string; proxyToken?: string }) =>
+  saveImagineProxyConfig: (body: {
+    proxyUrl?: string
+    proxyToken?: string
+    /** Single clipboard string from Imagine Bridge */
+    paste?: string
+  }) =>
     adminRequest<{ ok: true } & ImagineProxyConfigStatus>(
       '/api/admin-v2/config/imagine-proxy',
       {

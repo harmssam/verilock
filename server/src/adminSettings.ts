@@ -201,6 +201,89 @@ export function clearOpenCodeApiKey(): OpenCodeConfigStatus {
 const KEY_IMAGINE_PROXY_URL = 'imagine_proxy_url'
 const KEY_IMAGINE_PROXY_TOKEN = 'imagine_proxy_token'
 
+/**
+ * Parse a single clipboard string from Imagine Bridge into URL + token.
+ * Matches content-studio parseImagineProxyPaste.
+ */
+export function parseImagineProxyPaste(raw: string): {
+  proxyUrl?: string
+  proxyToken?: string
+} {
+  const text = String(raw || '').trim()
+  if (!text) return {}
+
+  let proxyUrl: string | undefined
+  let proxyToken: string | undefined
+
+  const envUrl = text.match(/(?:^|[\s\n])IMAGINE_PROXY_URL\s*=\s*(\S+)/i)
+  const envToken = text.match(/(?:^|[\s\n])IMAGINE_PROXY_TOKEN\s*=\s*(\S+)/i)
+  if (envUrl?.[1]) proxyUrl = envUrl[1].trim()
+  if (envToken?.[1]) proxyToken = envToken[1].trim()
+
+  if (!proxyUrl) {
+    const labeledUrl = text.match(/Proxy\s*URL\s*:\s*\n?\s*(https?:\/\/\S+)/i)
+    if (labeledUrl?.[1]) proxyUrl = labeledUrl[1].trim()
+  }
+  if (!proxyToken) {
+    const labeledTok = text.match(/Shared\s*token\s*:\s*\n?\s*([^\s\n]+)/i)
+    if (labeledTok?.[1]) proxyToken = labeledTok[1].trim()
+  }
+
+  if (!proxyUrl || !proxyToken) {
+    const hashTok = text.match(
+      /^(https?:\/\/[^\s#|]+)(?:#|\?)token=([^\s&]+)\s*$/i,
+    )
+    if (hashTok) {
+      proxyUrl = proxyUrl || hashTok[1]
+      proxyToken = proxyToken || hashTok[2]
+    }
+  }
+
+  if (!proxyUrl || !proxyToken) {
+    const pipe = text.match(/^(https?:\/\/[^\s|]+)\|([^\s|]+)\s*$/i)
+    if (pipe) {
+      proxyUrl = proxyUrl || pipe[1]
+      proxyToken = proxyToken || pipe[2]
+    } else {
+      const spaced = text.match(/^(https?:\/\/\S+)\s+([A-Za-z0-9._~+/-]{8,})\s*$/)
+      if (spaced) {
+        proxyUrl = proxyUrl || spaced[1]
+        proxyToken = proxyToken || spaced[2]
+      }
+    }
+  }
+
+  if (!proxyUrl) {
+    const anyUrl = text.match(/https?:\/\/[^\s]+/i)
+    if (anyUrl) proxyUrl = anyUrl[0].replace(/[),.;]+$/, '')
+  }
+
+  if (proxyUrl) {
+    try {
+      const u = new URL(proxyUrl)
+      const tok =
+        u.searchParams.get('token') ||
+        (u.hash.startsWith('#token=') ? u.hash.slice(7) : '')
+      if (tok && !proxyToken) proxyToken = tok
+      u.hash = ''
+      u.searchParams.delete('token')
+      proxyUrl = u.toString().replace(/\/+$/, '')
+    } catch {
+      proxyUrl = proxyUrl
+        .replace(/#token=.*$/, '')
+        .replace(/\?token=.*$/, '')
+        .replace(/\/+$/, '')
+        .trim()
+    }
+  }
+  if (proxyToken) proxyToken = proxyToken.trim()
+
+  return {
+    ...(proxyUrl ? { proxyUrl } : {}),
+    ...(proxyToken ? { proxyToken } : {}),
+  }
+}
+
 export interface ImagineProxyConfigStatus {
   configured: boolean
   source: OpenCodeKeySource | null
