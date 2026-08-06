@@ -14,6 +14,11 @@ RUN npm ci --prefix client && npm ci --prefix server
 COPY client ./client
 COPY server ./server
 
+# Vite inlines VITE_* at build time. Railway injects service vars into the build
+# env; ARG/ENV make guest signing explicit if the flag is set on the service.
+ARG VITE_GUEST_SIGNING=false
+ENV VITE_GUEST_SIGNING=$VITE_GUEST_SIGNING
+
 # package.mjs → client/dist
 RUN npm run build --prefix client
 
