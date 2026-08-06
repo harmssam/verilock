@@ -54,6 +54,8 @@
     max(0.65rem, env(safe-area-inset-left, 0px));
   overflow: hidden;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: auto;
+  touch-action: none;
   background: var(--bg, #f8fafc);
 }
 

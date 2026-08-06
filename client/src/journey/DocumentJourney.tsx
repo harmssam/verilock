@@ -4526,10 +4526,9 @@ export function DocumentJourney({
                               })()}
                             </span>
                             <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                              Send email for a private personal link (only in the message — not
-                              shown here). Or share the general link below for slots that
-                              are not email-invited. Hand off the PDF file separately — VeriLock
-                              never hosts it.
+                              Send email for a private personal link. Or share the general
+                              link for slots that are not email-invited. Hand off the PDF
+                              file separately, VeriLock never hosts it.
                             </p>
                             {(() => {
                               const base = doc.shareUrl.startsWith('http')
@@ -4537,14 +4536,6 @@ export function DocumentJourney({
                                 : `${typeof window !== 'undefined' ? window.location.origin : ''}${doc.shareUrl.startsWith('/') ? '' : '/'}${doc.shareUrl}`
                               return (
                                 <div className="field-stack share-cosigner-fields">
-                                  <div className="share-cosigner-head">
-                                    <div className="share-cosigner-title">General link</div>
-                                  </div>
-                                  <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
-                                    Generic agreement link — no personal secret. Only share this
-                                    after you've emailed the person. Their slot requires the link
-                                    from that email; this general link doesn't specify a signer.
-                                  </p>
                                   <code className="share-cosigner-link mono">{base}</code>
                                   <div className="share-cosigner-actions">
                                     <button

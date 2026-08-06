@@ -316,10 +316,13 @@ export function InkCaptureSheet({
   useEffect(() => {
     if (needsLandscape) return
     if (variant !== 'overlay' && !isForceHost) return
-    const prev = document.body.style.overflow
+    const prevBody = document.body.style.overflow
+    const prevHtml = document.documentElement.style.overflow
     document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
     return () => {
-      document.body.style.overflow = prev
+      document.body.style.overflow = prevBody
+      document.documentElement.style.overflow = prevHtml
     }
   }, [isForceHost, variant, needsLandscape])
 
