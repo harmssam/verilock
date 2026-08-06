@@ -10,11 +10,10 @@ const buckets = new Map<string, Bucket>()
 function clientKey(req: Request): string {
   const token = req.headers.authorization?.replace('Bearer ', '')
   if (token) return `token:${token.slice(0, 12)}`
-  const forwarded = req.headers['x-forwarded-for']
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return `ip:${forwarded.split(',')[0]?.trim()}`
-  }
-  return `ip:${req.socket.remoteAddress ?? 'unknown'}`
+  // `req.ip` (not the raw header) — respects `app.set('trust proxy', 1)` in index.ts,
+  // so this resolves the client IP Railway's edge actually saw, not a spoofable
+  // client-supplied X-Forwarded-For value. See docs/guest-signing-plan.md Task 0.
+  return `ip:${req.ip ?? req.socket.remoteAddress ?? 'unknown'}`
 }
 
 export function rateLimit(max: number, windowMs: number) {

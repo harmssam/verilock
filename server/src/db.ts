@@ -134,6 +134,23 @@ if (!documentColumns.some(col => col.name === 'creator_display_name')) {
   db.exec('ALTER TABLE documents ADD COLUMN creator_display_name TEXT')
 }
 
+/** Guest signing (`docs/guest-signing-plan.md`): ownership + document-key columns. */
+if (!documentColumns.some(col => col.name === 'auth_mode')) {
+  db.exec("ALTER TABLE documents ADD COLUMN auth_mode TEXT NOT NULL DEFAULT 'wallet'")
+}
+if (!documentColumns.some(col => col.name === 'creator_document_key_hash')) {
+  db.exec('ALTER TABLE documents ADD COLUMN creator_document_key_hash TEXT')
+}
+if (!documentColumns.some(col => col.name === 'creator_document_key_created_at')) {
+  db.exec('ALTER TABLE documents ADD COLUMN creator_document_key_created_at INTEGER')
+}
+if (!documentColumns.some(col => col.name === 'claimed_at')) {
+  db.exec('ALTER TABLE documents ADD COLUMN claimed_at INTEGER')
+}
+if (!documentColumns.some(col => col.name === 'claimed_from_guest')) {
+  db.exec('ALTER TABLE documents ADD COLUMN claimed_from_guest INTEGER NOT NULL DEFAULT 0')
+}
+
 /** Co-signer invite email (latest) - creator-visible; not a public capability secret. */
 const partyColumns = db.prepare('PRAGMA table_info(document_parties)').all() as Array<{ name: string }>
 if (!partyColumns.some(col => col.name === 'invite_email')) {
@@ -152,9 +169,23 @@ if (!signatureColumns.some(col => col.name === 'invite_id')) {
   db.exec('ALTER TABLE signatures ADD COLUMN invite_id TEXT')
 }
 
+/** Guest signing (`docs/guest-signing-plan.md`): auth method + preferred identity subject. */
+if (!signatureColumns.some(col => col.name === 'auth_method')) {
+  db.exec("ALTER TABLE signatures ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'wallet'")
+}
+if (!signatureColumns.some(col => col.name === 'signer_subject')) {
+  db.exec('ALTER TABLE signatures ADD COLUMN signer_subject TEXT')
+}
+
 /**
  * Opaque personal invite tokens (email-only capability).
  * Store token_hash only; raw token lives in the email body, never in API responses.
+ *
+ * `email` is `NOT NULL` today. Link-only (no-email) guest invites (Task 5 of
+ * `docs/guest-signing-plan.md`, future work) will store `email: ''` by
+ * convention rather than requiring a schema change/table rebuild for a
+ * nullable column - SQLite can't easily drop a NOT NULL constraint via
+ * `ALTER TABLE ADD COLUMN`.
  */
 db.exec(`
   CREATE TABLE IF NOT EXISTS party_invites (
@@ -175,6 +206,30 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_party_invites_party ON party_invites(party_id);
   CREATE INDEX IF NOT EXISTS idx_party_invites_doc ON party_invites(document_id);
+`)
+
+/**
+ * Guest signing (`docs/guest-signing-plan.md`): short-lived Bearer sessions scoped
+ * to a document + role, used instead of a Nimiq wallet session. `party_id` is null
+ * for a creator (document-key) principal, set for a co-signer (invite) principal.
+ *
+ * Naming-collision caution: `sig_handoff_rooms.from_role` (below) already uses the
+ * string `'guest'` for the non-host side of an unrelated cross-device QR pairing
+ * feature. That table has nothing to do with guest signing - don't conflate them.
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS guest_sessions (
+    token TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL,
+    party_id TEXT,
+    role TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    FOREIGN KEY (document_id) REFERENCES documents(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_guest_sessions_doc ON guest_sessions(document_id);
+  CREATE INDEX IF NOT EXISTS idx_guest_sessions_exp ON guest_sessions(expires_at);
 `)
 
 /** Drop duplicate rows so unique indexes can be applied on existing DBs. */
@@ -263,6 +318,15 @@ export interface DocumentRecord {
   readyToSealEmailSentAt: number | null
   /** Organizer name from create (invite copy); independent of signing roster. */
   creatorDisplayName: string | null
+  /** Guest signing (`docs/guest-signing-plan.md`): `wallet` | `guest` | `claimed`. */
+  authMode: 'wallet' | 'guest' | 'claimed'
+  /** SHA-256 of the raw document key (guest creator capability secret). Null for wallet docs. */
+  creatorDocumentKeyHash: string | null
+  creatorDocumentKeyCreatedAt: number | null
+  /** Set when a guest doc's creator ownership was claimed onto a wallet. */
+  claimedAt: number | null
+  /** Audit flag: true if this (now wallet/claimed) document started out as guest. */
+  claimedFromGuest: boolean
 }
 
 export interface PartyRecord {
@@ -291,6 +355,10 @@ export interface SignatureRecord {
   /** Frozen invite email when signed via personal invite token. */
   invitedAsEmail: string | null
   inviteId: string | null
+  /** Guest signing (`docs/guest-signing-plan.md`): `wallet` | `guest`. */
+  authMethod: 'wallet' | 'guest'
+  /** Preferred identity subject going forward; migration target for `signerAddress`. Unused (null) for wallet signatures today. */
+  signerSubject: string | null
 }
 
 export interface PartyInviteRecord {
@@ -396,6 +464,88 @@ export function markSessionVerified(
 
 export function purgeExpiredSessions(): number {
   const result = db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now())
+  return result.changes
+}
+
+/**
+ * Guest signing (`docs/guest-signing-plan.md`): CRUD for `guest_sessions`, the
+ * Bearer-token session table used instead of a Nimiq wallet session. `partyId`
+ * is null for a creator (document-key) principal, set for a co-signer (invite)
+ * principal. Tokens are stored raw/plaintext here, same trust model as the
+ * wallet `sessions.token` column above - the token itself is the bearer secret.
+ */
+export interface GuestSessionRecord {
+  token: string
+  documentId: string
+  partyId: string | null
+  role: 'creator' | 'signer'
+  createdAt: number
+  expiresAt: number
+  lastSeenAt: number
+}
+
+export function createGuestSession(input: {
+  token: string
+  documentId: string
+  partyId: string | null
+  role: 'creator' | 'signer'
+  ttlMs: number
+}): GuestSessionRecord {
+  const now = Date.now()
+  const expiresAt = now + input.ttlMs
+  db.prepare(
+    'INSERT INTO guest_sessions (token, document_id, party_id, role, created_at, expires_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  ).run(input.token, input.documentId, input.partyId, input.role, now, expiresAt, now)
+  return {
+    token: input.token,
+    documentId: input.documentId,
+    partyId: input.partyId,
+    role: input.role,
+    createdAt: now,
+    expiresAt,
+    lastSeenAt: now,
+  }
+}
+
+export function getGuestSession(token: string): GuestSessionRecord | null {
+  const row = db
+    .prepare(
+      'SELECT token, document_id as documentId, party_id as partyId, role, created_at as createdAt, expires_at as expiresAt, last_seen_at as lastSeenAt FROM guest_sessions WHERE token = ?',
+    )
+    .get(token) as
+    | {
+        token: string
+        documentId: string
+        partyId: string | null
+        role: string
+        createdAt: number
+        expiresAt: number
+        lastSeenAt: number
+      }
+    | undefined
+  if (!row || row.expiresAt < Date.now()) return null
+  return {
+    token: row.token,
+    documentId: row.documentId,
+    partyId: row.partyId,
+    role: row.role as 'creator' | 'signer',
+    createdAt: row.createdAt,
+    expiresAt: row.expiresAt,
+    lastSeenAt: row.lastSeenAt,
+  }
+}
+
+/** Best-effort activity ping - never throws if the row is gone (e.g. purged mid-request). */
+export function touchGuestSession(token: string): void {
+  try {
+    db.prepare('UPDATE guest_sessions SET last_seen_at = ? WHERE token = ?').run(Date.now(), token)
+  } catch {
+    // ignore
+  }
+}
+
+export function purgeExpiredGuestSessions(): number {
+  const result = db.prepare('DELETE FROM guest_sessions WHERE expires_at < ?').run(Date.now())
   return result.changes
 }
 
@@ -608,6 +758,12 @@ function rowToDocument(row: Record<string, unknown>): DocumentRecord {
     readyToSealEmailSentAt:
       (row.ready_to_seal_email_sent_at as number | null | undefined) ?? null,
     creatorDisplayName: (row.creator_display_name as string | null | undefined) ?? null,
+    authMode: (row.auth_mode as DocumentRecord['authMode'] | null | undefined) ?? 'wallet',
+    creatorDocumentKeyHash: (row.creator_document_key_hash as string | null | undefined) ?? null,
+    creatorDocumentKeyCreatedAt:
+      (row.creator_document_key_created_at as number | null | undefined) ?? null,
+    claimedAt: (row.claimed_at as number | null | undefined) ?? null,
+    claimedFromGuest: Boolean(row.claimed_from_guest),
   }
 }
 
@@ -616,12 +772,14 @@ export function insertDocument(doc: DocumentRecord): void {
     INSERT INTO documents (
       id, slug, title, original_filename, type, status, creator_address,
       original_sha256, final_sha256, page_count, metadata, annotations, required_signatures,
-      created_at, locked_at, creator_notify_email, ready_to_seal_email_sent_at, creator_display_name
+      created_at, locked_at, creator_notify_email, ready_to_seal_email_sent_at, creator_display_name,
+      auth_mode, creator_document_key_hash, creator_document_key_created_at, claimed_at, claimed_from_guest
     )
     VALUES (
       @id, @slug, @title, @originalFilename, @type, @status, @creatorAddress,
       @originalSha256, @finalSha256, @pageCount, @metadata, @annotations, @requiredSignatures,
-      @createdAt, @lockedAt, @creatorNotifyEmail, @readyToSealEmailSentAt, @creatorDisplayName
+      @createdAt, @lockedAt, @creatorNotifyEmail, @readyToSealEmailSentAt, @creatorDisplayName,
+      @authMode, @creatorDocumentKeyHash, @creatorDocumentKeyCreatedAt, @claimedAt, @claimedFromGuest
     )
   `).run({
     id: doc.id,
@@ -643,6 +801,15 @@ export function insertDocument(doc: DocumentRecord): void {
     creatorNotifyEmail: doc.creatorNotifyEmail,
     readyToSealEmailSentAt: doc.readyToSealEmailSentAt,
     creatorDisplayName: doc.creatorDisplayName,
+    // Default to the wallet-path shape so callers built before the guest-signing
+    // columns existed (e.g. server/scripts/test-annotations.mjs, which constructs a
+    // DocumentRecord literal directly) don't break on a missing bound param - mirrors
+    // the columns' own `DEFAULT 'wallet'` / NULL / 0 semantics.
+    authMode: doc.authMode ?? 'wallet',
+    creatorDocumentKeyHash: doc.creatorDocumentKeyHash ?? null,
+    creatorDocumentKeyCreatedAt: doc.creatorDocumentKeyCreatedAt ?? null,
+    claimedAt: doc.claimedAt ?? null,
+    claimedFromGuest: doc.claimedFromGuest ? 1 : 0,
   })
 }
 
@@ -710,6 +877,27 @@ export function lockDocument(id: string, lockedAt: number): void {
   db.prepare('UPDATE documents SET status = ?, locked_at = ? WHERE id = ?').run('locked', lockedAt, id)
 }
 
+/**
+ * One-shot: flips a guest document to wallet ownership. Guarded by `WHERE auth_mode = 'guest'`
+ * so a race between two claim attempts (or a claim on an already-claimed/wallet-native doc)
+ * is caught here, not just in application logic - the SECOND caller gets `changes === 0`.
+ */
+export function claimDocumentToWallet(
+  documentId: string,
+  walletAddress: string,
+  claimedAt: number,
+): boolean {
+  const wallet = normalizeAddress(walletAddress)
+  const result = db
+    .prepare(
+      `UPDATE documents
+       SET creator_address = ?, auth_mode = 'claimed', claimed_at = ?, claimed_from_guest = 1
+       WHERE id = ? AND auth_mode = 'guest'`,
+    )
+    .run(wallet, claimedAt, documentId)
+  return result.changes === 1
+}
+
 export function deleteDocumentById(documentId: string): boolean {
   const doc = getDocumentById(documentId)
   if (!doc) return false
@@ -749,6 +937,15 @@ export function deleteDocumentById(documentId: string): boolean {
       db.prepare('DELETE FROM document_list_prefs WHERE document_id = ?').run(id)
     } catch {
       /* optional table */
+    }
+    // Guest sessions FK-reference document_id with no cascade - only ever populated
+    // for guest-created/claimed documents (wallet docs never have rows here), so this
+    // is a no-op for the wallet-native delete path. Without it, cancelling a guest
+    // draft while its own creator session is still active hits a FK violation.
+    try {
+      db.prepare('DELETE FROM guest_sessions WHERE document_id = ?').run(id)
+    } catch {
+      /* defensive - table always present after migrate */
     }
     db.prepare('DELETE FROM documents WHERE id = ?').run(id)
   })
@@ -907,6 +1104,8 @@ function mapSignatureRow(row: Record<string, unknown>): SignatureRecord {
     signedAt: row.signed_at as number,
     invitedAsEmail: (row.invited_as_email as string | null | undefined) ?? null,
     inviteId: (row.invite_id as string | null | undefined) ?? null,
+    authMethod: (row.auth_method as SignatureRecord['authMethod'] | null | undefined) ?? 'wallet',
+    signerSubject: (row.signer_subject as string | null | undefined) ?? null,
   }
 }
 
@@ -1153,11 +1352,11 @@ export function insertSignature(sig: SignatureRecord): void {
   db.prepare(`
     INSERT INTO signatures (
       id, document_id, party_id, signer_address, signature_type, client_sha256, signed_at,
-      invited_as_email, invite_id
+      invited_as_email, invite_id, auth_method, signer_subject
     )
     VALUES (
       @id, @documentId, @partyId, @signerAddress, @signatureType, @clientSha256, @signedAt,
-      @invitedAsEmail, @inviteId
+      @invitedAsEmail, @inviteId, @authMethod, @signerSubject
     )
   `).run({
     id: sig.id,
@@ -1169,6 +1368,9 @@ export function insertSignature(sig: SignatureRecord): void {
     signedAt: sig.signedAt,
     invitedAsEmail: sig.invitedAsEmail,
     inviteId: sig.inviteId,
+    // Same defensive default as insertDocument() - see comment there.
+    authMethod: sig.authMethod ?? 'wallet',
+    signerSubject: sig.signerSubject ?? null,
   })
 }
 

@@ -5,6 +5,7 @@ import type {
   SealDocument,
   VerifyResult,
 } from './types'
+import { loadGuestSession, loadSession } from './session'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -35,8 +36,28 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return data as T
 }
 
+/**
+ * Also used for guest bearer tokens (`docs/guest-signing-plan.md`) - the header shape
+ * is identical (`Bearer <token>`); the server tells wallet vs. guest apart by which
+ * table (`sessions` vs `guest_sessions`) the token resolves against.
+ */
 export function withAuth(token: string) {
   return { Authorization: `Bearer ${token}` }
+}
+
+/**
+ * Convenience accessor for whichever session is currently active. Checks the guest
+ * session first (shouldn't normally coexist with a wallet session, but guest takes
+ * priority if it somehow does), then falls back to the wallet session. Returns
+ * `undefined` when neither is present. Scaffolding for later tasks - existing call
+ * sites are not rewired to use this yet.
+ */
+export function currentAuthHeader(): Record<string, string> | undefined {
+  const guest = loadGuestSession()
+  if (guest) return withAuth(guest.token)
+  const wallet = loadSession()
+  if (wallet) return withAuth(wallet.token)
+  return undefined
 }
 
 /** Shared shape for on-chain data archive quote / SSE progress events. */
@@ -90,6 +111,36 @@ export interface SignDocumentBody {
   signatureImage?: string
   /** Raw personal invite token from email deep link (`?invite=`). */
   inviteToken?: string
+}
+
+/**
+ * Guest create (`docs/guest-signing-plan.md` Task 3) - same shape as
+ * `CreateDocumentBody` but no `creatorRole` (guest always creates the
+ * creator party) and `creatorDisplayName` is required, not optional -
+ * there is no wallet address to fall back to as a label.
+ */
+export interface CreateGuestDocumentBody {
+  title: string
+  originalFileName?: string
+  type: string
+  creatorDisplayName: string
+  originalSha256: string
+  pageCount: number
+  metadata?: DocumentMetadata
+  parties?: Array<{ role: string; displayName: string; required?: boolean }>
+  requiredSignatures?: number
+  creatorNotifyEmail?: string
+  annotations?: DocumentAnnotation[]
+  /** Omit when Turnstile is not wired in client-side (see DocumentJourney's createGuestDoc). */
+  turnstileToken?: string
+}
+
+export interface CreateGuestDocumentResult {
+  document: SealDocument
+  /** Raw document key secret - shown ONCE. Never returned by the server again. */
+  documentKey: string
+  guestSession: { token: string; expiresAt: number }
+  hashWarning?: string
 }
 
 export const api = {
@@ -159,6 +210,17 @@ export const api = {
     request<{ document: SealDocument; hashWarning?: string }>('/api/documents', {
       method: 'POST',
       headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+
+  /**
+   * Guest create - no `Authorization` header, no wallet involved.
+   * `docs/guest-signing-plan.md` Task 3 / `POST /api/documents/guest`.
+   */
+  createGuestDocument: (body: CreateGuestDocumentBody) =>
+    request<CreateGuestDocumentResult>('/api/documents/guest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }),
 
@@ -377,6 +439,70 @@ export const api = {
     request<{ documentId: string; slug: string; partyId: string }>(
       `/api/invites/lookup?token=${encodeURIComponent(inviteToken)}`,
     ),
+
+  /**
+   * Creator (wallet or guest): mint a personal, link-only party invite - no email
+   * required (`docs/guest-signing-plan.md` Task 5). Same rotation semantics as
+   * `sendPartyInviteEmail`: minting a fresh link for a party invalidates any previous
+   * link/email invite for that party.
+   */
+  mintPartyInvite: (token: string, docId: string, body: { partyId: string; email?: string }) =>
+    request<{ inviteUrl: string; token: string; expiresAt: number }>(
+      `/api/documents/${docId}/party-invites`,
+      {
+        method: 'POST',
+        headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    ),
+
+  /**
+   * Redeem a personal party invite token into a guest signer session - no wallet,
+   * no `Authorization` header (`docs/guest-signing-plan.md` Task 5). Does not consume
+   * the invite (that only happens at actual sign time) - safe to call again if the
+   * resulting guest session later expires.
+   */
+  redeemInviteAsGuest: (inviteToken: string) =>
+    request<{ session: { token: string; expiresAt: number } }>('/api/auth/guest/redeem-invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inviteToken }),
+    }),
+
+  /**
+   * Redeem a guest creator's document key into a fresh guest creator session - the
+   * "Enter document key" re-entry path for a new browser/device with no active guest
+   * session (`docs/guest-signing-plan.md` Task 7 / API surface "Redeem document key").
+   * No wallet, no `Authorization` header. Never consumes/rotates the key - safe to
+   * call again from yet another device or after a prior session expired.
+   */
+  redeemDocumentKey: (body: { documentId?: string; slug?: string; documentKey: string }) =>
+    request<{ session: { token: string; expiresAt: number } }>(
+      '/api/auth/guest/redeem-document-key',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    ),
+
+  /**
+   * Wallet claim of a guest-owned agreement (`docs/guest-signing-plan.md` Task 6) - binds
+   * `creatorAddress` to this wallet and flips `authMode` to `claimed`. Proof is either a
+   * live guest creator session token for this document, or the document key typed in by
+   * hand (new device / browser, or an expired session). Past guest signature rows are
+   * unchanged - claim is ownership-only, never a signature rewrite.
+   */
+  claimDocument: (
+    token: string,
+    docId: string,
+    body: { documentKey?: string; guestSessionToken?: string },
+  ) =>
+    request<{ document: SealDocument }>(`/api/documents/${docId}/claim`, {
+      method: 'POST',
+      headers: { ...withAuth(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
 
   /** Creator share step: set total required signatures (1–10) and optional co-signer names. */
   configureCosigners: (

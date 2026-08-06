@@ -11,6 +11,7 @@ import {
   Shield,
   ShieldCheck,
   Trash2,
+  Wallet,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -91,6 +92,8 @@ import { SignOnMobileModal } from './SignOnMobileModal'
 import { isLikelyMobileViewport } from '../useViewport'
 import { StageRail } from './StageRail'
 import { CancelAgreementModal } from './CancelAgreementModal'
+import { ClaimAgreementModal } from './ClaimAgreementModal'
+import { GuestDocumentKeyModal } from './GuestDocumentKeyModal'
 import { PlacementEditor } from '../pdf/PlacementEditor'
 import { SignedDocumentView } from '../pdf/SignedDocumentView'
 import { SignerFillView, type SignerFillResult } from '../pdf/SignerFillView'
@@ -113,6 +116,7 @@ import {
   packPlacementBatch,
 } from '../pdf/placementStream'
 import { saveHubReturnPath } from '../hubReturnPath'
+import { clearGuestSession, loadGuestSession, saveGuestSession, type StoredGuestSession } from '../session'
 import { journeyPathMeta, type PageMeta } from '../seo'
 import {
   allSigned,
@@ -170,6 +174,19 @@ function slugFromPath(pathname: string): string | null {
 function verifySlugFromPath(pathname: string): string | null {
   const m = pathname.match(/^\/v\/([a-zA-Z0-9_-]+)/)
   return m?.[1] ?? null
+}
+
+/**
+ * Client-side mirror of `guestPartySubject` (`server/src/guestIdentity.ts`) - the sentinel
+ * `signer_address` / viewer subject for a guest co-signer party (`docs/guest-signing-plan.md`
+ * Task 5). Kept byte-identical to the server's raw (non-uppercased) form deliberately: every
+ * comparison site that matters (`resolveSigningParty`, `isDocumentCreator`, `canDeleteDocument`)
+ * already runs both sides through `normalizeAddress()` (a pure `toUpperCase()` transform)
+ * before comparing, so the exact casing produced here never actually affects a match - this
+ * form is chosen purely so it reads identically to the server helper it mirrors.
+ */
+function guestPartySubject(partyId: string): string {
+  return `guest:party:${partyId}`
 }
 
 async function loadVerifyDetails(
@@ -262,6 +279,83 @@ export function DocumentJourney({
   const [doc, setDoc] = useState<JourneyDoc | null>(null)
   const [sharedAck, setSharedAck] = useState(false)
   /**
+   * Guest create success (`docs/guest-signing-plan.md` Task 3) - a non-null value IS
+   * the "modal open" state (same nullable-object idiom as `inviteHandoff` below). The
+   * raw key only ever lives here, in memory, for this one screen.
+   */
+  const [guestDocumentKeyModal, setGuestDocumentKeyModal] = useState<{
+    documentKey: string
+    savedAck: boolean
+  } | null>(null)
+  /**
+   * Guest creator session, hydrated from `localStorage` (`docs/guest-signing-plan.md`
+   * Task 4). `createGuestDoc` keeps this in sync at create time; the effect below
+   * re-reads `localStorage` whenever the loaded document changes so navigating between
+   * documents (or a hard refresh landing on a `/d/:slug` deep link) picks up whatever
+   * guest session is actually stored for that document - mirrors the wallet session
+   * hydration idea in `useJourneyWallet.ts` (`loadSession()` checks), kept intentionally
+   * simple here (no boot-gating needed - a stale/missing guest session just means the
+   * derived values below fall back to wallet-only behavior).
+   */
+  const [guestSession, setGuestSession] = useState<StoredGuestSession | null>(() =>
+    loadGuestSession(),
+  )
+  useEffect(() => {
+    setGuestSession(loadGuestSession())
+  }, [doc?.id])
+  /**
+   * Guest session that actually matches the currently-loaded document, ANY role
+   * (`docs/guest-signing-plan.md` Task 5 - generalized from the Task 4 creator-only
+   * version). A co-signer's redeemed invite session (role `'signer'`) now resolves here
+   * too, not just the document's own creator.
+   */
+  const activeGuestSession = useMemo(
+    () => (guestSession && doc && guestSession.documentId === doc.id ? guestSession : null),
+    [guestSession, doc],
+  )
+  /** Non-null only for a matching guest CREATOR session - creator-only actions key off this. */
+  const activeGuestCreatorSession = useMemo(
+    () => (activeGuestSession?.role === 'creator' ? activeGuestSession : null),
+    [activeGuestSession],
+  )
+  /** Non-null only for a matching guest CO-SIGNER (non-creator, invite-redeemed) session. */
+  const activeGuestSignerSession = useMemo(
+    () => (activeGuestSession?.role === 'signer' ? activeGuestSession : null),
+    [activeGuestSession],
+  )
+  /**
+   * Effective identity for actions genuinely shared between a guest creator and a guest
+   * co-signer (sign, submit page fields, load the placement plan, resolve the signing
+   * party): a real wallet always takes priority; otherwise fall back to ANY matching
+   * guest session, either role. The derived ADDRESS is role-aware: a creator session
+   * resolves to `doc.source.creatorAddress` (the `guest:doc:{id}` sentinel, already
+   * normalized by the server - see `guestCreatorSubject`), a signer session resolves to
+   * `guestPartySubject(partyId)` (the `guest:party:{id}` sentinel). Both sentinels are
+   * safe to feed into `isDocumentCreator` / `canDeleteDocument` (`../agreements`) and
+   * `resolveSigningParty` (`../signing`), which already compare via `normalizeAddress`
+   * - a pure string transform. When there is no matching guest session, both reduce to
+   * exactly `token`/`address` (byte-for-byte unchanged wallet behavior).
+   */
+  const effectiveToken = token || activeGuestSession?.token || null
+  const effectiveAddress =
+    address ||
+    (activeGuestSession
+      ? activeGuestSession.role === 'creator'
+        ? doc?.source.creatorAddress ?? null
+        : guestPartySubject(activeGuestSession.partyId!)
+      : null)
+  /**
+   * Effective identity for CREATOR-ONLY mutations: roster / cosigners / notify-email /
+   * cancel-delete / placement lock-unlock. These must NEVER resolve for a co-signer's
+   * guest session - a co-signer legitimately holding `effectiveToken` above must not be
+   * able to cancel the agreement or rewrite the roster. This is exactly the Task 4
+   * `effectiveToken`/`effectiveAddress` pair, renamed (not otherwise changed): it still
+   * keys off `activeGuestCreatorSession` only, never the widened `activeGuestSession`.
+   */
+  const creatorOnlyEffectiveToken = token || activeGuestCreatorSession?.token || null
+  const creatorOnlyEffectiveAddress =
+    address || (activeGuestCreatorSession ? doc?.source.creatorAddress ?? null : null)
+  /**
    * Creator free-complete (all signed): print/done is primary until they choose lock.
    * preferSeal / lock CTAs (“Lock now”, “Retry lock”) set this so seal payment stays front-and-center.
    */
@@ -302,6 +396,17 @@ export function DocumentJourney({
     Record<string, { email: string; sentAt: number }>
   >({})
   /**
+   * partyId → minted personal invite LINK (`docs/guest-signing-plan.md` Task 5 -
+   * "Create invite link"). In-memory only for this session - the raw token only ever
+   * lives inside `url` itself, same "shown once" spirit as the document key but lower
+   * stakes (revocable/rotatable), so no dedicated modal is needed here.
+   */
+  const [partyLinkInvites, setPartyLinkInvites] = useState<
+    Record<string, { url: string; expiresAt: number }>
+  >({})
+  /** partyId → link-invite mint in flight (separate from `inviteSendBusyId`, the email one). */
+  const [linkInviteBusyId, setLinkInviteBusyId] = useState<string | null>(null)
+  /**
    * Post-invite handoff help: email or copy-link.
    * Stays open until the user dismisses (no auto-timeout - easy to miss).
    */
@@ -328,6 +433,15 @@ export function DocumentJourney({
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelBusy, setCancelBusy] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
+  /**
+   * Wallet claim of a guest-owned agreement (`docs/guest-signing-plan.md` Task 6) -
+   * "Save to wallet" from either the dock header pill or the free-complete CTA opens
+   * this same modal/state, regardless of which one was clicked.
+   */
+  const [claimModalOpen, setClaimModalOpen] = useState(false)
+  const [claimDocumentKeyInput, setClaimDocumentKeyInput] = useState('')
+  const [claimBusy, setClaimBusy] = useState(false)
+  const [claimError, setClaimError] = useState<string | null>(null)
   const fileSizeByDocIdRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
@@ -898,6 +1012,60 @@ export function DocumentJourney({
               /* private mode */
             }
           }
+
+          /**
+           * Guest co-signer auto-redeem (`docs/guest-signing-plan.md` Task 5) - the
+           * lookup above only resolves which party this link is for; it does not
+           * authenticate anything. A connected wallet always wins (matches the "real
+           * wallet wins" principle used everywhere else this session) - only attempt
+           * a guest session when there is none. Read the PERSISTED guest session
+           * fresh (not the `guestSession` state closure) so this decision is never
+           * stale and this effect's deps below don't need to widen for it.
+           */
+          if (FEATURES.guestSigning && !account) {
+            const existing = loadGuestSession()
+            const alreadyRedeemed =
+              existing &&
+              existing.documentId === res.documentId &&
+              existing.role === 'signer' &&
+              existing.partyId === res.partyId
+            if (!alreadyRedeemed) {
+              void api
+                .redeemInviteAsGuest(token)
+                .then(({ session }) => {
+                  if (cancelled) return
+                  const next: StoredGuestSession = {
+                    token: session.token,
+                    documentId: res.documentId,
+                    partyId: res.partyId,
+                    role: 'signer',
+                  }
+                  saveGuestSession(next)
+                  setGuestSession(next)
+                })
+                .catch((redeemErr: unknown) => {
+                  if (cancelled) return
+                  // Only surface a hard "invite is dead" banner for the same statuses
+                  // the lookup catch below treats that way - a guest-signing-off /
+                  // rate-limited failure here should NOT claim the (still valid) link
+                  // is dead, since the wallet-era sign path (raw inviteToken) may
+                  // still work for this same link. Note: the server also returns 404
+                  // (not 403/503) when `GUEST_SIGNING` itself is off server-side
+                  // (`guestSigningDisabled`) - exclude that specific message so a
+                  // flag mismatch never gets mislabeled as a dead invite.
+                  const status =
+                    redeemErr && typeof redeemErr === 'object' && 'status' in redeemErr
+                      ? Number((redeemErr as { status?: number }).status)
+                      : 0
+                  const message =
+                    redeemErr instanceof Error && redeemErr.message.trim() ? redeemErr.message : ''
+                  const guestSigningOff = /guest signing is disabled/i.test(message)
+                  if (!guestSigningOff && (status === 410 || status === 404)) {
+                    setInviteLinkInvalid(message || 'This invite link is no longer valid.')
+                  }
+                })
+            }
+          }
         })
         .catch((err: unknown) => {
           if (cancelled) return
@@ -931,7 +1099,11 @@ export function DocumentJourney({
       setStashedInviteToken(null)
       setInvitePartyFromToken(null)
     }
-  }, [doc?.slug, navEpoch])
+    // `account` re-runs this when a wallet connects after mount (async Hub reconnect
+    // can resolve after this effect's first run) so the guest-redeem branch above
+    // correctly backs off once a real wallet is present - re-running the (idempotent)
+    // lookup call itself is harmless.
+  }, [doc?.slug, navEpoch, account])
 
   // Seed share-step cosigner draft from the live document once per agreement.
   useEffect(() => {
@@ -957,9 +1129,10 @@ export function DocumentJourney({
   }, [doc?.id, step]) // eslint-disable-line react-hooks/exhaustive-deps -- seed on open only
 
   const revealParticipantPrivate = Boolean(
-    doc && canRevealParticipantDetails(doc.source, address),
+    doc && canRevealParticipantDetails(doc.source, effectiveAddress),
   )
-  const canCancelCurrent = Boolean(doc && canDeleteDocument(doc.source, address))
+  // Cancel/delete is a creator-only action - a co-signer's guest session must never trigger it.
+  const canCancelCurrent = Boolean(doc && canDeleteDocument(doc.source, creatorOnlyEffectiveAddress))
 
   /** Verify path: fingerprint match settled (used to slim header + drop redundant lists). */
   const verifyMatched = verifyOutcome.kind === 'match'
@@ -1056,8 +1229,9 @@ export function DocumentJourney({
       doc &&
       constructionPlan?.status === 'locked' &&
       signedCount(doc) === 0 &&
-      address &&
-      isDocumentCreator(doc.source, address),
+      // Re-opening field layout is creator-only - a co-signer's guest session must not trigger it.
+      creatorOnlyEffectiveAddress &&
+      isDocumentCreator(doc.source, creatorOnlyEffectiveAddress),
   )
   /** Full placement editor (PDF stage + people) - not during invite/wait dock. */
   const showSetupPlacementEditor = Boolean(
@@ -1081,7 +1255,7 @@ export function DocumentJourney({
     showSetupPlacementEditor && constructionPlan?.status !== 'locked'
       ? placementLockBusy
         ? null
-        : !token
+        : !effectiveToken
           ? 'Log in to save the layout.'
           : busy
             ? null
@@ -1090,7 +1264,7 @@ export function DocumentJourney({
   const setupContinueDisabled = Boolean(
     showSetupPlacementEditor &&
       constructionPlan?.status !== 'locked' &&
-      (busy || !token || placementLockBusy || setupContinueLayoutBlocked),
+      (busy || !effectiveToken || placementLockBusy || setupContinueLayoutBlocked),
   )
 
   /** Disabled buttons don't fire click — wrapper catches the attempt and flashes the hint. */
@@ -1110,9 +1284,22 @@ export function DocumentJourney({
     }
   }, [doc?.id, navEpoch])
 
-  // Email invite party wins over legacy ?party= and manual pick when token is valid.
+  /**
+   * Priority order (highest first):
+   * 1. `activeGuestSignerSession.partyId` - an already-AUTHENTICATED binding (the invite
+   *    was redeemed into a guest session server-side, Turnstile/rate-limit checks and all)
+   *    for one specific party. Strictly more authoritative than the wallet-era signal
+   *    below, which is only a pre-auth lookup hint - wins if the two ever disagree.
+   * 2. `invitePartyFromToken` - wallet-era equivalent: the same `?invite=` link, but only
+   *    resolved (via `GET /api/invites/lookup`) to a party id, not yet authenticated to it.
+   * 3. `pickedPartyId` - manual "Who are you?" pick for an open name-only slot.
+   * 4. `preferredPartyFromUrl` - legacy `?party=` soft prefer.
+   */
   const effectivePreferredPartyId =
-    invitePartyFromToken || pickedPartyId || preferredPartyFromUrl
+    activeGuestSignerSession?.partyId ||
+    invitePartyFromToken ||
+    pickedPartyId ||
+    preferredPartyFromUrl
 
   /** Prefer typed name, then create-time name, then a real party label (not placeholders). */
   const resolveSignDisplayName = useCallback(
@@ -1135,8 +1322,8 @@ export function DocumentJourney({
   )
 
   const signingResolution =
-    doc && address
-      ? resolveSigningParty(doc.source, address, {
+    doc && effectiveAddress
+      ? resolveSigningParty(doc.source, effectiveAddress, {
           allowOpenClaim: !creatorIsOrganizerOnly,
           preferredPartyId: effectivePreferredPartyId,
         })
@@ -1682,6 +1869,92 @@ export function DocumentJourney({
     }
   }
 
+  /**
+   * Guest create (`docs/guest-signing-plan.md` Task 3 - locked decision).
+   * No wallet/token needed. Direct seal (0 required signatures) is wallet-only
+   * by design and out of scope here - this call always sends
+   * `requiredSignatures: 1`; enforcing the guest-can't-direct-seal rule for
+   * later roster/cosigner edits is a later task's server-side responsibility.
+   */
+  const createGuestDoc = async () => {
+    if (!pdfFile || !pdfHash) return
+    // Guest has no wallet address to fall back to as a label - unlike the wallet
+    // path's `creatorName.trim() || 'Organizer'`, a real name is required here.
+    if (!creatorName.trim()) {
+      setLocalError('Your name is required')
+      return
+    }
+    setBusy(true)
+    setLocalError(null)
+    try {
+      // Fingerprint only - parties / who signs are set when placements lock.
+      const metadata =
+        documentTypeUsesNotes(docType) && docNotes.trim()
+          ? { notes: clampField(docNotes.trim(), MAX_DOCUMENT_NOTES_LENGTH) }
+          : undefined
+
+      const { document, documentKey, guestSession, hashWarning } =
+        await api.createGuestDocument({
+          title: clampField(title || stripDocumentExtension(pdfFile.name), MAX_TITLE_LENGTH),
+          originalFileName: pdfFile.name,
+          type: docType,
+          creatorDisplayName: clampField(creatorName.trim(), MAX_DISPLAY_NAME_LENGTH),
+          originalSha256: pdfHash,
+          pageCount,
+          requiredSignatures: 1,
+          ...(metadata ? { metadata } : {}),
+          // TODO(guest-signing): no Turnstile widget is wired into this component yet.
+          // `SupportPage.tsx` has a working Cloudflare Turnstile pattern (script load +
+          // explicit render + token callback), but it's ~100 lines of script-loading /
+          // widget-lifecycle code that isn't factored into a reusable hook anywhere in
+          // this codebase today. Deferring that extraction to a follow-up task rather
+          // than inlining a one-off copy here. The server route no-ops the Turnstile
+          // check while `TURNSTILE_SECRET_KEY` is unset, but will 400 once an
+          // environment has it configured - this call must start sending
+          // `turnstileToken` before that happens in production.
+        })
+
+      if (hashWarning) setLocalError(hashWarning)
+      setActiveFromSeal(document, pdfFile.size)
+      setSharedAck(false)
+      setSignFile(pdfFile)
+      setSignHash(pdfHash)
+      setConstructionPlan(emptyPlan(pdfHash, 2))
+      setPageFieldsConfirmed(false)
+      // Bearer token for this guest's creator session - localStorage (not
+      // sessionStorage), see `client/src/session.ts` for why.
+      saveGuestSession({
+        token: guestSession.token,
+        documentId: document.id,
+        partyId: null,
+        role: 'creator',
+      })
+      // Keep React state and localStorage in sync in the same render pass - the
+      // `doc?.id`-keyed re-sync effect above would also pick this up next render,
+      // but setting it directly here avoids a one-render gap where
+      // `activeGuestCreatorSession` is still null right after create.
+      setGuestSession({
+        token: guestSession.token,
+        documentId: document.id,
+        partyId: null,
+        role: 'creator',
+      })
+      // Raw key only ever lives in this component's memory - never persisted
+      // automatically. The modal is the only place it is shown.
+      setGuestDocumentKeyModal({ documentKey, savedAck: false })
+      window.history.pushState({}, '', `/d/${document.slug}`)
+      // Keep IndexedDB local PDF so hard-refresh / Pay remount can rehydrate the file.
+      // (Clearing here forced “drop document again” after every deploy refresh.)
+      void flushCreatePdfDraft()
+      // Step advances to Setup - bring the next actions into view.
+      scrollToJourneyAction('auto')
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Create failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const dismissInviteHandoff = useCallback(() => {
     setInviteHandoff(null)
   }, [])
@@ -1791,7 +2064,7 @@ export function DocumentJourney({
     let cancelled = false
     setPlanLoadState('loading')
     void api
-      .getPlacementPlan(doc.fingerprint, token, { documentId: doc.id })
+      .getPlacementPlan(doc.fingerprint, effectiveToken, { documentId: doc.id })
       .then(r => {
         if (cancelled) return
         if (!r.plan) {
@@ -1845,7 +2118,7 @@ export function DocumentJourney({
     return () => {
       cancelled = true
     }
-  }, [doc?.id, doc?.fingerprint, token])
+  }, [doc?.id, doc?.fingerprint, effectiveToken])
 
   /**
    * Seed a draft plan only after we know the server has none (create / setup path).
@@ -1905,7 +2178,7 @@ export function DocumentJourney({
 
   const signAsCurrentUser = useCallback(
     async (opts?: { signatureBlob?: Blob | null; displayName?: string }) => {
-      if (!token || !doc || !address) return false
+      if (!effectiveToken || !doc || !effectiveAddress) return false
 
       // Prefer explicit sign-step hash; fall back to create-time file still in this session.
       const clientHash =
@@ -1923,8 +2196,8 @@ export function DocumentJourney({
         FEATURES.pdfAnnotationUi &&
         constructionPlan?.status === 'locked' &&
         (constructionPlan.creatorSigningAs == null || constructionPlan.creatorSigningAs === 0) &&
-        isDocumentCreator(doc.source, address)
-      const resolution = resolveSigningParty(doc.source, address, {
+        isDocumentCreator(doc.source, effectiveAddress)
+      const resolution = resolveSigningParty(doc.source, effectiveAddress, {
         allowOpenClaim: !creatorOnlyBlock,
         preferredPartyId: effectivePreferredPartyId,
       })
@@ -1953,7 +2226,7 @@ export function DocumentJourney({
       setLocalError(null)
       try {
         const signatureImage = await prepareSignatureImageUpload(ink)
-        const { document: signedDoc } = await api.signDocument(token, doc.id, {
+        const { document: signedDoc } = await api.signDocument(effectiveToken, doc.id, {
           partyId: myParty.id,
           signatureType: 'drawn',
           clientSha256: clientHash,
@@ -1984,7 +2257,7 @@ export function DocumentJourney({
           setMobileSigPreview(null)
         }
         // Invitees stay on the signer path so they never land on seal CTAs.
-        if (!isDocumentCreator(signedDoc, address)) {
+        if (!isDocumentCreator(signedDoc, effectiveAddress)) {
           setRole('signer')
           saveJourneyIntent('signer')
           setSharedAck(true)
@@ -2020,7 +2293,7 @@ export function DocumentJourney({
         // Slot races / already-signed: pull latest party assignment for a clean retry.
         if (/already signed|claimed this slot|refresh/i.test(message) && doc?.slug) {
           try {
-            const { document: latest } = await api.getDocument(doc.slug, token)
+            const { document: latest } = await api.getDocument(doc.slug, effectiveToken)
             setActiveFromSeal(latest, doc.fileSize)
           } catch {
             /* keep prior doc state */
@@ -2032,9 +2305,9 @@ export function DocumentJourney({
       }
     },
     [
-      token,
+      effectiveToken,
       doc,
-      address,
+      effectiveAddress,
       signHash,
       pdfHash,
       constructionPlan,
@@ -2052,10 +2325,10 @@ export function DocumentJourney({
 
   const submitPageFields = useCallback(
     async (result: SignerFillResult) => {
-      if (!token || !doc || !constructionPlan?.planRoot) {
+      if (!effectiveToken || !doc || !constructionPlan?.planRoot) {
         throw new Error('Missing session or locked plan')
       }
-      if (!address) {
+      if (!effectiveAddress) {
         throw new Error('Connect your wallet before submitting fields')
       }
       const hash = (pdfHash || signHash || doc.fingerprint || '').toLowerCase()
@@ -2089,8 +2362,8 @@ export function DocumentJourney({
           constructionPlan.status === 'locked' &&
           (constructionPlan.creatorSigningAs == null ||
             constructionPlan.creatorSigningAs === 0) &&
-          isDocumentCreator(doc.source, address)
-        const resolution = resolveSigningParty(doc.source, address, {
+          isDocumentCreator(doc.source, effectiveAddress)
+        const resolution = resolveSigningParty(doc.source, effectiveAddress, {
           allowOpenClaim: !creatorOnlyBlock,
           preferredPartyId: effectivePreferredPartyId,
         })
@@ -2136,7 +2409,7 @@ export function DocumentJourney({
               lastBatchRoot ||
               planRoot ||
               '0000000000000000000000000000000000000000000000000000000000000000'
-            const live = await api.getPlacementPlan(hash, token, { documentId: doc.id })
+            const live = await api.getPlacementPlan(hash, effectiveToken, { documentId: doc.id })
             batchIndex = (live.fillBatchCount ?? 0) + 1
             prev = live.lastBatchRoot || live.batch0Root || live.planRoot || prev
             known = new Set(live.knownBlobIds ?? [])
@@ -2154,7 +2427,7 @@ export function DocumentJourney({
             })
             const batchRoot = await computeBatchRoot(batch)
             const frames = packPlacementBatch({ ...batch, batchRoot })
-            const saved = await api.appendPlacementFill(token, hash, {
+            const saved = await api.appendPlacementFill(effectiveToken, hash, {
               personSlotIndex: result.personSlotIndex,
               prevRoot: prev,
               batchRoot,
@@ -2198,7 +2471,7 @@ export function DocumentJourney({
       }
     },
     [
-      token,
+      effectiveToken,
       doc,
       constructionPlan,
       pdfHash,
@@ -2207,7 +2480,7 @@ export function DocumentJourney({
       knownBlobIds,
       signerName,
       creatorName,
-      address,
+      effectiveAddress,
       effectivePreferredPartyId,
       signAsCurrentUser,
       resolveSignDisplayName,
@@ -2215,7 +2488,7 @@ export function DocumentJourney({
   )
 
   const lockPlacements = useCallback(async () => {
-    if (!token || !doc || !constructionPlan) return
+    if (!creatorOnlyEffectiveToken || !doc || !constructionPlan) return
     const hash = (pdfHash || signHash || doc.fingerprint || constructionPlan.pdfSha256).toLowerCase()
     if (!/^[a-f0-9]{64}$/.test(hash)) {
       setLocalError('Document fingerprint missing - re-open the file.')
@@ -2251,7 +2524,7 @@ export function DocumentJourney({
       const planRoot = await computePlanRoot(planForHash)
       const lockedLocal = lockConstructionPlanLocal(planForHash, planRoot)
       const packed = await packLockedPlan(lockedLocal)
-      const saved = await api.savePlacementPlan(token, {
+      const saved = await api.savePlacementPlan(creatorOnlyEffectiveToken, {
         originalSha256: hash,
         documentId: doc.id,
         plan: lockedLocal,
@@ -2285,7 +2558,7 @@ export function DocumentJourney({
         rosterIdx = found >= 0 ? found : null
       }
 
-      const { document: rosterDoc } = await api.configureSigningRoster(token, doc.id, {
+      const { document: rosterDoc } = await api.configureSigningRoster(creatorOnlyEffectiveToken, doc.id, {
         parties: sortedPeople.map(p => ({
           displayName: p.displayName?.trim() || `Person ${p.slotIndex}`,
           role: p.role,
@@ -2319,7 +2592,7 @@ export function DocumentJourney({
       setPlacementLockBusy(false)
     }
   }, [
-    token,
+    creatorOnlyEffectiveToken,
     doc,
     constructionPlan,
     pdfHash,
@@ -2331,7 +2604,7 @@ export function DocumentJourney({
 
   /** Re-open placements for editing (before anyone fills fields or signs). */
   const unlockPlacements = useCallback(async () => {
-    if (!token || !doc || !constructionPlan) return
+    if (!creatorOnlyEffectiveToken || !doc || !constructionPlan) return
     if (signedCount(doc) > 0) {
       setLocalError('Placements cannot be changed after someone has signed.')
       return
@@ -2345,7 +2618,7 @@ export function DocumentJourney({
     setPlacementStatus(null)
     setLocalError(null)
     try {
-      const saved = await api.savePlacementPlan(token, {
+      const saved = await api.savePlacementPlan(creatorOnlyEffectiveToken, {
         originalSha256: hash,
         documentId: doc.id,
         unlock: true,
@@ -2385,7 +2658,7 @@ export function DocumentJourney({
     } finally {
       setPlacementLockBusy(false)
     }
-  }, [token, doc, constructionPlan, pdfHash, signHash])
+  }, [creatorOnlyEffectiveToken, doc, constructionPlan, pdfHash, signHash])
 
   /**
    * Creator finished inviting - switch to the quiet waiting view (not a second
@@ -2413,7 +2686,7 @@ export function DocumentJourney({
     requiredSignatures?: number
     coSignerNames?: string[]
   }) => {
-    if (!token || !doc) return
+    if (!creatorOnlyEffectiveToken || !doc) return
     const total = Math.max(
       1,
       Math.min(10, overrides?.requiredSignatures ?? requiredSigners),
@@ -2423,7 +2696,7 @@ export function DocumentJourney({
     setLocalError(null)
     try {
       const others = Math.max(0, total - 1)
-      const { document } = await api.configureCosigners(token, doc.id, {
+      const { document } = await api.configureCosigners(creatorOnlyEffectiveToken, doc.id, {
         requiredSignatures: total,
         coSignerNames: names.slice(0, others).map(n => n.trim()),
       })
@@ -2439,7 +2712,7 @@ export function DocumentJourney({
 
   /** Save optional “email me when everyone has signed” with visible success feedback. */
   const saveNotifyEmail = async () => {
-    if (!token || !doc || !FEATURES.emailNotifyUi) return
+    if (!creatorOnlyEffectiveToken || !doc || !FEATURES.emailNotifyUi) return
     const raw = creatorNotifyEmail.trim()
     if (raw && !isValidEmailAddress(raw)) {
       setNotifyEmailError('Enter a valid email address')
@@ -2455,7 +2728,7 @@ export function DocumentJourney({
     setLocalError(null)
     try {
       const email = raw || null
-      await api.setDocumentNotifyEmail(token, doc.id, email)
+      await api.setDocumentNotifyEmail(creatorOnlyEffectiveToken, doc.id, email)
       setNotifyEmailSavedValue(raw)
       setCreatorNotifyEmail(raw)
       setNotifyEmailFlashSaved(true)
@@ -2483,7 +2756,7 @@ export function DocumentJourney({
 
   /** Creator-only: open cancel confirm (before anyone has signed). */
   const requestCancelCurrentAgreement = () => {
-    if (!token || !doc || !canDeleteDocument(doc.source, address)) return
+    if (!creatorOnlyEffectiveToken || !doc || !canDeleteDocument(doc.source, creatorOnlyEffectiveAddress)) return
     setCancelError(null)
     setCancelModalOpen(true)
   }
@@ -2496,13 +2769,13 @@ export function DocumentJourney({
 
   /** Creator-only: cancel after modal confirm. */
   const confirmCancelCurrentAgreement = async () => {
-    if (!token || !doc || !canDeleteDocument(doc.source, address)) return
+    if (!creatorOnlyEffectiveToken || !doc || !canDeleteDocument(doc.source, creatorOnlyEffectiveAddress)) return
     setCancelBusy(true)
     setBusy(true)
     setCancelError(null)
     setLocalError(null)
     try {
-      await api.deleteDocument(token, doc.id)
+      await api.deleteDocument(creatorOnlyEffectiveToken, doc.id)
       setCancelModalOpen(false)
       setDoc(null)
       setSharedAck(false)
@@ -2524,6 +2797,60 @@ export function DocumentJourney({
       setBusy(false)
     }
   }
+
+  /** Creator-only: open the "Save to wallet" claim modal for the current guest doc. */
+  const openClaimModal = useCallback(() => {
+    if (!doc || doc.source.authMode !== 'guest') return
+    setClaimError(null)
+    setClaimDocumentKeyInput('')
+    setClaimModalOpen(true)
+  }, [doc])
+
+  const closeClaimModal = useCallback(() => {
+    if (claimBusy) return
+    setClaimModalOpen(false)
+    setClaimError(null)
+  }, [claimBusy])
+
+  /**
+   * Claim requires an actual verified wallet token (`token`, never
+   * `creatorOnlyEffectiveToken`) - claim's whole point is adding a wallet identity to a
+   * document that does not have one yet, so it cannot be gated behind the guest-session
+   * fallback the other creator-only mutations use.
+   */
+  const confirmClaimDocument = useCallback(async () => {
+    if (!doc || !token) return
+    const usedGuestSession = Boolean(activeGuestCreatorSession)
+    const documentKey = claimDocumentKeyInput.trim()
+    if (!usedGuestSession && !documentKey) return
+    setClaimBusy(true)
+    setClaimError(null)
+    try {
+      const { document } = await api.claimDocument(
+        token,
+        doc.id,
+        usedGuestSession ? { guestSessionToken: activeGuestCreatorSession!.token } : { documentKey },
+      )
+      setActiveFromSeal(document, doc.fileSize)
+      if (usedGuestSession) {
+        // The wallet is now the creator of record - the guest session is no longer the
+        // meaningful identity for this document (the underlying DB row is harmless if it
+        // lingers). Clear local state directly rather than waiting for the `doc?.id`-keyed
+        // re-sync effect so `activeGuestCreatorSession` goes stale immediately.
+        clearGuestSession()
+        setGuestSession(null)
+      }
+      setClaimModalOpen(false)
+      setClaimDocumentKeyInput('')
+      setLockMessage('Saved to your wallet.')
+    } catch (err) {
+      setClaimError(
+        err instanceof Error ? err.message : 'Could not save this agreement to your wallet',
+      )
+    } finally {
+      setClaimBusy(false)
+    }
+  }, [doc, token, activeGuestCreatorSession, claimDocumentKeyInput, setActiveFromSeal])
 
   const sealWithCredit = async () => {
     if (!token || !doc) return
@@ -2775,8 +3102,25 @@ export function DocumentJourney({
                     <ArrowLeft size={14} strokeWidth={2.25} aria-hidden />
                     Back home
                   </button>
-                  {account && role === 'creator' && (
-                    <span className="journey-role-pill">Creating as {account.shortAddress}</span>
+                  {role === 'creator' && (account || activeGuestCreatorSession) && (
+                    <span className="journey-role-pill">
+                      Creating as {account ? account.shortAddress : 'guest (no wallet)'}
+                    </span>
+                  )}
+                  {/*
+                    Persistent claim affordance (`docs/guest-signing-plan.md` Task 6) - any
+                    step, as soon as the doc exists and is still guest-owned. Same modal/state
+                    as the more prominent free-complete CTA below.
+                  */}
+                  {role === 'creator' && doc?.source.authMode === 'guest' && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost journey-claim-pill"
+                      onClick={openClaimModal}
+                    >
+                      <Wallet size={13} strokeWidth={2.25} aria-hidden />
+                      Save to wallet
+                    </button>
                   )}
                   {role === 'signer' && (
                     <span className="journey-role-pill">
@@ -3031,64 +3375,136 @@ export function DocumentJourney({
                       </span>
                     </label>
                   )}
-                  {!account && loginNeedsSheet && loginSheetOpen ? (
-                    <LoginSheet
-                      open
-                      connectMode={connectMode}
-                      connecting={connecting}
-                      walletStatus={walletStatus}
-                      error={walletError}
-                      showOpenInPay={showOpenInPay}
-                      onClose={() => setLoginSheetOpen(false)}
-                      onProceed={connectFromPath}
-                      onSession={applySession}
-                      placement="inline"
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      className={`btn btn-primary btn-lg${busy || connecting ? ' btn--busy' : ''}`}
-                      disabled={
-                        !pdfFile || !pdfHash || busy || (!account && connecting)
-                      }
-                      onClick={() => {
-                        if (!account) {
-                          requestLogin()
-                          return
-                        }
-                        void createDoc()
-                      }}
-                    >
-                      {busy ? (
-                        <>
-                          <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                          Creating…
-                        </>
-                      ) : !account ? (
-                        connecting ? (
+                  {/*
+                    Dual CTA (`docs/guest-signing-plan.md` Task 3 / locked decision): guests get
+                    a free "no wallet" primary path here, demoting wallet login to secondary.
+                    Direct seal doesn't apply to this create call - it always sends
+                    `requiredSignatures: 1`; direct seal (0 signatures) is chosen later in Setup
+                    and stays wallet-only by design (out of scope for this task to enforce
+                    client-side - that's the roster/cosigner endpoints' job in a later task).
+                    When the flag is off, or once a wallet is connected, this renders identically
+                    to the pre-guest-signing markup (else-branch below is a verbatim copy).
+                  */}
+                  {FEATURES.guestSigning && !account ? (
+                    <>
+                      <button
+                        type="button"
+                        className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
+                        disabled={!pdfFile || !pdfHash || busy}
+                        onClick={() => void createGuestDoc()}
+                      >
+                        {busy ? (
                           <>
                             <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                            {journeyLoginEntryLabels().busy}
+                            Creating…
                           </>
                         ) : (
                           <>
-                            <NimiqHexagonIcon size={18} />
-                            {journeyLoginEntryLabels().idle} to continue
+                            <Fingerprint size={18} strokeWidth={2.25} />
+                            Continue free - no wallet
                           </>
-                        )
+                        )}
+                      </button>
+                      {loginNeedsSheet && loginSheetOpen ? (
+                        <LoginSheet
+                          open
+                          connectMode={connectMode}
+                          connecting={connecting}
+                          walletStatus={walletStatus}
+                          error={walletError}
+                          showOpenInPay={showOpenInPay}
+                          onClose={() => setLoginSheetOpen(false)}
+                          onProceed={connectFromPath}
+                          onSession={applySession}
+                          placement="inline"
+                        />
                       ) : (
-                        <>
-                          <Fingerprint size={18} strokeWidth={2.25} />
-                          Continue
-                        </>
+                        <button
+                          type="button"
+                          className={`btn btn-ghost${connecting ? ' btn--busy' : ''}`}
+                          disabled={busy || connecting}
+                          onClick={requestLogin}
+                        >
+                          {connecting ? (
+                            <>
+                              <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
+                              {journeyLoginEntryLabels().busy}
+                            </>
+                          ) : (
+                            <>
+                              <NimiqHexagonIcon size={16} />
+                              Continue with Nimiq instead
+                            </>
+                          )}
+                        </button>
                       )}
-                    </button>
-                  )}
-                  {!account && (
-                    <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-                      Login with Nimiq when you are ready to register the fingerprint. Your file
-                      never leaves this device.
-                    </p>
+                      <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                        No account needed. Save your document key after creating so you can get
+                        back in later.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      {!account && loginNeedsSheet && loginSheetOpen ? (
+                        <LoginSheet
+                          open
+                          connectMode={connectMode}
+                          connecting={connecting}
+                          walletStatus={walletStatus}
+                          error={walletError}
+                          showOpenInPay={showOpenInPay}
+                          onClose={() => setLoginSheetOpen(false)}
+                          onProceed={connectFromPath}
+                          onSession={applySession}
+                          placement="inline"
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          className={`btn btn-primary btn-lg${busy || connecting ? ' btn--busy' : ''}`}
+                          disabled={
+                            !pdfFile || !pdfHash || busy || (!account && connecting)
+                          }
+                          onClick={() => {
+                            if (!account) {
+                              requestLogin()
+                              return
+                            }
+                            void createDoc()
+                          }}
+                        >
+                          {busy ? (
+                            <>
+                              <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
+                              Creating…
+                            </>
+                          ) : !account ? (
+                            connecting ? (
+                              <>
+                                <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
+                                {journeyLoginEntryLabels().busy}
+                              </>
+                            ) : (
+                              <>
+                                <NimiqHexagonIcon size={18} />
+                                {journeyLoginEntryLabels().idle} to continue
+                              </>
+                            )
+                          ) : (
+                            <>
+                              <Fingerprint size={18} strokeWidth={2.25} />
+                              Continue
+                            </>
+                          )}
+                        </button>
+                      )}
+                      {!account && (
+                        <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                          Login with Nimiq when you are ready to register the fingerprint. Your
+                          file never leaves this device.
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -3105,7 +3521,7 @@ export function DocumentJourney({
                       <button
                         type="button"
                         className={`btn btn-secondary${placementLockBusy ? ' btn--busy' : ''}`}
-                        disabled={busy || !token || placementLockBusy}
+                        disabled={busy || !creatorOnlyEffectiveToken || placementLockBusy}
                         onClick={() => void unlockPlacements()}
                       >
                         {placementLockBusy ? (
@@ -3151,7 +3567,7 @@ export function DocumentJourney({
                           setConstructionPlan(next)
                           setRequiredSigners(Math.max(1, Math.min(10, next.people.length)))
                         }}
-                        disabled={busy || !token}
+                        disabled={busy || !effectiveToken}
                         lockBusy={placementLockBusy}
                       />
                       {constructionPlan.status !== 'locked' && (
@@ -3336,6 +3752,7 @@ export function DocumentJourney({
                       ) : (
                         <>
                           {!account &&
+                            !activeGuestSession &&
                             (loginNeedsSheet && loginSheetOpen ? (
                               <LoginSheet
                                 open
@@ -3370,7 +3787,7 @@ export function DocumentJourney({
                               </button>
                             ))}
 
-                          {account &&
+                          {(account || activeGuestSession) &&
                             signingResolution &&
                             !signingResolution.ok &&
                             signingResolution.hint === 'pick_person' &&
@@ -3416,7 +3833,7 @@ export function DocumentJourney({
                             )}
 
                           {/* Creator invite/wait dock already shows party status - skip duplicate banner. */}
-                          {account &&
+                          {(account || activeGuestSession) &&
                             signingResolution &&
                             !signingResolution.ok &&
                             signingResolution.hint !== 'pick_person' &&
@@ -3430,7 +3847,7 @@ export function DocumentJourney({
                             </div>
                           )}
 
-                          {account && signingResolution?.ok && pendingParty && (
+                          {(account || activeGuestSession) && signingResolution?.ok && pendingParty && (
                             <>
                               {/* Multi only: solo already has identity from the wallet pill + PDF. */}
                               {requiredCount(doc) > 1 && (
@@ -3445,7 +3862,7 @@ export function DocumentJourney({
                                   <span className="muted">
                                     {' '}
                                     ({signedCount(doc) + 1} of {requiredCount(doc)}) with{' '}
-                                    {account.shortAddress}
+                                    {account ? account.shortAddress : 'guest (no wallet)'}
                                     {pendingParty.walletAddress
                                       ? ' · wallet required for this person'
                                       : ''}
@@ -4030,6 +4447,49 @@ export function DocumentJourney({
                                   ''
                                 const sending = inviteSendBusyId === p.id
                                 const note = inviteSendNote[p.id]
+                                /** Minted personal link invite (Task 5 "Create invite link"). */
+                                const linkInvite = partyLinkInvites[p.id]
+                                const linkBusy = linkInviteBusyId === p.id
+                                const mintLinkInvite = () => {
+                                  if (!creatorOnlyEffectiveToken || !doc) return
+                                  if (emailed) {
+                                    const ok = window.confirm(
+                                      `Creating a link will replace the emailed invite for ${label}. Continue?`,
+                                    )
+                                    if (!ok) return
+                                  }
+                                  setLinkInviteBusyId(p.id)
+                                  setLocalError(null)
+                                  void api
+                                    .mintPartyInvite(creatorOnlyEffectiveToken, doc.id, {
+                                      partyId: p.id,
+                                    })
+                                    .then(res => {
+                                      setPartyLinkInvites(prev => ({
+                                        ...prev,
+                                        [p.id]: { url: res.inviteUrl, expiresAt: res.expiresAt },
+                                      }))
+                                      // Server-side rotation revokes any active email invite for
+                                      // this party (Task 5a) - refresh from the server so the
+                                      // "Invite sent" badge doesn't keep showing a dead link.
+                                      void api
+                                        .getDocument(doc.slug, creatorOnlyEffectiveToken)
+                                        .then(({ document }) =>
+                                          setActiveFromSeal(document, doc.fileSize),
+                                        )
+                                        .catch(() => {
+                                          /* keep local state; next poll reconciles */
+                                        })
+                                    })
+                                    .catch(err => {
+                                      setLocalError(
+                                        err instanceof Error
+                                          ? err.message
+                                          : 'Could not create invite link',
+                                      )
+                                    })
+                                    .finally(() => setLinkInviteBusyId(null))
+                                }
                                 const setPartyEmail = (value: string) => {
                                   setPartyInviteEmails(prev => ({ ...prev, [p.id]: value }))
                                   // Keep legacy array in sync for count-picker edge paths.
@@ -4146,10 +4606,17 @@ export function DocumentJourney({
                                           if (!token || !doc) return
                                           const to = emailVal.trim()
                                           if (!to) return
-                                          // Confirm before replacing an active invite link
+                                          // Confirm before replacing an active invite link -
+                                          // either a previous email invite, or (Task 5) a
+                                          // "Create invite link" link invite for this party.
                                           if (emailed) {
                                             const ok = window.confirm(
                                               `This will invalidate the previous invite link for ${label}. Continue?`,
+                                            )
+                                            if (!ok) return
+                                          } else if (linkInvite) {
+                                            const ok = window.confirm(
+                                              `Sending an email invite will replace the invite link you created for ${label}. Continue?`,
                                             )
                                             if (!ok) return
                                           }
@@ -4172,6 +4639,14 @@ export function DocumentJourney({
                                                 res.to || to,
                                                 res.inviteSentAt,
                                               )
+                                              // Server-side rotation revokes the link invite too
+                                              // (Task 5a) - drop the now-dead URL from local state.
+                                              setPartyLinkInvites(prev => {
+                                                if (!(p.id in prev)) return prev
+                                                const nextLinks = { ...prev }
+                                                delete nextLinks[p.id]
+                                                return nextLinks
+                                              })
                                               const sentTo = res.to || to
                                               const prev = res.previousEmail?.trim()
                                               const rotated =
@@ -4242,6 +4717,103 @@ export function DocumentJourney({
                                         {note}
                                       </p>
                                     ) : null}
+                                    {/*
+                                      Guest-signing link invite (`docs/guest-signing-plan.md`
+                                      Task 5) - alongside, not replacing, the email option above.
+                                      Mutual exclusion with the email invite is by rotation
+                                      (server-side) + confirm prompts on both buttons, not by
+                                      disabling either one outright.
+                                    */}
+                                    {FEATURES.guestSigning && !p.signed && (
+                                      <div className="field-stack" style={{ marginTop: '0.35rem' }}>
+                                        <span className="field-label">Or create an invite link</span>
+                                        <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
+                                          No wallet needed — the person opens this link and signs
+                                          without connecting a wallet.
+                                          {emailed
+                                            ? ' Creating a link will replace the emailed invite.'
+                                            : ''}
+                                        </p>
+                                        {linkInvite ? (
+                                          <>
+                                            <code className="share-cosigner-link mono">
+                                              {linkInvite.url}
+                                            </code>
+                                            <div className="share-cosigner-actions">
+                                              <button
+                                                type="button"
+                                                className="btn btn-secondary"
+                                                disabled={busy || linkBusy}
+                                                onClick={() =>
+                                                  void copyText(linkInvite.url, p.id, label)
+                                                }
+                                              >
+                                                <Copy size={16} strokeWidth={2.25} aria-hidden />
+                                                Copy link
+                                              </button>
+                                              {typeof navigator !== 'undefined' &&
+                                                typeof navigator.share === 'function' && (
+                                                  <button
+                                                    type="button"
+                                                    className="btn btn-secondary"
+                                                    disabled={busy || linkBusy}
+                                                    onClick={() =>
+                                                      void sharePersonInvite({
+                                                        partyId: p.id,
+                                                        personName: label,
+                                                        personLink: linkInvite.url,
+                                                      })
+                                                    }
+                                                  >
+                                                    <Share2 size={16} strokeWidth={2.25} aria-hidden />
+                                                    Share
+                                                  </button>
+                                                )}
+                                              <button
+                                                type="button"
+                                                className={`btn btn-ghost${linkBusy ? ' btn--busy' : ''}`}
+                                                disabled={busy || linkBusy || !creatorOnlyEffectiveToken}
+                                                title={`This will invalidate the previous invite link for ${label}.`}
+                                                onClick={mintLinkInvite}
+                                              >
+                                                {linkBusy ? (
+                                                  <>
+                                                    <LoaderCircle
+                                                      className="btn-spinner"
+                                                      size={16}
+                                                      strokeWidth={2.5}
+                                                    />
+                                                    Recreating…
+                                                  </>
+                                                ) : (
+                                                  'Recreate link'
+                                                )}
+                                              </button>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            className={`btn btn-secondary${linkBusy ? ' btn--busy' : ''}`}
+                                            disabled={busy || linkBusy || !creatorOnlyEffectiveToken}
+                                            onClick={mintLinkInvite}
+                                          >
+                                            {linkBusy ? (
+                                              <>
+                                                <LoaderCircle
+                                                  className="btn-spinner"
+                                                  size={16}
+                                                  strokeWidth={2.5}
+                                                />
+                                                Creating…
+                                              </>
+                                            ) : (
+                                              'Create invite link'
+                                            )}
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 )
                               })}
@@ -4419,7 +4991,7 @@ export function DocumentJourney({
                           parties={doc.source.parties}
                           compact
                           revealPrivate={revealParticipantPrivate}
-                          authToken={token}
+                          authToken={effectiveToken}
                           fingerprint={doc.fingerprint}
                           documentId={doc.id}
                         />
@@ -4478,7 +5050,7 @@ export function DocumentJourney({
                             file={(signFile ?? pdfFile)!}
                             fingerprint={doc.fingerprint}
                             documentId={doc.id}
-                            authToken={token}
+                            authToken={effectiveToken}
                             revealPrivate={revealParticipantPrivate}
                             documentAnnotations={doc.source.annotations}
                             signatures={doc.source.signatures}
@@ -4532,7 +5104,7 @@ export function DocumentJourney({
                           parties={doc.source.parties}
                           compact
                           revealPrivate={revealParticipantPrivate}
-                          authToken={token}
+                          authToken={effectiveToken}
                           fingerprint={doc.fingerprint}
                           documentId={doc.id}
                         />
@@ -4653,7 +5225,7 @@ export function DocumentJourney({
                           signatures={doc.source.signatures}
                           parties={doc.source.parties}
                           revealPrivate={revealParticipantPrivate}
-                          authToken={token}
+                          authToken={effectiveToken}
                           fingerprint={doc.fingerprint}
                           documentId={doc.id}
                         />
@@ -4742,7 +5314,7 @@ export function DocumentJourney({
                                 file={(signFile ?? pdfFile)!}
                                 fingerprint={doc.fingerprint}
                                 documentId={doc.id}
-                                authToken={token}
+                                authToken={effectiveToken}
                                 revealPrivate={revealParticipantPrivate}
                                 documentAnnotations={doc.source.annotations}
                                 signatures={doc.source.signatures}
@@ -4802,6 +5374,38 @@ export function DocumentJourney({
                   )}
 
                   {/*
+                    Guest free-complete "lock secondary" (`docs/guest-signing-plan.md` -
+                    "Seal / free complete" -> "Lock secondary"). A guest creator never reaches
+                    the wallet-gated `step === 'seal'` block above (`naturalStep` only resolves
+                    to `seal` when a connected wallet matches `creatorAddress` - guaranteed
+                    false pre-claim), so this is the free-complete moment they actually see.
+                    Claiming first is the bridge to that richer wallet "Lock now" flow.
+                  */}
+                  {step === 'done' &&
+                    doc &&
+                    role === 'creator' &&
+                    doc.source.authMode === 'guest' && (
+                    <div className="claim-upsell">
+                      <div className="claim-upsell-text">
+                        <strong>Want to lock this on the blockchain?</strong>
+                        <p className="muted">
+                          Locking needs a Nimiq wallet. Save this agreement to a wallet to
+                          manage it under My agreements and lock it with credits - your
+                          existing signatures do not change.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-primary claim-upsell-cta"
+                        onClick={openClaimModal}
+                      >
+                        <Wallet size={16} strokeWidth={2.25} aria-hidden />
+                        Save to Nimiq wallet to lock
+                      </button>
+                    </div>
+                  )}
+
+                  {/*
                     Done (not signer) without a live verify match: party roster only when we
                     are not about to show Recorded signatures (avoids name+address twice).
                   */}
@@ -4825,7 +5429,7 @@ export function DocumentJourney({
                         signatures={doc.source.signatures}
                         parties={doc.source.parties}
                         revealPrivate={revealParticipantPrivate}
-                        authToken={token}
+                        authToken={effectiveToken}
                         fingerprint={doc.fingerprint}
                         documentId={doc.id}
                       />
@@ -5140,6 +5744,40 @@ export function DocumentJourney({
         error={cancelError}
         onClose={closeCancelModal}
         onConfirm={() => void confirmCancelCurrentAgreement()}
+      />
+
+      <GuestDocumentKeyModal
+        documentKey={guestDocumentKeyModal?.documentKey ?? null}
+        savedAck={guestDocumentKeyModal?.savedAck ?? false}
+        onSavedAckChange={checked =>
+          setGuestDocumentKeyModal(prev => (prev ? { ...prev, savedAck: checked } : prev))
+        }
+        documentTitle={doc?.source.title}
+        onContinue={() => setGuestDocumentKeyModal(null)}
+      />
+
+      <ClaimAgreementModal
+        open={claimModalOpen}
+        documentTitle={doc?.source.title}
+        account={account}
+        hasGuestSession={Boolean(activeGuestCreatorSession)}
+        documentKeyInput={claimDocumentKeyInput}
+        onDocumentKeyInputChange={setClaimDocumentKeyInput}
+        busy={claimBusy}
+        error={claimError}
+        onClose={closeClaimModal}
+        onClaim={() => void confirmClaimDocument()}
+        connectMode={connectMode}
+        connecting={connecting}
+        walletStatus={walletStatus}
+        walletError={walletError}
+        showOpenInPay={showOpenInPay}
+        loginNeedsSheet={loginNeedsSheet}
+        loginSheetOpen={loginSheetOpen}
+        onRequestLogin={requestLogin}
+        onCloseLoginSheet={() => setLoginSheetOpen(false)}
+        onProceedLogin={connectFromPath}
+        onSession={applySession}
       />
 
       {/*

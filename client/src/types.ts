@@ -24,6 +24,8 @@ export interface DocumentSignature {
   hasImage?: boolean
   /** Frozen email from personal invite when signed via ?invite= token. */
   invitedAsEmail?: string | null
+  /** `wallet` | `guest` - see docs/guest-signing-plan.md. Omitted for legacy rows. */
+  authMethod?: 'wallet' | 'guest'
 }
 
 export interface DocumentAttestation {
@@ -161,6 +163,8 @@ export interface SealDocument {
    * Null/omitted when not archived for this wallet. Not the on-chain data archive.
    */
   listArchivedAt?: number | null
+  /** `wallet` | `guest` | `claimed` - see docs/guest-signing-plan.md. Omitted for legacy rows. */
+  authMode?: 'wallet' | 'guest' | 'claimed'
 }
 
 /** Lightweight status for the “store data forever” upsell on My Agreements. */

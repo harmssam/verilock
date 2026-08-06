@@ -453,10 +453,18 @@ async function sendCustomerAutoAck(ticket: SupportTicketRecord): Promise<void> {
   }
 }
 
+/**
+ * Prefers Express's `req.ip`, which (with `app.set('trust proxy', 1)` in index.ts)
+ * resolves the client IP Railway's single trusted edge hop actually saw. Falls back to
+ * parsing the raw header only for callers that pass a plain object instead of a real
+ * Express Request (there are none left server-side, but keep it defensive).
+ */
 export function clientIpFromRequest(req: {
+  ip?: string | undefined
   headers: { [key: string]: string | string[] | undefined }
   socket?: { remoteAddress?: string | undefined }
 }): string | null {
+  if (req.ip) return req.ip
   const forwarded = req.headers['x-forwarded-for']
   if (typeof forwarded === 'string' && forwarded.length > 0) {
     return forwarded.split(',')[0]?.trim() || null

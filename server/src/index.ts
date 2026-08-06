@@ -25,14 +25,18 @@ import {
   markSessionVerified,
 } from './db.js'
 import {
+  addGuestSignature,
   addSignature,
+  claimGuestDocumentToWallet,
   configureDocumentCosigners,
   configureSigningRoster,
   createDocument,
+  createGuestDocument,
   deleteDocument,
   getDocumentPublic,
   getMyDocuments,
   hashInviteToken,
+  mintLinkPartyInvite,
   setCreatorNotifyEmail,
   setMyDocumentListArchived,
   viewerMayAccessSignatureImage,
@@ -64,6 +68,15 @@ import {
   isPdfAnnotationUiEnabled,
   pdfAnnotationFeaturesPublic,
 } from './pdfAnnotationConfig.js'
+import { guestSigningFeaturesPublic, isGuestSigningEnabled } from './guestSigningConfig.js'
+import {
+  mintGuestSession,
+  redeemDocumentKey,
+  redeemPartyInviteAsGuest,
+  requireWalletOrAnyGuestParty,
+  requireWalletOrGuestCreator,
+  resolveViewerSubject,
+} from './guestAuth.js'
 import { verifySignature } from './nimiq-rpc.js'
 import {
   assertSafeBootConfig,
@@ -101,6 +114,15 @@ const SKIP_CHAIN_VERIFY = process.env.SKIP_CHAIN_VERIFY === 'true'
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
 const app = express()
+/**
+ * Railway's edge proxy is the only hop between the internet and this container,
+ * so `X-Forwarded-For` has exactly one trusted proxy in front of us. `trust proxy: 1`
+ * makes Express's `req.ip` / `req.ips` resolve the *rightmost* untrusted entry instead
+ * of blindly trusting a client-supplied header — this is what rate-limit.ts and Turnstile
+ * remoteip should read from now that a free, anonymous, publicly-writable guest-create
+ * endpoint is coming (see docs/guest-signing-plan.md Task 0 / constraint on X-Forwarded-For).
+ */
+app.set('trust proxy', 1)
 applySecurityHeaders(app)
 
 // Blog moved to blog.verilock.online (private store / content-studio).
@@ -214,6 +236,10 @@ const verifyHashLimit = rateLimit(60, 60_000)
 const supportContactLimit = rateLimit(5, 15 * 60_000)
 /** Per-person invite emails via Resend. */
 const inviteEmailLimit = rateLimit(12, 60_000)
+/** Guest document-key redeem - tight, brute-force/enumeration defense-in-depth. */
+const guestRedeemLimit = rateLimit(20, 60_000)
+/** Guest create - free, unauthenticated, publicly-writable; much tighter than the wallet create limit. */
+const guestCreateLimit = rateLimit(5, 60 * 60_000)
 
 function lockErrorStatus(message: string): number {
   if (message === 'Only the creator can seal this agreement') return 403
@@ -247,14 +273,17 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
  * so private fields (names, ink images, placement fill frames) cannot be unlocked by
  * POSTing /auth/challenge as a public creator/signer address.
  * When SKIP_CHAIN_VERIFY is on (non-production only), any live session counts.
+ *
+ * Implementation is a thin call to `resolveViewerSubject` (`guestAuth.ts`), which
+ * additionally resolves a guest Bearer token into the guest sentinel subject
+ * (`guest:doc:{id}` / `guest:party:{partyId}`) using the identical wallet-verified-only
+ * rule for the wallet case. Kept the same function name/signature here (rather than
+ * renaming every call site) so every existing caller - document GET, signature-image
+ * GET, verify GET, placement-plan GET - transparently gains guest-viewer support with
+ * no further edits (see `docs/guest-signing-plan.md` "Read path").
  */
 function optionalViewerAddress(req: express.Request): string | null {
-  const token = req.headers.authorization?.replace('Bearer ', '')?.trim()
-  if (!token) return null
-  const session = getSession(token)
-  if (!session) return null
-  if (!session.verified && !SKIP_CHAIN_VERIFY) return null
-  return session.address
+  return resolveViewerSubject(req)
 }
 
 function requireVerifiedWallet(
@@ -1003,6 +1032,86 @@ app.post(
   },
 )
 
+function guestSigningDisabled(res: express.Response): boolean {
+  if (isGuestSigningEnabled()) return false
+  res.status(404).json({ error: 'Guest signing is disabled on this environment' })
+  return true
+}
+
+/**
+ * Redeem a guest document key -> fresh creator guest session. Idempotent (never
+ * consumes/rotates the key, see `guestAuth.ts` / plan "Redeem document key"). Turnstile
+ * follows the same pattern as `/api/support/contact` - `verifyTurnstileToken` already
+ * no-ops via `isTurnstileRequired()` when not configured, so this is safe to always run.
+ */
+app.post('/api/auth/guest/redeem-document-key', guestRedeemLimit, async (req, res) => {
+  if (guestSigningDisabled(res)) return
+  const body = (req.body ?? {}) as {
+    documentId?: string
+    slug?: string
+    documentKey?: string
+    turnstileToken?: string
+  }
+  if (!body.documentKey || typeof body.documentKey !== 'string') {
+    res.status(400).json({ error: 'documentKey is required' })
+    return
+  }
+
+  const remoteIp = clientIpFromRequest(req)
+  const turnstile = await verifyTurnstileToken(body.turnstileToken ?? null, remoteIp)
+  if (!turnstile.ok) {
+    res.status(400).json({ error: turnstile.error })
+    return
+  }
+
+  try {
+    const result = redeemDocumentKey({
+      documentId: body.documentId ?? null,
+      slug: body.slug ?? null,
+      documentKey: body.documentKey,
+    })
+    res.status(200).json(result)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Could not redeem document key'
+    const status = message === 'Document not found' ? 404 : 400
+    res.status(status).json({ error: message })
+  }
+})
+
+/**
+ * Redeem a personal party-invite token -> fresh guest signer session. Idempotent
+ * (never marks the invite redeemed - see `guestAuth.ts` / plan "Redeem invite ->
+ * guest session"). No Turnstile here (unlike redeem-document-key) - reuses the
+ * same `guestRedeemLimit` limiter rather than a near-duplicate.
+ */
+app.post('/api/auth/guest/redeem-invite', guestRedeemLimit, (req, res) => {
+  if (guestSigningDisabled(res)) return
+  const body = (req.body ?? {}) as { inviteToken?: string }
+  if (!body.inviteToken || typeof body.inviteToken !== 'string') {
+    res.status(400).json({ error: 'inviteToken is required' })
+    return
+  }
+  try {
+    const result = redeemPartyInviteAsGuest(body.inviteToken)
+    res.status(200).json(result)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Could not redeem invite'
+    // Mirror GET /api/invites/lookup's status-code choices for the equivalent errors.
+    const NON_ACTIVE_INVITE_MESSAGES = new Set([
+      'This invite link was replaced. Ask the organizer to send a new invite if you still need to sign.',
+      'This invite link was already used to sign.',
+      'This invite link has expired. Ask the organizer to resend the invite.',
+    ])
+    const status =
+      message === 'Invite not found or expired'
+        ? 404
+        : NON_ACTIVE_INVITE_MESSAGES.has(message)
+          ? 410
+          : 400
+    res.status(status).json({ error: message })
+  }
+})
+
 app.get('/api/me', authMiddleware, (req, res) => {
   const address = res.locals.address as string
   res.json({ address, documents: getMyDocuments(address) })
@@ -1013,6 +1122,7 @@ app.get('/api/features', (_req, res) => {
     ...emailFeaturesPublic(),
     ...supportContactPublicFeatures(),
     ...pdfAnnotationFeaturesPublic(),
+    ...guestSigningFeaturesPublic(),
   })
 })
 
@@ -1149,14 +1259,102 @@ app.post('/api/documents', docLimit, authMiddleware, requireVerifiedWallet, (req
 })
 
 /**
+ * Guest create - no wallet, no `authMiddleware`/`requireVerifiedWallet`. Rate-limited
+ * hard (5/hour/IP) + Turnstile-gated instead, since this is a free, anonymous,
+ * publicly-writable endpoint (`docs/guest-signing-plan.md` "Security & abuse" #1/#8).
+ * Direct seal (0 required signatures) stays wallet-only - `createGuestDocument` rejects it.
+ */
+app.post('/api/documents/guest', guestCreateLimit, async (req, res) => {
+  if (guestSigningDisabled(res)) return
+  const body = req.body as {
+    title?: string
+    originalFileName?: string
+    type?: string
+    originalSha256?: string
+    pageCount?: number
+    metadata?: Record<string, unknown>
+    parties?: Array<{ role: string; displayName: string; required?: boolean }>
+    requiredSignatures?: number
+    creatorDisplayName?: string
+    creatorNotifyEmail?: string
+    /** Client PDF overlays only - never PDF file bytes. */
+    annotations?: unknown
+    turnstileToken?: unknown
+  }
+
+  if (!body.originalSha256 || !/^[a-f0-9]{64}$/i.test(body.originalSha256)) {
+    res.status(400).json({ error: 'Valid originalSha256 required' })
+    return
+  }
+
+  // Reject accidental PDF byte fields (privacy: file never uploaded).
+  const pdfByteKeys = ['pdf', 'pdfBytes', 'file', 'fileBytes', 'documentBytes', 'content'] as const
+  for (const key of pdfByteKeys) {
+    if (key in body && (body as Record<string, unknown>)[key] != null) {
+      res.status(400).json({ error: 'PDF file bytes are not accepted - send hash + annotations only' })
+      return
+    }
+  }
+
+  const remoteIp = clientIpFromRequest(req)
+  const turnstile = await verifyTurnstileToken(
+    typeof body.turnstileToken === 'string' ? body.turnstileToken : null,
+    remoteIp,
+  )
+  if (!turnstile.ok) {
+    res.status(400).json({ error: turnstile.error })
+    return
+  }
+
+  let creatorNotifyEmail: string | null = null
+  try {
+    creatorNotifyEmail = sanitizeNotifyEmail(body.creatorNotifyEmail)
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : 'Invalid email' })
+    return
+  }
+
+  try {
+    const result = createGuestDocument({
+      title: body.title ?? 'Untitled agreement',
+      originalFileName: body.originalFileName,
+      type: body.type ?? 'rental',
+      creatorDisplayName: body.creatorDisplayName,
+      originalSha256: body.originalSha256,
+      pageCount: Number(body.pageCount ?? 1),
+      metadata: body.metadata,
+      parties: body.parties,
+      requiredSignatures: body.requiredSignatures,
+      creatorNotifyEmail,
+      annotations: body.annotations,
+    })
+
+    const { token: guestToken, expiresAt } = mintGuestSession({
+      documentId: result.document.id,
+      partyId: null,
+      role: 'creator',
+    })
+
+    res.status(201).json({
+      document: result.document,
+      documentKey: result.documentKey,
+      guestSession: { token: guestToken, expiresAt },
+      ...(result.hashWarning ? { hashWarning: result.hashWarning } : {}),
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Create failed'
+    res.status(400).json({ error: message })
+  }
+})
+
+/**
  * Creator-only: rebuild parties from construction people.
  * Body: { parties: [{ displayName, role? }], creatorSignsAsIndex: number | null }
  */
 app.put(
   '/api/documents/:id/signing-roster',
   docLimit,
-  authMiddleware,
-  requireVerifiedWallet,
+  requireWalletOrGuestCreator,
   (req, res) => {
     const body = req.body as {
       parties?: Array<{ displayName?: string; role?: string; walletAddress?: string | null }>
@@ -1204,8 +1402,7 @@ app.put(
 app.patch(
   '/api/documents/:id/cosigners',
   docLimit,
-  authMiddleware,
-  requireVerifiedWallet,
+  requireWalletOrGuestCreator,
   (req, res) => {
     const body = req.body as {
       requiredSignatures?: number
@@ -1246,8 +1443,7 @@ app.patch(
 app.patch(
   '/api/documents/:id/notify-email',
   docLimit,
-  authMiddleware,
-  requireVerifiedWallet,
+  requireWalletOrGuestCreator,
   (req, res) => {
     const body = req.body as { email?: string | null }
     const address = res.locals.address as string
@@ -1349,6 +1545,44 @@ app.post(
   },
 )
 
+/**
+ * Creator-only: mint a personal invite link (no email send) for one party.
+ * Guest-capable (wallet or guest creator - mint is a creator-mutation action).
+ * Turnstile not required - creator already passed the create-time gate; this is
+ * a low-value target (docs/guest-signing-plan.md Phase 2 task 1).
+ */
+app.post(
+  '/api/documents/:id/party-invites',
+  docLimit,
+  requireWalletOrGuestCreator,
+  (req, res) => {
+    const body = (req.body ?? {}) as { partyId?: string; email?: string }
+    const address = res.locals.address as string
+    if (!body.partyId || typeof body.partyId !== 'string') {
+      res.status(400).json({ error: 'partyId required' })
+      return
+    }
+    try {
+      const result = mintLinkPartyInvite({
+        documentId: routeParam(req.params.id),
+        requesterAddress: address,
+        partyId: body.partyId.trim(),
+        email: typeof body.email === 'string' ? body.email : null,
+      })
+      res.status(201).json(result)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not mint invite'
+      const status =
+        message === 'Document not found'
+          ? 404
+          : message.includes('Only the creator')
+            ? 403
+            : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
+
 app.get('/api/documents/:id', publicReadLimit, (req, res) => {
   const viewer = optionalViewerAddress(req)
   const doc = getDocumentPublic(routeParam(req.params.id), viewer)
@@ -1359,7 +1593,7 @@ app.get('/api/documents/:id', publicReadLimit, (req, res) => {
   res.json({ document: doc })
 })
 
-app.delete('/api/documents/:id', docLimit, authMiddleware, requireVerifiedWallet, (req, res) => {
+app.delete('/api/documents/:id', docLimit, requireWalletOrGuestCreator, (req, res) => {
   const address = res.locals.address as string
   try {
     deleteDocument(routeParam(req.params.id), address)
@@ -1379,8 +1613,7 @@ app.delete('/api/documents/:id', docLimit, authMiddleware, requireVerifiedWallet
 app.put(
   '/api/documents/:id/list-archive',
   docLimit,
-  authMiddleware,
-  requireVerifiedWallet,
+  requireWalletOrGuestCreator,
   (req, res) => {
     const address = res.locals.address as string
     const body = (req.body ?? {}) as { archived?: unknown }
@@ -1408,7 +1641,46 @@ app.put(
   },
 )
 
-app.post('/api/documents/:id/signatures', docLimit, authMiddleware, requireVerifiedWallet, (req, res) => {
+/**
+ * Wallet claim bridge (`docs/guest-signing-plan.md` Task 6). Standard wallet auth only
+ * - the CLAIMING identity is always a real wallet, no guest-auth branch here at all.
+ *
+ * `guestSessionToken` is a plain JSON body field, not a header: this route already
+ * requires the primary `Authorization` header for the wallet (`requireVerifiedWallet`),
+ * so there's no room for a second `Authorization`-style header without inventing a
+ * nonstandard header name/convention. A body field needs no new header-parsing code
+ * and the client can trivially include it alongside `documentKey`.
+ */
+app.post(
+  '/api/documents/:id/claim',
+  docLimit,
+  authMiddleware,
+  requireVerifiedWallet,
+  (req, res) => {
+    const body = req.body as { documentKey?: string; guestSessionToken?: string }
+    const address = res.locals.address as string
+    try {
+      const document = claimGuestDocumentToWallet({
+        documentId: routeParam(req.params.id),
+        walletAddress: address,
+        documentKey: typeof body.documentKey === 'string' ? body.documentKey : null,
+        guestSessionToken: typeof body.guestSessionToken === 'string' ? body.guestSessionToken : null,
+      })
+      res.json({ document })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Claim failed'
+      const status =
+        message === 'Document not found'
+          ? 404
+          : message.includes('already been claimed')
+            ? 409
+            : 400
+      res.status(status).json({ error: message })
+    }
+  },
+)
+
+app.post('/api/documents/:id/signatures', docLimit, requireWalletOrAnyGuestParty, (req, res) => {
   const { partyId, signatureType, clientSha256, displayName, signatureImage, inviteToken } =
     req.body as {
       partyId?: string
@@ -1420,7 +1692,13 @@ app.post('/api/documents/:id/signatures', docLimit, authMiddleware, requireVerif
       inviteToken?: string
     }
 
-  if (!partyId || !signatureType || !clientSha256) {
+  if (!signatureType || !clientSha256) {
+    res.status(400).json({ error: 'partyId, signatureType, and clientSha256 required' })
+    return
+  }
+
+  const isGuest = res.locals.authKind === 'guest'
+  if (!isGuest && !partyId) {
     res.status(400).json({ error: 'partyId, signatureType, and clientSha256 required' })
     return
   }
@@ -1436,17 +1714,28 @@ app.post('/api/documents/:id/signatures', docLimit, authMiddleware, requireVerif
       imageSha256 = hashSignatureImage(imageBuffer)
     }
 
-    const document = addSignature({
-      documentId: docId,
-      partyId,
-      signerAddress: address,
-      signatureType,
-      clientSha256,
-      displayName,
-      signatureImage: imageBuffer,
-      signatureImageSha256: imageSha256,
-      inviteToken: typeof inviteToken === 'string' ? inviteToken : null,
-    })
+    const document = isGuest
+      ? addGuestSignature({
+          documentId: docId,
+          guestRole: (res.locals.guestSession as { role: 'creator' | 'signer' }).role,
+          guestPartyId: (res.locals.guestSession as { partyId: string | null }).partyId,
+          signatureType,
+          clientSha256,
+          displayName,
+          signatureImage: imageBuffer,
+          signatureImageSha256: imageSha256,
+        })
+      : addSignature({
+          documentId: docId,
+          partyId: partyId!,
+          signerAddress: address,
+          signatureType,
+          clientSha256,
+          displayName,
+          signatureImage: imageBuffer,
+          signatureImageSha256: imageSha256,
+          inviteToken: typeof inviteToken === 'string' ? inviteToken : null,
+        })
     res.json({ document })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Sign failed'
@@ -1558,8 +1847,7 @@ function pdfAnnotationUiDisabled(res: express.Response): boolean {
 app.post(
   '/api/placement-plans',
   annotationStreamLimit,
-  authMiddleware,
-  requireVerifiedWallet,
+  requireWalletOrGuestCreator,
   (req, res) => {
     if (pdfAnnotationUiDisabled(res)) return
     const body = req.body as {
@@ -1655,8 +1943,15 @@ app.get('/api/placement-plans/:sha256', publicReadLimit, (req, res) => {
 app.post(
   '/api/placement-plans/:sha256/fills',
   annotationStreamLimit,
-  authMiddleware,
-  requireVerifiedWallet,
+  /**
+   * `requireWalletOrAnyGuestParty` (Task 5): a guest CO-SIGNER (invite-bound party,
+   * not just the creator) needs to fill their own fields too, not only a solo guest
+   * creator (Task 4's `requireWalletOrGuestCreator`, which rejected signer-role guest
+   * sessions by design). Any real wallet still passes through this middleware exactly
+   * as before (it does not itself restrict to "the creator's wallet" - `appendFillBatch`
+   * below does its own per-party wallet/open-slot authorization, unchanged).
+   */
+  requireWalletOrAnyGuestParty,
   (req, res) => {
     if (pdfAnnotationUiDisabled(res)) return
     const sha = routeParam(req.params.sha256).toLowerCase()

@@ -18,6 +18,8 @@ export function buildCertificate(idOrSlug: string) {
     originalFilename: doc.originalFilename,
     type: doc.type,
     status: doc.status,
+    /** `wallet` | `guest` | `claimed` - see `docs/guest-signing-plan.md`. */
+    authMode: doc.authMode,
     originalSha256: doc.originalSha256,
     finalSha256: doc.finalSha256,
     metadata: doc.metadata,

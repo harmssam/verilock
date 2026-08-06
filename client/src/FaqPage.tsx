@@ -19,7 +19,7 @@ const FAQS: FaqItem[] = [
   {
     question: 'Do I need a Nimiq wallet to sign?',
     answer:
-      'Yes, to sign. Your Nimiq wallet is your identity — no email, no password, no account to create. To verify a locked document later, no wallet is needed. Anyone can verify.',
+      'No. VeriLock lets you sign for free without a wallet — create an agreement, share the invite link, everyone types their name and draws a signature. A wallet only matters once you want more: it\'s your identity for locking a permanent blockchain proof, or for signing with an on-chain, wallet-bound identity instead of an invite. To verify a locked document later, no wallet is needed. Anyone can verify.',
   },
   {
     question: 'What happens when I run out of lock credits?',

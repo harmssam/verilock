@@ -254,6 +254,13 @@ export function SecurityPage({ onCreate, onVerify, onPrivacy }: SecurityPageProp
               VeriLock. Signing records intent from that address against the agreement fingerprint,
               not file custody on our servers.
             </p>
+            <p>
+              Free signing does not require a wallet at all. A guest signature is intent plus a
+              one-time capability token—the document key you're shown once at creation, or a personal
+              invite link—not a Nimiq-key-bound cryptographic proof. It's a weaker guarantee than a
+              wallet signature: anyone holding that link or key can act as that party. Connecting a
+              wallet is what upgrades an agreement to on-chain-locked, wallet-address-attributed proof.
+            </p>
           </section>
 
           <section id="on-chain" className="security-section">

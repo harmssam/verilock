@@ -1,4 +1,9 @@
-import { purgeExpiredPayLoginQr, purgeExpiredSessions, purgeExpiredSigHandoffs } from './db.js'
+import {
+  purgeExpiredGuestSessions,
+  purgeExpiredPayLoginQr,
+  purgeExpiredSessions,
+  purgeExpiredSigHandoffs,
+} from './db.js'
 
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000
 
@@ -15,6 +20,10 @@ export function startSessionCleanup(): void {
     const payQr = purgeExpiredPayLoginQr()
     if (payQr > 0) {
       console.log(`[seal] purged ${payQr} expired pay-login QR session(s)`)
+    }
+    const guestSessions = purgeExpiredGuestSessions()
+    if (guestSessions > 0) {
+      console.log(`[seal] purged ${guestSessions} expired guest session(s)`)
     }
   }
 

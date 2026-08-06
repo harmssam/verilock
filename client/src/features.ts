@@ -26,4 +26,11 @@ export const FEATURES = {
    * Build-time override: VITE_SIGN_ON_MOBILE=false
    */
   signOnMobile: envFlag('VITE_SIGN_ON_MOBILE', true),
+  /**
+   * Create/sign multi-party agreements without a Nimiq wallet.
+   * Server kill-switch: GUEST_SIGNING=false (guest-capable routes stay wallet-only).
+   * Build-time override: VITE_GUEST_SIGNING=true
+   * See docs/guest-signing-plan.md.
+   */
+  guestSigning: envFlag('VITE_GUEST_SIGNING', false),
 } as const

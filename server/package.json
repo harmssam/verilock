@@ -8,6 +8,8 @@
     "start": "node --import tsx src/index.ts",
     "build": "tsc",
     "test:concurrent-sign": "node --import tsx scripts/test-concurrent-sign.mjs",
+    "test:claim-bridge": "node --import tsx scripts/test-claim-bridge.mjs",
+    "test:guest-identity": "node --import tsx scripts/test-guest-identity.mjs",
     "test:redeem": "node --import tsx scripts/test-redeem-codes.mjs",
     "test:support": "node --import tsx scripts/test-support-tickets.mjs",
     "codes:generate": "node --import tsx scripts/generate-appsumo-codes.mjs",

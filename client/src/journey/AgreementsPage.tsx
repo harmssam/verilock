@@ -3,6 +3,7 @@ import {
   ArchiveRestore,
   Database,
   FilePlus,
+  KeyRound,
   LoaderCircle,
   Lock,
   PenLine,
@@ -14,7 +15,9 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { shortAddress } from '../addresses'
+import { FEATURES } from '../features'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
+import { saveGuestSession } from '../session'
 import {
   BUCKET_PILL_LABELS,
   LIST_MODE_LABELS,
@@ -118,17 +121,158 @@ interface AgreementsPageProps {
   onGetCredits?: () => void
 }
 
+/**
+ * Extracts a document slug from either a pasted share URL (`https://…/d/xxxx`)
+ * or a bare slug/id typed in directly. Mirrors `slugFromPath` in
+ * `DocumentJourney.tsx` (not exported there, so duplicated here rather than
+ * cross-importing from that file - see `docs/guest-signing-plan.md` Task 7).
+ */
+function slugFromInput(raw: string): string {
+  return raw.trim().replace(/^.*\/d\//, '').split(/[/?#]/)[0]
+}
+
+/**
+ * Guest re-entry into a document created without a wallet, from a browser/device
+ * with no saved guest session (`docs/guest-signing-plan.md` Task 7 - "Enter
+ * document key" empty state). Deliberately a small, secondary path below the
+ * primary wallet login - this page's identity model stays wallet-first.
+ */
+function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const [docInput, setDocInput] = useState('')
+  const [keyInput, setKeyInput] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  if (!FEATURES.guestSigning) return null
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        className="agreements-guest-entry-toggle"
+        onClick={() => setExpanded(true)}
+      >
+        Have a document key instead?
+      </button>
+    )
+  }
+
+  const submit = async () => {
+    const slug = slugFromInput(docInput)
+    const documentKey = keyInput.trim()
+    if (!slug) {
+      setError('Enter the agreement link or slug.')
+      return
+    }
+    if (!documentKey) {
+      setError('Enter your document key.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const { session } = await api.redeemDocumentKey({ slug, documentKey })
+      const { document } = await api.getDocument(slug, session.token)
+      saveGuestSession({
+        token: session.token,
+        documentId: document.id,
+        partyId: null,
+        role: 'creator',
+      })
+      onOpen(document)
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not find that agreement with this document key.',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="agreements-guest-entry-form">
+      <label className="agreements-guest-entry-label" htmlFor="agreements-guest-doc">
+        Agreement link or slug
+      </label>
+      <input
+        id="agreements-guest-doc"
+        type="text"
+        className="agreements-guest-entry-input"
+        value={docInput}
+        onChange={e => setDocInput(e.target.value)}
+        placeholder="https://verilock.online/d/…"
+        disabled={busy}
+        autoComplete="off"
+        spellCheck={false}
+      />
+      <label className="agreements-guest-entry-label" htmlFor="agreements-guest-key">
+        Document key
+      </label>
+      <input
+        id="agreements-guest-key"
+        type="text"
+        className="agreements-guest-entry-input mono"
+        value={keyInput}
+        onChange={e => setKeyInput(e.target.value)}
+        placeholder="Paste your document key"
+        disabled={busy}
+        autoComplete="off"
+        spellCheck={false}
+      />
+      {error && (
+        <p className="agreements-guest-entry-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="agreements-guest-entry-actions">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={busy}
+          onClick={() => {
+            setExpanded(false)
+            setError(null)
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className={`btn btn-primary${busy ? ' btn--busy' : ''}`}
+          disabled={busy}
+          onClick={() => void submit()}
+        >
+          {busy ? (
+            <>
+              <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} aria-hidden />
+              Checking…
+            </>
+          ) : (
+            <>
+              <KeyRound size={16} strokeWidth={2.25} aria-hidden />
+              Continue
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function AgreementsLoginGate({
   connectMode,
   connecting,
   onConnect,
   onSession,
+  onOpen,
   entry,
 }: {
   connectMode: JourneyConnectMode
   connecting: boolean
   onConnect: (options?: JourneyConnectRequest) => void
   onSession?: (token: string, address: string) => void
+  onOpen: (doc: SealDocument) => void
   entry: { idle: string; busy: string }
 }) {
   const [loginOpen, setLoginOpen] = useState(false)
@@ -181,6 +325,7 @@ function AgreementsLoginGate({
           placement="inline"
         />
       )}
+      <GuestDocumentKeyEntry onOpen={onOpen} />
     </section>
   )
 }
@@ -822,6 +967,7 @@ export function AgreementsPage({
         connecting={connecting}
         onConnect={onConnect}
         onSession={onSession}
+        onOpen={doc => onOpen(doc)}
         entry={entry}
       />
     )

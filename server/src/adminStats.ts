@@ -87,6 +87,10 @@ export interface AdminStats {
     withLockedAt: number
     createdLast24h: number
     createdLast7d: number
+    /** `creator_address LIKE 'GUEST:%'` - guest-native docs (never claimed). */
+    guestCreated: number
+    /** `claimed_from_guest = 1` - guest docs later claimed onto a wallet. */
+    claimedFromGuest: number
   }
   wallets: {
     uniqueCreators: number
@@ -192,6 +196,7 @@ function buildTimeline(now: number): AdminStatsTimeline {
            SELECT UPPER(REPLACE(creator_address, ' ', '')) AS a, created_at AS t
            FROM documents
            WHERE creator_address IS NOT NULL AND TRIM(creator_address) != ''
+             AND creator_address NOT LIKE 'GUEST:%'
            UNION ALL
            SELECT UPPER(REPLACE(signer_address, ' ', '')), signed_at
            FROM signatures
@@ -264,11 +269,18 @@ export function getAdminStats(): AdminStats {
   const withLockedAt = countScalar(
     `SELECT COUNT(*) AS n FROM documents WHERE locked_at IS NOT NULL`,
   )
+  const guestCreated = countScalar(
+    `SELECT COUNT(*) AS n FROM documents WHERE creator_address LIKE 'GUEST:%'`,
+  )
+  const claimedFromGuest = countScalar(
+    `SELECT COUNT(*) AS n FROM documents WHERE claimed_from_guest = 1`,
+  )
 
   const uniqueCreators = countScalar(
     `SELECT COUNT(DISTINCT UPPER(REPLACE(creator_address, ' ', ''))) AS n
      FROM documents
-     WHERE creator_address IS NOT NULL AND TRIM(creator_address) != ''`,
+     WHERE creator_address IS NOT NULL AND TRIM(creator_address) != ''
+       AND creator_address NOT LIKE 'GUEST:%'`,
   )
   const uniqueSigners = countScalar(
     `SELECT COUNT(DISTINCT UPPER(REPLACE(signer_address, ' ', ''))) AS n
@@ -284,6 +296,7 @@ export function getAdminStats(): AdminStats {
     `SELECT COUNT(*) AS n FROM (
        SELECT UPPER(REPLACE(creator_address, ' ', '')) AS a FROM documents
          WHERE creator_address IS NOT NULL AND TRIM(creator_address) != ''
+           AND creator_address NOT LIKE 'GUEST:%'
        UNION
        SELECT UPPER(REPLACE(signer_address, ' ', '')) FROM signatures
          WHERE signer_address IS NOT NULL AND TRIM(signer_address) != ''
@@ -341,6 +354,8 @@ export function getAdminStats(): AdminStats {
             .get(now - 7 * MS_PER_DAY) as { n: number } | undefined
         )?.n ?? 0,
       ),
+      guestCreated,
+      claimedFromGuest,
     },
     wallets: {
       uniqueCreators,

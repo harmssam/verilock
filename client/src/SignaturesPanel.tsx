@@ -275,15 +275,19 @@ export function SignaturesPanel({
             return (
               <li key={sig.id} className="signatures-panel-item signatures-panel-item--public">
                 <div className="signatures-panel-meta">
-                  <a
-                    className="signatures-panel-address signatures-panel-address--primary"
-                    href={buildNimiqAddressExplorerUrl(sig.signerAddress)}
-                    target="_blank"
-                    rel="noreferrer"
-                    title={sig.signerAddress}
-                  >
-                    {shortAddress(sig.signerAddress)}
-                  </a>
+                  {sig.authMethod === 'guest' ? (
+                    <span className="signatures-panel-guest-badge">Signed without wallet (invite)</span>
+                  ) : (
+                    <a
+                      className="signatures-panel-address signatures-panel-address--primary"
+                      href={buildNimiqAddressExplorerUrl(sig.signerAddress)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={sig.signerAddress}
+                    >
+                      {shortAddress(sig.signerAddress)}
+                    </a>
+                  )}
                   <span className="muted">{signedAt}</span>
                 </div>
               </li>
@@ -315,15 +319,19 @@ export function SignaturesPanel({
                 <strong>{label}</strong>
                 <span className="muted">
                   {name ? `${role} · ` : null}
-                  <a
-                    className="signatures-panel-address"
-                    href={buildNimiqAddressExplorerUrl(sig.signerAddress)}
-                    target="_blank"
-                    rel="noreferrer"
-                    title={sig.signerAddress}
-                  >
-                    {shortAddress(sig.signerAddress)}
-                  </a>
+                  {sig.authMethod === 'guest' ? (
+                    <span className="signatures-panel-guest-badge">Signed without wallet (invite)</span>
+                  ) : (
+                    <a
+                      className="signatures-panel-address"
+                      href={buildNimiqAddressExplorerUrl(sig.signerAddress)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={sig.signerAddress}
+                    >
+                      {shortAddress(sig.signerAddress)}
+                    </a>
+                  )}
                   {' · '}
                   {signedAt}
                 </span>

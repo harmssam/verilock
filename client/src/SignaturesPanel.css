@@ -81,6 +81,16 @@
   align-items: center;
 }
 
+/*
+ * Guest signatures (no Nimiq wallet) show this in place of the explorer link -
+ * plain text, matching `.signatures-panel-typed` below (never a filled badge).
+ * Guest subjects (`guest:party:...`) are not real addresses and must never
+ * reach `buildNimiqAddressExplorerUrl` / `shortAddress`.
+ */
+.signatures-panel-guest-badge {
+  font-style: italic;
+}
+
 .signatures-panel--public .signatures-panel-meta {
   gap: 0.15rem;
 }

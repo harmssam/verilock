@@ -1,6 +1,8 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { v4 as uuid } from 'uuid'
 import {
+  assignPartyWallet,
+  claimDocumentToWallet as dbClaimDocumentToWallet,
   deleteDocumentById,
   findDocumentsByHash,
   getDocumentById,
@@ -8,6 +10,7 @@ import {
   getDocumentDataArchive,
   getDocumentListArchivedAt,
   getDocumentListArchivedMap,
+  getGuestSession,
   getPartiesForDocument,
   getPartyById,
   getSignaturesForDocument,
@@ -32,14 +35,23 @@ import {
   deletePartyById,
   getActiveInviteForParty,
   getPartyInviteByTokenHash,
+  insertPartyInvite,
   markPartyInviteRedeemed,
+  revokeActivePartyInvites,
   type DocumentRecord,
   type PartyInviteRecord,
   type PartyRecord,
 } from './db.js'
 import { buildNimiqExplorerUrl } from './explorer.js'
+import { documentDeepLink } from './email/resend.js'
 import { buildAttestationPayload } from './nimiq-rpc.js'
 import { normalizeAddress, shortAddress } from './addresses.js'
+import {
+  guestCreatorSubject,
+  guestPartySubject,
+  hashGuestSecret,
+  mintGuestSecretRaw,
+} from './guestIdentity.js'
 import {
   sanitizeAnnotations,
   sanitizeDisplayName,
@@ -243,6 +255,8 @@ export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOpti
     type: freshDoc.type,
     status: freshDoc.status,
     creatorAddress: freshDoc.creatorAddress,
+    /** `wallet` | `guest` | `claimed` - see `docs/guest-signing-plan.md`. */
+    authMode: freshDoc.authMode,
     originalSha256: freshDoc.originalSha256,
     finalSha256: freshDoc.finalSha256,
     pageCount: freshDoc.pageCount,
@@ -304,6 +318,9 @@ export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOpti
           : null,
       hasImage: signatureImageIds.has(sig.id),
       invitedAsEmail: revealPrivate ? sig.invitedAsEmail : null,
+      // `wallet` | `guest` - not privacy-sensitive (unlike names/ink), exposed
+      // unconditionally so certificates/public views honestly label auth method.
+      authMethod: sig.authMethod,
     })),
     signingProgress: {
       signed: signedRequired,
@@ -427,6 +444,12 @@ export function createDocument(input: {
     readyToSealEmailSentAt: null,
     // Survives roster rebuild - invite emails always know who organized.
     creatorDisplayName: isDirectSeal ? null : organizerLabel,
+    // Wallet-native create path (guest creation is a separate function - see guest-signing-plan.md).
+    authMode: 'wallet',
+    creatorDocumentKeyHash: null,
+    creatorDocumentKeyCreatedAt: null,
+    claimedAt: null,
+    claimedFromGuest: false,
   }
   insertDocument(doc)
 
@@ -484,6 +507,252 @@ export function createDocument(input: {
     document: publicDocument(doc, { viewerAddress: input.creatorAddress }),
     hashWarning,
   }
+}
+
+/**
+ * Guest-native sibling of `createDocument` - no Nimiq wallet involved.
+ *
+ * Differences from the wallet path:
+ * - `creatorAddress` is the guest sentinel `guest:doc:{id}` (`guestCreatorSubject`),
+ *   never a real wallet address.
+ * - The creator party always gets `walletAddress: null` - unlike `createDocument`,
+ *   which binds the creator's own wallet to their party immediately, a guest
+ *   creator has no wallet to bind. It only ever gets one via a later claim
+ *   (out of scope here - see `docs/guest-signing-plan.md` Task 6).
+ * - Direct seal (0 required signatures) is rejected - guest agreements are always
+ *   multi-party free-sign; 0-signature stays wallet-only (locked decision #4).
+ * - A display name is required up front (no `shortAddress()` fallback - that
+ *   produces a garbled label for a guest sentinel string).
+ * - Mints a one-time **document key** (`documentKey` in the return value). This is
+ *   the ONLY place the raw secret ever exists - the caller (route) must return it
+ *   to the client once and never log or persist it anywhere except as
+ *   `creatorDocumentKeyHash` in the DB (already handled below).
+ */
+export function createGuestDocument(input: {
+  title: string
+  originalFileName?: string
+  type: string
+  creatorDisplayName?: string
+  originalSha256: string
+  pageCount: number
+  metadata?: Record<string, unknown>
+  requiredSignatures?: number
+  parties?: Array<{ role: string; displayName: string; required?: boolean }>
+  /** Optional; stored for ready-to-seal email (never returned in public document). */
+  creatorNotifyEmail?: string | null
+  /**
+   * Optional client PDF annotations (normalized geometry + signature/text).
+   * Never includes PDF file bytes - only overlay data for reconstruction.
+   */
+  annotations?: unknown
+}): {
+  document: ReturnType<typeof publicDocument>
+  hashWarning?: string
+  /** Raw document key - shown once, caller (route) returns it in the response and never logs/persists it raw. */
+  documentKey: string
+} {
+  const requiredSignatures = clampRequiredSignatures(input.requiredSignatures, 2)
+  if (requiredSignatures === 0) {
+    throw new Error('Guest agreements must have at least one required signature')
+  }
+  if (!input.creatorDisplayName?.trim()) {
+    throw new Error('Your name is required')
+  }
+
+  const id = uuid()
+  const slug = slugFromId(id)
+  const now = Date.now()
+  const type = sanitizeDocumentType(input.type)
+  const creatorRole = resolveCreatorRole(type, undefined)
+  const otherRole = resolveOtherRole(type, creatorRole)
+  const metadata = sanitizeDocumentMetadata(type, input.metadata)
+  const annotations = sanitizeAnnotations(input.annotations)
+
+  const organizerLabel = sanitizeDisplayName(input.creatorDisplayName.trim(), 'Organizer')
+  const creatorAddress = normalizeAddress(guestCreatorSubject(id))
+
+  const documentKeyRaw = mintGuestSecretRaw()
+  const creatorDocumentKeyHash = hashGuestSecret(documentKeyRaw)
+
+  const doc: DocumentRecord = {
+    id,
+    slug,
+    title: sanitizeTitle(input.title),
+    originalFilename: sanitizeFilename(input.originalFileName),
+    type,
+    status: 'collecting_signatures',
+    creatorAddress,
+    originalSha256: input.originalSha256.toLowerCase(),
+    finalSha256: null,
+    pageCount: Math.max(1, input.pageCount),
+    metadata,
+    annotations,
+    requiredSignatures,
+    createdAt: now,
+    lockedAt: null,
+    creatorNotifyEmail: input.creatorNotifyEmail ?? null,
+    readyToSealEmailSentAt: null,
+    // Guest agreements are never direct-seal (rejected above) - always set.
+    creatorDisplayName: organizerLabel,
+    authMode: 'guest',
+    creatorDocumentKeyHash,
+    creatorDocumentKeyCreatedAt: now,
+    claimedAt: null,
+    claimedFromGuest: false,
+  }
+  insertDocument(doc)
+
+  const creatorParty: PartyRecord = {
+    id: uuid(),
+    documentId: id,
+    role: creatorRole,
+    displayName: organizerLabel,
+    // No wallet to bind for a guest creator - only a later claim can set this.
+    walletAddress: null,
+    sortOrder: 0,
+    required: true,
+    status: 'pending',
+    signedAt: null,
+    inviteEmail: null,
+    inviteSentAt: null,
+  }
+  insertParty(creatorParty)
+
+  const priorMatches = findDocumentsByHash(doc.originalSha256).filter(existing => existing.id !== id)
+  const hashWarning =
+    priorMatches.length > 0
+      ? `${priorMatches.length} other agreement(s) already use this PDF fingerprint. The same file always matches the same records, so a shared template can show multiple agreements when verified. Edit the document if you want this one unique.`
+      : undefined
+
+  const extraPartyCount = Math.max(0, requiredSignatures - 1)
+  const providedParties = input.parties ?? []
+
+  for (let index = 0; index < extraPartyCount; index++) {
+    const provided = providedParties[index]
+    const fallbackName = defaultOtherDisplayName(otherRole, index, extraPartyCount)
+    const providedName = provided?.displayName?.trim()
+    insertParty({
+      id: uuid(),
+      documentId: id,
+      role: provided?.role || otherRole,
+      displayName: providedName
+        ? sanitizeDisplayName(providedName, fallbackName)
+        : fallbackName,
+      // Guest co-signer parties never start with a wallet - self-bind on claim/sign.
+      walletAddress: null,
+      sortOrder: index + 1,
+      required: true,
+      status: 'pending',
+      signedAt: null,
+      inviteEmail: null,
+      inviteSentAt: null,
+    })
+  }
+
+  return {
+    document: publicDocument(doc, { viewerAddress: guestCreatorSubject(id) }),
+    hashWarning,
+    documentKey: documentKeyRaw,
+  }
+}
+
+/**
+ * Wallet claim bridge (`docs/guest-signing-plan.md` Task 6 "Claim ownership").
+ *
+ * Named `claimGuestDocumentToWallet` here (distinct from `db.ts`'s
+ * `claimDocumentToWallet`, imported above as `dbClaimDocumentToWallet`) to avoid a
+ * same-name collision across modules despite the plan using the same name for both
+ * the DB-layer and domain-layer functions.
+ *
+ * ONE-SHOT: the real race guard is `dbClaimDocumentToWallet`'s
+ * `WHERE auth_mode = 'guest'` UPDATE - this function's own `authMode` re-check
+ * inside the transaction is defense in depth, not the source of truth.
+ *
+ * Existing guest SIGNATURE rows are never rewritten - `authMethod` stays `'guest'`
+ * forever on those rows (the plan's core design promise: past guest signatures stay
+ * guest-attributed even after claim).
+ *
+ * Existing PARTY INVITES and any already-redeemed co-signer `guest_sessions` rows
+ * continue to work completely unchanged after claim - nothing here touches
+ * `party_invites` or other parties' `guest_sessions` rows. See the plan's "Ugly
+ * states" note: "Mid-flight claim -> co-signers still guest-invite".
+ */
+export function claimGuestDocumentToWallet(input: {
+  documentId: string
+  walletAddress: string
+  /** Raw document key - one of this or guestSessionToken must prove creator ownership. */
+  documentKey?: string | null
+  /** Raw guest bearer token for a live creator session on this exact doc - alternative proof. */
+  guestSessionToken?: string | null
+}): ReturnType<typeof publicDocument> {
+  const doc = getDocumentById(input.documentId)
+  if (!doc) throw new Error('Document not found')
+
+  if (doc.authMode === 'wallet') {
+    throw new Error('This agreement was created with a wallet and cannot be claimed')
+  }
+  if (doc.authMode === 'claimed') {
+    throw new Error('This agreement has already been claimed')
+  }
+
+  // Prove creator ownership - guestSessionToken checked first (more specific/current
+  // signal) when both are somehow provided.
+  if (input.guestSessionToken) {
+    const session = getGuestSession(input.guestSessionToken)
+    if (!session || session.role !== 'creator' || session.documentId !== doc.id) {
+      throw new Error(
+        'Your session for this agreement is no longer valid - enter your document key instead',
+      )
+    }
+  } else if (input.documentKey) {
+    if (!doc.creatorDocumentKeyHash) {
+      throw new Error('This document has no active document key')
+    }
+    const providedHash = Buffer.from(hashGuestSecret(input.documentKey), 'hex')
+    const storedHash = Buffer.from(doc.creatorDocumentKeyHash, 'hex')
+    if (
+      providedHash.length !== storedHash.length ||
+      !timingSafeEqual(providedHash, storedHash)
+    ) {
+      throw new Error('Incorrect document key')
+    }
+  } else {
+    throw new Error('Provide your document key or claim from the browser where you created this agreement')
+  }
+
+  runInTransaction(() => {
+    // Defense against a race that already flipped authMode between the check above
+    // and now - the DB-level `WHERE auth_mode = 'guest'` guard below is the real
+    // source of truth, this is just an earlier, clearer error for the common case.
+    const fresh = getDocumentById(doc.id)
+    if (!fresh || fresh.authMode !== 'guest') {
+      throw new Error('This agreement has already been claimed')
+    }
+
+    const claimed = dbClaimDocumentToWallet(doc.id, input.walletAddress, Date.now())
+    if (!claimed) {
+      throw new Error('This agreement has already been claimed')
+    }
+
+    // Creator party is always inserted first (sortOrder 0) - same convention used by
+    // `redeemDocumentKey` / `addGuestSignature`'s creator-role resolution.
+    const parties = getPartiesForDocument(doc.id).slice().sort((a, b) => a.sortOrder - b.sortOrder)
+    const creatorParty = parties[0]
+    if (creatorParty) {
+      const alreadySigned = getSignaturesForDocument(doc.id).some(
+        sig => sig.partyId === creatorParty.id,
+      )
+      // v1 rule (plan "Claim ownership" #4): only bind the creator party's wallet when
+      // it hasn't signed yet as a guest. If it already guest-signed, leave the party
+      // wallet null forever and rely on `document.creatorAddress` for ownership - the
+      // signature row itself is never touched either way.
+      if (!alreadySigned) {
+        assignPartyWallet(creatorParty.id, input.walletAddress)
+      }
+    }
+  })
+
+  return publicDocument(getDocumentById(doc.id)!, { viewerAddress: input.walletAddress })
 }
 
 /**
@@ -742,6 +1011,78 @@ export function mintInviteTokenRaw(): string {
   return randomBytes(32).toString('base64url')
 }
 
+/**
+ * Mint a personal, link-only party invite (no email send) - the guest-capable
+ * sibling of `sendPartyInviteEmail` (`./email/inviteSigner.js`). Lives here rather
+ * than a new file because it's really just an invite-table operation with the
+ * same creator-assertion + rotation pattern as the other invite helpers already
+ * in this file (`hashInviteToken`, `mintInviteTokenRaw`) - no guest-specific logic
+ * is needed inside it. `assertDocumentCreator` already accepts a wallet address OR
+ * a guest creator subject via `normalizeAddress`, so a link invite works identically
+ * for a wallet-creator's document (see plan's Authorization matrix: "Mint personal
+ * invite" is `wallet: yes`, `guest creator: yes`).
+ *
+ * Link invites and email invites share ONE active-invite-per-party slot (rotating
+ * one revokes the other) - this is deliberate, matches `sendPartyInviteEmail`'s
+ * existing single-active-invite-per-party model. Do not try to support both
+ * simultaneously for the same party.
+ */
+export function mintLinkPartyInvite(input: {
+  documentId: string
+  requesterAddress: string
+  partyId: string
+  /** Optional - if provided, also usable as an email-channel record; the link is still returned. */
+  email?: string | null
+}): { inviteUrl: string; token: string; expiresAt: number } {
+  const doc = assertDocumentCreator(input.documentId, input.requesterAddress)
+
+  if (doc.status === 'locked') {
+    throw new Error('This agreement is already locked')
+  }
+
+  const party = getPartyById(input.partyId)
+  if (!party || party.documentId !== doc.id) {
+    throw new Error('Party not found on this agreement')
+  }
+  if (!party.required) {
+    throw new Error('This party is not a required signer')
+  }
+  if (party.status === 'signed') {
+    throw new Error('This person has already signed')
+  }
+
+  const rawToken = mintInviteTokenRaw()
+  const tokenHash = hashInviteToken(rawToken)
+  const inviteId = uuid()
+  const now = Date.now()
+  const expiresAt = now + 30 * 24 * 60 * 60 * 1000 // 30-day invite expiry, matches email invites
+
+  const base = documentDeepLink(doc.slug)
+  // Same query param shape as the email flow (`?invite=`) - existing `GET /api/invites/lookup`
+  // and client `?invite=` parsing already understand this, no client changes needed for this part.
+  const inviteUrl = `${base}${base.includes('?') ? '&' : '?'}invite=${encodeURIComponent(rawToken)}`
+
+  runInTransaction(() => {
+    revokeActivePartyInvites(party.id, now)
+    insertPartyInvite({
+      id: inviteId,
+      documentId: doc.id,
+      partyId: party.id,
+      email: input.email?.trim() || '',
+      tokenHash,
+      channel: 'link',
+      createdAt: now,
+      expiresAt,
+      revokedAt: null,
+      redeemedAt: null,
+      redeemedByWallet: null,
+      resendMessageId: null,
+    })
+  })
+
+  return { inviteUrl, token: rawToken, expiresAt }
+}
+
 const INVITE_LINK_REQUIRED =
   'Open the personal invite link from your email to sign as this person.'
 
@@ -752,15 +1093,26 @@ const INVITE_LINK_REQUIRED =
  *
  * Parties with an active email invite can only be claimed when `invitePartyId`
  * matches that party (token already validated by caller).
+ *
+ * `docAuthMode` gates the open/no-invite claim path itself (see plan's locked decision:
+ * "Guest open share without `?invite=` must not allow guest sign... Wallet-native open
+ * claim can remain for `auth_mode=wallet` docs only"): on a guest document (not yet
+ * claimed to a wallet), a wallet may only claim/sign a party via a matching invite -
+ * never via open claim, even when that party currently has no active invite record.
+ * Written as `docAuthMode === 'guest'` (not `!== 'wallet'`) so a future `'claimed'`
+ * document - which should behave like wallet-native going forward - isn't accidentally
+ * over-restricted by this check once Task 6's claim flow lands.
  */
 function resolveAndClaimParty(
   documentId: string,
   preferredPartyId: string,
   signer: string,
+  docAuthMode: string,
   options?: { invitePartyId?: string | null },
 ): PartyRecord {
   const invitePartyId = options?.invitePartyId ?? null
   const canAccessParty = (partyId: string): boolean => {
+    if (docAuthMode === 'guest') return invitePartyId === partyId
     const active = getActiveInviteForParty(partyId)
     if (!active) return true
     return invitePartyId === partyId
@@ -911,7 +1263,7 @@ export function addSignature(input: {
 
       // Token wins over client partyId so a forwarded email always maps to its slot.
       const preferredPartyId = inviteForSign?.partyId ?? input.partyId
-      const party = resolveAndClaimParty(input.documentId, preferredPartyId, signer, {
+      const party = resolveAndClaimParty(input.documentId, preferredPartyId, signer, doc.authMode, {
         invitePartyId: inviteForSign?.partyId ?? null,
       })
 
@@ -953,6 +1305,9 @@ export function addSignature(input: {
         signedAt: Date.now(),
         invitedAsEmail,
         inviteId,
+        // Wallet-native sign path (guest signing is a separate function - see guest-signing-plan.md).
+        authMethod: 'wallet',
+        signerSubject: null,
       })
 
       if (inviteForSign) {
@@ -992,6 +1347,158 @@ export function addSignature(input: {
 
     if (becameReadyToLock) {
       // Lazy import avoids circular deps; fire-and-forget so sign response is fast
+      void import('./email/readyToSeal.js').then(({ notifyCreatorReadyToSeal }) =>
+        notifyCreatorReadyToSeal(input.documentId),
+      )
+    }
+
+    return publicDoc
+  } catch (err) {
+    if (isUniqueConstraintError(err)) {
+      throw new Error(
+        'Another signer claimed this slot at the same time. Refresh and try again if you still need to sign.',
+      )
+    }
+    throw err
+  }
+}
+
+/**
+ * Guest-native sibling of `addSignature` - no Nimiq wallet involved.
+ *
+ * Unlike `addSignature`, there is no open-slot-claiming step: `resolveAndClaimParty`
+ * is wallet-claim-specific (it calls `claimPartyWalletIfOpen`, which would incorrectly
+ * SET `document_parties.wallet_address` to a guest sentinel - guest parties keep
+ * `wallet_address = null` always; binding a real wallet only happens later via wallet
+ * claim, out of scope here). Instead, the guest session that authenticated this request
+ * (Task 2's `requireWalletOrGuestCreator` / `requireWalletOrGuestSigner` middleware) has
+ * ALREADY deterministically identified which party this is via `guestRole`/`guestPartyId`.
+ * The route must never accept a client-supplied partyId for the guest path - enforced here
+ * by the type signature simply not having one.
+ */
+export function addGuestSignature(input: {
+  documentId: string
+  /** From the guest session that authenticated this request - NEVER derive from request body. */
+  guestRole: 'creator' | 'signer'
+  /** Non-null only when guestRole === 'signer'. */
+  guestPartyId: string | null
+  signatureType: string
+  clientSha256: string
+  displayName?: string
+  signatureImage?: Buffer
+  signatureImageSha256?: string
+}): ReturnType<typeof publicDocument> {
+  try {
+    let becameReadyToLock = false
+    const publicDoc = runInTransaction(() => {
+      const doc = getDocumentById(input.documentId)
+      if (!doc) throw new Error('Document not found')
+      if (doc.status === 'locked' || doc.status === 'locking') {
+        throw new Error('Document is already locked')
+      }
+
+      if (input.clientSha256.toLowerCase() !== doc.originalSha256) {
+        throw new Error('Document hash mismatch - reload the PDF before signing')
+      }
+
+      let party: PartyRecord
+      if (input.guestRole === 'creator') {
+        // Creator guest sessions carry no partyId - resolve by convention, mirroring
+        // `redeemDocumentKey` (`guestAuth.ts`) and `createGuestDocument`'s insert order:
+        // the creator party is always inserted first at sortOrder 0.
+        const parties = getPartiesForDocument(input.documentId)
+          .slice()
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+        const creatorParty = parties[0]
+        if (!creatorParty) throw new Error('Document has no creator party')
+        party = creatorParty
+      } else {
+        // Not reachable yet (no route wires a signer-role guest session here this task
+        // - see plan Task 5), but implemented correctly now so that task needs no changes.
+        const found = input.guestPartyId ? getPartyById(input.guestPartyId) : null
+        if (!found || found.documentId !== input.documentId) {
+          throw new Error('Party not found')
+        }
+        party = found
+      }
+
+      const existingForParty = getSignaturesForDocument(input.documentId).find(
+        sig => sig.partyId === party.id,
+      )
+      if (existingForParty) {
+        markPartySigned(party.id)
+        reconcileDocumentParties(input.documentId)
+        throw new Error('This party already signed - refresh the page to continue.')
+      }
+
+      const partyRow = getPartyById(party.id) ?? party
+      if (partyNeedsDisplayName(partyRow)) {
+        const name = input.displayName?.trim()
+        if (!name) {
+          throw new Error('Your name is required before signing')
+        }
+        updatePartyDisplayName(party.id, sanitizeDisplayName(name, partyRow.displayName))
+      }
+
+      const sigId = uuid()
+      insertSignature({
+        id: sigId,
+        documentId: input.documentId,
+        partyId: party.id,
+        // Always party-scoped, even for a creator-role guest session - the plan's
+        // "v1 pragmatic approach": signature rows use guest:party:{partyId}, distinct
+        // from document.creatorAddress which stays guest:doc:{id}.
+        signerAddress: guestPartySubject(party.id),
+        signatureType: input.signatureType,
+        clientSha256: input.clientSha256.toLowerCase(),
+        signedAt: Date.now(),
+        // No invite involved for the creator-signs-alone case; Task 5 will pass through
+        // invite data for the signer case if/when needed.
+        invitedAsEmail: null,
+        inviteId: null,
+        authMethod: 'guest',
+        // Not populated in v1 - see docs/guest-signing-plan.md "Signatures" section.
+        signerSubject: null,
+      })
+
+      if (input.signatureImage) {
+        if (input.signatureType !== 'drawn') {
+          throw new Error('Signature image is only allowed for drawn signatures')
+        }
+        insertSignatureImage({
+          signatureId: sigId,
+          imageBlob: input.signatureImage,
+          contentType: 'image/png',
+          byteSize: input.signatureImage.length,
+          imageSha256: input.signatureImageSha256 ?? hashSignatureImage(input.signatureImage),
+        })
+      }
+
+      markPartySigned(party.id)
+
+      const updatedParties = getPartiesForDocument(input.documentId)
+      const updatedSignatures = getSignaturesForDocument(input.documentId)
+      const updatedDoc = getDocumentById(input.documentId)!
+      if (signaturesComplete(updatedDoc, updatedParties, updatedSignatures)) {
+        becameReadyToLock = doc.status !== 'ready_to_lock'
+        updateDocumentStatus(input.documentId, 'ready_to_lock')
+      } else if (doc.status === 'draft') {
+        updateDocumentStatus(input.documentId, 'collecting_signatures')
+      }
+
+      // Viewer is the acting guest's OWN subject (creator subject for a creator
+      // session, even though the signature row itself used the party subject) so the
+      // response reveals full detail to them - mirrors `addSignature`'s
+      // `viewerAddress: signer` (the acting wallet).
+      return publicDocument(getDocumentById(input.documentId)!, {
+        viewerAddress:
+          input.guestRole === 'creator'
+            ? guestCreatorSubject(input.documentId)
+            : guestPartySubject(party.id),
+      })
+    })
+
+    if (becameReadyToLock) {
       void import('./email/readyToSeal.js').then(({ notifyCreatorReadyToSeal }) =>
         notifyCreatorReadyToSeal(input.documentId),
       )

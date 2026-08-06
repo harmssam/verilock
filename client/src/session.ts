@@ -38,3 +38,47 @@ export function clearSession(): void {
     // ignore
   }
 }
+
+/**
+ * Guest sessions use `localStorage`, not `sessionStorage` like the wallet session above.
+ * This is intentional, not an inconsistency: a wallet session always has a recovery path
+ * (reconnect the wallet), so losing it on tab close is fine. A guest has no such
+ * fallback - losing a tab mid multi-day flow (create -> wait on co-signers -> claim) must
+ * not mean losing the session (`docs/guest-signing-plan.md` locked decision #6).
+ */
+const GUEST_SESSION_KEY = 'verilock-guest-session'
+
+export interface StoredGuestSession {
+  token: string
+  documentId: string
+  partyId: string | null
+  role: 'creator' | 'signer'
+}
+
+export function saveGuestSession(session: StoredGuestSession): void {
+  try {
+    localStorage.setItem(GUEST_SESSION_KEY, JSON.stringify(session))
+  } catch {
+    // localStorage may be unavailable in some WebViews
+  }
+}
+
+export function loadGuestSession(): StoredGuestSession | null {
+  try {
+    const raw = localStorage.getItem(GUEST_SESSION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as StoredGuestSession
+    if (!parsed.token || !parsed.documentId || !parsed.role) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function clearGuestSession(): void {
+  try {
+    localStorage.removeItem(GUEST_SESSION_KEY)
+  } catch {
+    // ignore
+  }
+}
