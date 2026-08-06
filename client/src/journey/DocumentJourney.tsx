@@ -4740,7 +4740,7 @@ export function DocumentJourney({
                                           busy ||
                                           p.signed ||
                                           sending ||
-                                          !token ||
+                                          !creatorOnlyEffectiveToken ||
                                           !emailVal.trim() ||
                                           !emailSendEnabled
                                         }
@@ -4752,7 +4752,7 @@ export function DocumentJourney({
                                               : undefined
                                         }
                                         onClick={() => {
-                                          if (!token || !doc) return
+                                          if (!creatorOnlyEffectiveToken || !doc) return
                                           const to = emailVal.trim()
                                           if (!to) return
                                           // Confirm before replacing an active invite link -
@@ -4777,7 +4777,7 @@ export function DocumentJourney({
                                           })
                                           setLocalError(null)
                                           void api
-                                            .sendPartyInviteEmail(token, doc.id, {
+                                            .sendPartyInviteEmail(creatorOnlyEffectiveToken, doc.id, {
                                               partyId: p.id,
                                               to,
                                             })
