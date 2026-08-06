@@ -115,7 +115,8 @@ export interface CreatePdfDraft extends CreatePdfDraftMeta {
   fileName: string
   fileType: string
   lastModified: number
-  blob: Blob
+  /** Raw PDF bytes — ArrayBuffer is stored by value on all platforms (Blob is stored by reference on Safari/iOS, which breaks after page reload). */
+  bytes: ArrayBuffer
   savedAt: number
 }
 
@@ -186,13 +187,34 @@ export async function loadCreatePdfDraft(): Promise<CreatePdfDraft | null> {
   try {
     const raw = await withStore('readonly', store => store.get(CREATE_KEY))
     if (!raw || typeof raw !== 'object') return null
-    const draft = raw as CreatePdfDraft
-    if (!draft.blob || !draft.fileName) return null
-    if (typeof draft.savedAt !== 'number' || Date.now() - draft.savedAt > MAX_AGE_MS) {
+    const draft = raw as Record<string, unknown>
+    if (!draft.fileName) return null
+
+    // Migration: old drafts stored a Blob (Safari stores by reference → breaks on reload).
+    // Convert to ArrayBuffer on read so the next save uses the durable format.
+    if (draft.bytes instanceof ArrayBuffer && (draft.bytes as ArrayBuffer).byteLength > 0) {
+      // Current format — nothing to migrate.
+    } else if (draft.blob instanceof Blob) {
+      try {
+        const buf = await (draft.blob as Blob).arrayBuffer()
+        if (buf.byteLength === 0) return null
+        draft.bytes = buf
+        delete draft.blob
+        // Persist the migrated format immediately so the next load is fast.
+        await saveCreatePdfDraft(draft as unknown as CreatePdfDraftInput)
+      } catch {
+        return null
+      }
+    } else {
+      return null
+    }
+
+    const typed = draft as unknown as CreatePdfDraft
+    if (typeof typed.savedAt !== 'number' || Date.now() - typed.savedAt > MAX_AGE_MS) {
       await clearCreatePdfDraft()
       return null
     }
-    return draft
+    return typed
   } catch {
     return null
   }
@@ -208,7 +230,7 @@ export async function clearCreatePdfDraft(): Promise<void> {
 
 /** Rebuild a File from a stored draft for React state. */
 export function fileFromCreatePdfDraft(draft: CreatePdfDraft): File {
-  return new File([draft.blob], draft.fileName, {
+  return new File([draft.bytes], draft.fileName, {
     type: draft.fileType || '',
     lastModified: draft.lastModified || Date.now(),
   })
@@ -223,14 +245,14 @@ export async function createPdfDraftFromFile(
   file: File,
   meta: CreatePdfDraftMeta,
 ): Promise<CreatePdfDraftInput> {
-  // Eager copy so IndexedDB does not depend on a temporary input File path.
+  // Eager copy so IndexedDB stores raw bytes (ArrayBuffer is stored by value on all
+  // platforms; Blob is stored by reference on Safari/iOS and breaks after page reload).
   const bytes = await file.arrayBuffer()
-  const blob = new Blob([bytes], { type: file.type || 'application/octet-stream' })
   return {
     fileName: file.name,
     fileType: file.type || '',
     lastModified: file.lastModified,
-    blob,
+    bytes,
     ...meta,
   }
 }
