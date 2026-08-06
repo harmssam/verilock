@@ -131,6 +131,57 @@ import {
 } from './types'
 import type { UseJourneyWalletResult } from './useJourneyWallet'
 
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        el: HTMLElement,
+        options: {
+          sitekey: string
+          callback?: (token: string) => void
+          'expired-callback'?: () => void
+          'error-callback'?: () => void
+          theme?: 'light' | 'dark' | 'auto'
+          size?: 'normal' | 'compact' | 'flexible'
+        },
+      ) => string
+      reset: (widgetId?: string) => void
+      remove: (widgetId?: string) => void
+    }
+  }
+}
+
+const TURNSTILE_SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+
+let turnstileScriptPromise: Promise<void> | null = null
+
+function loadTurnstileScript(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve()
+  if (window.turnstile) return Promise.resolve()
+  if (turnstileScriptPromise) return turnstileScriptPromise
+
+  turnstileScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-verilock-turnstile]')
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true })
+      existing.addEventListener('error', () => reject(new Error('Turnstile script failed')), {
+        once: true,
+      })
+      return
+    }
+    const script = document.createElement('script')
+    script.src = TURNSTILE_SCRIPT
+    script.async = true
+    script.defer = true
+    script.dataset.verilockTurnstile = '1'
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Turnstile script failed to load'))
+    document.head.appendChild(script)
+  })
+
+  return turnstileScriptPromise
+}
+
 interface DocumentJourneyProps {
   wallet: UseJourneyWalletResult
   /** Shell pushState navigation epoch - re-read /d/:slug deep links. */
@@ -287,6 +338,13 @@ export function DocumentJourney({
     documentKey: string
     savedAck: boolean
   } | null>(null)
+  /** Turnstile widget for guest document create (same pattern as SupportPage.tsx). */
+  const turnstileHostRef = useRef<HTMLDivElement | null>(null)
+  const turnstileWidgetIdRef = useRef<string | null>(null)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null)
+  const [turnstileRequired, setTurnstileRequired] = useState(false)
+  const [turnstileReady, setTurnstileReady] = useState(false)
   /**
    * Guest creator session, hydrated from `localStorage` (`docs/guest-signing-plan.md`
    * Task 4). `createGuestDoc` keeps this in sync at create time; the effect below
@@ -303,6 +361,90 @@ export function DocumentJourney({
   useEffect(() => {
     setGuestSession(loadGuestSession())
   }, [doc?.id])
+
+  // Turnstile: fetch site key + required flag from /api/features
+  useEffect(() => {
+    let cancelled = false
+    void api
+      .features()
+      .then(f => {
+        if (cancelled) return
+        const key = f.turnstileSiteKey?.trim() || null
+        setTurnstileSiteKey(key)
+        setTurnstileRequired(Boolean(f.turnstileRequired && key))
+      })
+      .catch(() => {
+        // Features optional; server still enforces Turnstile when required.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const resetTurnstile = useCallback(() => {
+    setTurnstileToken(null)
+    const id = turnstileWidgetIdRef.current
+    if (id && window.turnstile) {
+      try {
+        window.turnstile.reset(id)
+      } catch {
+        // ignore
+      }
+    }
+  }, [])
+
+  // Turnstile: render widget when site key is available
+  useEffect(() => {
+    if (!turnstileSiteKey || !turnstileHostRef.current) return
+    let cancelled = false
+
+    void loadTurnstileScript()
+      .then(() => {
+        if (cancelled || !turnstileHostRef.current || !window.turnstile) return
+        if (turnstileWidgetIdRef.current && window.turnstile) {
+          try {
+            window.turnstile.remove(turnstileWidgetIdRef.current)
+          } catch {
+            // ignore
+          }
+          turnstileWidgetIdRef.current = null
+        }
+        turnstileHostRef.current.innerHTML = ''
+        const widgetId = window.turnstile.render(turnstileHostRef.current, {
+          sitekey: turnstileSiteKey,
+          theme: 'light',
+          size: 'flexible',
+          callback: token => {
+            if (!cancelled) setTurnstileToken(token)
+          },
+          'expired-callback': () => {
+            if (!cancelled) setTurnstileToken(null)
+          },
+          'error-callback': () => {
+            if (!cancelled) setTurnstileToken(null)
+          },
+        })
+        turnstileWidgetIdRef.current = widgetId
+        setTurnstileReady(true)
+      })
+      .catch(err => {
+        console.error('[journey] turnstile load', err)
+        if (!cancelled) setTurnstileReady(false)
+      })
+
+    return () => {
+      cancelled = true
+      const id = turnstileWidgetIdRef.current
+      if (id && window.turnstile) {
+        try {
+          window.turnstile.remove(id)
+        } catch {
+          // ignore
+        }
+      }
+      turnstileWidgetIdRef.current = null
+    }
+  }, [turnstileSiteKey])
   /**
    * Guest session that actually matches the currently-loaded document, ANY role
    * (`docs/guest-signing-plan.md` Task 5 - generalized from the Task 4 creator-only
@@ -1884,6 +2026,11 @@ export function DocumentJourney({
       setLocalError('Your name is required')
       return
     }
+    // Turnstile guard — must complete bot check when server requires it.
+    if (turnstileRequired && !turnstileToken) {
+      setLocalError('Please complete the bot check and try again.')
+      return
+    }
     setBusy(true)
     setLocalError(null)
     try {
@@ -1903,15 +2050,7 @@ export function DocumentJourney({
           pageCount,
           requiredSignatures: 1,
           ...(metadata ? { metadata } : {}),
-          // TODO(guest-signing): no Turnstile widget is wired into this component yet.
-          // `SupportPage.tsx` has a working Cloudflare Turnstile pattern (script load +
-          // explicit render + token callback), but it's ~100 lines of script-loading /
-          // widget-lifecycle code that isn't factored into a reusable hook anywhere in
-          // this codebase today. Deferring that extraction to a follow-up task rather
-          // than inlining a one-off copy here. The server route no-ops the Turnstile
-          // check while `TURNSTILE_SECRET_KEY` is unset, but will 400 once an
-          // environment has it configured - this call must start sending
-          // `turnstileToken` before that happens in production.
+          turnstileToken: turnstileToken ?? undefined,
         })
 
       if (hashWarning) setLocalError(hashWarning)
@@ -1950,6 +2089,7 @@ export function DocumentJourney({
       scrollToJourneyAction('auto')
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Create failed')
+      resetTurnstile()
     } finally {
       setBusy(false)
     }
@@ -3374,6 +3514,15 @@ export function DocumentJourney({
                         Visible to signers. Do not paste sensitive information or the full contract.
                       </span>
                     </label>
+                  )}
+                  {/* Turnstile bot check for guest create — rendered only when server has it configured. */}
+                  {FEATURES.guestSigning && !account && turnstileSiteKey && (
+                    <div className="turnstile-field">
+                      <div ref={turnstileHostRef} />
+                      {!turnstileReady && (
+                        <p className="muted turnstile-loading">Loading bot check…</p>
+                      )}
+                    </div>
                   )}
                   {/*
                     Dual CTA (`docs/guest-signing-plan.md` Task 3 / locked decision): guests get

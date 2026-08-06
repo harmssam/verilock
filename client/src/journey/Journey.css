@@ -8109,4 +8109,14 @@ button.exp-account-menu-full:focus-visible {
   }
 }
 
+/* Turnstile widget – guest create bot check */
+.turnstile-field {
+  margin: 0.75rem 0 1rem;
+  min-height: 65px;
+}
+.turnstile-loading {
+  font-size: 0.82rem;
+  padding: 0.5rem 0;
+}
+
 
