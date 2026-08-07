@@ -50,6 +50,7 @@ import {
   guestCreatorSubject,
   guestPartySubject,
   hashGuestSecret,
+  isEasterEggDocument,
   mintGuestSecretRaw,
 } from './guestIdentity.js'
 import {
@@ -257,6 +258,12 @@ export function publicDocument(doc: DocumentRecord, options?: PublicDocumentOpti
     creatorAddress: freshDoc.creatorAddress,
     /** `wallet` | `guest` | `claimed` - see `docs/guest-signing-plan.md`. */
     authMode: freshDoc.authMode,
+    /**
+     * VeriLock Easter egg: this specific guest document is permanently read-only.
+     * Server-enforced (`guestAuth.ts` rejects its mutations); the client renders a
+     * locked-down image-only view when this is true.
+     */
+    easterEggLocked: isEasterEggDocument(freshDoc),
     originalSha256: freshDoc.originalSha256,
     finalSha256: freshDoc.finalSha256,
     pageCount: freshDoc.pageCount,

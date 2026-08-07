@@ -77,6 +77,7 @@ import {
   mintGuestSession,
   redeemDocumentKey,
   redeemPartyInviteAsGuest,
+  rejectEasterEggMutation,
   requireWalletOrAnyGuestParty,
   requireWalletOrGuestCreator,
   resolveViewerSubject,
@@ -562,6 +563,7 @@ app.post(
   authMiddleware,
   requireVerifiedWallet,
   async (req, res) => {
+    if (rejectEasterEggMutation(req, res)) return
     try {
       const { payWithCreditAndSeal } = await import('./payWithCredit.js')
       const { finalSha256 } = req.body as { finalSha256?: string }
@@ -1694,6 +1696,7 @@ app.post(
   authMiddleware,
   requireVerifiedWallet,
   (req, res) => {
+    if (rejectEasterEggMutation(req, res)) return
     const body = req.body as { documentKey?: string; guestSessionToken?: string }
     const address = res.locals.address as string
     try {

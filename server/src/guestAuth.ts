@@ -42,6 +42,7 @@ import {
   guestCreatorSubject,
   guestPartySubject,
   hashGuestSecret,
+  isEasterEggDocument,
   mintGuestSecretRaw,
 } from './guestIdentity.js'
 
@@ -135,6 +136,26 @@ function resolveTargetDocumentId(req: Request): string | null {
 }
 
 /**
+ * The Easter egg document (identified by its guest key hash) is permanently
+ * read-only: every mutating request that targets it is rejected here, before any
+ * auth branch runs, regardless of wallet/guest/session state. Read paths stay
+ * open so the locked-down view can still load.
+ *
+ * Also used on wallet-only mutation routes in `index.ts` (claim, pay-with-credit)
+ * that don't run the wallet-or-guest guards.
+ */
+export function rejectEasterEggMutation(req: Request, res: Response): boolean {
+  const targetDocumentId = resolveTargetDocumentId(req)
+  if (!targetDocumentId) return false
+  const target = getDocumentById(targetDocumentId)
+  if (isEasterEggDocument(target)) {
+    res.status(403).json({ error: 'This agreement is locked and cannot be modified.' })
+    return true
+  }
+  return false
+}
+
+/**
  * Combined wallet-or-guest-creator auth. Replaces the `authMiddleware, requireVerifiedWallet`
  * pair for routes that a guest creator session should also be able to perform (roster,
  * cosigners, notify-email, list-archive, delete, placement-plan creator actions - wiring
@@ -145,6 +166,8 @@ export function requireWalletOrGuestCreator(
   res: Response,
   next: NextFunction,
 ): void {
+  if (rejectEasterEggMutation(req, res)) return
+
   const token = guestBearerToken(req)
   if (!token) {
     res.status(401).json({ error: 'Missing session token' })
@@ -190,6 +213,8 @@ export function requireWalletOrGuestSigner(
   res: Response,
   next: NextFunction,
 ): void {
+  if (rejectEasterEggMutation(req, res)) return
+
   const token = guestBearerToken(req)
   if (!token) {
     res.status(401).json({ error: 'Missing session token' })
@@ -239,6 +264,8 @@ export function requireWalletOrAnyGuestParty(
   res: Response,
   next: NextFunction,
 ): void {
+  if (rejectEasterEggMutation(req, res)) return
+
   const token = guestBearerToken(req)
   if (!token) {
     res.status(401).json({ error: 'Missing session token' })

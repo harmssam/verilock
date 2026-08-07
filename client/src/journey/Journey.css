@@ -4488,6 +4488,30 @@ a.hash-chip.text-link:focus-visible {
   line-height: 1.4;
 }
 
+/* VeriLock Easter egg: locked image-only view (see DocumentJourney). */
+.easter-egg-frame {
+  margin-top: 1rem;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--lr-line, #dbe3ea);
+  background: var(--lr-surface, #fff);
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+}
+
+.easter-egg-image {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.easter-egg-hint {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: var(--lr-muted, var(--text-muted, #4b5c6b));
+}
+
 .done-banner {
   background: rgba(94, 234, 212, 0.1);
   border: 1px solid rgba(94, 234, 212, 0.3);

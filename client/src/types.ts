@@ -165,6 +165,11 @@ export interface SealDocument {
   listArchivedAt?: number | null
   /** `wallet` | `guest` | `claimed` - see docs/guest-signing-plan.md. Omitted for legacy rows. */
   authMode?: 'wallet' | 'guest' | 'claimed'
+  /**
+   * VeriLock Easter egg: this specific guest document is permanently read-only.
+   * Server-enforced; the client renders a locked-down image-only view when true.
+   */
+  easterEggLocked?: boolean
 }
 
 /** Lightweight status for the “store data forever” upsell on My Agreements. */

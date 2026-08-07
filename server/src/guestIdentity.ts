@@ -43,8 +43,28 @@ export function hashGuestSecret(raw: string): string {
 }
 
 /**
+ * The VeriLock Easter egg: a single specific guest document is permanently
+ * read-only. Anyone who redeems its document key (or opens it by slug/URL)
+ * gets a locked-down, view-only presentation - no dock, no signing, no roster
+ * edits, no delete/claim. Enforcement is server-side: the mutation guards in
+ * `guestAuth.ts` reject every mutating request that targets this document.
+ *
+ * The document is identified by the SHA-256 of its raw guest document key
+ * (never stored raw; see `getDocumentByGuestKeyHash` in `db.ts`).
+ */
+export const EASTER_EGG_DOCUMENT_KEY = '8nFs-RtFHaoO5lTR_SWJl8Aw63ObgioHtAIcVlCQ9Xc'
+export const EASTER_EGG_DOCUMENT_KEY_HASH = hashGuestSecret(EASTER_EGG_DOCUMENT_KEY)
+
+/** True when the given document row is the read-only Easter egg guest document. */
+export function isEasterEggDocument(doc: {
+  creatorDocumentKeyHash: string | null
+} | null | undefined): boolean {
+  return Boolean(doc?.creatorDocumentKeyHash === EASTER_EGG_DOCUMENT_KEY_HASH)
+}
+
+/**
  * Mints a high-entropy raw secret (32 bytes, base64url - ~256 bits).
- * Used for BOTH the document key (organizer capability secret) and guest
+ * Used for BOTH the document key (creator capability secret) and guest
  * session bearer tokens. Callers store `hashGuestSecret(raw)` only.
  */
 export function mintGuestSecretRaw(): string {

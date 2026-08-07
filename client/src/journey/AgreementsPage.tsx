@@ -305,7 +305,7 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
         className="agreements-guest-entry-toggle"
         onClick={() => setExpanded(true)}
       >
-        Have a document key instead?
+        Have a document key?
       </button>
     )
   }
