@@ -191,12 +191,12 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
   const [error, setError] = useState<string | null>(null)
 
   // Turnstile (same pattern as DocumentJourney / SupportPage)
-  const turnstileHostRef = useRef<HTMLDivElement | null>(null)
   const turnstileWidgetIdRef = useRef<string | null>(null)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null)
   const [turnstileRequired, setTurnstileRequired] = useState(false)
   const [turnstileReady, setTurnstileReady] = useState(false)
+  const turnstileAttemptedRef = useRef(false)
 
   // Fetch Turnstile config
   useEffect(() => {
@@ -217,58 +217,43 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
     }
   }, [])
 
-  // Render Turnstile widget when required
-  useEffect(() => {
-    if (!turnstileRequired || !turnstileSiteKey || !turnstileHostRef.current) return
-    let cancelled = false
+  // Callback ref: renders the Turnstile widget the moment the host div mounts,
+  // avoiding the useEffect timing gap where state has updated but the ref hasn't.
+  const turnstileHostRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (!el) return
+      if (turnstileAttemptedRef.current) return
+      if (!turnstileRequired || !turnstileSiteKey) return
+      turnstileAttemptedRef.current = true
 
-    void loadTurnstileScript()
-      .then(() => {
-        if (cancelled || !turnstileHostRef.current || !window.turnstile) return
-        if (turnstileWidgetIdRef.current && window.turnstile) {
-          try {
-            window.turnstile.remove(turnstileWidgetIdRef.current)
-          } catch {
-            // ignore
-          }
-          turnstileWidgetIdRef.current = null
-        }
-        turnstileHostRef.current.innerHTML = ''
-        const widgetId = window.turnstile.render(turnstileHostRef.current, {
-          sitekey: turnstileSiteKey,
-          theme: 'light',
-          size: 'flexible',
-          callback: token => {
-            if (!cancelled) setTurnstileToken(token)
-          },
-          'expired-callback': () => {
-            if (!cancelled) setTurnstileToken(null)
-          },
-          'error-callback': () => {
-            if (!cancelled) setTurnstileToken(null)
-          },
+      void loadTurnstileScript()
+        .then(() => {
+          if (!window.turnstile) return
+          el.innerHTML = ''
+          const widgetId = window.turnstile.render(el, {
+            sitekey: turnstileSiteKey,
+            theme: 'light',
+            size: 'flexible',
+            callback: token => {
+              setTurnstileToken(token)
+            },
+            'expired-callback': () => {
+              setTurnstileToken(null)
+            },
+            'error-callback': () => {
+              setTurnstileToken(null)
+            },
+          })
+          turnstileWidgetIdRef.current = widgetId
+          setTurnstileReady(true)
         })
-        turnstileWidgetIdRef.current = widgetId
-        setTurnstileReady(true)
-      })
-      .catch(err => {
-        console.error('[agreements] turnstile load', err)
-        if (!cancelled) setTurnstileReady(false)
-      })
-
-    return () => {
-      cancelled = true
-      const id = turnstileWidgetIdRef.current
-      if (id && window.turnstile) {
-        try {
-          window.turnstile.remove(id)
-        } catch {
-          // ignore
-        }
-        turnstileWidgetIdRef.current = null
-      }
-    }
-  }, [turnstileRequired, turnstileSiteKey])
+        .catch(err => {
+          console.error('[agreements] turnstile load', err)
+          setTurnstileReady(false)
+        })
+    },
+    [turnstileRequired, turnstileSiteKey],
+  )
 
   const resetTurnstile = useCallback(() => {
     setTurnstileToken(null)
@@ -278,6 +263,21 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
         window.turnstile.reset(id)
       } catch {
         // ignore
+      }
+    }
+  }, [])
+
+  // Cleanup Turnstile widget on unmount
+  useEffect(() => {
+    return () => {
+      const id = turnstileWidgetIdRef.current
+      if (id && window.turnstile) {
+        try {
+          window.turnstile.remove(id)
+        } catch {
+          // ignore
+        }
+        turnstileWidgetIdRef.current = null
       }
     }
   }, [])
@@ -377,6 +377,9 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
           onClick={() => {
             setExpanded(false)
             setError(null)
+            turnstileAttemptedRef.current = false
+            setTurnstileToken(null)
+            setTurnstileReady(false)
           }}
         >
           Cancel
