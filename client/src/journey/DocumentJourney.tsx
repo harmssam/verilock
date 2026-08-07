@@ -3490,8 +3490,7 @@ export function DocumentJourney({
                       maxLength={MAX_DISPLAY_NAME_LENGTH}
                     />
                     <span className="muted" style={{ fontSize: '0.78rem' }}>
-                      Shown on invite emails (“Alex has requested you sign…”). On Setup you choose
-                      whether you sign as one of the people (or none).
+                      Shown on invite emails (“Alex has requested you sign…”).
                     </span>
                   </label>
                   {documentTypeUsesNotes(docType) && (
@@ -3536,24 +3535,6 @@ export function DocumentJourney({
                   */}
                   {FEATURES.guestSigning && !account ? (
                     <>
-                      <button
-                        type="button"
-                        className={`btn btn-primary btn-lg${busy ? ' btn--busy' : ''}`}
-                        disabled={!pdfFile || !pdfHash || busy}
-                        onClick={() => void createGuestDoc()}
-                      >
-                        {busy ? (
-                          <>
-                            <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
-                            Creating…
-                          </>
-                        ) : (
-                          <>
-                            <Fingerprint size={18} strokeWidth={2.25} />
-                            Continue free - no wallet
-                          </>
-                        )}
-                      </button>
                       {loginNeedsSheet && loginSheetOpen ? (
                         <LoginSheet
                           open
@@ -3570,23 +3551,41 @@ export function DocumentJourney({
                       ) : (
                         <button
                           type="button"
-                          className={`btn btn-ghost${connecting ? ' btn--busy' : ''}`}
+                          className={`btn btn-primary btn-lg${connecting ? ' btn--busy' : ''}`}
                           disabled={busy || connecting}
                           onClick={requestLogin}
                         >
                           {connecting ? (
                             <>
-                              <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
+                              <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
                               {journeyLoginEntryLabels().busy}
                             </>
                           ) : (
                             <>
-                              <NimiqHexagonIcon size={16} />
-                              Continue with Nimiq instead
+                              <NimiqHexagonIcon size={18} />
+                              Login with Nimiq
                             </>
                           )}
                         </button>
                       )}
+                      <button
+                        type="button"
+                        className={`btn btn-ghost${busy ? ' btn--busy' : ''}`}
+                        disabled={!pdfFile || !pdfHash || busy}
+                        onClick={() => void createGuestDoc()}
+                      >
+                        {busy ? (
+                          <>
+                            <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
+                            Creating…
+                          </>
+                        ) : (
+                          <>
+                            <Fingerprint size={16} strokeWidth={2.25} />
+                            Continue as Guest
+                          </>
+                        )}
+                      </button>
                       <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
                         No account needed. Save your document key after creating so you can get
                         back in later.
