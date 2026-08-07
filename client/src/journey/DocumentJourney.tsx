@@ -1976,6 +1976,10 @@ export function DocumentJourney({
 
   const createDoc = async () => {
     if (!token || !pdfFile || !pdfHash) return
+    if (!creatorName.trim()) {
+      setNameFieldError(true)
+      return
+    }
     setBusy(true)
     setLocalError(null)
     try {
@@ -2030,8 +2034,7 @@ export function DocumentJourney({
    */
   const createGuestDoc = async () => {
     if (!pdfFile || !pdfHash) return
-    // Guest has no wallet address to fall back to as a label - unlike the wallet
-    // path's `creatorName.trim() || 'Organizer'`, a real name is required here.
+    // Both wallet and guest paths now require a name — no 'Organizer' fallback.
     if (!creatorName.trim()) {
       setNameFieldError(true)
       return

@@ -2577,7 +2577,7 @@ button.exp-account-menu-full:focus-visible {
 
 /* Name field validation highlight — red border + shake, no error banner. */
 .field--error input {
-  border-color: #ef4444;
+  border: 1px solid #ef4444;
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
   animation: field-shake 0.35s ease;
 }
