@@ -5478,7 +5478,13 @@ export function DocumentJourney({
                         <Check size={18} strokeWidth={2.5} />
                       )}
                       <div>
-                        <strong>{doc.sealed ? 'Locked.' : 'Complete.'}</strong>
+                        <strong>
+                          {doc.sealed
+                            ? 'Locked.'
+                            : allSigned(doc)
+                              ? 'Document complete'
+                              : 'Complete.'}
+                        </strong>
                         <p className="muted">
                           {doc.sealed ? (
                             <>
@@ -5502,6 +5508,12 @@ export function DocumentJourney({
                                 ) : null}
                               </span>
                             </>
+                          ) : allSigned(doc) && role === 'creator' ? (
+                            <>
+                              All signatures are in. Print a signed copy anytime with the
+                              same local file, or save to a wallet to lock on the blockchain
+                              for permanent proof.
+                            </>
                           ) : (
                             <>
                               Drop any copy of <em>{doc.fileName}</em> to check integrity later.
@@ -5510,6 +5522,119 @@ export function DocumentJourney({
                         </p>
                       </div>
                     </div>
+                  )}
+
+                  {/* Guest / no-wallet creator: same print view wallet creators get at seal step. */}
+                  {step === 'done' &&
+                    doc &&
+                    !doc.sealed &&
+                    role === 'creator' &&
+                    allSigned(doc) && (
+                    <>
+                      <PartyList doc={doc} revealNames={revealParticipantPrivate} />
+                      {doc.source.signatures.length > 0 && (
+                        <SignaturesPanel
+                          signatures={doc.source.signatures}
+                          parties={doc.source.parties}
+                          compact
+                          revealPrivate={revealParticipantPrivate}
+                          authToken={effectiveToken}
+                          fingerprint={doc.fingerprint}
+                          documentId={doc.id}
+                        />
+                      )}
+                      {FEATURES.pdfAnnotationUi && (
+                        <section
+                          className="journey-pdf-editor"
+                          aria-labelledby={
+                            hasVerifiedLocalPdf
+                              ? undefined
+                              : 'guest-print-title'
+                          }
+                        >
+                          {!hasVerifiedLocalPdf && (
+                            <>
+                              <header className="signatures-config-head">
+                                <h3 id="guest-print-title">
+                                  Print signed document
+                                </h3>
+                                <p
+                                  className="muted"
+                                  style={{ margin: 0, fontSize: '0.85rem' }}
+                                >
+                                  Drop the same file you created so signatures
+                                  paint on the page, then print. The file stays
+                                  on this device - nothing is sent to VeriLock.
+                                </p>
+                              </header>
+                              <DocumentStage
+                                step={step}
+                                doc={doc}
+                                file={signFile ?? null}
+                                onFileChange={file => {
+                                  setSignFile(file)
+                                  setSignHash(null)
+                                  if (!file) setLocalError(null)
+                                }}
+                                accepting
+                                localCopyRequired
+                                localCopyMatches={
+                                  !(signFile || pdfFile)
+                                    ? null
+                                    : signFileMatches ||
+                                      Boolean(
+                                        pdfFile && pdfHash === doc.fingerprint,
+                                      )
+                                }
+                                localCopyHint="Drop the same file you fingerprinted so signatures paint on the page, then print. The file stays on this device - nothing is sent to VeriLock."
+                              />
+                            </>
+                          )}
+                          {signFile &&
+                            !hasVerifiedLocalPdf &&
+                            signHash &&
+                            signHash !== doc.fingerprint && (
+                              <div className="result-banner result-banner--bad">
+                                That file does not match this agreement
+                                fingerprint. Use the same document you created (
+                                <strong>{doc.fileName}</strong>
+                                ).
+                              </div>
+                            )}
+                          {hasVerifiedLocalPdf &&
+                            (signFile || pdfFile) && (
+                              <SignedDocumentView
+                                className="signed-document-view signed-document-view--primary"
+                                file={(signFile ?? pdfFile)!}
+                                fingerprint={doc.fingerprint}
+                                documentId={doc.id}
+                                authToken={effectiveToken}
+                                revealPrivate={revealParticipantPrivate}
+                                documentAnnotations={
+                                  doc.source.annotations
+                                }
+                                signatures={doc.source.signatures}
+                                parties={doc.source.parties}
+                              />
+                            )}
+                        </section>
+                      )}
+                      {!FEATURES.pdfAnnotationUi && (
+                        <DocumentStage
+                          step={step}
+                          doc={doc}
+                          file={pdfFile}
+                          accepting={false}
+                        />
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={resetAll}
+                      >
+                        Finish
+                      </button>
+                    </>
                   )}
 
                   {/*
@@ -5558,12 +5683,14 @@ export function DocumentJourney({
                       <PartyList doc={doc} revealNames={revealParticipantPrivate} />
                     )}
 
-                  {/* Pre-match sealed doc: one signatures list (not PartyList + panel). */}
+                  {/* Pre-match sealed doc: one signatures list (not PartyList + panel).
+                      Skip when the guest-creator print section above already rendered it. */}
                   {doc &&
                     role !== 'signer' &&
                     doc.source.signatures.length > 0 &&
                     (step === 'done' || (step === 'verify' && doc.sealed)) &&
-                    !verifyMatched && (
+                    !verifyMatched &&
+                    !(allSigned(doc) && role === 'creator') && (
                       <SignaturesPanel
                         signatures={doc.source.signatures}
                         parties={doc.source.parties}
