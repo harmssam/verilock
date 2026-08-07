@@ -1075,6 +1075,69 @@
   box-shadow: 0 1px 0 rgb(15 23 42 / 4%);
 }
 
+/*
+ * Placement stage: pages fit the stage at 100% zoom, so drop the permanent
+ * inner scroll rail (the nested "iframe" scroll inside the journey page).
+ * overflow still becomes scrollable when zoomed past fit, and the webkit
+ * track/thumb rules from PdfAnnotator.css re-apply automatically.
+ */
+.placement-stage {
+  overflow-x: auto;
+  overflow-y: auto;
+  scrollbar-gutter: auto;
+}
+
+/* Page pager arrows overlaid on the stage edges (multipage documents). */
+.placement-page-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 92%);
+  color: #334155;
+  cursor: pointer;
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 10%),
+    0 4px 12px rgb(15 23 42 / 8%);
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.placement-page-arrow:hover:not(:disabled) {
+  background: #fff;
+  border-color: #0f766e;
+  color: #0f766e;
+}
+
+.placement-page-arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.placement-page-arrow:focus-visible {
+  outline: 2px solid #0f766e;
+  outline-offset: 2px;
+}
+
+.placement-page-arrow.is-prev {
+  left: 0.9rem;
+}
+
+.placement-page-arrow.is-next {
+  right: 0.9rem;
+}
+
 /* Center helper / error copy above the stage */
 .placement-stage-panel .placement-editor-hint,
 .placement-stage-panel .placement-editor-error {

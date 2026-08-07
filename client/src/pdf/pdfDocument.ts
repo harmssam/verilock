@@ -80,7 +80,10 @@ export async function renderPageToCanvas(
 ): Promise<RenderedPage> {
   const page = await doc.getPage(pageNumber)
   const base = page.getViewport({ scale: 1 })
-  const scale = Math.max(0.5, targetCssWidth / base.width)
+  // No scale floor: the caller's target width must be honored exactly so pages
+  // fit their stage (a floor makes wide pages render larger than the fit and
+  // overflow). Canvas pixels come from devicePixelRatio, so sharpness is kept.
+  const scale = targetCssWidth / base.width
   const viewport = page.getViewport({ scale })
   const dpr = typeof window !== 'undefined' ? Math.min(2, window.devicePixelRatio || 1) : 1
 

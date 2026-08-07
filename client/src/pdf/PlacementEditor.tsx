@@ -6,6 +6,8 @@
 import {
   Calendar,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Maximize2,
   Minimize2,
   Minus,
@@ -225,8 +227,8 @@ export function PlacementEditor({
   const autoScrollRafRef = useRef<number | null>(null)
   /** Full-viewport stage workspace (toolbar + PDF) for dense placement work. */
   const [stageFullscreen, setStageFullscreen] = useState(false)
-  /** Usable stage content width (padding/gutter excluded) for fullscreen page fit. */
-  const [stageInnerWidth, setStageInnerWidth] = useState(0)
+  /** Usable stage content size (padding/gutter excluded) for page fitting. */
+  const [stageInner, setStageInner] = useState<{ w: number; h: number } | null>(null)
   /** View zoom % applied on top of fit/base page width (placement only; not stored). */
   const [zoomPct, setZoomPct] = useState(100)
   const cssSizeRef = useRef(cssSize)
@@ -386,19 +388,35 @@ export function PlacementEditor({
   /**
    * Base page width: docked prop size, or (in fullscreen) fit to stage.
    * Zoom multiplies this so placement boxes stay in normalized coords.
-   * stageInnerWidth is already the usable content width (padding + gutter removed)
+   * stageInner is already the usable content size (padding + gutter removed)
    * so the page never slightly overflows and left-aligns.
    */
   const basePageWidth = useMemo(() => {
-    if (!stageFullscreen) return pageWidth
-    if (stageInnerWidth <= 0) return Math.max(pageWidth, 720)
-    return Math.max(pageWidth, Math.min(stageInnerWidth, 1100))
-  }, [stageFullscreen, stageInnerWidth, pageWidth])
+    const w = stageInner?.w ?? null
+    if (!stageFullscreen) {
+      // Docked: the page must never exceed the stage width (no inner scroll).
+      if (w == null || w <= 0) return pageWidth
+      return Math.min(pageWidth, w)
+    }
+    if (w == null || w <= 0) return Math.max(pageWidth, 720)
+    return Math.max(pageWidth, Math.min(w, 1100))
+  }, [stageFullscreen, stageInner, pageWidth])
 
-  const effectivePageWidth = useMemo(
-    () => Math.max(160, Math.round(basePageWidth * (zoomPct / 100))),
-    [basePageWidth, zoomPct],
-  )
+  /**
+   * Page width at 100% zoom that fits the stage on BOTH axes, so a page is
+   * always fully visible and the stage never needs its own scrollbar (no nested
+   * "iframe" scroll inside the scrolling journey page). Zoom multiplies the
+   * fitted width; zoomed-in pages may overflow and scroll, which is explicit.
+   */
+  const effectivePageWidth = useMemo(() => {
+    let base = basePageWidth
+    const h = stageInner?.h ?? null
+    if (h != null && h > 0 && pagePts.width > 0 && pagePts.height > 0) {
+      base = Math.min(base, h * (pagePts.width / pagePts.height))
+    }
+    const at100 = Math.max(160, Math.floor(base))
+    return Math.max(160, Math.round(at100 * (zoomPct / 100)))
+  }, [basePageWidth, stageInner, pagePts, zoomPct])
 
   const nudgeZoom = useCallback((delta: number) => {
     setZoomPct(prev =>
@@ -406,14 +424,56 @@ export function PlacementEditor({
     )
   }, [])
 
+  /** Flip to an adjacent page; keeps the stage scrolled to the top. */
+  const goToPage = useCallback(
+    (n: number) => {
+      const next = Math.max(1, Math.min(pageCount, Math.round(n)))
+      if (next === pageNumber) return
+      setPageNumber(next)
+      stageRef.current?.scrollTo({ top: 0, left: 0 })
+    },
+    [pageCount, pageNumber],
+  )
+
+  // Left/Right arrows flip pages (unless the focus is in a text field).
+  useEffect(() => {
+    if (pageCount <= 1 || disabled) return
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (
+        t &&
+        (t.tagName === 'INPUT' ||
+          t.tagName === 'TEXTAREA' ||
+          t.tagName === 'SELECT' ||
+          t.isContentEditable)
+      ) {
+        return
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        goToPage(pageNumber - 1)
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        goToPage(pageNumber + 1)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pageCount, disabled, pageNumber, goToPage])
+
   useEffect(() => {
     if (!surface || !canvasRef.current) return
     let cancelled = false
-    const canvas = canvasRef.current
+    const prevCanvas = canvasRef.current
     surface
-      .renderPage(pageNumber, effectivePageWidth, canvas)
+      .renderPage(pageNumber, effectivePageWidth)
       .then(rendered => {
         if (cancelled) return
+        // Swap in the freshly rendered canvas so the displayed size always
+        // matches cssSize (no cross-render races on a shared canvas - a stale
+        // draw could otherwise stretch the page and overflow the stage).
+        prevCanvas.replaceWith(rendered.canvas)
+        canvasRef.current = rendered.canvas
         setCssSize({ width: rendered.cssWidth, height: rendered.cssHeight })
         setPagePts({ width: rendered.pageWidthPts, height: rendered.pageHeightPts })
       })
@@ -425,28 +485,52 @@ export function PlacementEditor({
     return () => {
       cancelled = true
     }
-    // stageFullscreen: portal remounts the canvas; re-paint after enter/exit.
+    // stageFullscreen: portal remounts the panel; re-paint after enter/exit.
   }, [surface, pageNumber, effectivePageWidth, stageFullscreen])
 
-  // Measure usable stage width for fullscreen page scaling (exclude padding +
-  // scrollbar-gutter so the page stays within the content box and centers).
+  /**
+   * Measure usable stage content size (padding/gutter excluded) so the page can
+   * fit on both axes. Docked: the stage caps at max-height (70vh / 720px), so
+   * fit against that cap, not the current content height (the content IS the
+   * page - that would feed back into itself). Fullscreen: the stage is a fixed
+   * flex panel, so current clientHeight is the real limit.
+   */
   useEffect(() => {
     const stage = stageRef.current
     if (!stage || typeof ResizeObserver === 'undefined') return
+    let rafs: number[] = []
     const measure = () => {
       const style = getComputedStyle(stage)
       const padX =
         (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0)
+      const padY =
+        (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0)
+      const maxH = parseFloat(style.maxHeight)
       // clientWidth excludes classic scrollbars but not always stable gutter.
       // Small slack keeps the page strictly inside so margin:auto can center it.
       const gutterSlack = 16
-      const usable = Math.floor(stage.clientWidth - padX - gutterSlack)
-      if (usable > 0) setStageInnerWidth(usable)
+      const w = Math.floor(stage.clientWidth - padX - gutterSlack)
+      const h =
+        Number.isFinite(maxH) && maxH > 0
+          ? Math.floor(maxH - padY - 4)
+          : Math.floor(stage.clientHeight - padY - 4)
+      setStageInner({ w: Math.max(1, w), h: Math.max(1, h) })
     }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(stage)
-    return () => ro.disconnect()
+    // vh-based max-height changes with the window even if the stage size does not.
+    window.addEventListener('resize', measure)
+    // Entering fullscreen re-mounts the stage in a portal; its fixed flex panel
+    // (bar / people / toolbar) settles a frame or two later, so re-measure then.
+    for (let i = 0; i < 4; i++) {
+      rafs.push(requestAnimationFrame(() => requestAnimationFrame(measure)))
+    }
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+      rafs.forEach(cancelAnimationFrame)
+    }
   }, [stageFullscreen])
 
   // Fullscreen: lock body scroll; Escape exits (after place-tool cancel is handled elsewhere).
@@ -1317,7 +1401,7 @@ export function PlacementEditor({
             type="button"
             className="placement-tool-btn placement-tool-btn--sm"
             disabled={disabled || pageNumber <= 1}
-            onClick={() => setPageNumber(p => Math.max(1, p - 1))}
+            onClick={() => goToPage(pageNumber - 1)}
             title="Previous page"
             aria-label="Previous page"
           >
@@ -1330,7 +1414,7 @@ export function PlacementEditor({
             type="button"
             className="placement-tool-btn placement-tool-btn--sm"
             disabled={disabled || pageNumber >= pageCount}
-            onClick={() => setPageNumber(p => Math.min(pageCount, p + 1))}
+            onClick={() => goToPage(pageNumber + 1)}
             title="Next page"
             aria-label="Next page"
           >
@@ -1740,7 +1824,7 @@ export function PlacementEditor({
                 )}
                 <div
                   ref={stageRef}
-                  className={`pdf-annotator-stage${stageFullscreen ? ' is-fullscreen' : ''}`}
+                  className={`pdf-annotator-stage placement-stage${stageFullscreen ? ' is-fullscreen' : ''}`}
                 >
                   {loading && <p className="pdf-annotator-hint">Loading document…</p>}
                   {loadError && <p className="pdf-annotator-hint">{loadError}</p>}
@@ -1875,6 +1959,30 @@ export function PlacementEditor({
                     </div>
                   </div>
                 </div>
+                {pageCount > 1 && !loading && !loadError && (
+                  <>
+                    <button
+                      type="button"
+                      className="placement-page-arrow is-prev"
+                      disabled={disabled || pageNumber <= 1}
+                      onClick={() => goToPage(pageNumber - 1)}
+                      title="Previous page"
+                      aria-label="Previous page"
+                    >
+                      <ChevronLeft size={22} strokeWidth={2.5} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      className="placement-page-arrow is-next"
+                      disabled={disabled || pageNumber >= pageCount}
+                      onClick={() => goToPage(pageNumber + 1)}
+                      title="Next page"
+                      aria-label="Next page"
+                    >
+                      <ChevronRight size={22} strokeWidth={2.5} aria-hidden />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
