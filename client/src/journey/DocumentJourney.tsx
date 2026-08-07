@@ -566,6 +566,7 @@ export function DocumentJourney({
   const [howOpen, setHowOpen] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
+  const [nameFieldError, setNameFieldError] = useState(false)
   const [lockMessage, setLockMessage] = useState<string | null>(null)
   const [creditBalance, setCreditBalance] = useState(0)
   const [creditsRefresh, setCreditsRefresh] = useState(0)
@@ -2032,7 +2033,7 @@ export function DocumentJourney({
     // Guest has no wallet address to fall back to as a label - unlike the wallet
     // path's `creatorName.trim() || 'Organizer'`, a real name is required here.
     if (!creatorName.trim()) {
-      setLocalError('Your name is required')
+      setNameFieldError(true)
       return
     }
     // Turnstile guard — must complete bot check when server requires it.
@@ -3487,13 +3488,14 @@ export function DocumentJourney({
                       }
                     />
                   </label>
-                  <label className="field">
-                    <span className="field-label">Your name (optional)</span>
+                  <label className={`field${nameFieldError ? ' field--error' : ''}`}>
+                    <span className="field-label">Your name</span>
                     <input
                       value={creatorName}
-                      onChange={e =>
+                      onChange={e => {
+                        setNameFieldError(false)
                         setCreatorName(clampField(e.target.value, MAX_DISPLAY_NAME_LENGTH))
-                      }
+                      }}
                       placeholder="Organizer name"
                       autoComplete="name"
                       maxLength={MAX_DISPLAY_NAME_LENGTH}
