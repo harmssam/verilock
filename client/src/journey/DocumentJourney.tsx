@@ -706,14 +706,23 @@ export function DocumentJourney({
         setActiveFromSeal(document)
         setLocalError(null)
         setLockMessage(null)
+        const storedGuest = loadGuestSession()
+        const isGuestCreator =
+          storedGuest &&
+          storedGuest.documentId === document.id &&
+          storedGuest.role === 'creator'
         const isCreator =
-          address &&
-          document.creatorAddress.replace(/\s/g, '').toUpperCase() ===
-            address.replace(/\s/g, '').toUpperCase()
+          isGuestCreator ||
+          (address &&
+            document.creatorAddress.replace(/\s/g, '').toUpperCase() ===
+              address.replace(/\s/g, '').toUpperCase())
         const sealed =
           document.status === 'locked' || document.attestation?.status === 'confirmed'
 
         if (isCreator) {
+          if (isGuestCreator && storedGuest) {
+            setGuestSession(storedGuest)
+          }
           setRole('creator')
           saveJourneyIntent('creator')
           const { required } = document.signingProgress
