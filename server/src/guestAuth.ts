@@ -319,8 +319,8 @@ export function redeemDocumentKey(input: {
   const doc =
     (input.documentId ? getDocumentById(input.documentId) : null) ??
     (input.slug ? getDocumentBySlug(input.slug) : null) ??
-    // Key-only lookup: scan guest docs by key hash so the user doesn't need
-    // to remember/paste a slug or document URL alongside the key.
+    // Key-only lookup: indexed exact-match on the key hash so the user doesn't
+    // need to remember/paste a slug or document URL alongside the key.
     getDocumentByGuestKeyHash(keyHash)
   if (!doc) {
     throw new Error('Document not found')

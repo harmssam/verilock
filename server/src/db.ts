@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import { randomBytes, randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { normalizeAddress } from './addresses.js'
@@ -150,6 +150,21 @@ if (!documentColumns.some(col => col.name === 'claimed_at')) {
 if (!documentColumns.some(col => col.name === 'claimed_from_guest')) {
   db.exec('ALTER TABLE documents ADD COLUMN claimed_from_guest INTEGER NOT NULL DEFAULT 0')
 }
+
+/**
+ * Exact-match index for key-only guest re-entry. Without it,
+ * `getDocumentByGuestKeyHash` scanned every guest document (with full
+ * annotations/metadata JSON materialized) synchronously inside the request -
+ * blocking the event loop (and Railway's `/api/health` probe) for seconds as
+ * the guest-doc table grew, restarting the container mid-session and surfacing
+ * as transient 502s on the next navigation. Exact equality on the stored
+ * SHA-256 key hash is safe: the hash is high-entropy (256-bit), not the key.
+ */
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_documents_guest_key_hash
+    ON documents(creator_document_key_hash)
+    WHERE auth_mode = 'guest' AND creator_document_key_hash IS NOT NULL
+`)
 
 /** Co-signer invite email (latest) - creator-visible; not a public capability secret. */
 const partyColumns = db.prepare('PRAGMA table_info(document_parties)').all() as Array<{ name: string }>
@@ -852,23 +867,28 @@ export function getDocumentBySlug(slug: string): DocumentRecord | null {
 /**
  * Find a guest document by its key hash — enables key-only re-entry without
  * requiring the user to remember or paste a document slug/URL.
+ *
+ * Indexed exact-equality lookup on the high-entropy (256-bit) SHA-256 key
+ * hash instead of scanning every guest document synchronously in the request
+ * (see the `idx_documents_guest_key_hash` migration above - the old scan
+ * blocked the event loop once the table grew, causing Railway to fail its
+ * health probe and restart the container mid-session → transient 502s).
+ * The timing-safe re-check below is defense-in-depth; timing leakage on the
+ * hash itself is not an attack surface since it cannot be inverted to the key.
  */
 export function getDocumentByGuestKeyHash(keyHash: Buffer): DocumentRecord | null {
-  const rows = db
+  const row = db
     .prepare(
-      'SELECT * FROM documents WHERE auth_mode = ? AND creator_document_key_hash IS NOT NULL',
+      `SELECT * FROM documents
+       WHERE auth_mode = 'guest' AND creator_document_key_hash = ?`,
     )
-    .all('guest') as Record<string, unknown>[]
-  for (const row of rows) {
-    const stored = Buffer.from(row.creator_document_key_hash as string, 'hex')
-    // Timing-safe compare against every candidate (small N, safety-first).
-    if (stored.length === keyHash.length) {
-      let diff = 0
-      for (let i = 0; i < stored.length; i++) diff |= stored[i] ^ keyHash[i]
-      if (diff === 0) return rowToDocument(row)
-    }
+    .get(keyHash.toString('hex')) as Record<string, unknown> | undefined
+  if (!row) return null
+  const stored = Buffer.from(row.creator_document_key_hash as string, 'hex')
+  if (stored.length !== keyHash.length || !timingSafeEqual(stored, keyHash)) {
+    return null
   }
-  return null
+  return rowToDocument(row)
 }
 
 export function updateDocumentStatus(id: string, status: DocumentStatus): void {
