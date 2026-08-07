@@ -7191,6 +7191,16 @@ a.hash-chip.text-link:focus-visible {
     background: #ffffff;
 }
 
+/* Name field validation highlight — light-shell override (base `.field--error input`
+   red border loses to the white-field rules above; keep red + shake on focus too). */
+.field--error input,
+.field--error input:hover,
+.field--error input:focus {
+  border: 1px solid #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+  animation: field-shake 0.35s ease;
+}
+
 .field select option {
   background: #ffffff;
     color: var(--lr-text);

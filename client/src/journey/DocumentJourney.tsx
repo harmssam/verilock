@@ -393,9 +393,10 @@ export function DocumentJourney({
     }
   }, [])
 
-  // Turnstile: render widget when site key is available
+  // Turnstile: render widget only when the server actually requires it (never
+  // show a bot check that isn't enforced - e.g. local dev with TURNSTILE_REQUIRED=false).
   useEffect(() => {
-    if (!turnstileSiteKey || !turnstileHostRef.current) return
+    if (!turnstileRequired || !turnstileSiteKey || !turnstileHostRef.current) return
     let cancelled = false
 
     void loadTurnstileScript()
@@ -444,7 +445,7 @@ export function DocumentJourney({
       }
       turnstileWidgetIdRef.current = null
     }
-  }, [turnstileSiteKey])
+  }, [turnstileSiteKey, turnstileRequired])
   /**
    * Guest session that actually matches the currently-loaded document, ANY role
    * (`docs/guest-signing-plan.md` Task 5 - generalized from the Task 4 creator-only
@@ -3060,6 +3061,13 @@ export function DocumentJourney({
 
   /** Header-style Login: sheet on mobile (Pay vs Hub), direct Hub/Pay-native on desktop. */
   const requestLogin = () => {
+    // Creator path: the name field lives on the fingerprint (create) step, and a
+    // wallet login never creates the document. Block the login flow until a name
+    // is entered - highlight the field instead of opening the sheet / connecting.
+    if (step === 'fingerprint' && !creatorName.trim()) {
+      setNameFieldError(true)
+      return
+    }
     if (loginNeedsSheet) {
       if (pdfFile && !doc) void flushCreatePdfDraft()
       setLoginSheetOpen(true)
@@ -3529,7 +3537,7 @@ export function DocumentJourney({
                     </label>
                   )}
                   {/* Turnstile bot check for guest create — rendered only when server has it configured. */}
-                  {FEATURES.guestSigning && !account && turnstileSiteKey && (
+                  {FEATURES.guestSigning && !account && turnstileRequired && turnstileSiteKey && (
                     <div className="turnstile-field">
                       <div ref={turnstileHostRef} />
                       {!turnstileReady && (

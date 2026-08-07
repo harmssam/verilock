@@ -126,7 +126,7 @@ export function SupportPage() {
   }, [])
 
   useEffect(() => {
-    if (!turnstileSiteKey || !turnstileHostRef.current) return
+    if (!turnstileRequired || !turnstileSiteKey || !turnstileHostRef.current) return
     let cancelled = false
 
     void loadTurnstileScript()
@@ -176,7 +176,7 @@ export function SupportPage() {
       }
       turnstileWidgetIdRef.current = null
     }
-  }, [turnstileSiteKey])
+  }, [turnstileSiteKey, turnstileRequired])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -371,7 +371,7 @@ export function SupportPage() {
           </div>
         </div>
 
-        {turnstileSiteKey ? (
+        {turnstileRequired && turnstileSiteKey ? (
           <div className="support-turnstile">
             <div ref={turnstileHostRef} className="support-turnstile-host" />
             {!turnstileReady && (
