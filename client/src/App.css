@@ -1952,6 +1952,28 @@ a.lr-cta {
   font-weight: 700;
 }
 
+.lr-app .agreements-page-header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+/* "Clear this device" stays a plain white button, not the teal secondary style */
+.lr-app .agreements-page .btn-secondary.agreements-page-clear-device {
+  border: 1px solid var(--lr-line-strong, rgba(15, 23, 42, 0.13));
+  background: #ffffff;
+  color: var(--lr-text);
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.lr-app .agreements-page .btn-secondary.agreements-page-clear-device:hover:not(:disabled) {
+  border-color: rgba(15, 23, 42, 0.26);
+  background: rgba(15, 23, 42, 0.045);
+  color: var(--lr-text);
+}
+
 .lr-app .agreements-page .btn-secondary:hover:not(:disabled) {
   border-color: var(--lr-accent);
   background: var(--lr-accent-soft);

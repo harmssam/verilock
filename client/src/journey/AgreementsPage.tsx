@@ -6,6 +6,7 @@ import {
   KeyRound,
   LoaderCircle,
   Lock,
+  LogOut,
   PenLine,
   Files,
   Search,
@@ -41,6 +42,7 @@ import { formatDataArchiveCredits } from '../dataArchivePricing'
 import { shortHash } from '../pdf/hashPdf'
 import { documentTypeLabel, type SealDocument } from '../types'
 import { CancelAgreementModal, type CancelAgreementMode } from './CancelAgreementModal'
+import { ClearDeviceModal } from './ClearDeviceModal'
 import { DataArchiveModal } from './DataArchiveModal'
 import {
   journeyLoginEntryLabels,
@@ -48,7 +50,10 @@ import {
   type JourneyConnectMode,
   type JourneyConnectRequest,
 } from './journeyConnectUi'
+import { clearJourneyIntent } from './journeyIntent'
+import { clearCreateFormCache, clearCreatePdfDraft } from './journeyPdfDraft'
 import { LoginSheet } from './LoginSheet'
+import { clearSealInFlight } from '../sealRecovery'
 
 const PAGE_SIZE = 8
 const SERVER_LIST_CAP = 100
@@ -578,6 +583,37 @@ export function AgreementsPage({
   const [listMode, setListMode] = useState<AgreementListMode>('inbox')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [listArchiveBusyId, setListArchiveBusyId] = useState<string | null>(null)
+  const [clearDeviceOpen, setClearDeviceOpen] = useState(false)
+
+  /**
+   * Guest-only "Clear this device": removes this browser's access to the guest
+   * agreement (plus journey sidecars that could re-open it) without deleting
+   * anything from VeriLock. After this the page falls back to the login gate -
+   * re-entry is possible with the document key or an invite link.
+   */
+  const confirmClearDevice = useCallback(() => {
+    try {
+      clearGuestSession()
+      clearJourneyIntent()
+      clearCreateFormCache()
+      clearSealInFlight()
+      for (let i = 0; i < sessionStorage.length; i += 1) {
+        const key = sessionStorage.key(i)
+        if (key?.startsWith('verilock-invite-token:') || key?.startsWith('verilock-invite-sent:')) {
+          sessionStorage.removeItem(key)
+        }
+      }
+      void clearCreatePdfDraft()
+    } catch {
+      // storage unavailable (private mode / WebView) - React state reset still applies
+    }
+    setGuestSession(null)
+    setDocuments([])
+    setQuery('')
+    setListMode('inbox')
+    setVisibleCount(PAGE_SIZE)
+    setClearDeviceOpen(false)
+  }, [])
 
   const load = useCallback(async () => {
     if (!token) {
@@ -1194,6 +1230,16 @@ export function AgreementsPage({
               When you create or sign, they show up here - even years later.
             </p>
           </div>
+          {isGuest && (
+            <button
+              type="button"
+              className="btn btn-secondary agreements-page-clear-device"
+              onClick={() => setClearDeviceOpen(true)}
+            >
+              <LogOut size={15} strokeWidth={2.25} aria-hidden />
+              Clear this device
+            </button>
+          )}
         </header>
         <div className="agreements-page-empty">
           <Files size={28} strokeWidth={1.75} className="agreements-page-empty-icon" aria-hidden />
@@ -1205,6 +1251,11 @@ export function AgreementsPage({
             Create &amp; invite
           </button>
         </div>
+        <ClearDeviceModal
+          open={clearDeviceOpen}
+          onClose={() => setClearDeviceOpen(false)}
+          onConfirm={confirmClearDevice}
+        />
       </section>
     )
   }
@@ -1260,10 +1311,22 @@ export function AgreementsPage({
             <span className="agreements-page-wallet">{identityLabel}</span>
           </p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={onCreate}>
-          <FilePlus size={16} strokeWidth={2.25} aria-hidden />
-          New agreement
-        </button>
+        <div className="agreements-page-header-actions">
+          {isGuest && (
+            <button
+              type="button"
+              className="btn btn-secondary agreements-page-clear-device"
+              onClick={() => setClearDeviceOpen(true)}
+            >
+              <LogOut size={15} strokeWidth={2.25} aria-hidden />
+              Clear this device
+            </button>
+          )}
+          <button type="button" className="btn btn-primary" onClick={onCreate}>
+            <FilePlus size={16} strokeWidth={2.25} aria-hidden />
+            New agreement
+          </button>
+        </div>
       </header>
 
       <div className="agreements-page-toolbar">
@@ -1638,6 +1701,12 @@ export function AgreementsPage({
         error={cancelError}
         onClose={closeCancelModal}
         onConfirm={() => void confirmCancelAgreement()}
+      />
+
+      <ClearDeviceModal
+        open={clearDeviceOpen}
+        onClose={() => setClearDeviceOpen(false)}
+        onConfirm={confirmClearDevice}
       />
 
       <DataArchiveModal

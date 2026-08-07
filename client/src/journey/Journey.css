@@ -3533,6 +3533,17 @@ a.hash-chip.text-link:focus-visible {
   color: rgba(185, 28, 28, 0.55);
 }
 
+/* Informational variant (Clear this device) - neutral slate instead of red */
+.cancel-agreement-icon--neutral {
+  color: var(--lr-text, var(--text, #0f172a));
+  background: rgba(15, 23, 42, 0.06);
+  border-color: var(--lr-line-strong, rgba(15, 23, 42, 0.13));
+}
+
+.cancel-agreement-bullets--neutral li::marker {
+  color: rgba(15, 23, 42, 0.4);
+}
+
 .cancel-agreement-error {
   margin: 0;
   padding: 0.55rem 0.7rem;
