@@ -518,11 +518,34 @@
 
 .placement-creator-role select {
   font-size: 0.875rem;
-  padding: 0.4rem 0.5rem;
+  padding: 0.45rem 2.25rem 0.45rem 0.65rem;
   border-radius: 8px;
   border: 1px solid var(--border, #cbd5e1);
   background: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 0.7rem;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
   max-width: 100%;
+  color: var(--text, #0f172a);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.placement-creator-role select:focus {
+  outline: none;
+  border-color: var(--mint, #0d9488);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.18);
+}
+
+.placement-creator-role select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background-color: #f8fafc;
 }
 
 .placement-editor-active-banner {
