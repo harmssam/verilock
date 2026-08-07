@@ -476,7 +476,7 @@ export const api = {
    * No wallet, no `Authorization` header. Never consumes/rotates the key - safe to
    * call again from yet another device or after a prior session expired.
    */
-  redeemDocumentKey: (body: { documentId?: string; slug?: string; documentKey: string }) =>
+  redeemDocumentKey: (body: { documentId?: string; slug?: string; documentKey: string; turnstileToken?: string }) =>
     request<{ session: { token: string; expiresAt: number } }>(
       '/api/auth/guest/redeem-document-key',
       {

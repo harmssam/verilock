@@ -3061,6 +3061,16 @@ a.hash-chip.text-link:focus-visible {
   margin-top: 0.25rem;
 }
 
+.agreements-guest-turnstile {
+  margin: 0.25rem 0 0;
+  min-height: 4rem;
+}
+
+.agreements-guest-turnstile-loading {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+}
+
 .agreements-page-empty {
   display: flex;
   flex-direction: column;

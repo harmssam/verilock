@@ -143,6 +143,41 @@ function guestSessionAddress(session: StoredGuestSession): string {
     : guestPartySubject(session.partyId!)
 }
 
+const TURNSTILE_SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+
+let turnstileScriptPromise: Promise<void> | null = null
+
+function loadTurnstileScript(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve()
+  if (window.turnstile) return Promise.resolve()
+  if (turnstileScriptPromise) return turnstileScriptPromise
+
+  turnstileScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[data-verilock-turnstile]',
+    )
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true })
+      existing.addEventListener(
+        'error',
+        () => reject(new Error('Turnstile script failed')),
+        { once: true },
+      )
+      return
+    }
+    const script = document.createElement('script')
+    script.src = TURNSTILE_SCRIPT
+    script.async = true
+    script.defer = true
+    script.dataset.verilockTurnstile = '1'
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Turnstile script failed to load'))
+    document.head.appendChild(script)
+  })
+
+  return turnstileScriptPromise
+}
+
 /**
  * Guest re-entry into a document created without a wallet, from a browser/device
  * with no saved guest session (`docs/guest-signing-plan.md` Task 7 - "Enter
@@ -154,6 +189,98 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
   const [keyInput, setKeyInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Turnstile (same pattern as DocumentJourney / SupportPage)
+  const turnstileHostRef = useRef<HTMLDivElement | null>(null)
+  const turnstileWidgetIdRef = useRef<string | null>(null)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null)
+  const [turnstileRequired, setTurnstileRequired] = useState(false)
+  const [turnstileReady, setTurnstileReady] = useState(false)
+
+  // Fetch Turnstile config
+  useEffect(() => {
+    let cancelled = false
+    void api
+      .features()
+      .then(f => {
+        if (cancelled) return
+        const key = f.turnstileSiteKey?.trim() || null
+        setTurnstileSiteKey(key)
+        setTurnstileRequired(Boolean(f.turnstileRequired && key))
+      })
+      .catch(() => {
+        // Features optional; server still enforces Turnstile when required.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Render Turnstile widget when required
+  useEffect(() => {
+    if (!turnstileRequired || !turnstileSiteKey || !turnstileHostRef.current) return
+    let cancelled = false
+
+    void loadTurnstileScript()
+      .then(() => {
+        if (cancelled || !turnstileHostRef.current || !window.turnstile) return
+        if (turnstileWidgetIdRef.current && window.turnstile) {
+          try {
+            window.turnstile.remove(turnstileWidgetIdRef.current)
+          } catch {
+            // ignore
+          }
+          turnstileWidgetIdRef.current = null
+        }
+        turnstileHostRef.current.innerHTML = ''
+        const widgetId = window.turnstile.render(turnstileHostRef.current, {
+          sitekey: turnstileSiteKey,
+          theme: 'light',
+          size: 'flexible',
+          callback: token => {
+            if (!cancelled) setTurnstileToken(token)
+          },
+          'expired-callback': () => {
+            if (!cancelled) setTurnstileToken(null)
+          },
+          'error-callback': () => {
+            if (!cancelled) setTurnstileToken(null)
+          },
+        })
+        turnstileWidgetIdRef.current = widgetId
+        setTurnstileReady(true)
+      })
+      .catch(err => {
+        console.error('[agreements] turnstile load', err)
+        if (!cancelled) setTurnstileReady(false)
+      })
+
+    return () => {
+      cancelled = true
+      const id = turnstileWidgetIdRef.current
+      if (id && window.turnstile) {
+        try {
+          window.turnstile.remove(id)
+        } catch {
+          // ignore
+        }
+        turnstileWidgetIdRef.current = null
+      }
+    }
+  }, [turnstileRequired, turnstileSiteKey])
+
+  const resetTurnstile = useCallback(() => {
+    setTurnstileToken(null)
+    const id = turnstileWidgetIdRef.current
+    if (id && window.turnstile) {
+      try {
+        window.turnstile.reset(id)
+      } catch {
+        // ignore
+      }
+    }
+  }, [])
 
   if (!FEATURES.guestSigning) return null
 
@@ -175,10 +302,17 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
       setError('Enter your document key.')
       return
     }
+    if (turnstileRequired && !turnstileToken) {
+      setError('Please complete the bot check and try again.')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
-      const { session } = await api.redeemDocumentKey({ documentKey })
+      const { session } = await api.redeemDocumentKey({
+        documentKey,
+        turnstileToken: turnstileToken ?? undefined,
+      })
       // Fetch the document — server finds it by key hash, so we don't know the slug.
       // Use the session to call me() and get the document.
       const me = await api.me(session.token)
@@ -196,8 +330,11 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
       onOpen(document)
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Could not find that agreement with this document key.',
+        err instanceof Error
+          ? err.message
+          : 'Could not find that agreement with this document key.',
       )
+      resetTurnstile()
     } finally {
       setBusy(false)
     }
@@ -219,6 +356,14 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
         autoComplete="off"
         spellCheck={false}
       />
+      {turnstileRequired && turnstileSiteKey && (
+        <div className="agreements-guest-turnstile">
+          <div ref={turnstileHostRef} />
+          {!turnstileReady && (
+            <p className="muted agreements-guest-turnstile-loading">Loading bot check…</p>
+          )}
+        </div>
+      )}
       {error && (
         <p className="agreements-guest-entry-error" role="alert">
           {error}
@@ -239,7 +384,7 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
         <button
           type="button"
           className={`btn btn-primary${busy ? ' btn--busy' : ''}`}
-          disabled={busy}
+          disabled={busy || (turnstileRequired && !turnstileToken)}
           onClick={() => void submit()}
         >
           {busy ? (
