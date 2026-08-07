@@ -3917,23 +3917,71 @@ export function DocumentJourney({
                             ) : (
                               <button
                                 type="button"
-                                className={`btn btn-primary${connecting ? ' btn--busy' : ''}`}
+                                className={`btn btn-primary btn-lg${connecting ? ' btn--busy' : ''}`}
                                 onClick={requestLogin}
                                 disabled={connecting}
                               >
                                 {connecting ? (
                                   <>
-                                    <LoaderCircle className="btn-spinner" size={16} strokeWidth={2.5} />
+                                    <LoaderCircle className="btn-spinner" size={18} strokeWidth={2.5} />
                                     {journeyLoginEntryLabels().busy}
                                   </>
                                 ) : (
                                   <>
-                                    <NimiqHexagonIcon size={16} />
-                                    {journeyLoginEntryLabels().idle}
+                                    <NimiqHexagonIcon size={18} />
+                                    Login with Nimiq
                                   </>
                                 )}
                               </button>
                             ))}
+                          {!account &&
+                            !activeGuestSession &&
+                            FEATURES.guestSigning && (
+                              <button
+                                type="button"
+                                className="btn btn-ghost"
+                                disabled={!stashedInviteToken}
+                                title={
+                                  stashedInviteToken
+                                    ? 'Sign without a wallet using your invite link'
+                                    : 'You need a personal invite link to sign as a guest. Ask the organizer to send you one.'
+                                }
+                                onClick={() => {
+                                  if (!stashedInviteToken || !doc) return
+                                  const existing = loadGuestSession()
+                                  if (
+                                    existing &&
+                                    existing.documentId === doc.id &&
+                                    existing.role === 'signer'
+                                  ) {
+                                    setGuestSession(existing)
+                                    return
+                                  }
+                                  void api
+                                    .redeemInviteAsGuest(stashedInviteToken)
+                                    .then(({ session }) => {
+                                      const next: StoredGuestSession = {
+                                        token: session.token,
+                                        documentId: doc.id,
+                                        partyId: invitePartyFromToken ?? null,
+                                        role: 'signer',
+                                      }
+                                      saveGuestSession(next)
+                                      setGuestSession(next)
+                                    })
+                                    .catch((err: unknown) => {
+                                      setLocalError(
+                                        err instanceof Error
+                                          ? err.message
+                                          : 'Could not sign in as guest',
+                                      )
+                                    })
+                                }}
+                              >
+                                <Fingerprint size={16} strokeWidth={2.25} />
+                                Continue as Guest
+                              </button>
+                            )}
 
                           {(account || activeGuestSession) &&
                             signingResolution &&
