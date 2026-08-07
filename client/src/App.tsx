@@ -594,17 +594,16 @@ export function App() {
               .filter(Boolean)
               .join(' ')}
           >
-            {/* Logged-in: Agreements nav (hidden on narrow - also in AccountMenu). */}
-            {wallet.account && (
-              <AppLink
-                to="/agreements"
-                onClick={goAgreements}
-                className={`lr-nav lr-nav--agreements${screen === 'agreements' ? ' lr-nav--active' : ''}`}
-                aria-current={screen === 'agreements' ? 'page' : undefined}
-              >
-                Agreements
-              </AppLink>
-            )}
+            {/* Agreements nav (hidden on narrow - also in AccountMenu). Always
+                visible: the page itself handles wallet, guest, and logged-out states. */}
+            <AppLink
+              to="/agreements"
+              onClick={goAgreements}
+              className={`lr-nav lr-nav--agreements${screen === 'agreements' ? ' lr-nav--active' : ''}`}
+              aria-current={screen === 'agreements' ? 'page' : undefined}
+            >
+              Agreements
+            </AppLink>
             {/*
               Credits nav (AccountMenu) already opens Pricing when balance is known.
               Hide Pricing nav when the credits link already covers it.
@@ -639,7 +638,7 @@ export function App() {
               onConnect={connectPreservingPath}
               onSession={wallet.applySession}
               onDisconnect={wallet.disconnect}
-              onAgreements={wallet.account ? goAgreements : undefined}
+              onAgreements={goAgreements}
               onCredits={goPricing}
             />
           </div>

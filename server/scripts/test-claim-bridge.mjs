@@ -405,6 +405,51 @@ async function main() {
       `(j) placement-plans save works for wallet-native (${JSON.stringify(placementPlanJ.body)})`,
     )
 
+    // (k) /api/me lists for guest sessions (no wallet) - agreements visible to guests.
+    const docK = await createGuestDoc({ requiredSignatures: 2 })
+    const guestTokenK = docK.guestSession.token
+    const meGuestCreator = await j('GET', '/api/me', undefined, guestTokenK)
+    assert(meGuestCreator.status === 200, `(k) /api/me with guest creator token (${JSON.stringify(meGuestCreator.body?.error ?? '')})`)
+    assert(Array.isArray(meGuestCreator.body.documents), '(k) /api/me returns documents array for guest creator')
+    assert(
+      meGuestCreator.body.documents.some(d => d.id === docK.document.id),
+      '(k) guest creator list contains their document',
+    )
+    assert(
+      meGuestCreator.body.address.startsWith('guest:doc:'),
+      `(k) /api/me guest creator address is guest:doc: sentinel (got "${meGuestCreator.body.address}")`,
+    )
+
+    const partyIdsK = docK.document.parties.map(p => p.id)
+    const coSignerPartyIdK = partyIdsK[1]
+    const inviteK = await j(
+      'POST',
+      `/api/documents/${docK.document.id}/party-invites`,
+      { partyId: coSignerPartyIdK },
+      guestTokenK,
+    )
+    assert(inviteK.status === 201, `(k) mint link invite for guest /api/me co-signer (${JSON.stringify(inviteK.body)})`)
+    const redeemK = await j('POST', '/api/auth/guest/redeem-invite', { inviteToken: inviteK.body.token })
+    assert(redeemK.status === 200, '(k) redeem invite -> guest signer session')
+    const coSignerTokenK = redeemK.body.session.token
+
+    const meGuestSigner = await j('GET', '/api/me', undefined, coSignerTokenK)
+    assert(meGuestSigner.status === 200, '(k) /api/me with guest signer token')
+    assert(Array.isArray(meGuestSigner.body.documents), '(k) /api/me returns documents array for guest signer')
+    assert(
+      meGuestSigner.body.documents.some(d => d.id === docK.document.id),
+      '(k) guest signer list contains the session-bound document',
+    )
+    assert(
+      meGuestSigner.body.address.startsWith('guest:party:'),
+      `(k) /api/me guest signer address is guest:party: sentinel (got "${meGuestSigner.body.address}")`,
+    )
+
+    const meNoToken = await j('GET', '/api/me')
+    assert(meNoToken.status === 401, '(k) /api/me without token -> 401')
+    const meBadGuest = await j('GET', '/api/me', undefined, 'not-a-real-guest-token')
+    assert(meBadGuest.status === 401, '(k) /api/me with invalid guest token -> 401')
+
     console.log('\nALL CLAIM-BRIDGE SMOKE TESTS PASSED')
   } finally {
     child.kill()

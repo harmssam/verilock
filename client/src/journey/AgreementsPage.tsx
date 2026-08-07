@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { shortAddress } from '../addresses'
 import { FEATURES } from '../features'
 import { NimiqHexagonIcon } from '../NimiqHexagonIcon'
-import { saveGuestSession } from '../session'
+import { clearGuestSession, loadGuestSession, saveGuestSession, type StoredGuestSession } from '../session'
 import {
   BUCKET_PILL_LABELS,
   LIST_MODE_LABELS,
@@ -129,6 +129,29 @@ interface AgreementsPageProps {
  */
 function slugFromInput(raw: string): string {
   return raw.trim().replace(/^.*\/d\//, '').split(/[/?#]/)[0]
+}
+
+/**
+ * Client-side mirrors of `guestCreatorSubject` / `guestPartySubject`
+ * (`server/src/guestIdentity.ts`) - the sentinel `creator_address` / viewer subject
+ * strings for guest sessions (`docs/guest-signing-plan.md`). Duplicated here rather
+ * than cross-importing from `DocumentJourney.tsx` (not exported there), matching the
+ * `slugFromInput` pattern above. Kept byte-identical to the server's raw form; every
+ * comparison site runs both sides through `normalizeAddress()` anyway.
+ */
+function guestCreatorSubject(documentId: string): string {
+  return `guest:doc:${documentId}`
+}
+
+function guestPartySubject(partyId: string): string {
+  return `guest:party:${partyId}`
+}
+
+/** Effective identity for a stored guest session - role-aware, mirrors `DocumentJourney`. */
+function guestSessionAddress(session: StoredGuestSession): string {
+  return session.role === 'creator'
+    ? guestCreatorSubject(session.documentId)
+    : guestPartySubject(session.partyId!)
 }
 
 /**
@@ -331,8 +354,8 @@ function AgreementsLoginGate({
 }
 
 export function AgreementsPage({
-  token,
-  address,
+  token: walletToken,
+  address: walletAddress,
   connecting,
   connectMode,
   onConnect,
@@ -344,6 +367,27 @@ export function AgreementsPage({
   const [documents, setDocuments] = useState<SealDocument[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [guestSession, setGuestSession] = useState<StoredGuestSession | null>(() =>
+    loadGuestSession(),
+  )
+  /**
+   * Effective identity for this list. Wallet-first: a connected wallet (even with a
+   * stale guest session lingering in localStorage) keeps full wallet powers (credits,
+   * archive, claim). Without a wallet, a live guest session takes over - the list then
+   * shows the guest's own agreement(s) instead of the login gate
+   * (`docs/guest-signing-plan.md`). A guest creator resolves to the `guest:doc:{id}`
+   * sentinel (matches the doc's `creatorAddress`), a guest co-signer to
+   * `guest:party:{partyId}` - so creator-only checks (`isDocumentCreator`,
+   * `canDeleteDocument`) behave correctly without special-casing.
+   */
+  const token = walletToken ?? (guestSession ? guestSession.token : null)
+  const address = walletAddress ?? (guestSession ? guestSessionAddress(guestSession) : null)
+  const isGuest = !walletToken && Boolean(guestSession)
+  const identityLabel = isGuest
+    ? guestSession!.role === 'creator'
+      ? 'guest creator'
+      : 'guest signer'
+    : shortAddress(walletAddress ?? '')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [pendingCancel, setPendingCancel] = useState<SealDocument | null>(null)
   const [cancelMode, setCancelMode] = useState<CancelAgreementMode>('cancel')
@@ -416,12 +460,21 @@ export function AgreementsPage({
       const me = await api.me(token)
       setDocuments(me.documents)
     } catch (err) {
+      // Expired/revoked guest session - drop it and fall back to the login gate.
+      if (isGuest && (err as Error & { status?: number })?.status === 401) {
+        clearGuestSession()
+        setGuestSession(null)
+        setDocuments([])
+        setError(null)
+        setLoading(false)
+        return
+      }
       setDocuments([])
       setError(err instanceof Error ? err.message : 'Could not load agreements')
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [token, isGuest])
 
   useEffect(() => {
     void load()
@@ -1005,7 +1058,7 @@ export function AgreementsPage({
           <div>
             <h2>Your agreements</h2>
             <p className="muted agreements-page-subtitle">
-              No agreements yet for <span className="agreements-page-wallet">{shortAddress(address)}</span>.
+              No agreements yet for <span className="agreements-page-wallet">{identityLabel}</span>.
               When you create or sign, they show up here - even years later.
             </p>
           </div>
@@ -1041,11 +1094,13 @@ export function AgreementsPage({
 
   const shown = modeItems.slice(0, visibleCount)
   const remaining = modeItems.length - shown.length
-  const needsBackupCount = byMode.completed.filter(doc => {
-    if (!isDocumentCreator(doc, address)) return false
-    const archive = doc.dataArchive
-    return archive && !archive.onChain && archive.eligible
-  }).length
+  const needsBackupCount = isGuest
+    ? 0
+    : byMode.completed.filter(doc => {
+        if (!isDocumentCreator(doc, address)) return false
+        const archive = doc.dataArchive
+        return archive && !archive.onChain && archive.eligible
+      }).length
 
   const emptyCopy = (() => {
     if (queryTrimmed) {
@@ -1070,7 +1125,7 @@ export function AgreementsPage({
           <p className="muted agreements-page-subtitle">
             {subtitleParts.join(' · ')}
             {' · '}
-            <span className="agreements-page-wallet">{shortAddress(address)}</span>
+            <span className="agreements-page-wallet">{identityLabel}</span>
           </p>
         </div>
         <button type="button" className="btn btn-primary" onClick={onCreate}>
@@ -1176,6 +1231,7 @@ export function AgreementsPage({
               const creator = isDocumentCreator(doc, address)
               const preferSeal = isLockCta(view.cta) && creator
               const freeComplete =
+                !isGuest &&
                 creator &&
                 view.bucket === 'ready_to_seal' &&
                 view.cta === 'View & print'
@@ -1191,6 +1247,7 @@ export function AgreementsPage({
                 doc.status === 'locked' ||
                 doc.attestation?.status === 'confirmed'
               const showDataArchiveUpsell =
+                !isGuest &&
                 creator &&
                 fingerprintLocked &&
                 !archived &&

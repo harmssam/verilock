@@ -18,11 +18,13 @@ import {
   createSession,
   findDocumentsByHash,
   getDocumentById,
-  inspectPartyInviteByTokenHash,
+  getGuestSession,
   getSession,
   getSignatureForDocument,
   getSignatureImage,
+  inspectPartyInviteByTokenHash,
   markSessionVerified,
+  touchGuestSession,
 } from './db.js'
 import {
   addGuestSignature,
@@ -37,10 +39,12 @@ import {
   getMyDocuments,
   hashInviteToken,
   mintLinkPartyInvite,
+  publicDocument,
   setCreatorNotifyEmail,
   setMyDocumentListArchived,
   viewerMayAccessSignatureImage,
 } from './documents.js'
+import { guestCreatorSubject, guestPartySubject } from './guestIdentity.js'
 import { emailFeaturesPublic } from './email/config.js'
 import { sendPartyInviteEmail } from './email/inviteSigner.js'
 import { verifyHubSignedMessage } from './hub-signature.js'
@@ -1112,9 +1116,42 @@ app.post('/api/auth/guest/redeem-invite', guestRedeemLimit, (req, res) => {
   }
 })
 
-app.get('/api/me', authMiddleware, (req, res) => {
-  const address = res.locals.address as string
-  res.json({ address, documents: getMyDocuments(address) })
+/**
+ * `GET /api/me` - wallet OR guest session listing (`docs/guest-signing-plan.md`).
+ * Wallet path: any live session token (unchanged from the old `authMiddleware` gate).
+ * Guest path: a guest creator session lists via its `guest:doc:{id}` sentinel (matches
+ * the document's `creator_address`); if that comes back empty (e.g. the doc was already
+ * claimed to a wallet), fall back to the session-bound document so the list is never
+ * empty for a live session. A guest co-signer session is bound to exactly one document,
+ * so that document is returned directly - the `guest:party:{id}` sentinel never matches
+ * any `creator_address`, and listing by it would always be empty.
+ */
+app.get('/api/me', (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '')
+  const walletSession = token ? getSession(token) : null
+  if (walletSession) {
+    res.json({
+      address: walletSession.address,
+      documents: getMyDocuments(walletSession.address),
+    })
+    return
+  }
+  const guestSession = token ? getGuestSession(token) : null
+  if (guestSession) {
+    touchGuestSession(token!)
+    const address =
+      guestSession.role === 'creator'
+        ? guestCreatorSubject(guestSession.documentId)
+        : guestPartySubject(guestSession.partyId!)
+    let documents = getMyDocuments(address)
+    if (documents.length === 0) {
+      const doc = getDocumentById(guestSession.documentId)
+      if (doc) documents = [publicDocument(doc, { viewerAddress: address })]
+    }
+    res.json({ address, documents })
+    return
+  }
+  res.status(401).json({ error: 'Invalid or expired session' })
 })
 
 app.get('/api/features', (_req, res) => {
