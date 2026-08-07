@@ -849,6 +849,28 @@ export function getDocumentBySlug(slug: string): DocumentRecord | null {
   return row ? rowToDocument(row) : null
 }
 
+/**
+ * Find a guest document by its key hash — enables key-only re-entry without
+ * requiring the user to remember or paste a document slug/URL.
+ */
+export function getDocumentByGuestKeyHash(keyHash: Buffer): DocumentRecord | null {
+  const rows = db
+    .prepare(
+      'SELECT * FROM documents WHERE auth_mode = ? AND creator_document_key_hash IS NOT NULL',
+    )
+    .all('guest') as Record<string, unknown>[]
+  for (const row of rows) {
+    const stored = Buffer.from(row.creator_document_key_hash as string, 'hex')
+    // Timing-safe compare against every candidate (small N, safety-first).
+    if (stored.length === keyHash.length) {
+      let diff = 0
+      for (let i = 0; i < stored.length; i++) diff |= stored[i] ^ keyHash[i]
+      if (diff === 0) return rowToDocument(row)
+    }
+  }
+  return null
+}
+
 export function updateDocumentStatus(id: string, status: DocumentStatus): void {
   db.prepare('UPDATE documents SET status = ? WHERE id = ?').run(status, id)
 }

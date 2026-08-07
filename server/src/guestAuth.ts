@@ -28,6 +28,7 @@ import { timingSafeEqual } from 'node:crypto'
 import {
   createGuestSession,
   getDocumentById,
+  getDocumentByGuestKeyHash,
   getDocumentBySlug,
   getGuestSession,
   getPartiesForDocument,
@@ -313,9 +314,14 @@ export function redeemDocumentKey(input: {
   slug?: string | null
   documentKey: string
 }): { session: { token: string; expiresAt: number } } {
+  const keyHash = Buffer.from(hashGuestSecret(input.documentKey), 'hex')
+
   const doc =
     (input.documentId ? getDocumentById(input.documentId) : null) ??
-    (input.slug ? getDocumentBySlug(input.slug) : null)
+    (input.slug ? getDocumentBySlug(input.slug) : null) ??
+    // Key-only lookup: scan guest docs by key hash so the user doesn't need
+    // to remember/paste a slug or document URL alongside the key.
+    getDocumentByGuestKeyHash(keyHash)
   if (!doc) {
     throw new Error('Document not found')
   }
@@ -328,11 +334,10 @@ export function redeemDocumentKey(input: {
 
   // Intentionally not rate-limited here - the caller (route handler) is responsible
   // for rateLimit(...) + Turnstile (see plan "Security & abuse" #2/#8).
-  const providedHash = Buffer.from(hashGuestSecret(input.documentKey), 'hex')
   const storedHash = Buffer.from(doc.creatorDocumentKeyHash, 'hex')
   if (
-    providedHash.length !== storedHash.length ||
-    !timingSafeEqual(providedHash, storedHash)
+    keyHash.length !== storedHash.length ||
+    !timingSafeEqual(keyHash, storedHash)
   ) {
     throw new Error('Incorrect document key')
   }

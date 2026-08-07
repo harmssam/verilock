@@ -122,21 +122,10 @@ interface AgreementsPageProps {
 }
 
 /**
- * Extracts a document slug from either a pasted share URL (`https://…/d/xxxx`)
- * or a bare slug/id typed in directly. Mirrors `slugFromPath` in
- * `DocumentJourney.tsx` (not exported there, so duplicated here rather than
- * cross-importing from that file - see `docs/guest-signing-plan.md` Task 7).
- */
-function slugFromInput(raw: string): string {
-  return raw.trim().replace(/^.*\/d\//, '').split(/[/?#]/)[0]
-}
-
-/**
  * Client-side mirrors of `guestCreatorSubject` / `guestPartySubject`
  * (`server/src/guestIdentity.ts`) - the sentinel `creator_address` / viewer subject
  * strings for guest sessions (`docs/guest-signing-plan.md`). Duplicated here rather
- * than cross-importing from `DocumentJourney.tsx` (not exported there), matching the
- * `slugFromInput` pattern above. Kept byte-identical to the server's raw form; every
+ * than cross-importing from `DocumentJourney.tsx` (not exported there). Kept byte-identical to the server's raw form; every
  * comparison site runs both sides through `normalizeAddress()` anyway.
  */
 function guestCreatorSubject(documentId: string): string {
@@ -162,7 +151,6 @@ function guestSessionAddress(session: StoredGuestSession): string {
  */
 function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void }) {
   const [expanded, setExpanded] = useState(false)
-  const [docInput, setDocInput] = useState('')
   const [keyInput, setKeyInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -182,12 +170,7 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
   }
 
   const submit = async () => {
-    const slug = slugFromInput(docInput)
     const documentKey = keyInput.trim()
-    if (!slug) {
-      setError('Enter the agreement link or slug.')
-      return
-    }
     if (!documentKey) {
       setError('Enter your document key.')
       return
@@ -195,8 +178,15 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
     setBusy(true)
     setError(null)
     try {
-      const { session } = await api.redeemDocumentKey({ slug, documentKey })
-      const { document } = await api.getDocument(slug, session.token)
+      const { session } = await api.redeemDocumentKey({ documentKey })
+      // Fetch the document — server finds it by key hash, so we don't know the slug.
+      // Use the session to call me() and get the document.
+      const me = await api.me(session.token)
+      const document = me.documents[0]
+      if (!document) {
+        setError('No agreement found for this key.')
+        return
+      }
       saveGuestSession({
         token: session.token,
         documentId: document.id,
@@ -215,20 +205,6 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
 
   return (
     <div className="agreements-guest-entry-form">
-      <label className="agreements-guest-entry-label" htmlFor="agreements-guest-doc">
-        Agreement link or slug
-      </label>
-      <input
-        id="agreements-guest-doc"
-        type="text"
-        className="agreements-guest-entry-input"
-        value={docInput}
-        onChange={e => setDocInput(e.target.value)}
-        placeholder="https://verilock.online/d/…"
-        disabled={busy}
-        autoComplete="off"
-        spellCheck={false}
-      />
       <label className="agreements-guest-entry-label" htmlFor="agreements-guest-key">
         Document key
       </label>

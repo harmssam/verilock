@@ -2999,8 +2999,9 @@ a.hash-chip.text-link:focus-visible {
  */
 .agreements-guest-entry-toggle {
   display: inline-block;
-  margin-top: 2.25rem;
+  margin-top: 1rem;
   padding: 0;
+  padding-left: 1.25rem;
   border: none;
   background: none;
   font: inherit;
