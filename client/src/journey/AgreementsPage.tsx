@@ -191,6 +191,7 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
   const [error, setError] = useState<string | null>(null)
 
   // Turnstile (same pattern as DocumentJourney / SupportPage)
+  const turnstileHostRef = useRef<HTMLDivElement | null>(null)
   const turnstileWidgetIdRef = useRef<string | null>(null)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null)
@@ -217,18 +218,20 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
     }
   }, [])
 
-  // Callback ref: renders the Turnstile widget the moment the host div mounts,
-  // avoiding the useEffect timing gap where state has updated but the ref hasn't.
-  const turnstileHostRef = useCallback(
-    (el: HTMLDivElement | null) => {
-      if (!el) return
-      if (turnstileAttemptedRef.current) return
-      if (!turnstileRequired || !turnstileSiteKey) return
+  // Render Turnstile widget — deferred by rAF to guarantee the host div
+  // is in the DOM when this runs (avoids the useEffect-vs-ref timing gap).
+  useEffect(() => {
+    if (!turnstileRequired || !turnstileSiteKey) return
+    if (turnstileAttemptedRef.current) return
+
+    const raf = requestAnimationFrame(() => {
+      const el = turnstileHostRef.current
+      if (!el || turnstileAttemptedRef.current) return
       turnstileAttemptedRef.current = true
 
       void loadTurnstileScript()
         .then(() => {
-          if (!window.turnstile) return
+          if (!window.turnstile || !el) return
           el.innerHTML = ''
           const widgetId = window.turnstile.render(el, {
             sitekey: turnstileSiteKey,
@@ -251,9 +254,15 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
           console.error('[agreements] turnstile load', err)
           setTurnstileReady(false)
         })
-    },
-    [turnstileRequired, turnstileSiteKey],
-  )
+    })
+
+    return () => cancelAnimationFrame(raf)
+  }, [turnstileRequired, turnstileSiteKey, expanded])
+
+  // Reset the render guard when the form opens so the widget re-renders
+  useEffect(() => {
+    if (expanded) turnstileAttemptedRef.current = false
+  }, [expanded])
 
   const resetTurnstile = useCallback(() => {
     setTurnstileToken(null)
@@ -377,7 +386,6 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
           onClick={() => {
             setExpanded(false)
             setError(null)
-            turnstileAttemptedRef.current = false
             setTurnstileToken(null)
             setTurnstileReady(false)
           }}
