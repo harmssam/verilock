@@ -1959,6 +1959,19 @@ a.lr-cta {
   gap: 0.55rem;
 }
 
+/* Guest "Have a document key?" entry inline in the header actions - the
+   login-gate indentation/margins don't apply here */
+.lr-app .agreements-page-header-actions > .agreements-guest-entry-toggle {
+  margin-top: 0;
+  padding-left: 0;
+}
+
+/* Expanded key form wraps below the header buttons instead of squeezing in */
+.lr-app .agreements-page-header-actions > .agreements-guest-entry-form {
+  flex-basis: 100%;
+  max-width: none;
+}
+
 /* "Clear this device" stays a plain white button, not the teal secondary style */
 .lr-app .agreements-page .btn-secondary.agreements-page-clear-device {
   border: 1px solid var(--lr-line-strong, rgba(15, 23, 42, 0.13));

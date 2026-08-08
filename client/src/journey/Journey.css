@@ -3008,6 +3008,7 @@ a.hash-chip.text-link:focus-visible {
   font-size: 0.84rem;
   color: var(--text-muted);
   cursor: pointer;
+  animation: invite-handoff-fade 0.22s ease both;
 }
 
 .agreements-guest-entry-toggle:hover,
@@ -3025,6 +3026,7 @@ a.hash-chip.text-link:focus-visible {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: rgba(15, 23, 42, 0.02);
+  animation: invite-handoff-rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .agreements-guest-entry-label {
@@ -6964,7 +6966,9 @@ a.hash-chip.text-link:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .invite-handoff-modal-layer,
-  .invite-handoff-modal {
+  .invite-handoff-modal,
+  .agreements-guest-entry-toggle,
+  .agreements-guest-entry-form {
     animation: none;
   }
 }

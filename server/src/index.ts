@@ -44,7 +44,11 @@ import {
   setMyDocumentListArchived,
   viewerMayAccessSignatureImage,
 } from './documents.js'
-import { guestCreatorSubject, guestPartySubject } from './guestIdentity.js'
+import {
+  guestCreatorSubject,
+  guestPartySubject,
+  isEasterEggDocument,
+} from './guestIdentity.js'
 import { emailFeaturesPublic } from './email/config.js'
 import { sendPartyInviteEmail } from './email/inviteSigner.js'
 import { verifyHubSignedMessage } from './hub-signature.js'
@@ -1148,7 +1152,11 @@ app.get('/api/me', (req, res) => {
     let documents = getMyDocuments(address)
     if (documents.length === 0) {
       const doc = getDocumentById(guestSession.documentId)
-      if (doc) documents = [publicDocument(doc, { viewerAddress: address })]
+      // The Easter egg must not fall back into the list either - it stays hidden
+      // and reachable only by re-entering its document key.
+      if (doc && !isEasterEggDocument(doc)) {
+        documents = [publicDocument(doc, { viewerAddress: address })]
+      }
     }
     res.json({ address, documents })
     return

@@ -1569,7 +1569,10 @@ export function beginLock(documentId: string, requesterAddress: string) {
 }
 
 export function getMyDocuments(address: string) {
-  const docs = listDocumentsForAddress(address)
+  // The Easter egg guest document never appears in agreements lists - it only
+  // exists for whoever redeems its document key. Verified server-side so no
+  // client list surface (wallet or guest) can ever re-surface it.
+  const docs = listDocumentsForAddress(address).filter(doc => !isEasterEggDocument(doc))
   const archivedMap = getDocumentListArchivedMap(
     address,
     docs.map(d => d.id),

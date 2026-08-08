@@ -1231,14 +1231,17 @@ export function AgreementsPage({
             </p>
           </div>
           {isGuest && (
-            <button
-              type="button"
-              className="btn btn-secondary agreements-page-clear-device"
-              onClick={() => setClearDeviceOpen(true)}
-            >
-              <LogOut size={15} strokeWidth={2.25} aria-hidden />
-              Clear this device
-            </button>
+            <div className="agreements-page-header-actions">
+              <GuestDocumentKeyEntry onOpen={onOpen} />
+              <button
+                type="button"
+                className="btn btn-secondary agreements-page-clear-device"
+                onClick={() => setClearDeviceOpen(true)}
+              >
+                <LogOut size={15} strokeWidth={2.25} aria-hidden />
+                Clear this device
+              </button>
+            </div>
           )}
         </header>
         <div className="agreements-page-empty">
@@ -1313,14 +1316,17 @@ export function AgreementsPage({
         </div>
         <div className="agreements-page-header-actions">
           {isGuest && (
-            <button
-              type="button"
-              className="btn btn-secondary agreements-page-clear-device"
-              onClick={() => setClearDeviceOpen(true)}
-            >
-              <LogOut size={15} strokeWidth={2.25} aria-hidden />
-              Clear this device
-            </button>
+            <>
+              <GuestDocumentKeyEntry onOpen={onOpen} />
+              <button
+                type="button"
+                className="btn btn-secondary agreements-page-clear-device"
+                onClick={() => setClearDeviceOpen(true)}
+              >
+                <LogOut size={15} strokeWidth={2.25} aria-hidden />
+                Clear this device
+              </button>
+            </>
           )}
           <button type="button" className="btn btn-primary" onClick={onCreate}>
             <FilePlus size={16} strokeWidth={2.25} aria-hidden />
