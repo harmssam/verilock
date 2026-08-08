@@ -35,6 +35,15 @@ if (!inboxColumns.some(c => c.name === 'reply_sent_at')) {
   db.exec('ALTER TABLE admin_inbox ADD COLUMN reply_sent_at INTEGER')
 }
 
+// Backfill — auto-archive DMARC aggregate reports already sitting in the inbox
+db.exec(`
+  UPDATE admin_inbox
+  SET read = 1, archived = 1
+  WHERE archived = 0
+    AND LOWER(subject) LIKE 'report domain:%'
+    AND (LOWER(from_email) LIKE '%google%' OR LOWER(body_text) LIKE '%submitter:%')
+`)
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface InboxEmail {
@@ -100,6 +109,17 @@ function coalesce(obj: Record<string, unknown>, ...keys: string[]): string {
     if (typeof val === 'number') return String(val)
   }
   return ''
+}
+
+/**
+ * DMARC aggregate reports (rua) are routine and rarely useful — Google and other
+ * providers auto-send them daily with subjects like "Report Domain: <domain>".
+ * Auto-archive on receipt so they never populate the personal inbox.
+ */
+function isDmarcAggregateReport(fromEmail: string, fromName: string, subject: string, bodyText: string): boolean {
+  if (!/report domain:/i.test(subject)) return false
+  const blob = `${fromEmail} ${fromName} ${bodyText}`.toLowerCase()
+  return blob.includes('submitter:') || /report-id:/i.test(blob)
 }
 
 // ── Inbound webhook handler (no admin auth — called by Resend) ─────────────
@@ -179,12 +199,13 @@ export async function handleInboxWebhook(req: Request, res: Response): Promise<v
     }
   }
 
+  const archived = isDmarcAggregateReport(fromEmail, fromName, subject, bodyText) ? 1 : 0
   db.prepare(`
-    INSERT INTO admin_inbox (id, resend_email_id, from_email, from_name, to_email, subject, body_text, body_html, received_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, resendEmailId, fromEmail, fromName, toEmail, subject, bodyText, bodyHtml, receivedAt)
+    INSERT INTO admin_inbox (id, resend_email_id, from_email, from_name, to_email, subject, body_text, body_html, received_at, read, archived)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, resendEmailId, fromEmail, fromName, toEmail, subject, bodyText, bodyHtml, receivedAt, archived ? 1 : 0, archived)
 
-  console.log(`[inbox] ${fromEmail} → ${toEmail}  "${subject.slice(0, 60)}"  body=${bodyText ? `${bodyText.length} chars` : 'EMPTY'}`)
+  console.log(`[inbox] ${fromEmail} → ${toEmail}  "${subject.slice(0, 60)}"  body=${bodyText ? `${bodyText.length} chars` : 'EMPTY'}${archived ? '  DMARC auto-archived' : ''}`)
   res.json({ ok: true })
 }
 
