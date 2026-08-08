@@ -311,20 +311,6 @@ export function App() {
     scrollShellTop()
   }, [rememberJourneyPath])
 
-  const goRedeem = useCallback(() => {
-    rememberJourneyPath()
-    setScreen('redeem')
-    pushShellUrl('/redeem')
-    scrollShellTop()
-  }, [rememberJourneyPath])
-
-  const goStatsPricing = useCallback(() => {
-    rememberJourneyPath()
-    setScreen('stats-pricing')
-    pushShellUrl('/esignature-pricing')
-    scrollShellTop()
-  }, [rememberJourneyPath])
-
   const goFaq = useCallback(() => {
     rememberJourneyPath()
     setScreen('faq')
@@ -815,9 +801,6 @@ export function App() {
       </div>
 
       <footer className="lr-footer">
-        <p className="lr-footer-tagline">
-          Your wallet is your identity; the chain is the proof.
-        </p>
         <div className="lr-footer-links">
           <a
             className="lr-footer-link"
@@ -829,6 +812,17 @@ export function App() {
             <svg width="14" height="14" viewBox="0 0 1200 1227" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style={{ verticalAlign: 'middle' }}>
               <path d="M714.163 519.284L1160.89 0H1055.03L667.137 450.887L357.328 0H0L468.492 681.821L0 1226.37H105.866L515.491 750.218L842.672 1226.37H1200L714.137 519.284H714.163ZM569.165 687.828L521.697 619.934L144.011 79.6944H306.615L611.412 515.685L658.88 583.579L1055.08 1150.3H892.476L569.165 687.854V687.828Z"/>
             </svg>
+          </a>
+          <a
+            className="lr-footer-link"
+            href="https://maidensail.com/startup/verilock"
+            rel="dofollow"
+          >
+            <img
+              src="https://maidensail.com/badge/verilock.svg"
+              alt="Listed on Maidensail"
+              height="0"
+            />
           </a>
           <AppLink
             to="/security"
@@ -852,20 +846,6 @@ export function App() {
             Support
           </AppLink>
           <AppLink
-            to="/redeem"
-            className={`lr-footer-link${screen === 'redeem' ? ' lr-footer-link--active' : ''}`}
-            onClick={goRedeem}
-          >
-            Redeem code
-          </AppLink>
-          <AppLink
-            to="/esignature-pricing"
-            className={`lr-footer-link${screen === 'stats-pricing' ? ' lr-footer-link--active' : ''}`}
-            onClick={goStatsPricing}
-          >
-            Pricing Report
-          </AppLink>
-          <AppLink
             to="/faq"
             className={`lr-footer-link${screen === 'faq' ? ' lr-footer-link--active' : ''}`}
             onClick={goFaq}
@@ -881,6 +861,9 @@ export function App() {
             Offline verifier
           </a>
         </div>
+        <p className="lr-footer-tagline">
+          Your wallet is your identity; the chain is the proof.
+        </p>
       </footer>
     </div>
   )

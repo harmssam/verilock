@@ -23,9 +23,6 @@ function isKnownAppPath(path: string): boolean {
   if (/^\/v\/[^/]+\/?$/.test(path)) return true
   if (/^\/m\/sign\/[^/]+\/?$/.test(path)) return true
   if (/^\/m\/login\/[^/]+\/?$/.test(path)) return true
-  // Easter egg: only token-bearing egg URLs reach the SPA (the client enforces the
-  // token); the bare /easter-egg and guessed paths stay 404.
-  if (/^\/easter-egg\/[0-9a-f]{32}\/?$/.test(path)) return true
   return false
 }
 

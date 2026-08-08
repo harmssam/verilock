@@ -354,7 +354,7 @@ export function LandingHome({
               <span className="lr-promo-sep" aria-hidden>
                 ·
               </span>
-              <span>Lock on chain for 1 credit</span>
+              <span>Lock on blockchain for 1 credit</span>
             </p>
           </div>
           <div className="lr-hero-visual" aria-hidden>
