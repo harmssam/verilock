@@ -5,6 +5,9 @@ const HUB_RETURN_PATH_KEY = 'verilock-hub-return-path'
  */
 const PAY_RETURN_PATH_KEY = 'verilock-pay-return-path'
 
+export { isEasterEggPath } from './journey/easterEggPath'
+import { isEasterEggPath } from './journey/easterEggPath'
+
 export function saveHubReturnPath(): void {
   if (typeof window === 'undefined') return
   // Include hash when present (e.g. /pricing?pack=25#buy-credits) for same-tab restore.
@@ -227,6 +230,7 @@ export function isAdminPath(path: string): boolean {
 export function isKnownAppPath(path: string): boolean {
   if (path === '/' || path === '') return true
   if (isAgreementsPath(path)) return true
+  if (isEasterEggPath(path)) return true
   if (isPricingPath(path)) return true
   if (isPrivacyPath(path)) return true
   if (isSecurityPath(path)) return true

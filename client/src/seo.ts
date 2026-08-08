@@ -69,6 +69,12 @@ export const PAGE_META = {
     path: '/agreements',
     noindex: true,
   },
+  easterEgg: {
+    title: `Locked agreement${TITLE_SUFFIX}`,
+    description: 'A locked, view-only VeriLock agreement.',
+    path: '/easter-egg',
+    noindex: true,
+  },
   create: {
     title: `New Agreement${TITLE_SUFFIX}`,
     description: 'Fingerprint a document and start a multi-party signing workflow on VeriLock.',

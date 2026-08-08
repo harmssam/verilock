@@ -475,9 +475,15 @@ export const api = {
    * session (`docs/guest-signing-plan.md` Task 7 / API surface "Redeem document key").
    * No wallet, no `Authorization` header. Never consumes/rotates the key - safe to
    * call again from yet another device or after a prior session expired.
+   *
+   * The Easter egg key short-circuits: the server returns `{ easterEgg: true }`
+   * (no session, no document) and the client shows the dedicated egg page.
    */
   redeemDocumentKey: (body: { documentId?: string; slug?: string; documentKey: string; turnstileToken?: string }) =>
-    request<{ session: { token: string; expiresAt: number } }>(
+    request<
+      | { easterEgg: true }
+      | { session: { token: string; expiresAt: number }; documentId: string }
+    >(
       '/api/auth/guest/redeem-document-key',
       {
         method: 'POST',

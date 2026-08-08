@@ -4,9 +4,9 @@
  */
 import { BookSearch, Fingerprint, Users, type LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  isAgreementsPath,
+import { isAgreementsPath,
   isBlogPath,
+  isEasterEggPath,
   isFaqPath,
   isKnownAppPath,
   isPricingPath,
@@ -39,6 +39,8 @@ import { SupportPage } from './SupportPage'
 import { AccountMenu } from './journey/AccountMenu'
 import { AgreementsPage } from './journey/AgreementsPage'
 import { DocumentJourney } from './journey/DocumentJourney'
+import { EasterEggPage } from './journey/EasterEggPage'
+import { mintEasterEggPath } from './journey/easterEggPath'
 import { NotFoundPage } from './journey/NotFoundPage'
 import { useCreditBalance } from './journey/useCreditBalance'
 import {
@@ -110,6 +112,7 @@ type ShellScreen =
   | 'support'
   | 'redeem'
   | 'agreements'
+  | 'easter-egg'
   | 'sign-mobile'
   | 'pay-login'
   | 'stats-pricing'
@@ -127,6 +130,7 @@ function screenFromPath(pathname: string): ShellScreen {
   if (isStatsPricingPath(pathname)) return 'stats-pricing'
   if (isFaqPath(pathname)) return 'faq'
   if (isAgreementsPath(pathname)) return 'agreements'
+  if (isEasterEggPath(pathname)) return 'easter-egg'
   if (!isKnownAppPath(pathname)) return 'not-found'
   return 'journey'
 }
@@ -513,6 +517,10 @@ export function App() {
       applyPageMeta({ ...PAGE_META.agreements })
       return
     }
+    if (screen === 'easter-egg') {
+      applyPageMeta({ ...PAGE_META.easterEgg })
+      return
+    }
     if (screen === 'not-found') {
       applyPageMeta({ ...PAGE_META.notFound, path })
       return
@@ -562,7 +570,9 @@ export function App() {
         'exp-app',
         wideShell ? 'exp-app--wide' : '',
         // Home, tracks, and agreements share one desktop content width.
-        screen === 'journey' || screen === 'agreements' ? 'lr-app--landing' : '',
+        screen === 'journey' || screen === 'agreements' || screen === 'easter-egg'
+          ? 'lr-app--landing'
+          : '',
         // Pricing + Security: 960px shell (not the wider exp-app--wide content pages).
         screen === 'pricing' || screen === 'security' || screen === 'stats-pricing' ? 'lr-app--pricing' : '',
       ]
@@ -668,6 +678,7 @@ export function App() {
         screen === 'support' ||
         screen === 'redeem' ||
         screen === 'agreements' ||
+        screen === 'easter-egg' ||
         screen === 'not-found') && (
         <AppLink to="/" onClick={goJourney} className="lr-back">
           ← Back to home
@@ -721,10 +732,17 @@ export function App() {
           onConnect={connectPreservingPath}
           onSession={wallet.applySession}
           onOpen={openAgreement}
+          onOpenEasterEgg={() => {
+            const eggPath = mintEasterEggPath()
+            setScreen('easter-egg')
+            pushShellUrl(eggPath)
+            scrollShellTop()
+          }}
           onCreate={startCreate}
           onGetCredits={goPricing}
         />
       )}
+      {screen === 'easter-egg' && <EasterEggPage onHome={goJourney} />}
       {screen === 'not-found' && (
         <NotFoundPage
           path={typeof window !== 'undefined' ? window.location.pathname : null}

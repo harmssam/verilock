@@ -39,6 +39,7 @@ import {
 } from './db.js'
 import { hashInviteToken } from './documents.js'
 import {
+  EASTER_EGG_DOCUMENT_KEY_HASH,
   guestCreatorSubject,
   guestPartySubject,
   hashGuestSecret,
@@ -335,13 +336,26 @@ export function resolveViewerSubject(req: Request): string | null {
  * guest session. Idempotent: never marks/rotates/invalidates the key - see plan
  * "Redeem document key" - so re-entering the same key from a new browser/device or
  * after a session expired mid-flow always works.
+ *
+ * The Easter egg key is special-cased BEFORE any document lookup: it never touches
+ * the database, never mints a session, and never surfaces any document row - the
+ * client just gets a `easterEgg` marker and shows the egg page directly. The egg
+ * therefore exists only for whoever knows the key (no agreements-list entry, no
+ * sign/archive surface, nothing to clean up).
  */
 export function redeemDocumentKey(input: {
   documentId?: string | null
   slug?: string | null
   documentKey: string
-}): { session: { token: string; expiresAt: number } } {
+}):
+  | { easterEgg: true }
+  | { session: { token: string; expiresAt: number }; documentId: string } {
   const keyHash = Buffer.from(hashGuestSecret(input.documentKey), 'hex')
+
+  const eggHash = Buffer.from(EASTER_EGG_DOCUMENT_KEY_HASH, 'hex')
+  if (keyHash.length === eggHash.length && timingSafeEqual(keyHash, eggHash)) {
+    return { easterEgg: true }
+  }
 
   const doc =
     (input.documentId ? getDocumentById(input.documentId) : null) ??
@@ -376,7 +390,7 @@ export function redeemDocumentKey(input: {
   }
 
   const session = mintGuestSession({ documentId: doc.id, partyId: null, role: 'creator' })
-  return { session }
+  return { session, documentId: doc.id }
 }
 
 /**

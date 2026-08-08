@@ -121,6 +121,8 @@ interface AgreementsPageProps {
   onConnect: (options?: JourneyConnectRequest) => void
   onSession?: (token: string, address: string) => void
   onOpen: (doc: SealDocument, preferSeal?: boolean) => void
+  /** Easter egg: open the dedicated egg page (no document exists for it). */
+  onOpenEasterEgg: () => void
   onCreate: () => void
   /** Optional: send user to pricing when they need credits for data archive. */
   onGetCredits?: () => void
@@ -189,7 +191,13 @@ function loadTurnstileScript(): Promise<void> {
  * document key" empty state). Deliberately a small, secondary path below the
  * primary wallet login - this page's identity model stays wallet-first.
  */
-function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void }) {
+function GuestDocumentKeyEntry({
+  onOpen,
+  onOpenEasterEgg,
+}: {
+  onOpen: (doc: SealDocument) => void
+  onOpenEasterEgg: () => void
+}) {
   const [expanded, setExpanded] = useState(false)
   const [keyInput, setKeyInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -323,14 +331,21 @@ function GuestDocumentKeyEntry({ onOpen }: { onOpen: (doc: SealDocument) => void
     setBusy(true)
     setError(null)
     try {
-      const { session } = await api.redeemDocumentKey({
+      const res = await api.redeemDocumentKey({
         documentKey,
         turnstileToken: turnstileToken ?? undefined,
       })
-      // Fetch the document — server finds it by key hash, so we don't know the slug.
-      // Use the session to call me() and get the document.
-      const me = await api.me(session.token)
-      const document = me.documents[0]
+      // Easter egg: the server short-circuits this key - no session, no document.
+      // Show the dedicated egg page; nothing is ever created or listed.
+      if ('easterEgg' in res) {
+        onOpenEasterEgg()
+        return
+      }
+      const { session, documentId } = res
+      // Fetch the document directly by id — the session is bound to it. Never via
+      // the agreements list (`me()`), which hides list-invisible docs and would
+      // make this flow report "not found" for them.
+      const { document } = await api.getDocument(documentId, session.token)
       if (!document) {
         setError('No agreement found for this key.')
         return
@@ -426,6 +441,7 @@ function AgreementsLoginGate({
   onConnect,
   onSession,
   onOpen,
+  onOpenEasterEgg,
   entry,
 }: {
   connectMode: JourneyConnectMode
@@ -433,6 +449,7 @@ function AgreementsLoginGate({
   onConnect: (options?: JourneyConnectRequest) => void
   onSession?: (token: string, address: string) => void
   onOpen: (doc: SealDocument) => void
+  onOpenEasterEgg: () => void
   entry: { idle: string; busy: string }
 }) {
   const [loginOpen, setLoginOpen] = useState(false)
@@ -485,7 +502,7 @@ function AgreementsLoginGate({
           placement="inline"
         />
       )}
-      <GuestDocumentKeyEntry onOpen={onOpen} />
+      <GuestDocumentKeyEntry onOpen={onOpen} onOpenEasterEgg={onOpenEasterEgg} />
     </section>
   )
 }
@@ -498,6 +515,7 @@ export function AgreementsPage({
   onConnect,
   onSession,
   onOpen,
+  onOpenEasterEgg,
   onCreate,
   onGetCredits,
 }: AgreementsPageProps) {
@@ -1189,6 +1207,7 @@ export function AgreementsPage({
         onConnect={onConnect}
         onSession={onSession}
         onOpen={doc => onOpen(doc)}
+        onOpenEasterEgg={onOpenEasterEgg}
         entry={entry}
       />
     )
@@ -1232,7 +1251,7 @@ export function AgreementsPage({
           </div>
           {isGuest && (
             <div className="agreements-page-header-actions">
-              <GuestDocumentKeyEntry onOpen={onOpen} />
+              <GuestDocumentKeyEntry onOpen={onOpen} onOpenEasterEgg={onOpenEasterEgg} />
               <button
                 type="button"
                 className="btn btn-secondary agreements-page-clear-device"
@@ -1317,7 +1336,7 @@ export function AgreementsPage({
         <div className="agreements-page-header-actions">
           {isGuest && (
             <>
-              <GuestDocumentKeyEntry onOpen={onOpen} />
+              <GuestDocumentKeyEntry onOpen={onOpen} onOpenEasterEgg={onOpenEasterEgg} />
               <button
                 type="button"
                 className="btn btn-secondary agreements-page-clear-device"
